@@ -254,6 +254,15 @@ function App() {
     setNotice("");
   }
 
+  function handlePasswordChange(event) {
+    setForm((currentForm) => ({
+      ...currentForm,
+      password: event.target.value
+    }));
+    setError("");
+    setNotice("");
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setStatus("submitting");
@@ -633,14 +642,23 @@ function App() {
 
             {authView !== "reset" ? (
               <>
-                <label htmlFor="password">Password</label>
-                <input
-                  autoComplete={
-                    authView === "signup" ? "new-password" : "current-password"
+                <label
+                  htmlFor={
+                    authView === "login" ? "signin-passcode" : "signup-password"
                   }
-                  id="password"
-                  name="password"
-                  onChange={handleChange}
+                >
+                  Password
+                </label>
+                <input
+                  data-1p-ignore={authView === "login" ? "true" : undefined}
+                  data-lpignore={authView === "login" ? "true" : undefined}
+                  autoComplete={
+                    authView === "login" ? "one-time-code" : "new-password"
+                  }
+                  id={authView === "login" ? "signin-passcode" : "signup-password"}
+                  key={`${authView}-password`}
+                  name={authView === "login" ? "signin-passcode" : "password"}
+                  onChange={handlePasswordChange}
                   required
                   type="password"
                   value={form.password}
