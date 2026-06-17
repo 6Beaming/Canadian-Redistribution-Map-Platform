@@ -133,7 +133,8 @@ button:disabled {
 }
 
 .primary-button,
-.ghost-button {
+.ghost-button,
+.text-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -172,6 +173,27 @@ button:disabled {
   border-radius: 4px;
   color: #7b2319;
   background: #fbebe8;
+}
+
+.form-success {
+  margin: 6px 0 0;
+  border-left: 4px solid #2f6d4f;
+  padding: 10px 12px;
+  border-radius: 4px;
+  color: #23513b;
+  background: #eaf5ee;
+}
+
+.text-button {
+  min-height: 36px;
+  border: 0;
+  color: #2f6d4f;
+  background: transparent;
+}
+
+.text-button:hover:not(:disabled) {
+  color: #244f3b;
+  text-decoration: underline;
 }
 
 .dashboard-shell {

@@ -31,6 +31,12 @@ export const authApi = {
       body: JSON.stringify(credentials)
     });
   },
+  requestPasswordReset({ email }) {
+    return request("/api/auth/password-reset", {
+      method: "POST",
+      body: JSON.stringify({ email })
+    });
+  },
   logout() {
     return request("/api/auth/logout", {
       method: "POST"

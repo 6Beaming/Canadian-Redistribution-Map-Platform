@@ -48,6 +48,36 @@ router.post("/login", async (req, res, next) => {
   }
 });
 
+router.post("/password-reset", async (req, res, next) => {
+  const email =
+    typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+
+  if (!email) {
+    res.status(400).json({ error: "Email is required." });
+    return;
+  }
+
+  try {
+    const supabase = getSupabaseClient();
+    const options = process.env.PASSWORD_RESET_REDIRECT_URL
+      ? { redirectTo: process.env.PASSWORD_RESET_REDIRECT_URL }
+      : undefined;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, options);
+
+    if (error) {
+      res.status(400).json({ error: "Unable to send password reset link." });
+      return;
+    }
+
+    res.status(200).json({
+      message:
+        "If an account exists for that email, a password reset link has been sent."
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get("/me", requireAuth, (req, res) => {
   res.json({ user: publicUser(req.user) });
 });
