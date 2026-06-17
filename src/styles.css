@@ -96,8 +96,8 @@ button:disabled {
 .onboarding-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  justify-content: flex-start;
+  gap: 14px;
 }
 
 .eyebrow,
@@ -198,6 +198,22 @@ button:disabled {
 }
 
 .profile-icon-button:hover {
+  background: #edf2ee;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #b9c4bc;
+  border-radius: 50%;
+  color: #234d3a;
+  background: #ffffff;
+}
+
+.icon-button:hover:not(:disabled) {
   background: #edf2ee;
 }
 

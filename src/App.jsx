@@ -203,6 +203,7 @@ function App() {
   const [form, setForm] = useState(initialForm);
   const [profileForm, setProfileForm] = useState(initialProfileForm);
   const [authView, setAuthView] = useState("login");
+  const [pendingProfileUser, setPendingProfileUser] = useState(null);
   const [user, setUser] = useState(null);
   const [status, setStatus] = useState("checking");
   const [error, setError] = useState("");
@@ -228,19 +229,42 @@ function App() {
 
     let isMounted = true;
 
-    authApi
-      .getCurrentUser()
-      .then(({ user: currentUser }) => {
+    async function restoreSession() {
+      try {
+        const { user: currentUser } = await authApi.getCurrentUser();
+
         if (isMounted) {
           setUser(currentUser);
+          setPendingProfileUser(null);
           setStatus("signed-in");
         }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setStatus("signed-out");
+
+        return;
+      } catch {
+        // No complete app session; check for an onboarding-only session.
+      }
+
+      try {
+        const pendingResult = await authApi.getPendingProfileSession();
+
+        if (isMounted && pendingResult?.profileRequired) {
+          setUser(null);
+          setPendingProfileUser(pendingResult.user);
+          setStatus("profile-required");
+          return;
         }
-      });
+      } catch {
+        // No pending onboarding session either.
+      }
+
+      if (isMounted) {
+        setUser(null);
+        setPendingProfileUser(null);
+        setStatus("signed-out");
+      }
+    }
+
+    restoreSession();
 
     return () => {
       isMounted = false;
@@ -270,9 +294,18 @@ function App() {
     setNotice("");
 
     try {
-      const { user: signedInUser } = await authApi.login(form);
-      setUser(signedInUser);
+      const result = await authApi.login(form);
       setForm(initialForm);
+
+      if (result.profileRequired) {
+        setUser(null);
+        setPendingProfileUser(result.user);
+        setStatus("profile-required");
+        return;
+      }
+
+      setPendingProfileUser(null);
+      setUser(result.user);
       setStatus("signed-in");
     } catch (loginError) {
       setError(loginError.message);
@@ -328,12 +361,13 @@ function App() {
 
     try {
       const { user: updatedUser } = await authApi.completeProfile(profileForm);
+      setPendingProfileUser(null);
       setUser(updatedUser);
       setProfileForm(initialProfileForm);
       setStatus("signed-in");
     } catch (profileError) {
       setError(profileError.message);
-      setStatus("signed-in");
+      setStatus("profile-required");
     }
   }
 
@@ -397,6 +431,7 @@ function App() {
     try {
       await authApi.logout();
       setUser(null);
+      setPendingProfileUser(null);
       setSignedInView("dashboard");
       setStatus("signed-out");
     } catch (logoutError) {
@@ -417,25 +452,26 @@ function App() {
     );
   }
 
-  if (user && !user.profileComplete) {
+  if (pendingProfileUser && status === "profile-required") {
     return (
       <main className="auth-shell">
         <section className="auth-layout" aria-label="Complete profile">
           <div className="login-panel">
             <div className="onboarding-header">
+              <button
+                aria-label="Back to sign in"
+                className="icon-button"
+                onClick={handleLogout}
+                disabled={status === "submitting"}
+                type="button"
+              >
+                <ArrowLeft aria-hidden="true" size={22} />
+              </button>
               <div className="brand-lockup">
                 <div>
                   <h1>Complete Profile</h1>
                 </div>
               </div>
-              <button
-                className="text-button"
-                onClick={handleLogout}
-                disabled={status === "submitting"}
-                type="button"
-              >
-                Sign out
-              </button>
             </div>
 
             <form className="login-form" onSubmit={handleCompleteProfile}>

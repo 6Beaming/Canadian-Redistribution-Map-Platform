@@ -25,6 +25,9 @@ export const authApi = {
   getCurrentUser() {
     return request("/api/auth/me");
   },
+  getPendingProfileSession() {
+    return request("/api/auth/profile-session");
+  },
   login(credentials) {
     return request("/api/auth/login", {
       method: "POST",

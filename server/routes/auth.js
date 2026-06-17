@@ -1,10 +1,19 @@
 import { Router } from "express";
-import { clearSessionCookies, setSessionCookies } from "../lib/cookies.js";
+import {
+  clearAuthenticatedSessionCookies,
+  clearPendingSessionCookies,
+  clearSessionCookies,
+  setPendingSessionCookies,
+  setSessionCookies
+} from "../lib/cookies.js";
 import {
   getSupabaseClient,
   updateSupabaseUserMetadata
 } from "../lib/supabase.js";
-import { requireAuth } from "../middleware/requireAuth.js";
+import {
+  requireAuth,
+  requirePendingProfileAuth
+} from "../middleware/requireAuth.js";
 
 const router = Router();
 
@@ -137,8 +146,18 @@ router.post("/login", async (req, res, next) => {
       return;
     }
 
+    const user = publicUser(data.user);
+
+    if (!user.profileComplete) {
+      clearAuthenticatedSessionCookies(res);
+      setPendingSessionCookies(res, data.session);
+      res.status(200).json({ profileRequired: true, user });
+      return;
+    }
+
+    clearPendingSessionCookies(res);
     setSessionCookies(res, data.session);
-    res.status(200).json({ user: publicUser(data.user) });
+    res.status(200).json({ user });
   } catch (error) {
     next(error);
   }
@@ -191,7 +210,24 @@ router.post("/signup", async (req, res, next) => {
   }
 });
 
-router.post("/profile", requireAuth, async (req, res, next) => {
+router.get("/profile-session", requirePendingProfileAuth, (req, res) => {
+  const user = publicUser(req.user);
+
+  if (user.profileComplete) {
+    clearPendingSessionCookies(res);
+    setSessionCookies(res, {
+      access_token: req.accessToken,
+      expires_in: 3600,
+      refresh_token: req.refreshToken
+    });
+    res.json({ user });
+    return;
+  }
+
+  res.json({ profileRequired: true, user });
+});
+
+router.post("/profile", requirePendingProfileAuth, async (req, res, next) => {
   const validation = validatePublicProfile(req.body);
 
   if (validation.error) {
@@ -216,7 +252,15 @@ router.post("/profile", requireAuth, async (req, res, next) => {
       sin
     });
 
-    res.status(200).json({ user: publicUser(updated.user || updated) });
+    const user = publicUser(updated.user || updated);
+
+    clearPendingSessionCookies(res);
+    setSessionCookies(res, {
+      access_token: req.accessToken,
+      expires_in: 3600,
+      refresh_token: req.refreshToken
+    });
+    res.status(200).json({ user });
   } catch (error) {
     next(error);
   }
