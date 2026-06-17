@@ -18,3 +18,12 @@ Regular citizens use the platform to engage with the redistribution process.
 The backend dashboard is strictly for the independent boundary commissioners tasked with reviewing the maps. 
 * **Structure:** There are 10 separate commissions (one for each of the 10 provinces), with each team consisting of 3 to 5 commissioners. 
 * **Workflow:** These officials log into the private dashboard to read, categorize, and analyze all public complaints and counter-proposals.
+
+## Team information
+| Team member | Student # | Email |
+| :--- | :--- | :--- |
+| Eric Liu | 1011195939 | ericb.liu@mail.utoronto.ca |
+| Erfang Yuan | 1011400360 | erfang.yuan@mail.utoronto.ca |
+| Alex Xu | 1010244264 | alexxx.xu@mail.utoronto.ca |
+| Muhammad Hamza | 1011333709 | maza.hamza@mail.utoronto.ca |
+| Arvindh Sengu | 1010396947 | arvindh.sengu@mail.utoronto.ca |
