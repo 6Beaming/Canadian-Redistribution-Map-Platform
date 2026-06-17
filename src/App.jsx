@@ -17,10 +17,35 @@ const initialForm = {
   confirmPassword: ""
 };
 
+const initialProfileForm = {
+  firstName: "",
+  lastName: "",
+  province: "",
+  postalCode: "",
+  sin: "",
+  dob: ""
+};
+
 const initialPasswordResetForm = {
   password: "",
   confirmPassword: ""
 };
+
+const provinces = [
+  ["AB", "Alberta"],
+  ["BC", "British Columbia"],
+  ["MB", "Manitoba"],
+  ["NB", "New Brunswick"],
+  ["NL", "Newfoundland and Labrador"],
+  ["NS", "Nova Scotia"],
+  ["NT", "Northwest Territories"],
+  ["NU", "Nunavut"],
+  ["ON", "Ontario"],
+  ["PE", "Prince Edward Island"],
+  ["QC", "Quebec"],
+  ["SK", "Saskatchewan"],
+  ["YT", "Yukon"]
+];
 
 function ResetPasswordView() {
   const [form, setForm] = useState(initialPasswordResetForm);
@@ -176,6 +201,7 @@ function ResetPasswordView() {
 
 function App() {
   const [form, setForm] = useState(initialForm);
+  const [profileForm, setProfileForm] = useState(initialProfileForm);
   const [authView, setAuthView] = useState("login");
   const [user, setUser] = useState(null);
   const [status, setStatus] = useState("checking");
@@ -278,6 +304,30 @@ function App() {
     }
   }
 
+  function handleProfileChange(event) {
+    const { name, value } = event.target;
+    setProfileForm((currentForm) => ({ ...currentForm, [name]: value }));
+    setError("");
+    setNotice("");
+  }
+
+  async function handleCompleteProfile(event) {
+    event.preventDefault();
+    setStatus("submitting");
+    setError("");
+    setNotice("");
+
+    try {
+      const { user: updatedUser } = await authApi.completeProfile(profileForm);
+      setUser(updatedUser);
+      setProfileForm(initialProfileForm);
+      setStatus("signed-in");
+    } catch (profileError) {
+      setError(profileError.message);
+      setStatus("signed-in");
+    }
+  }
+
   async function handlePasswordReset(event) {
     event.preventDefault();
     setStatus("submitting");
@@ -354,6 +404,132 @@ function App() {
     return (
       <main className="screen-center">
         <div className="loading-mark" aria-label="Loading session" />
+      </main>
+    );
+  }
+
+  if (user && !user.profileComplete) {
+    return (
+      <main className="auth-shell">
+        <section className="auth-layout" aria-label="Complete profile">
+          <div className="login-panel">
+            <div className="onboarding-header">
+              <div className="brand-lockup">
+                <div>
+                  <h1>Complete Profile</h1>
+                </div>
+              </div>
+              <button
+                className="text-button"
+                onClick={handleLogout}
+                disabled={status === "submitting"}
+                type="button"
+              >
+                Sign out
+              </button>
+            </div>
+
+            <form className="login-form" onSubmit={handleCompleteProfile}>
+              <div className="form-row">
+                <div>
+                  <label htmlFor="firstName">First Name</label>
+                  <input
+                    autoComplete="given-name"
+                    id="firstName"
+                    name="firstName"
+                    onChange={handleProfileChange}
+                    required
+                    type="text"
+                    value={profileForm.firstName}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="lastName">Last Name</label>
+                  <input
+                    autoComplete="family-name"
+                    id="lastName"
+                    name="lastName"
+                    onChange={handleProfileChange}
+                    required
+                    type="text"
+                    value={profileForm.lastName}
+                  />
+                </div>
+              </div>
+
+              <label htmlFor="province">Province</label>
+              <select
+                autoComplete="address-level1"
+                id="province"
+                name="province"
+                onChange={handleProfileChange}
+                required
+                value={profileForm.province}
+              >
+                <option value="">Select province or territory</option>
+                {provinces.map(([code, name]) => (
+                  <option key={code} value={code}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+
+              <div className="form-row">
+                <div>
+                  <label htmlFor="postalCode">Postal Code</label>
+                  <input
+                    autoComplete="postal-code"
+                    id="postalCode"
+                    name="postalCode"
+                    onChange={handleProfileChange}
+                    placeholder="A1A 1A1"
+                    required
+                    type="text"
+                    value={profileForm.postalCode}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="dob">Date of Birth</label>
+                  <input
+                    autoComplete="bday"
+                    id="dob"
+                    name="dob"
+                    onChange={handleProfileChange}
+                    required
+                    type="date"
+                    value={profileForm.dob}
+                  />
+                </div>
+              </div>
+
+              <label htmlFor="sin">SIN</label>
+              <input
+                autoComplete="off"
+                id="sin"
+                inputMode="numeric"
+                name="sin"
+                onChange={handleProfileChange}
+                pattern="[0-9 -]{9,11}"
+                required
+                type="password"
+                value={profileForm.sin}
+              />
+
+              {error ? <p className="form-error">{error}</p> : null}
+
+              <button
+                className="primary-button"
+                disabled={status === "submitting"}
+                type="submit"
+              >
+                <ShieldCheck aria-hidden="true" size={19} />
+                <span>
+                  {status === "submitting" ? "Saving profile" : "Continue"}
+                </span>
+              </button>
+            </form>
+          </div>
+        </section>
       </main>
     );
   }
@@ -478,21 +654,20 @@ function App() {
                     Forgot password?
                   </button>
                 ) : null}
-              </>
-            ) : null}
-
-            {authView === "signup" ? (
-              <>
-                <label htmlFor="confirmPassword">Confirm Password</label>
-                <input
-                  autoComplete="new-password"
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  onChange={handleChange}
-                  required
-                  type="password"
-                  value={form.confirmPassword}
-                />
+                {authView === "signup" ? (
+                  <>
+                    <label htmlFor="confirmPassword">Confirm Password</label>
+                    <input
+                      autoComplete="new-password"
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      onChange={handleChange}
+                      required
+                      type="password"
+                      value={form.confirmPassword}
+                    />
+                  </>
+                ) : null}
               </>
             ) : null}
 

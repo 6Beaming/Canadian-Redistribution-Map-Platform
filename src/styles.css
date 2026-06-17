@@ -20,7 +20,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -92,6 +93,13 @@ button:disabled {
   gap: 14px;
 }
 
+.onboarding-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .eyebrow,
 .panel-label {
   margin: 0 0 2px;
@@ -114,7 +122,8 @@ button:disabled {
   font-weight: 700;
 }
 
-.login-form input {
+.login-form input,
+.login-form select {
   width: 100%;
   min-height: 46px;
   border: 1px solid #b9c4bc;
@@ -124,10 +133,22 @@ button:disabled {
   background: #ffffff;
 }
 
-.login-form input:focus {
+.login-form input:focus,
+.login-form select:focus {
   border-color: #2f6d4f;
   box-shadow: 0 0 0 3px rgba(47, 109, 79, 0.18);
   outline: none;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.form-row > div {
+  display: grid;
+  gap: 10px;
 }
 
 .primary-button,
@@ -333,6 +354,10 @@ button:disabled {
   .profile-page {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
   }
 
   .sign-out-button {

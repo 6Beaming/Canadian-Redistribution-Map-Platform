@@ -1,20 +1,116 @@
 import { Router } from "express";
 import { clearSessionCookies, setSessionCookies } from "../lib/cookies.js";
-import { getSupabaseClient } from "../lib/supabase.js";
+import {
+  getSupabaseClient,
+  updateSupabaseUserMetadata
+} from "../lib/supabase.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 
 const router = Router();
 
+const VALID_PROVINCES = new Set([
+  "AB",
+  "BC",
+  "MB",
+  "NB",
+  "NL",
+  "NS",
+  "NT",
+  "NU",
+  "ON",
+  "PE",
+  "QC",
+  "SK",
+  "YT"
+]);
+
+function requiredString(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizePostalCode(value) {
+  return requiredString(value).toUpperCase().replace(/\s+/g, "");
+}
+
+function normalizeSin(value) {
+  return requiredString(value).replace(/\D/g, "");
+}
+
+function isValidDate(value) {
+  const date = new Date(value);
+  return value && !Number.isNaN(date.getTime()) && date <= new Date();
+}
+
+function validatePublicProfile(body) {
+  const firstName = requiredString(body?.firstName);
+  const lastName = requiredString(body?.lastName);
+  const province = requiredString(body?.province).toUpperCase();
+  const postalCode = normalizePostalCode(body?.postalCode);
+  const sin = normalizeSin(body?.sin);
+  const dob = requiredString(body?.dob);
+
+  if (!firstName || !lastName || !province || !postalCode || !sin || !dob) {
+    return { error: "All profile fields are required." };
+  }
+
+  if (!VALID_PROVINCES.has(province)) {
+    return { error: "Select a valid province or territory." };
+  }
+
+  if (
+    !/^[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z]\d[ABCEGHJ-NPRSTV-Z]\d$/.test(
+      postalCode
+    )
+  ) {
+    return { error: "Enter a valid Canadian postal code." };
+  }
+
+  if (!/^\d{9}$/.test(sin)) {
+    return { error: "SIN must contain 9 digits." };
+  }
+
+  if (!isValidDate(dob)) {
+    return { error: "Enter a valid date of birth." };
+  }
+
+  return {
+    profile: {
+      dob,
+      firstName,
+      lastName,
+      postalCode: `${postalCode.slice(0, 3)} ${postalCode.slice(3)}`,
+      province,
+      sin
+    }
+  };
+}
+
+function isPublicProfileComplete(metadata = {}) {
+  return Boolean(
+    metadata.first_name &&
+      metadata.last_name &&
+      metadata.province &&
+      metadata.postal_code &&
+      metadata.sin &&
+      metadata.dob
+  );
+}
+
 function publicUser(user) {
+  const metadata = user.user_metadata || {};
+  const role =
+    user.app_metadata?.role ||
+    metadata.role ||
+    user.app_metadata?.user_role ||
+    "public_user";
+
   return {
     id: user.id,
     email: user.email,
-    name: user.user_metadata?.full_name || user.user_metadata?.name || null,
-    role:
-      user.app_metadata?.role ||
-      user.user_metadata?.role ||
-      user.app_metadata?.user_role ||
-      "user"
+    name: metadata.full_name || metadata.name || null,
+    profileComplete:
+      role === "public_user" ? isPublicProfileComplete(metadata) : true,
+    role
   };
 }
 
@@ -71,7 +167,14 @@ router.post("/signup", async (req, res, next) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: emailRedirectTo ? { emailRedirectTo } : undefined
+      options: {
+        ...(emailRedirectTo ? { emailRedirectTo } : {}),
+        data: {
+          account_created_at: new Date().toISOString(),
+          profile_complete: false,
+          role: "public_user",
+        }
+      }
     });
 
     if (error) {
@@ -83,6 +186,37 @@ router.post("/signup", async (req, res, next) => {
       message:
         "Account created. Check your email to validate your address before signing in."
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/profile", requireAuth, async (req, res, next) => {
+  const validation = validatePublicProfile(req.body);
+
+  if (validation.error) {
+    res.status(400).json({ error: validation.error });
+    return;
+  }
+
+  try {
+    const { dob, firstName, lastName, postalCode, province, sin } =
+      validation.profile;
+    const updated = await updateSupabaseUserMetadata(req.accessToken, {
+      ...(req.user.user_metadata || {}),
+      dob,
+      first_name: firstName,
+      full_name: `${firstName} ${lastName}`,
+      last_name: lastName,
+      postal_code: postalCode,
+      profile_complete: true,
+      profile_completed_at: new Date().toISOString(),
+      province,
+      role: req.user.user_metadata?.role || "public_user",
+      sin
+    });
+
+    res.status(200).json({ user: publicUser(updated.user || updated) });
   } catch (error) {
     next(error);
   }

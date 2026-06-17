@@ -2,11 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 
 let supabaseClient;
 
-export function getSupabaseClient() {
-  if (supabaseClient) {
-    return supabaseClient;
-  }
-
+function getSupabaseConfig() {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey =
     process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
@@ -17,6 +13,16 @@ export function getSupabaseClient() {
     );
   }
 
+  return { supabaseKey, supabaseUrl };
+}
+
+export function getSupabaseClient() {
+  if (supabaseClient) {
+    return supabaseClient;
+  }
+
+  const { supabaseKey, supabaseUrl } = getSupabaseConfig();
+
   supabaseClient = createClient(supabaseUrl, supabaseKey, {
     auth: {
       autoRefreshToken: false,
@@ -26,4 +32,25 @@ export function getSupabaseClient() {
   });
 
   return supabaseClient;
+}
+
+export async function updateSupabaseUserMetadata(accessToken, metadata) {
+  const { supabaseKey, supabaseUrl } = getSupabaseConfig();
+  const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    method: "PUT",
+    headers: {
+      apikey: supabaseKey,
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ data: metadata })
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.msg || data.error_description || data.error || "Unable to update user profile.");
+  }
+
+  return data;
 }

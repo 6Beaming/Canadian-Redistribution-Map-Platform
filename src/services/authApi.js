@@ -37,6 +37,12 @@ export const authApi = {
       body: JSON.stringify({ email, password })
     });
   },
+  completeProfile(profile) {
+    return request("/api/auth/profile", {
+      method: "POST",
+      body: JSON.stringify(profile)
+    });
+  },
   requestPasswordReset({ email }) {
     return request("/api/auth/password-reset", {
       method: "POST",

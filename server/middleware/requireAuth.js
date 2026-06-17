@@ -23,6 +23,7 @@ export async function requireAuth(req, res, next) {
     const { data, error } = await supabase.auth.getUser(accessToken);
 
     if (!error && data?.user) {
+      req.accessToken = accessToken;
       req.user = data.user;
       next();
       return;
@@ -36,6 +37,7 @@ export async function requireAuth(req, res, next) {
 
     if (!error && data?.session?.access_token && data?.user) {
       setSessionCookies(res, data.session);
+      req.accessToken = data.session.access_token;
       req.user = data.user;
       next();
       return;

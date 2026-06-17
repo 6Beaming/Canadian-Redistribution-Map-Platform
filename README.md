@@ -34,7 +34,7 @@ This project is built using the following technologies:
    ```bash
    npm install
    ```
-2. Copy `.env.example` to `.env` and set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SIGNUP_EMAIL_REDIRECT_URL`, and `PASSWORD_RESET_REDIRECT_URL`.
+2. Copy `.env.example` to `.env` and set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `SIGNUP_EMAIL_REDIRECT_URL`, and `PASSWORD_RESET_REDIRECT_URL`.
 3. Start the React frontend and Express backend:
    ```bash
    npm run dev
