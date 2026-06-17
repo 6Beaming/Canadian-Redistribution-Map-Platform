@@ -28,6 +28,20 @@ This project is built using the following technologies:
 * **Database:** Supabase *(An open-source Firebase alternative providing our <b>PostgreSQL</b> database, authentication, and instant APIs)*
 * **Testing:** Jest, Cypress
 
+## Local Development
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Copy `.env.example` to `.env` and set `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
+3. Start the React frontend and Express backend:
+   ```bash
+   npm run dev
+   ```
+
+The login flow uses Supabase Auth for existing email/password users. The Express backend sets HttpOnly session cookies after a successful login, and the React frontend checks `/api/auth/me` to restore the signed-in user without storing tokens in browser JavaScript.
+
 ## Team information
 | Team member | Student # | Email |
 | :--- | :--- | :--- |
