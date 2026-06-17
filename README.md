@@ -41,6 +41,7 @@ This project is built using the following technologies:
    ```
 
 ## Team information
+**Team Name:** Five Guys
 | Team member | Student # | Email |
 | :--- | :--- | :--- |
 | Eric Liu | 1011195939 | ericb.liu@mail.utoronto.ca |
