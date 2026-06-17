@@ -71,8 +71,7 @@ button:disabled {
 }
 
 .login-panel,
-.profile-panel,
-.status-panel {
+.profile-page {
   padding: 32px;
 }
 
@@ -83,8 +82,7 @@ button:disabled {
 }
 
 .brand-lockup h1,
-.profile-panel h2,
-.status-panel h2 {
+.profile-page h2 {
   margin: 0;
 }
 
@@ -166,6 +164,22 @@ button:disabled {
   background: #edf2ee;
 }
 
+.profile-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border: 1px solid #b9c4bc;
+  border-radius: 50%;
+  color: #234d3a;
+  background: #ffffff;
+}
+
+.profile-icon-button:hover {
+  background: #edf2ee;
+}
+
 .form-error {
   margin: 6px 0 0;
   border-left: 4px solid #bf3f2f;
@@ -239,27 +253,27 @@ button:disabled {
   padding: 18px 0 26px;
 }
 
-.workspace-grid {
-  display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr);
-  gap: 18px;
+.dashboard-empty,
+.profile-page {
   width: min(100%, 1120px);
   margin: 0 auto;
 }
 
-.profile-panel,
-.status-panel {
+.dashboard-empty {
+  min-height: 360px;
+}
+
+.profile-page {
   display: flex;
   align-items: center;
   gap: 18px;
-  min-height: 190px;
+  min-height: 220px;
   border: 1px solid #d8ded6;
   border-radius: 8px;
   background: #ffffff;
 }
 
-.profile-panel p,
-.status-panel p {
+.profile-page p {
   margin: 4px 0 0;
   color: #526157;
 }
@@ -291,13 +305,8 @@ button:disabled {
   font-weight: 800;
 }
 
-.status-panel {
-  color: #17201a;
-}
-
-.status-panel svg {
-  flex: 0 0 auto;
-  color: #2f6d4f;
+.sign-out-button {
+  margin-left: auto;
 }
 
 @keyframes spin {
@@ -312,22 +321,21 @@ button:disabled {
     padding: 18px;
   }
 
-  .workspace-grid {
-    grid-template-columns: 1fr;
-  }
-
   .auth-layout {
     min-height: auto;
   }
 
   .dashboard-header {
+    align-items: center;
+    flex-direction: row;
+  }
+
+  .profile-page {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .profile-panel,
-  .status-panel {
-    align-items: flex-start;
-    flex-direction: column;
+  .sign-out-button {
+    margin-left: 0;
   }
 }

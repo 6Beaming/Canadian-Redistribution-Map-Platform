@@ -1,4 +1,12 @@
-import { LogIn, LogOut, Mail, ShieldCheck, UserPlus } from "lucide-react";
+import {
+  ArrowLeft,
+  LogIn,
+  LogOut,
+  Mail,
+  ShieldCheck,
+  UserCircle,
+  UserPlus
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { authApi } from "./services/authApi.js";
 import { getPasswordRecoveryClient } from "./services/passwordRecoveryClient.js";
@@ -173,6 +181,7 @@ function App() {
   const [status, setStatus] = useState("checking");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [signedInView, setSignedInView] = useState("dashboard");
   const isPasswordRecoveryRoute = window.location.pathname === "/reset-password";
 
   const initials = useMemo(() => {
@@ -329,6 +338,7 @@ function App() {
     try {
       await authApi.logout();
       setUser(null);
+      setSignedInView("dashboard");
       setStatus("signed-out");
     } catch (logoutError) {
       setError(logoutError.message);
@@ -354,23 +364,32 @@ function App() {
         <header className="dashboard-header">
           <div className="brand-lockup">
             <div>
-              <p className="eyebrow">CRMP</p>
-              <h1>Commissioner Dashboard</h1>
+              <h1>{signedInView === "profile" ? "Profile" : "Dashboard"}</h1>
             </div>
           </div>
-          <button
-            className="ghost-button"
-            onClick={handleLogout}
-            disabled={status === "submitting"}
-            type="button"
-          >
-            <LogOut aria-hidden="true" size={18} />
-            <span>{status === "submitting" ? "Signing out" : "Sign out"}</span>
-          </button>
+          {signedInView === "profile" ? (
+            <button
+              className="ghost-button"
+              onClick={() => setSignedInView("dashboard")}
+              type="button"
+            >
+              <ArrowLeft aria-hidden="true" size={18} />
+              <span>Dashboard</span>
+            </button>
+          ) : (
+            <button
+              aria-label="Open profile"
+              className="profile-icon-button"
+              onClick={() => setSignedInView("profile")}
+              type="button"
+            >
+              <UserCircle aria-hidden="true" size={34} />
+            </button>
+          )}
         </header>
 
-        <section className="workspace-grid" aria-label="Dashboard">
-          <div className="profile-panel">
+        {signedInView === "profile" ? (
+          <section className="profile-page" aria-label="Profile">
             <div className="avatar" aria-hidden="true">
               {initials || "C"}
             </div>
@@ -380,17 +399,19 @@ function App() {
               <p>{user.email}</p>
               <span className="role-pill">{user.role}</span>
             </div>
-          </div>
-
-          <div className="status-panel">
-            <ShieldCheck aria-hidden="true" size={28} />
-            <div>
-              <p className="panel-label">Session</p>
-              <h2>Authenticated</h2>
-              <p>Protected API calls can now use the HttpOnly session cookie.</p>
-            </div>
-          </div>
-        </section>
+            <button
+              className="ghost-button sign-out-button"
+              onClick={handleLogout}
+              disabled={status === "submitting"}
+              type="button"
+            >
+              <LogOut aria-hidden="true" size={18} />
+              <span>{status === "submitting" ? "Signing out" : "Sign out"}</span>
+            </button>
+          </section>
+        ) : (
+          <section className="dashboard-empty" aria-label="Dashboard" />
+        )}
 
         {error ? <p className="form-error">{error}</p> : null}
       </main>
