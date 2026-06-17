@@ -1,11 +1,12 @@
-import { LogIn, LogOut, Mail, ShieldCheck } from "lucide-react";
+import { LogIn, LogOut, Mail, ShieldCheck, UserPlus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { authApi } from "./services/authApi.js";
 import { getPasswordRecoveryClient } from "./services/passwordRecoveryClient.js";
 
 const initialForm = {
   email: "",
-  password: ""
+  password: "",
+  confirmPassword: ""
 };
 
 const initialPasswordResetForm = {
@@ -235,6 +236,39 @@ function App() {
     }
   }
 
+  async function handleSignup(event) {
+    event.preventDefault();
+    setStatus("submitting");
+    setError("");
+    setNotice("");
+
+    if (form.password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      setStatus("signed-out");
+      return;
+    }
+
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match.");
+      setStatus("signed-out");
+      return;
+    }
+
+    try {
+      const { message } = await authApi.signup({
+        email: form.email,
+        password: form.password
+      });
+
+      setForm(initialForm);
+      setNotice(message);
+      setStatus("signed-out");
+    } catch (signupError) {
+      setError(signupError.message);
+      setStatus("signed-out");
+    }
+  }
+
   async function handlePasswordReset(event) {
     event.preventDefault();
     setStatus("submitting");
@@ -256,13 +290,33 @@ function App() {
 
   function showResetForm() {
     setAuthView("reset");
-    setForm((currentForm) => ({ ...currentForm, password: "" }));
+    setForm((currentForm) => ({
+      ...currentForm,
+      password: "",
+      confirmPassword: ""
+    }));
+    setError("");
+    setNotice("");
+  }
+
+  function showSignupForm() {
+    setAuthView("signup");
+    setForm((currentForm) => ({
+      ...currentForm,
+      password: "",
+      confirmPassword: ""
+    }));
     setError("");
     setNotice("");
   }
 
   function showLoginForm() {
     setAuthView("login");
+    setForm((currentForm) => ({
+      ...currentForm,
+      password: "",
+      confirmPassword: ""
+    }));
     setError("");
     setNotice("");
   }
@@ -349,13 +403,25 @@ function App() {
         <div className="login-panel">
           <div className="brand-lockup">
             <div>
-              <h1>{authView === "reset" ? "Reset Password" : "Sign In"}</h1>
+              <h1>
+                {authView === "reset"
+                  ? "Reset Password"
+                  : authView === "signup"
+                    ? "Sign Up"
+                    : "Sign In"}
+              </h1>
             </div>
           </div>
 
           <form
             className="login-form"
-            onSubmit={authView === "reset" ? handlePasswordReset : handleSubmit}
+            onSubmit={
+              authView === "reset"
+                ? handlePasswordReset
+                : authView === "signup"
+                  ? handleSignup
+                  : handleSubmit
+            }
           >
             <label htmlFor="email">Email</label>
             <input
@@ -368,17 +434,43 @@ function App() {
               value={form.email}
             />
 
-            {authView === "login" ? (
+            {authView !== "reset" ? (
               <>
                 <label htmlFor="password">Password</label>
                 <input
-                  autoComplete="current-password"
+                  autoComplete={
+                    authView === "signup" ? "new-password" : "current-password"
+                  }
                   id="password"
                   name="password"
                   onChange={handleChange}
                   required
                   type="password"
                   value={form.password}
+                />
+                {authView === "login" ? (
+                  <button
+                    className="inline-text-button forgot-password-button"
+                    onClick={showResetForm}
+                    type="button"
+                  >
+                    Forgot password?
+                  </button>
+                ) : null}
+              </>
+            ) : null}
+
+            {authView === "signup" ? (
+              <>
+                <label htmlFor="confirmPassword">Confirm Password</label>
+                <input
+                  autoComplete="new-password"
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  onChange={handleChange}
+                  required
+                  type="password"
+                  value={form.confirmPassword}
                 />
               </>
             ) : null}
@@ -393,6 +485,8 @@ function App() {
             >
               {authView === "reset" ? (
                 <Mail aria-hidden="true" size={19} />
+              ) : authView === "signup" ? (
+                <UserPlus aria-hidden="true" size={19} />
               ) : (
                 <LogIn aria-hidden="true" size={19} />
               )}
@@ -401,6 +495,10 @@ function App() {
                   ? status === "submitting"
                     ? "Sending link"
                     : "Send reset link"
+                  : authView === "signup"
+                    ? status === "submitting"
+                      ? "Creating account"
+                      : "Sign up"
                   : status === "submitting"
                     ? "Signing in"
                     : "Sign in"}
@@ -408,13 +506,16 @@ function App() {
             </button>
 
             {authView === "login" ? (
-              <button
-                className="text-button"
-                onClick={showResetForm}
-                type="button"
-              >
-                Forgot password?
-              </button>
+              <p className="auth-prompt">
+                <span>New user?</span>
+                <button
+                  className="inline-text-button"
+                  onClick={showSignupForm}
+                  type="button"
+                >
+                  Create an account
+                </button>
+              </p>
             ) : (
               <button
                 className="text-button"

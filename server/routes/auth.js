@@ -48,6 +48,46 @@ router.post("/login", async (req, res, next) => {
   }
 });
 
+router.post("/signup", async (req, res, next) => {
+  const email =
+    typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+  const password =
+    typeof req.body?.password === "string" ? req.body.password : "";
+
+  if (!email || !password) {
+    res.status(400).json({ error: "Email and password are required." });
+    return;
+  }
+
+  if (password.length < 8) {
+    res.status(400).json({ error: "Password must be at least 8 characters." });
+    return;
+  }
+
+  try {
+    const supabase = getSupabaseClient();
+    const emailRedirectTo =
+      process.env.SIGNUP_EMAIL_REDIRECT_URL || process.env.CLIENT_ORIGIN;
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: emailRedirectTo ? { emailRedirectTo } : undefined
+    });
+
+    if (error) {
+      res.status(400).json({ error: "Unable to create account." });
+      return;
+    }
+
+    res.status(201).json({
+      message:
+        "Account created. Check your email to validate your address before signing in."
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post("/password-reset", async (req, res, next) => {
   const email =
     typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";

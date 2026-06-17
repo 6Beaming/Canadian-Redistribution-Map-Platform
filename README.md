@@ -34,13 +34,13 @@ This project is built using the following technologies:
    ```bash
    npm install
    ```
-2. Copy `.env.example` to `.env` and set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `PASSWORD_RESET_REDIRECT_URL`.
+2. Copy `.env.example` to `.env` and set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SIGNUP_EMAIL_REDIRECT_URL`, and `PASSWORD_RESET_REDIRECT_URL`.
 3. Start the React frontend and Express backend:
    ```bash
    npm run dev
    ```
 
-The login flow uses Supabase Auth for existing email/password users. The Express backend sets HttpOnly session cookies after a successful login, and the React frontend checks `/api/auth/me` to restore the signed-in user without storing tokens in browser JavaScript. Users can also request a password reset link from the sign-in screen, which Supabase sends to the registered email address. After opening the email link, the `/reset-password` screen lets the user save a new password.
+The login flow uses Supabase Auth for existing email/password users. The Express backend sets HttpOnly session cookies after a successful login, and the React frontend checks `/api/auth/me` to restore the signed-in user without storing tokens in browser JavaScript. New users can create an account from the sign-in screen and must validate their email through the confirmation link sent by Supabase. Users can also request a password reset link from the sign-in screen, which Supabase sends to the registered email address. After opening the email link, the `/reset-password` screen lets the user save a new password.
 
 ## Team information
 | Team member | Student # | Email |

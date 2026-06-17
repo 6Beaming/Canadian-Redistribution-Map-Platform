@@ -196,6 +196,35 @@ button:disabled {
   text-decoration: underline;
 }
 
+.inline-text-button {
+  display: inline;
+  min-height: auto;
+  border: 0;
+  padding: 0;
+  color: #2f6d4f;
+  background: transparent;
+  font-weight: 800;
+}
+
+.inline-text-button:hover:not(:disabled) {
+  color: #244f3b;
+  text-decoration: underline;
+}
+
+.forgot-password-button {
+  justify-self: end;
+  margin-top: -2px;
+}
+
+.auth-prompt {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  color: #526157;
+  font-weight: 700;
+}
+
 .dashboard-shell {
   padding: 28px;
 }
