@@ -19,6 +19,15 @@ The backend dashboard is strictly for the independent boundary commissioners tas
 * **Structure:** There are 10 separate commissions (one for each of the 10 provinces), with each team consisting of 3 to 5 commissioners. 
 * **Workflow:** These officials log into the private dashboard to read, categorize, and analyze all public complaints and counter-proposals.
 
+## Tech Stack
+
+This project is built using the following technologies:
+
+* **Front-end:** React, D3.js
+* **Back-end:** Express.js
+* **Database:** Supabase *(An open-source Firebase alternative providing our <b>PostgreSQL</b> database, authentication, and instant APIs)*
+* **Testing:** Jest, Cypress
+
 ## Team information
 | Team member | Student # | Email |
 | :--- | :--- | :--- |
