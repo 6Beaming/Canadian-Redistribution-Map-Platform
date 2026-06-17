@@ -8,13 +8,15 @@ export function getPasswordRecoveryClient() {
   }
 
   const url = import.meta.env.VITE_SUPABASE_URL;
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const publishableKey =
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-  if (!url || !anonKey) {
+  if (!url || !publishableKey) {
     throw new Error("Password reset is not configured for this environment.");
   }
 
-  passwordRecoveryClient = createClient(url, anonKey, {
+  passwordRecoveryClient = createClient(url, publishableKey, {
     auth: {
       autoRefreshToken: false,
       detectSessionInUrl: true,

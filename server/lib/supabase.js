@@ -7,15 +7,17 @@ export function getSupabaseClient() {
     return supabaseClient;
   }
 
-  const { SUPABASE_URL, SUPABASE_ANON_KEY } = process.env;
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey =
+    process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
 
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  if (!supabaseUrl || !supabaseKey) {
     throw new Error(
-      "Missing SUPABASE_URL or SUPABASE_ANON_KEY in the environment."
+      "Missing SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in the environment."
     );
   }
 
-  supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  supabaseClient = createClient(supabaseUrl, supabaseKey, {
     auth: {
       autoRefreshToken: false,
       detectSessionInUrl: false,

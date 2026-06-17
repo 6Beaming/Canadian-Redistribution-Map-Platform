@@ -40,8 +40,6 @@ This project is built using the following technologies:
    npm run dev
    ```
 
-The login flow uses Supabase Auth for existing email/password users. The Express backend sets HttpOnly session cookies after a successful login, and the React frontend checks `/api/auth/me` to restore the signed-in user without storing tokens in browser JavaScript. New users can create an account from the sign-in screen and must validate their email through the confirmation link sent by Supabase. Users can also request a password reset link from the sign-in screen, which Supabase sends to the registered email address. After opening the email link, the `/reset-password` screen lets the user save a new password.
-
 ## Team information
 | Team member | Student # | Email |
 | :--- | :--- | :--- |
