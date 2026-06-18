@@ -13,18 +13,30 @@
     "check:server": "node --check server/index.js && node --check server/app.js && node --check server/routes/auth.js && node --check server/middleware/requireAuth.js && node --check server/lib/cookies.js && node --check server/lib/supabase.js"
   },
   "dependencies": {
+    "@fontsource-variable/geist": "^5.2.9",
     "@supabase/supabase-js": "^2.45.4",
+    "@tailwindcss/vite": "^4.3.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "lucide-react": "^0.468.0",
+    "radix-ui": "^1.6.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^7.18.0"
+    "react-router-dom": "^7.18.0",
+    "shadcn": "^4.11.0",
+    "tailwind-merge": "^3.6.0",
+    "tw-animate-css": "^1.4.0"
   },
   "devDependencies": {
+    "@types/node": "^25.9.3",
     "@vitejs/plugin-react": "^6.0.2",
+    "autoprefixer": "^10.5.0",
     "concurrently": "^8.2.2",
+    "postcss": "^8.5.15",
+    "tailwindcss": "^3.4.19",
     "vite": "^8.0.16"
   }
 }
