@@ -1,0 +1,16 @@
+{
+  "name": "crmp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canadian Redistribution Map Platform",
+  "scripts": {
+    "dev:map": "node server/index.js",
+    "start": "node server/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

@@ -1,3 +1,2 @@
-ACTIONS.md
-Raw_Data_Schema.md
-Raw_Data_redist-mini-guide.md
+local/
+node_modules/
