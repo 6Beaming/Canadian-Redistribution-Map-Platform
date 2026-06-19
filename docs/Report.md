@@ -1,190 +1,371 @@
-# CRMP Data Architecture Impact Report
+# CRMP Sprint Report — Map MVP Delivery & Data Strategy
 
 **Audience:** Project team only  
-**Assumption:** The bundle audited on **2026-06-19** (`CRMP-full-data.zip`) **will not be updated** during the development cycle.  
-**References:** `Actual_redist-mini-guide.md`, `Missing_Files.md`, `Proposal.pdf` (use cases), current `map-mvp/` implementation
+**Sprint outcome:** Map rendering MVP on branch `feature/issues6-8/map-rendering-mvp` is **complete and deliverable** for this cycle.  
+**Assumption:** `CRMP-full-data.zip` (audited 2026-06-19) **will not be updated** during the remainder of this development cycle.  
+**References:** `Actual_redist-mini-guide.md`, `Missing_Files.md`, `Proposal.pdf`
 
 ---
 
-## 1. Executive summary
+## 1. What we shipped (MVP branch)
 
-The canonical schema documents describe a **complete** national redistricting dataset. The **actual** bundle is a **partial repack**: DA boundary gaps in six provinces/territories, missing `006_dissemination_areas/*.csv` under expected names, and missing `029_feds_2023ro/`. DA-level census profiles **do exist** in nested StatCan products under `profile_2021/raw/`, but not at the paths the mini-guide specifies.
+### 1.1 Scope
 
-**Development strategy for this cycle:**
+The sprint delivers a **standalone map MVP** under `map-mvp/` — not the full React application yet. It proves the core map interaction model for one pilot region (**Yukon**, FED `60001`, **74 dissemination areas**) against a **national FED context** (343 districts).
 
-| Strategy | Where applied |
-|----------|----------------|
-| Deliver MVP on **complete geometry + workable profiles** | **Yukon (`yt`)**, FED `60001`, 74 DAs |
-| Use **real census join** from `*_English_CSV_data.csv` where mappable | Yukon extraction notebook (update path) |
-| **Placeholder** copy / UI for unavailable regions | Non-Yukon FED clicks → “Coming Soon!” |
-| **Defer** national-scale features | Ontario commission workflows, full national redraw |
-| **Do not upload** multi-GB raw assets to Supabase | Static hosting + slim PostgreSQL tables |
+### 1.2 Runtime behaviour
 
----
+| Interaction | Behaviour |
+|-------------|-----------|
+| National view | 343 FED polygons from PMTiles (`fed_boundaries_2023.pmtiles`) on a white basemap |
+| FED labels | 343 riding names at centroids (`fed_labels.geojson`), zoom 3–8 |
+| Yukon zoom-in | 74 DA polygons (`single_fed_das.geojson`); community labels (`place_labels_yt.geojson`), zoom ≥ 8 |
+| DA click | Yellow highlight + side panel: `DGUID`, `C1_COUNT_TOTAL`, FED hint |
+| Non-pilot FED click | Side panel: **“Coming Soon!”** + `fed_num` |
+| Dev server | Express (`npm run dev:map`) with HTTP Range support for PMTiles |
 
-## 2. Proposal use cases vs data reality
+### 1.3 Implementation strategy (this branch)
 
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  Static assets (map-mvp/data/)                              │
+│  • fed_boundaries_2023.pmtiles  — national FED base         │
+│  • single_fed_das.geojson       — Yukon DAs (Colab export)│
+│  • fed_labels / place_labels    — derived label layers      │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────┐
+│  map-mvp/js/  — MapLibre GL JS v4 + pmtiles protocol        │
+│  map.js       — layers, byte-range probe, interactions      │
+│  panel.js     — side panel content                          │
+│  labels.js    — FED + place symbol layers                   │
+│  districts.js — assignment helpers (stub, not wired)        │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────┐
+│  server/index.js (Express) — static host + Range headers    │
+└─────────────────────────────────────────────────────────────┘
+```
 
-| Use case | Data required | Status with actual bundle | Impact |
-|----------|---------------|---------------------------|--------|
-| **UC1 — View regions & statistics** | FED boundaries, DA polygons, population/demographics, optional labels | Yukon: full stack. Ontario / most provinces: **no DA layer** | National “click riding → stats” **not feasible** except Yukon + coarse FED-only elsewhere |
-| **UC1 — Toggle historical boundaries** | FED 2003/2013/2023 layers | PMTiles 2003/2015/2023 present; 2003 tiles lack `fed_num` | Toggle **visual** OK; per-district identify on 2003 RO **limited** |
-| **UC1 — Redraw / reassign communities** | DA building blocks + assignment + population sums | Yukon 74 DAs OK; adjacency graph **must be precomputed** | MVP redraw scoped to **Yukon**; contiguity validation needs offline graph |
-| **UC2 — Submit comment / objection / counter-proposal** | Map feature IDs traceable to submission | `DGUID` + custom `district_id` sufficient for Yukon | Submissions for other regions need **waitlist UI** or commissioner-only manual handling |
-| **UC3 — Commissioner review, tags, export** | Centralized submissions + live stats | Supabase tables (not raw zip) | Dashboard can work on **Yukon submissions**; national aggregates **misleading** if users expect Canada-wide coverage |
-| **Population equality validation** | Per-DA population on all units in edited region | Real for Yukon after profile join; absent for incomplete provinces | Backend validation **Yukon-only** unless placeholders explicitly allowed |
+**Key design choices:**
 
----
+1. **Pre-join census in Colab** — browser reads slim GeoJSON, not multi-MB CSVs.
+2. **PMTiles for national FED** — one ~29 MB file; GeoJSON fallback if byte serving fails.
+3. **Pilot gating in UI** — full DA interaction only inside Yukon; other regions degrade gracefully.
+4. **Label pipeline offline** — `scripts/generate_map_labels.py` reads bundle CSVs + reference JSON; no runtime external APIs.
+5. **Express over Python** — aligns with README tech stack; same Range semantics for PMTiles.
 
-## 3. Feature dependency map
+### 1.4 Data pipeline (verified path)
 
-Based on `Actual_redist-mini-guide.md`:
+| Step | Tool | Output |
+|------|------|--------|
+| Extract Yukon DAs + population | `scripts/extract_mvp_data.ipynb` (Colab) | `map-mvp/data/single_fed_das.geojson` |
+| Generate map labels | `scripts/generate_map_labels.py` | `fed_labels.geojson`, `place_labels_yt.geojson` |
+| Audit bundle vs schema | `scripts/audit_data_schema.py` | `data_schema_audit_report.txt` |
 
-| Feature | Primary files | Secondary / optional | Blocked without |
-|---------|---------------|----------------------|-----------------|
-| National FED outline map | `fed_boundaries_2023.pmtiles` | White background style | Nothing — **available** |
-| DA click + population panel | `yt_dissemination_areas.gpkg` + profile CSV | — | Other provinces: missing `{prov}_dissemination_areas.gpkg` |
-| DA highlight / selection | `single_fed_das.geojson` (exported) | — | Re-export if source changes |
-| Redistricting assignment | DA GeoJSON + `DGUID` | `localStorage` / Supabase `assignments` | DA layer for target province |
-| District population totals | Profile long CSV (`CHARACTERISTIC_ID == 1`) | — | Profile file for that region |
-| Place / community labels | `GEO_NAME` in profile CSV; `016_028/*_geo_index.csv` | OSM basemap (optional) | Not blocked for Yukon if join script updated |
-| FED name in panel | Join `fed_num` to external lookup or `029_feds_2023ro` | `ed_name` in polling gpkg | **`029_feds_2023ro/` missing** — use Elections Canada naming table or `ed_name` from `fed2021_pd` |
-| Historical FED comparison | PMTiles 2003/2015/2023 | Per-prov GPKG RO variants | 2003 PMTiles without IDs |
-| Partisan context (optional) | `fed2021_{prov}_polling_districts.gpkg` | DA↔PD spatial join (non-trivial) | Not MVP-critical |
-| Commissioner export | Supabase submissions + derived stats | — | Product scope, not zip-limited |
+Population join uses **`profile_2021/raw/*_English_CSV_data.csv`** (actual bundle path), not the missing canonical `006_dissemination_areas/*.csv` files.
 
----
+### 1.5 Explicitly deferred (post-MVP / next sprint)
 
-## 4. Missing data: impact and mitigations
-
-### 4.1 Missing `{prov}_dissemination_areas.gpkg` (on, qc, ns, nb, nt, nu)
-
-| Impact | Mitigation |
-|--------|------------|
-| No redistricting in those provinces | MVP + public demo on **Yukon only** |
-| Persona Mark (Ontario) cannot use product locally | Marketing copy: “Pilot region: Yukon”; Ontario FED click → **“Statistics for this region — coming soon.”** |
-| Commissioner national view incomplete | Dashboard filters default to **Yukon**; show coverage badge |
-
-### 4.2 Missing `006_dissemination_areas/{region}.csv` (expected names)
-
-| Impact | Mitigation |
-|--------|------------|
-| Mini-guide join path fails | Extraction reads `profile_2021/raw/*_English_CSV_data.csv` (see Actual guide) |
-| Risk: wrong product for a province | Validate `DGUID` prefix / `GEO_LEVEL` for Yukon in notebook; document mapping in extraction script |
-| If join still fails | **Placeholder** `C1_COUNT_TOTAL` (deterministic per `DGUID`) with UI disclaimer: *“Wait for actual statistics in a future release.”* |
-
-### 4.3 Missing `029_feds_2023ro/`
-
-| Impact | Mitigation |
-|--------|------------|
-| No canonical FED-level 2023 profile folder | FED click shows `fed_num` only; add small **`fed_names.json`** curated from Elections Canada for labels |
-| Cannot seed assignment from official FED–DA mapping nationally | Seed Yukon only from spatial join in Colab |
-
-### 4.4 Incomplete `census_boundaries/{prov}/` stacks
-
-| Impact | Mitigation |
-|--------|------------|
-| Missing supporting layers (tracts, CSDs, etc.) | Ignore for MVP; only DA + FED needed |
-| `on/` almost empty | Do not promise Ontario DA map |
+- React app shell, D3 integration, Supabase auth
+- DA click → redistricting colour cycling + persistence (`districts.js` exists but unwired)
+- Commissioner dashboard (UC3)
+- Submission API and validation backend (UC2)
+- Contiguity graph and population-equality validation
+- National DA interaction beyond Yukon
 
 ---
 
-## 5. Redundant or low-priority data (do not prioritize for upload)
+## 2. Proposal use cases vs missing data
 
-| Asset | Size / note | Why redundant for CRMP MVP |
-|-------|-------------|----------------------------|
-| `polling_districts_results_2006_2023.csv` | ~528 MB | Not in schema; poll-level; duplicate of newer `fed2021_pd` for 2021 |
-| `raw_data/data/statistics_canada/census/` duplicates | Duplicate statscan CSVs | Same as `census_profiles/` copies |
-| `fed_boundaries_2003.pmtiles` + 2003 RO GPKGs | Historical reference | Optional toggle only; 2003 PMTiles **not identifiable** by district |
-| `fed_boundaries_2015.pmtiles` | Superseded by 2023 for current RO | Reference layer only |
-| Full national `{prov}_*.gpkg` catalog | Hundreds of MB | Serve via **static files / PMTiles**, not PostgreSQL |
-| `012_adas/` path (absent) | — | N/A |
-| Geo-index-only folders (`002`, `007`, `009`, `011`, `013`, `014`) | Small | Metadata; keep on Drive, not Supabase |
-| `fed2021_source/` shapefile fragments | Incomplete | Source archive; not runtime |
+From **Proposal.pdf**, three public-facing use-case groups map to our data reality as follows.
+
+### UC1 — View regions, statistics, and redraw (Mark Thompson, citizen)
+
+| Capability | Data required | Available now | Blocked by (`Missing_Files.md`) |
+|------------|---------------|---------------|----------------------------------|
+| Pan/zoom national FED map | `fed_boundaries_2023.pmtiles` | Yes | — |
+| FED name labels | FED centroids + name lookup | Yes (`fed_labels.geojson`) | `029_feds_2023ro/` absent — mitigated by derived names |
+| Click DA → population panel | DA polygons + profile join on `DGUID` | **Yukon only** | `{on,qc,ns,nb,nt,nu}_dissemination_areas.gpkg` missing |
+| Click FED → riding statistics | FED-level 2023 profiles | No | `029_feds_2023ro/` missing |
+| Redraw / reassign DAs | DA layer + assignment + pop sums | Yukon geometry only | No DA layer in 6 provinces/territories; adjacency not precomputed |
+| Historical boundary toggle | PMTiles 2003 / 2015 / 2023 | Visual layers present | 2003 PMTiles lack `fed_num`; limited identify |
+| Community labels | Geo index or `GEO_NAME` in profiles | Yukon labels shipped | `016_028` has no `yt`; territories index needs coord join |
+
+**Sprint impact:** UC1 is **demonstrable end-to-end in Yukon**. National map context works; per-riding DA statistics and redraw are **not** deliverable outside provinces with complete DA stacks.
+
+### UC2 — Submit comments, objections, counter-proposals (citizen)
+
+| Capability | Data required | Available now | Blocked by |
+|------------|---------------|---------------|------------|
+| Attach submission to map feature | Stable IDs (`DGUID`, `fed_num`) | Yukon `DGUID`s valid | — |
+| Counter-proposal with valid populations | Per-DA `C1_COUNT_TOTAL` | Yukon (after profile join) | Missing DA layers + profiles for 6 provinces |
+| Objection tied to specific boundary segment | FED/DA geometry + metadata | Yukon DAs only | Ontario / Quebec stacks largely absent |
+
+**Sprint impact:** Submission **UI and schema** can be built against Yukon IDs. Accepting counter-proposals for Ontario (persona Mark) requires either **data repack** or a **placeholder / pilot-region policy**.
+
+### UC3 — Commissioner review, tagging, export (Richard Jefferson)
+
+| Capability | Data required | Available now | Blocked by |
+|------------|---------------|---------------|------------|
+| Inbox of public submissions | Supabase tables (app layer) | Not implemented | — |
+| Filter by riding / province | `fed_ref` + submission `fed_num` | FED reference derivable | No national DA coverage metadata in DB yet |
+| Live population stats on proposals | Join submissions → `das` table | Yukon rows possible | National `das` table incomplete |
+| Export for commission record | Submissions + derived stats | App feature | Exporting placeholder populations is misleading |
+
+**Sprint impact:** Dashboard can launch on **Yukon-filtered submissions**. A national commissioner view without coverage badges would misrepresent product readiness.
+
+### Summary: `Missing_Files.md` gap catalogue → future features
+
+| Missing item | Count / scope | Features most affected |
+|--------------|---------------|------------------------|
+| `{prov}_dissemination_areas.gpkg` | 6 provinces/territories (`on`, `qc`, `ns`, `nb`, `nt`, `nu`) | UC1 redraw, UC1 DA stats, UC2 counter-proposals |
+| `006_dissemination_areas/*.csv` (canonical names) | 0 of 6 regional files | UC1 population join path (workaround: `raw/*_English_CSV_data.csv`) |
+| `029_feds_2023ro/` | Entire folder | UC1 FED-level statistics panel |
+| `012_adas/` profiles | Absent | Alternative building-block path (low priority) |
+| Ontario boundary stack | Nearly empty `on/` | UC1/UC2 for largest user persona (Ontario) |
+| Full `profile_2021/` product CSVs | Geo-index stubs only in several folders | Enriched demographics beyond population |
 
 ---
 
+## 3. Supabase upload plan (from actual bundle)
 
-## 6. Supabase PostgreSQL — 500 MB quota plan
+**Quota constraint:** ~500 MB total PostgreSQL; reserve **≥ 350 MB** for user-generated rows (submissions, assignments, commissioner notes).
 
-**Constraint:** ~500 MB total; must reserve space for **user-generated rows** (submissions, assignments, commissioner notes).
+### 3.1 Upload to Supabase (relational / queryable)
 
-### 6.1 Do **not** load into Supabase
+These are **derived, slim tables** — not raw zip contents.
 
-| Data | Approx. size | Host instead |
-|------|--------------|----------------|
-| All `{prov}_dissemination_areas.gpkg` | 100s MB national | Static GeoJSON per deployed region only |
-| `fed_boundaries_2023.pmtiles` | ~29 MB | Git LFS / Drive / object storage; browser fetch |
-| Raw profile CSVs (`*_English_CSV_data.csv`) | 100+ MB combined | Pre-join in Colab → slim GeoJSON |
-| `polling_districts_results_*.csv` | 528 MB | Omit entirely |
-| Full geometry for non-MVP provinces | — | Omit until bundle complete |
+#### `fed_ref` — federal electoral district reference
 
-### 6.2 Recommended Supabase tables (Yukon MVP)
+| Column | Type | Source |
+|--------|------|--------|
+| `fed_num` | `text` PK | `fed_boundaries_2023.pmtiles` / GeoJSON `fed_num` |
+| `fed_name_en` | `text` | `scripts/data/fed_names_2023.json` or `fed2021_*_polling_districts.gpkg` `ed_name` |
+| `prov_code` | `text` nullable | PMTiles `prov_code` where present |
 
-| Table | Columns (core) | Est. size |
-|-------|------------------|-----------|
-| `das` | `dguid` PK, `fed_uid`, `pop_2021`, `geo_name` nullable, `geom` geometry(Polygon, 4326) | ~74 rows + index ≪ 1 MB |
-| `fed_ref` | `fed_num`, `fed_name_en`, `prov_code` | 343 rows ≪ 1 MB |
-| `assignments` | `user_id`, `dguid`, `district_id`, `updated_at` | grows with users |
-| `submissions` | `id`, `user_id`, `type`, `body`, `geom` optional, `fed_num`, `status`, `created_at` | primary user storage |
-| `commissioner_notes` | `submission_id`, `commissioner_id`, `tags`, `note`, internal | grows with review volume |
+~343 rows, ≪ 1 MB.
 
-**Geometry in Postgres:** optional for MVP — can store assignment as JSON (`{ dguid: district_id }`) without PostGIS if extension unavailable; keep canonical geometry in static GeoJSON.
+#### `das` — dissemination areas (pilot: Yukon first)
 
-### 6.3 Size reduction tactics
+| Column | Type | Source |
+|--------|------|--------|
+| `dguid` | `text` PK | `yt_dissemination_areas.gpkg` → `single_fed_das.geojson` |
+| `fed_num` | `text` FK → `fed_ref` | Spatial join: Yukon FED `60001` |
+| `pop_2021` | `integer` | `*_English_CSV_data.csv`, `CHARACTERISTIC_ID = 1` |
+| `geo_name` | `text` nullable | Profile `GEO_NAME` or `territories_geo_index.csv` |
+| `data_quality` | `text` | `verified` \| `placeholder` — audit flag |
+| `geom` | `geometry(Polygon, 4326)` optional | Pre-simplified from export; or omit geometry and serve static GeoJSON |
 
-1. **Pre-join census to GeoJSON** — export only properties needed in UI (`DGUID`, `C1_COUNT_TOTAL`, `GEO_NAME`, 2–3 demo stats), not full long-format CSV.
-2. **Single-province deploy** — one GeoJSON (~2 MB Yukon) vs national DA layer (~GB scale).
-3. **PMTiles off-DB** — already done.
-4. **Normalize submissions** — store text + references to `DGUID` list, not full GeoJSON duplicates per save.
-5. **Archive old submissions** — commissioner export to file; trim DB if quota tight.
-6. **Reserve budget** — target **≤ 150 MB** schema + indexes; **≥ 350 MB** headroom for user content.
+~74 rows for Yukon MVP, ≪ 1 MB with geometry.
 
-### 6.4 Static assets (outside Supabase)
+**Postgres geometry is optional for MVP.** Assignments can reference `dguid` only; canonical polygons stay in static `single_fed_das.geojson`.
 
-| File | Role |
+#### `yt_adjacency` — precomputed contiguity (Yukon)
+
+| Column | Type | Source |
+|--------|------|--------|
+| `dguid_a` | `text` | Offline graph from `yt_dissemination_areas.gpkg` |
+| `dguid_b` | `text` | Touching polygon pairs |
+
+~O(74 × degree) rows; required before backend contiguity validation.
+
+#### `assignments` — user redistricting state
+
+| Column | Type | Source |
+|--------|------|--------|
+| `user_id` | `uuid` FK | Supabase Auth |
+| `dguid` | `text` FK → `das` | App layer |
+| `district_id` | `integer` | App layer |
+| `updated_at` | `timestamptz` | App layer |
+
+Grows with users; primary mutable content besides submissions.
+
+#### `submissions` — public input (UC2)
+
+| Column | Type | Source |
+|--------|------|--------|
+| `id` | `uuid` PK | App |
+| `user_id` | `uuid` nullable | Auth (optional for anonymous phase) |
+| `type` | `text` | `comment` \| `objection` \| `counter_proposal` |
+| `body` | `text` | User input |
+| `fed_num` | `text` FK | Map selection |
+| `dguid_list` | `jsonb` nullable | Referenced DAs (counter-proposals) |
+| `assignment_snapshot` | `jsonb` nullable | `{ dguid: district_id }` at submit time |
+| `status` | `text` | `pending` \| `reviewed` \| `archived` |
+| `created_at` | `timestamptz` | App |
+
+#### `commissioner_notes` — internal review (UC3)
+
+| Column | Type | Source |
+|--------|------|--------|
+| `submission_id` | `uuid` FK | App |
+| `commissioner_id` | `uuid` | Auth |
+| `tags` | `text[]` | App |
+| `note` | `text` | App |
+| `created_at` | `timestamptz` | App |
+
+### 3.2 Do **not** upload to Supabase (host statically)
+
+| Asset | Size (approx.) | Host via |
+|-------|------------------|----------|
+| `fed_boundaries_2023.pmtiles` | ~29 MB | CDN / Express static / object storage |
+| `fed_boundaries_2023.geojson` | ~6 MB | Same (fallback only) |
+| `single_fed_das.geojson` | ~2 MB | Static until multi-region deploy |
+| `fed_labels.geojson`, `place_labels_*.geojson` | < 0.1 MB | Static |
+| Raw `*_English_CSV_data.csv` | 100+ MB combined | Colab pre-join only |
+| `polling_districts_results_2006_2023.csv` | ~528 MB | Omit |
+| National `{prov}_dissemination_areas.gpkg` catalog | 100s MB | Per-province static GeoJSON when unlocked |
+
+### 3.3 ETL sequence (Yukon → Supabase)
+
+1. Colab: `yt_dissemination_areas.gpkg` + `98-401-X2021028` profile CSV → verify 74 `DGUID` population join.
+2. Export slim `das` rows (+ optional simplified geometry).
+3. Build `yt_adjacency.json` offline → insert `yt_adjacency` edges.
+4. Seed `fed_ref` from `fed_names_2023.json` (343 rows).
+5. Wire Express API routes to Supabase client for `submissions` / `assignments`.
+
+---
+
+## 4. Delivery strategies
+
+### 4.1 Primary strategy (recommended) — Extend Yukon MVP
+
+**Goal:** On-time delivery with **real data** in one complete pilot region; national map as context only.
+
+| Phase | Work | Uses actual bundle |
+|-------|------|-------------------|
+| **Now (done)** | Map MVP: FED base, Yukon DAs, labels, panel | PMTiles, `single_fed_das.geojson`, label GeoJSON |
+| **Next** | Wire redistricting UI + `localStorage` / Supabase `assignments` | Yukon `DGUID`s |
+| **Next** | Supabase `submissions` + auth stub | Yukon `fed_num` `60001` |
+| **Next** | Backend validation: population sums, contiguity | `yt_adjacency`, real `pop_2021` |
+| **Next** | Commissioner dashboard (Yukon filter default) | Submission tables |
+| **Later** | Add provinces as `{prov}_dissemination_areas.gpkg` land in bundle v2 | ab, bc, mb, sk, nl, pe ready first |
+
+**UI policy:** Non-Yukon FED → *“Statistics for this region will be available in a future release.”* Submissions outside pilot region → disabled or tagged `out_of_pilot`.
+
+**Why this wins:** Only path that ships **verifiable census joins**, **real geometry**, and **validation logic** without fabricating data. Matches sprint MVP; minimizes Supabase footprint.
+
+---
+
+### 4.2 Alternative A — National placeholders + maximize existing data
+
+**Goal:** Marketing/demo shows **all 343 ridings clickable** with *some* content everywhere.
+
+| Layer | National approach | Data source |
+|-------|-------------------|-------------|
+| FED map + labels | Already national | PMTiles + `fed_labels.geojson` |
+| FED click panel | Show `fed_num`, name, **FED-level population** if derivable | `fed2021_*_polling_districts.gpkg` `electors_est`; historical `statscan_*_fednum_*.csv` |
+| DA layer | **Per-province where GPKG exists** (7 provinces); placeholder message elsewhere | ab, bc, mb, sk, nl, pe, yt |
+| Missing DA provinces | FED-level only + “DA detail coming soon” | — |
+| Population on DAs | Join `raw/*_English_CSV_data.csv` where mappable; else deterministic placeholder + `data_quality = placeholder` | Partial coverage |
+| Submissions | Accept nationally; validate strictly only in covered provinces | — |
+
+**Trade-offs:**
+
+| Pros | Cons |
 |------|------|
-| `fed_boundaries_2023.pmtiles` | National FED context |
-| `single_fed_das.geojson` | Yukon DA interaction |
-| `fed_names.json` (derived) | FED labels until `029_feds_2023ro/` exists |
-| `yt_adjacency.json` (precomputed) | Contiguity checks in API |
+| Broader geographic demo | Population validation unreliable in placeholder provinces |
+| Reuses 7 existing DA GPKGs | Ontario/Quebec still hollow — key personas underserved |
+| No fabricated geometry | Commissioner exports mix verified and placeholder rows |
+| Moderate engineering effort | Risk of stakeholders treating placeholders as real |
+
+**Supabase impact:** `das` table grows to ~tens of thousands of rows for 7 provinces; still manageable if geometry stays static. Target **≤ 150 MB** DB footprint; archive old submissions if needed.
 
 ---
 
-## 7. Placeholder and messaging policy
+### 4.3 Alternative B — Fabricate all core missing data
 
-| UI surface | When data missing | Recommended copy |
-|------------|-------------------|------------------|
-| Non-Yukon FED click | No DA layer / no profiles | **“Coming Soon!”** + `fed_num` (current) |
-| DA panel population | Placeholder join | **“Population (2021): —”** or deterministic placeholder + footnote |
-| Future regions | Commissioner / marketing | **“Statistics for this region will be available in a future release.”** |
-| Counter-proposal outside Yukon | No validation data | Disable submit; explain pilot region |
+**Goal:** Full national UC1–UC3 demo regardless of bundle gaps.
 
-Replace placeholders when `Missing_Files.md` checklist items are closed **in a future release** (out of scope for this cycle).
+| Fabrication | Method | Risk |
+|-------------|--------|------|
+| Missing DA polygons | Generate synthetic hex/grid cells per FED | **Not legally defensible** for redistribution tool |
+| DA populations | Random / uniform split of FED totals | Validation passes but meaningless |
+| FED profiles | Copy 2021 electors or random demographics | Misleading commissioner review |
+| Ontario stack | Entirely synthetic | Contradicts “official boundaries” product promise |
 
----
+**Trade-offs:**
 
-## 8. Recommended team actions (this sprint)
+| Pros | Cons |
+|------|------|
+| Fastest path to “national” UX | Academic integrity / stakeholder trust failure |
+| Unblocks all UC demos superficially | Useless for real boundary commission workflow |
+| Single schema nationwide | Must be ripped out when real data arrives |
 
-1. **Update `extract_mvp_data.ipynb`** — join Yukon DAs to `98-401-X2021028` (or verified territories product) `*_English_CSV_data.csv`; remove placeholder when join verified.
-2. **Add `fed_names.json`** — 343 rows from Elections Canada; use in panel + Step 4 labels.
-3. **Precompute `yt_adjacency.json`** — offline from `yt_dissemination_areas.gpkg`.
-4. **Supabase schema** — implement `submissions` + `assignments` only; defer national tables.
-5. **Document pilot scope** in user-facing README — Yukon only until bundle v2.
-6. **Send `Missing_Files.md`** to data owners for post-cycle repack (no expectation of update during this cycle).
-
----
-
-## 9. Risk register
-
-| Risk | Likelihood | Mitigation |
-|------|------------|------------|
-| Wrong StatCan product mapped to Yukon | Medium | Validate 74 `DGUID`s match after join |
-| Stakeholders expect Ontario support | High | Clear pilot messaging; Persona demos use Yukon |
-| Supabase quota exceeded by geometry | Medium | Static GeoJSON + slim rows |
-| PMTiles fail without byte-range server | Low | Document `serve.py`; use GeoJSON fallback in dev |
-| Commissioner exports include placeholder populations | Medium | Flag `data_quality` column in `das` table |
+**Recommendation:** **Reject for production.** Acceptable only as a **throwaway UI prototype** never shown to commissioners or cited in reports. If used internally, hard-code `data_quality = synthetic` and block export.
 
 ---
 
-*Generated from `data_schema_audit_report.txt` and current `map-mvp/` implementation. Update when extraction notebook or Supabase schema lands.*
+## 5. Strategy comparison
+
+| Criterion | Primary (Yukon extend) | Alt A (national placeholders) | Alt B (fabricate) |
+|-----------|------------------------|-------------------------------|-------------------|
+| On-time delivery | High | Medium | High |
+| Data integrity | High | Medium | **Low** |
+| UC1 full demo | Yukon | Partial national | Apparent full |
+| UC2 validation | Real (Yukon) | Mixed | Fake |
+| UC3 commissioner trust | High | Medium | **Low** |
+| Supabase size | Small | Medium | Medium–large |
+| Rework when bundle v2 lands | Low | Medium | **High** |
+
+**Team decision:** Proceed with **§4.1** for sprint close and next sprint planning. Revisit Alt A only if stakeholder demo **explicitly requires** multi-province DA clicks and accepts placeholder disclaimers.
+
+---
+
+## 6. Team actions
+
+### Immediate (sprint close)
+
+| # | Action | Owner | Done when |
+|---|--------|-------|-----------|
+| 1 | Merge map MVP branch; tag sprint deliverable | Dev | Branch merged, `npm run dev:map` documented |
+| 2 | Verify Yukon profile join in `extract_mvp_data.ipynb` (`98-401-X2021028`) | Data | 74/74 `DGUID`s with real `C1_COUNT_TOTAL` |
+| 3 | Ship `data_quality` flag on all `das` rows | Backend | Column in schema + ETL |
+| 4 | Precompute `yt_adjacency` from `yt_dissemination_areas.gpkg` | Data | JSON + Supabase seed script |
+| 5 | Implement Supabase tables: `fed_ref`, `das`, `submissions`, `assignments` | Backend | Migrations applied |
+| 6 | Wire `districts.js` redistricting to map clicks + persistence | Frontend | Colour cycle + save/restore |
+| 7 | User-facing pilot disclaimer: “Yukon pilot region” | Product | Copy in app README / landing |
+
+### Next sprint
+
+| # | Action | Notes |
+|---|--------|-------|
+| 8 | Express `/api/submissions` routes | UC2 |
+| 9 | Commissioner dashboard (Yukon-default filter) | UC3 |
+| 10 | Population-equality + contiguity validation API | Requires `yt_adjacency` |
+| 11 | React shell; embed map component | README stack |
+| 12 | Send `Missing_Files.md` to data collectors | Post-cycle repack; no in-cycle expectation |
+
+### Do not do (this cycle)
+
+- Upload 528 MB poll-results CSV to Supabase
+- Promise Ontario DA interaction without `on_dissemination_areas.gpkg`
+- Ship fabricated census data without `data_quality = synthetic` guardrails
+
+---
+
+## 7. Risk register
+
+| ID | Risk | Likelihood | Impact | Mitigation |
+|----|------|------------|--------|------------|
+| R1 | Stakeholders expect Ontario / national DA demo | High | High | Pilot disclaimer; demo script uses Yukon; Alt A only with explicit sign-off |
+| R2 | Wrong StatCan product mapped to Yukon DGUIDs | Medium | High | Validate 74/74 join; `data_quality` column; spot-check against StatCan table viewer |
+| R3 | Supabase 500 MB quota exceeded | Medium | Medium | Static geometry; slim rows; archive submissions; no raw CSV in DB |
+| R4 | PMTiles fail without HTTP Range | Low | Medium | Express dev server; GeoJSON fallback in `map.js`; use `127.0.0.1` not conflicted `localhost` |
+| R5 | Commissioner exports mix real / placeholder data | Medium | High | Filter exports by `data_quality`; Yukon-only default view |
+| R6 | Bundle v2 arrives mid-sprint and breaks ETL paths | Low | Medium | Pin ETL to `Actual_redist-mini-guide.md`; versioned Colab notebook |
+| R7 | Redistricting shipped without contiguity check | Medium | High | Block submit until `yt_adjacency` validation lands |
+| R8 | `029_feds_2023ro/` never repacked — FED stats panel blocked | High | Low | Use `fed_ref` + electors_est as interim; label as preliminary |
+| R9 | Team pursues Alt B under schedule pressure | Medium | **Critical** | Document rejection in this report; require PM approval for any synthetic data |
+
+---
+
+## 8. Document history
+
+| Date | Change |
+|------|--------|
+| 2026-06-19 | Initial audit-driven report |
+| 2026-06-19 | Rewritten: MVP delivery summary, use-case mapping, Supabase plan, three strategies, actions + risks |
+
+*Update when Supabase schema lands, bundle v2 is received, or delivery strategy changes.*
