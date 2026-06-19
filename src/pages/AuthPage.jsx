@@ -139,6 +139,8 @@ function ResetPasswordView() {
     }
   }
 
+  const canShowResetForm = status === "ready" || status === "submitting";
+
   return (
     <main className="auth-shell">
       <section className="auth-layout" aria-label="Reset password">
@@ -149,53 +151,72 @@ function ResetPasswordView() {
             </div>
           </div>
 
-          <form className="login-form" onSubmit={handleSubmit}>
-            <label htmlFor="new-password">New Password</label>
-            <input
-              autoComplete="new-password"
-              disabled={status !== "ready"}
-              id="new-password"
-              name="password"
-              onChange={handleChange}
-              required
-              type="password"
-              value={form.password}
-            />
+          {canShowResetForm ? (
+            <form className="login-form" onSubmit={handleSubmit}>
+              <label htmlFor="new-password">New Password</label>
+              <input
+                autoComplete="new-password"
+                disabled={status === "submitting"}
+                id="new-password"
+                name="password"
+                onChange={handleChange}
+                required
+                type="password"
+                value={form.password}
+              />
 
-            <label htmlFor="confirm-password">Confirm Password</label>
-            <input
-              autoComplete="new-password"
-              disabled={status !== "ready"}
-              id="confirm-password"
-              name="confirmPassword"
-              onChange={handleChange}
-              required
-              type="password"
-              value={form.confirmPassword}
-            />
+              <label htmlFor="confirm-password">Confirm Password</label>
+              <input
+                autoComplete="new-password"
+                disabled={status === "submitting"}
+                id="confirm-password"
+                name="confirmPassword"
+                onChange={handleChange}
+                required
+                type="password"
+                value={form.confirmPassword}
+              />
 
-            {error ? <p className="form-error">{error}</p> : null}
-            {notice ? <p className="form-success">{notice}</p> : null}
+              {error ? <p className="form-error">{error}</p> : null}
+              {notice ? <p className="form-success">{notice}</p> : null}
 
-            <button
-              className="primary-button"
-              disabled={status !== "ready"}
-              type="submit"
-            >
-              <ShieldCheck aria-hidden="true" size={19} />
-              <span>
-                {status === "submitting" ? "Updating password" : "Update password"}
-              </span>
-            </button>
+              <button
+                className="primary-button"
+                disabled={status === "submitting"}
+                type="submit"
+              >
+                <ShieldCheck aria-hidden="true" size={19} />
+                <span>
+                  {status === "submitting"
+                    ? "Updating password"
+                    : "Update password"}
+                </span>
+              </button>
 
-            <button
-              className="text-button"
-              onClick={() => window.location.assign("/")}
-              type="button"
-            >
-              Back to sign in
-            </button>
-          </form>
+              <button
+                className="text-button"
+                onClick={() => window.location.assign("/")}
+                type="button"
+              >
+                Back to sign in
+              </button>
+            </form>
+          ) : (
+            <div className="login-form">
+              {status === "checking" ? (
+                <div className="loading-mark" aria-label="Checking reset link" />
+              ) : null}
+              {error ? <p className="form-error">{error}</p> : null}
+              {notice ? <p className="form-success">{notice}</p> : null}
+              <button
+                className="text-button"
+                onClick={() => window.location.assign("/")}
+                type="button"
+              >
+                Back to sign in
+              </button>
+            </div>
+          )}
         </div>
       </section>
     </main>
