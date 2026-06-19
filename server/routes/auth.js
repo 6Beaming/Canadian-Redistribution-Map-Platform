@@ -49,6 +49,7 @@ function normalizePhoneNumber(value) {
 
   if (digits.length === 10) {
     return {
+      auth: `1${digits}`,
       e164: `+1${digits}`,
       national: digits
     };
@@ -56,6 +57,7 @@ function normalizePhoneNumber(value) {
 
   if (digits.length === 11 && digits.startsWith("1")) {
     return {
+      auth: digits,
       e164: `+${digits}`,
       national: digits.slice(1)
     };
@@ -98,6 +100,7 @@ function validatePublicProfile(body) {
     profile: {
       firstName,
       lastName,
+      phoneAuth: phone.auth,
       phoneNumber: phone.e164,
       phoneNational: phone.national,
       postalCode: `${postalCode.slice(0, 3)} ${postalCode.slice(3)}`,
@@ -282,6 +285,7 @@ router.post("/profile", requirePendingProfileAuth, async (req, res, next) => {
     const {
       firstName,
       lastName,
+      phoneAuth,
       phoneNational,
       phoneNumber,
       postalCode,
@@ -301,7 +305,7 @@ router.post("/profile", requirePendingProfileAuth, async (req, res, next) => {
       role: existingProfile?.role || "public_user"
     });
 
-    await startSupabasePhoneVerification(req.accessToken, phoneNumber);
+    await startSupabasePhoneVerification(req.accessToken, phoneAuth);
 
     res.status(202).json({
       message: "Verification code sent.",
@@ -333,7 +337,7 @@ router.post(
     }
 
     try {
-      await verifySupabasePhoneChange(req.accessToken, phone.e164, token);
+      await verifySupabasePhoneChange(req.accessToken, phone.auth, token);
 
       const completedProfile = await upsertSupabaseProfile(req.accessToken, {
         email: req.user.email,
