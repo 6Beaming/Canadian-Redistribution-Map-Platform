@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 let supabaseClient;
+let supabaseAdminClient;
 
 const PROFILE_COLUMNS =
   "id,email,first_name,last_name,province,postal_code,phone,role,profile_completed,created_at";
@@ -9,6 +10,7 @@ function getSupabaseConfig() {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey =
     process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
+  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
     throw new Error(
@@ -16,7 +18,7 @@ function getSupabaseConfig() {
     );
   }
 
-  return { supabaseKey, supabaseUrl };
+  return { supabaseKey, supabaseServiceRoleKey, supabaseUrl };
 }
 
 export function getSupabaseClient() {
@@ -54,6 +56,102 @@ function getSupabaseUserClient(accessToken) {
   });
 }
 
+function getSupabaseAdminClient() {
+  if (supabaseAdminClient) {
+    return supabaseAdminClient;
+  }
+
+  const { supabaseServiceRoleKey, supabaseUrl } = getSupabaseConfig();
+
+  if (!supabaseServiceRoleKey) {
+    return null;
+  }
+
+  supabaseAdminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      persistSession: false
+    }
+  });
+
+  return supabaseAdminClient;
+}
+
+export function isSupabaseAdminConfigured() {
+  return Boolean(getSupabaseAdminClient());
+}
+
+export async function findSupabaseAuthUserByEmail(email) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    return null;
+  }
+
+  const normalizedEmail = email.toLowerCase();
+  const perPage = 1000;
+  let page = 1;
+
+  while (page <= 20) {
+    const { data, error } = await supabase.auth.admin.listUsers({
+      page,
+      perPage
+    });
+
+    if (error) {
+      const lookupError = new Error(
+        error.message || "Unable to check existing users."
+      );
+      lookupError.statusCode = 500;
+      lookupError.publicMessage = "Unable to check existing users.";
+      throw lookupError;
+    }
+
+    const users = data?.users || [];
+    const existingUser = users.find(
+      (user) => user.email?.toLowerCase() === normalizedEmail
+    );
+
+    if (existingUser) {
+      return existingUser;
+    }
+
+    if (users.length < perPage) {
+      return null;
+    }
+
+    page += 1;
+  }
+
+  return null;
+}
+
+export async function findSupabaseProfileByPhone(phone) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(PROFILE_COLUMNS)
+    .eq("phone", phone)
+    .limit(1);
+
+  if (error) {
+    const lookupError = new Error(
+      error.message || "Unable to check phone number."
+    );
+    lookupError.statusCode = 500;
+    lookupError.publicMessage = "Unable to check phone number.";
+    throw lookupError;
+  }
+
+  return data?.[0] || null;
+}
+
 export async function getSupabaseProfile(accessToken, userId) {
   const supabase = getSupabaseUserClient(accessToken);
   const { data, error } = await supabase
@@ -81,10 +179,13 @@ export async function upsertSupabaseProfile(accessToken, profile) {
 
   if (error) {
     const profileError = new Error(error.message || "Unable to save user profile.");
-    profileError.statusCode = error.code === "42501" ? 403 : 500;
+    profileError.statusCode =
+      error.code === "42501" ? 403 : error.code === "23505" ? 409 : 500;
     profileError.publicMessage =
       error.code === "42501"
         ? "Profiles table permissions need to allow users to save their own profile."
+        : error.code === "23505"
+          ? "This phone number is already linked to another account."
         : "Unable to save user profile.";
     throw profileError;
   }

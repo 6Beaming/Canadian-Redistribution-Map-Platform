@@ -9,6 +9,8 @@ import {
   setSessionCookies
 } from "../lib/cookies.js";
 import {
+  findSupabaseAuthUserByEmail,
+  findSupabaseProfileByPhone,
   getSupabaseProfile,
   getSupabaseClient,
   startSupabasePhoneVerification,
@@ -161,6 +163,34 @@ function pendingProfileResponse(user, profile = null, pendingProfile = null) {
   };
 }
 
+function signupErrorMessage(message = "") {
+  const normalizedMessage = message.toLowerCase();
+
+  if (
+    normalizedMessage.includes("already") ||
+    normalizedMessage.includes("registered") ||
+    normalizedMessage.includes("exists")
+  ) {
+    return "An account with this email already exists. Please sign in.";
+  }
+
+  if (normalizedMessage.includes("rate limit")) {
+    return "Email rate limit exceeded. Please wait before trying again.";
+  }
+
+  if (normalizedMessage.includes("confirm") || normalizedMessage.includes("email")) {
+    return message;
+  }
+
+  return "Unable to create account.";
+}
+
+async function phoneBelongsToAnotherUser(phoneNational, userId) {
+  const existingProfile = await findSupabaseProfileByPhone(phoneNational);
+
+  return Boolean(existingProfile && existingProfile.id !== userId);
+}
+
 router.post("/login", async (req, res, next) => {
   const email =
     typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
@@ -228,6 +258,15 @@ router.post("/signup", async (req, res, next) => {
   }
 
   try {
+    const existingUser = await findSupabaseAuthUserByEmail(email);
+
+    if (existingUser) {
+      res.status(409).json({
+        error: "An account with this email already exists. Please sign in."
+      });
+      return;
+    }
+
     const supabase = getSupabaseClient();
     const emailRedirectTo =
       process.env.SIGNUP_EMAIL_REDIRECT_URL || process.env.CLIENT_ORIGIN;
@@ -242,10 +281,7 @@ router.post("/signup", async (req, res, next) => {
     if (error) {
       console.error("Supabase signup failed:", error.message);
       res.status(400).json({
-        error:
-          process.env.NODE_ENV === "production"
-            ? "Unable to create account."
-            : error.message || "Unable to create account."
+        error: signupErrorMessage(error.message)
       });
       return;
     }
@@ -300,6 +336,14 @@ router.post("/profile", requirePendingProfileAuth, async (req, res, next) => {
       postalCode,
       province
     } = validation.profile;
+
+    if (await phoneBelongsToAnotherUser(phoneNational, req.user.id)) {
+      res.status(409).json({
+        error: "This phone number is already linked to another account."
+      });
+      return;
+    }
+
     await startSupabasePhoneVerification(req.accessToken, phoneAuth);
     setPendingProfileCookie(res, {
       firstName,
@@ -341,6 +385,13 @@ router.post(
     }
 
     try {
+      if (await phoneBelongsToAnotherUser(pendingProfile.phoneNational, req.user.id)) {
+        res.status(409).json({
+          error: "This phone number is already linked to another account."
+        });
+        return;
+      }
+
       await verifySupabasePhoneChange(req.accessToken, phone.auth, token);
 
       const existingProfile = await getSupabaseProfile(req.accessToken, req.user.id);
