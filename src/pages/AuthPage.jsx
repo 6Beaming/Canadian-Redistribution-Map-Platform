@@ -498,10 +498,9 @@ function AuthPage() {
     );
   }
 
-  // Will uncomment this once they finish dashboard
-  // if (sessionStatus === "signed-in") {
-  //   return <Navigate to="/dashboard" replace />;
-  // }
+  if (sessionStatus === "signed-in") {
+    return <Navigate to="/dashboard-public-user" replace />;
+  }
 
   if (pendingProfileUser && sessionStatus === "profile-required") {
     return (
