@@ -1,0 +1,383 @@
+
+:root {
+  color: #17201a;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-synthesis: none;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: #f5f7f3;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.screen-center,
+.auth-shell,
+.dashboard-shell {
+  min-height: 100vh;
+}
+
+.screen-center {
+  display: grid;
+  place-items: center;
+}
+
+.loading-mark {
+  width: 44px;
+  height: 44px;
+  border: 4px solid #c7d5cb;
+  border-top-color: #2f6d4f;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.auth-shell {
+  display: grid;
+  place-items: center;
+  padding: 32px;
+}
+
+.auth-layout {
+  display: grid;
+  width: min(100%, 620px);
+  min-height: 520px;
+  border: 1px solid #d8ded6;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(23, 32, 26, 0.12);
+}
+
+.login-panel,
+.profile-page {
+  padding: 32px;
+}
+
+.login-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.brand-lockup h1,
+.profile-page h2 {
+  margin: 0;
+}
+
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.onboarding-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14px;
+}
+
+.eyebrow,
+.panel-label {
+  margin: 0 0 2px;
+  color: #5c6a60;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.login-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 40px;
+}
+
+.login-form label {
+  color: #28362d;
+  font-size: 0.94rem;
+  font-weight: 700;
+}
+
+.login-form input,
+.login-form select {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid #b9c4bc;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #17201a;
+  background: #ffffff;
+}
+
+.login-form input:focus,
+.login-form select:focus {
+  border-color: #2f6d4f;
+  box-shadow: 0 0 0 3px rgba(47, 109, 79, 0.18);
+  outline: none;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.form-row > div {
+  display: grid;
+  gap: 10px;
+}
+
+.primary-button,
+.ghost-button,
+.text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 44px;
+  border-radius: 8px;
+  font-weight: 800;
+}
+
+.primary-button {
+  margin-top: 14px;
+  border: 0;
+  color: #ffffff;
+  background: #2f6d4f;
+}
+
+.primary-button:hover:not(:disabled) {
+  background: #265941;
+}
+
+.ghost-button {
+  border: 1px solid #b9c4bc;
+  padding: 0 14px;
+  color: #17201a;
+  background: #ffffff;
+}
+
+.ghost-button:hover:not(:disabled) {
+  background: #edf2ee;
+}
+
+.profile-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border: 1px solid #b9c4bc;
+  border-radius: 50%;
+  color: #234d3a;
+  background: #ffffff;
+}
+
+.profile-icon-button:hover {
+  background: #edf2ee;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #b9c4bc;
+  border-radius: 50%;
+  color: #234d3a;
+  background: #ffffff;
+}
+
+.icon-button:hover:not(:disabled) {
+  background: #edf2ee;
+}
+
+.form-error {
+  margin: 6px 0 0;
+  border-left: 4px solid #bf3f2f;
+  padding: 10px 12px;
+  border-radius: 4px;
+  color: #7b2319;
+  background: #fbebe8;
+}
+
+.form-success {
+  margin: 6px 0 0;
+  border-left: 4px solid #2f6d4f;
+  padding: 10px 12px;
+  border-radius: 4px;
+  color: #23513b;
+  background: #eaf5ee;
+}
+
+.text-button {
+  min-height: 36px;
+  border: 0;
+  color: #2f6d4f;
+  background: transparent;
+}
+
+.text-button:hover:not(:disabled) {
+  color: #244f3b;
+  text-decoration: underline;
+}
+
+.inline-text-button {
+  display: inline;
+  min-height: auto;
+  border: 0;
+  padding: 0;
+  color: #2f6d4f;
+  background: transparent;
+  font-weight: 800;
+}
+
+.inline-text-button:hover:not(:disabled) {
+  color: #244f3b;
+  text-decoration: underline;
+}
+
+.forgot-password-button {
+  justify-self: end;
+  margin-top: -2px;
+}
+
+.auth-prompt {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  color: #526157;
+  font-weight: 700;
+}
+
+.dashboard-shell {
+  padding: 28px;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(100%, 1120px);
+  margin: 0 auto;
+  padding: 18px 0 26px;
+}
+
+.dashboard-empty,
+.profile-page {
+  width: min(100%, 1120px);
+  margin: 0 auto;
+}
+
+.dashboard-empty {
+  min-height: 360px;
+}
+
+.profile-page {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 220px;
+  border: 1px solid #d8ded6;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.profile-page p {
+  margin: 4px 0 0;
+  color: #526157;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 1.25rem;
+  font-weight: 800;
+  background: #234d3a;
+}
+
+.role-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  margin-top: 12px;
+  border: 1px solid #c5b98e;
+  border-radius: 999px;
+  padding: 3px 10px;
+  color: #51451f;
+  background: #fff7d8;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.sign-out-button {
+  margin-left: auto;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 760px) {
+  .auth-shell,
+  .dashboard-shell {
+    padding: 18px;
+  }
+
+  .auth-layout {
+    min-height: auto;
+  }
+
+  .dashboard-header {
+    align-items: center;
+    flex-direction: row;
+  }
+
+  .profile-page {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .sign-out-button {
+    margin-left: 0;
+  }
+}
