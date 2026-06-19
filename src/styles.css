@@ -92,6 +92,13 @@ button:disabled {
   margin: 0;
 }
 
+.brand-lockup h1 {
+  color: #17201a;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
 .brand-lockup {
   display: flex;
   align-items: center;
@@ -283,7 +290,7 @@ button:disabled {
   justify-content: center;
   gap: 6px;
   margin: 8px 0 0;
-  color: #526157;
+  color: #28362d;
   font-weight: 700;
 }
 
