@@ -7,9 +7,10 @@ import {
   setSessionCookies
 } from "../lib/cookies.js";
 import {
+  getSupabaseProfile,
   getSupabaseClient,
   startSupabasePhoneVerification,
-  updateSupabaseUserMetadata,
+  upsertSupabaseProfile,
   verifySupabasePhoneChange
 } from "../lib/supabase.js";
 import {
@@ -18,8 +19,6 @@ import {
 } from "../middleware/requireAuth.js";
 
 const router = Router();
-
-const PENDING_PROFILE_METADATA_KEY = "pending_public_profile";
 
 const VALID_PROVINCES = new Set([
   "AB",
@@ -107,58 +106,52 @@ function validatePublicProfile(body) {
   };
 }
 
-function isPublicProfileComplete(metadata = {}) {
+function isPublicProfileComplete(profile) {
   return Boolean(
-    metadata.profile_complete &&
-      metadata.first_name &&
-      metadata.last_name &&
-      metadata.province &&
-      metadata.postal_code &&
-      metadata.phone_number &&
-      metadata.phone_verified_at
+    profile?.profile_completed &&
+      profile.first_name &&
+      profile.last_name &&
+      profile.province &&
+      profile.postal_code &&
+      profile.phone
   );
 }
 
-function publicUser(user) {
-  const metadata = user.user_metadata || {};
-  const role =
-    user.app_metadata?.role ||
-    metadata.role ||
-    user.app_metadata?.user_role ||
-    "public_user";
+function publicUser(user, profile = null) {
+  const role = profile?.role || "public_user";
+  const fullName = profile
+    ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim()
+    : "";
 
   return {
     email: user.email,
     emailVerified: Boolean(user.email_confirmed_at || user.confirmed_at),
     id: user.id,
-    name: metadata.full_name || metadata.name || null,
-    phoneNumber: metadata.phone_number || null,
+    name: fullName || null,
+    phoneNumber: profile?.phone || null,
     profileComplete:
-      role === "public_user" ? isPublicProfileComplete(metadata) : true,
+      role === "public_user" ? isPublicProfileComplete(profile) : true,
     role
   };
 }
 
-function pendingOtpState(user) {
-  const pendingProfile =
-    user.user_metadata?.[PENDING_PROFILE_METADATA_KEY] || null;
-
-  if (!pendingProfile?.phone_number) {
+function pendingOtpState(profile) {
+  if (!profile?.phone || profile.profile_completed) {
     return null;
   }
 
   return {
     otpRequired: true,
-    phoneMasked: maskPhoneNumber(pendingProfile.phone_number)
+    phoneMasked: maskPhoneNumber(profile.phone)
   };
 }
 
-function pendingProfileResponse(user) {
-  const otpState = pendingOtpState(user);
+function pendingProfileResponse(user, profile = null) {
+  const otpState = pendingOtpState(profile);
 
   return {
     profileRequired: true,
-    user: publicUser(user),
+    user: publicUser(user, profile),
     ...(otpState || {})
   };
 }
@@ -195,12 +188,13 @@ router.post("/login", async (req, res, next) => {
       return;
     }
 
-    const user = publicUser(data.user);
+    const profile = await getSupabaseProfile(data.session.access_token, data.user.id);
+    const user = publicUser(data.user, profile);
 
     if (!user.profileComplete) {
       clearAuthenticatedSessionCookies(res);
       setPendingSessionCookies(res, data.session);
-      res.status(200).json(pendingProfileResponse(data.user));
+      res.status(200).json(pendingProfileResponse(data.user, profile));
       return;
     }
 
@@ -236,12 +230,7 @@ router.post("/signup", async (req, res, next) => {
       email,
       password,
       options: {
-        ...(emailRedirectTo ? { emailRedirectTo } : {}),
-        data: {
-          account_created_at: new Date().toISOString(),
-          profile_complete: false,
-          role: "public_user"
-        }
+        ...(emailRedirectTo ? { emailRedirectTo } : {})
       }
     });
 
@@ -259,21 +248,26 @@ router.post("/signup", async (req, res, next) => {
   }
 });
 
-router.get("/profile-session", requirePendingProfileAuth, (req, res) => {
-  const user = publicUser(req.user);
+router.get("/profile-session", requirePendingProfileAuth, async (req, res, next) => {
+  try {
+    const profile = await getSupabaseProfile(req.accessToken, req.user.id);
+    const user = publicUser(req.user, profile);
 
-  if (user.profileComplete) {
-    clearPendingSessionCookies(res);
-    setSessionCookies(res, {
-      access_token: req.accessToken,
-      expires_in: 3600,
-      refresh_token: req.refreshToken
-    });
-    res.json({ user });
-    return;
+    if (user.profileComplete) {
+      clearPendingSessionCookies(res);
+      setSessionCookies(res, {
+        access_token: req.accessToken,
+        expires_in: 3600,
+        refresh_token: req.refreshToken
+      });
+      res.json({ user });
+      return;
+    }
+
+    res.json(pendingProfileResponse(req.user, profile));
+  } catch (error) {
+    next(error);
   }
-
-  res.json(pendingProfileResponse(req.user));
 });
 
 router.post("/profile", requirePendingProfileAuth, async (req, res, next) => {
@@ -293,23 +287,18 @@ router.post("/profile", requirePendingProfileAuth, async (req, res, next) => {
       postalCode,
       province
     } = validation.profile;
-    const metadata = req.user.user_metadata || {};
-    const pendingProfile = {
-      first_name: firstName,
-      full_name: `${firstName} ${lastName}`,
-      last_name: lastName,
-      phone_national: phoneNational,
-      phone_number: phoneNumber,
-      postal_code: postalCode,
-      province,
-      saved_at: new Date().toISOString()
-    };
+    const existingProfile = await getSupabaseProfile(req.accessToken, req.user.id);
 
-    await updateSupabaseUserMetadata(req.accessToken, {
-      ...metadata,
-      [PENDING_PROFILE_METADATA_KEY]: pendingProfile,
-      profile_complete: false,
-      role: metadata.role || "public_user"
+    await upsertSupabaseProfile(req.accessToken, {
+      email: req.user.email,
+      first_name: firstName,
+      id: req.user.id,
+      last_name: lastName,
+      phone: phoneNational,
+      postal_code: postalCode,
+      profile_completed: false,
+      province,
+      role: existingProfile?.role || "public_user"
     });
 
     await startSupabasePhoneVerification(req.accessToken, phoneNumber);
@@ -335,40 +324,30 @@ router.post(
       return;
     }
 
-    const metadata = req.user.user_metadata || {};
-    const pendingProfile = metadata[PENDING_PROFILE_METADATA_KEY];
+    const profile = await getSupabaseProfile(req.accessToken, req.user.id);
+    const phone = normalizePhoneNumber(profile?.phone);
 
-    if (!pendingProfile?.phone_number) {
+    if (!profile?.phone || !phone) {
       res.status(409).json({ error: "Save your profile before entering a code." });
       return;
     }
 
     try {
-      await verifySupabasePhoneChange(
-        req.accessToken,
-        pendingProfile.phone_number,
-        token
-      );
+      await verifySupabasePhoneChange(req.accessToken, phone.e164, token);
 
-      const {
-        [PENDING_PROFILE_METADATA_KEY]: _pendingProfile,
-        ...existingMetadata
-      } = metadata;
-      const updated = await updateSupabaseUserMetadata(req.accessToken, {
-        ...existingMetadata,
-        first_name: pendingProfile.first_name,
-        full_name: pendingProfile.full_name,
-        last_name: pendingProfile.last_name,
-        phone_number: pendingProfile.phone_number,
-        phone_verified_at: new Date().toISOString(),
-        postal_code: pendingProfile.postal_code,
-        profile_complete: true,
-        profile_completed_at: new Date().toISOString(),
-        province: pendingProfile.province,
-        role: metadata.role || "public_user"
+      const completedProfile = await upsertSupabaseProfile(req.accessToken, {
+        email: req.user.email,
+        first_name: profile.first_name,
+        id: req.user.id,
+        last_name: profile.last_name,
+        phone: profile.phone,
+        postal_code: profile.postal_code,
+        profile_completed: true,
+        province: profile.province,
+        role: profile.role || "public_user"
       });
 
-      const user = publicUser(updated.user || updated);
+      const user = publicUser(req.user, completedProfile);
 
       clearPendingSessionCookies(res);
       setSessionCookies(res, {
@@ -414,7 +393,7 @@ router.post("/password-reset", async (req, res, next) => {
 });
 
 router.get("/me", requireAuth, (req, res) => {
-  res.json({ user: publicUser(req.user) });
+  res.json({ user: publicUser(req.user, req.profile) });
 });
 
 router.post("/logout", (_req, res) => {

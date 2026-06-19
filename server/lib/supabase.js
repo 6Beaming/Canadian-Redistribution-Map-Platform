@@ -2,6 +2,9 @@ import { createClient } from "@supabase/supabase-js";
 
 let supabaseClient;
 
+const PROFILE_COLUMNS =
+  "id,email,first_name,last_name,province,postal_code,phone,role,profile_completed,created_at";
+
 function getSupabaseConfig() {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey =
@@ -51,22 +54,31 @@ function getSupabaseUserClient(accessToken) {
   });
 }
 
-export async function updateSupabaseUserMetadata(accessToken, metadata) {
-  const { supabaseKey, supabaseUrl } = getSupabaseConfig();
-  const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    method: "PUT",
-    headers: {
-      apikey: supabaseKey,
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ data: metadata })
-  });
+export async function getSupabaseProfile(accessToken, userId) {
+  const supabase = getSupabaseUserClient(accessToken);
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(PROFILE_COLUMNS)
+    .eq("id", userId)
+    .maybeSingle();
 
-  const data = await response.json().catch(() => ({}));
+  if (error) {
+    throw new Error(error.message || "Unable to load user profile.");
+  }
 
-  if (!response.ok) {
-    throw new Error(data.msg || data.error_description || data.error || "Unable to update user profile.");
+  return data;
+}
+
+export async function upsertSupabaseProfile(accessToken, profile) {
+  const supabase = getSupabaseUserClient(accessToken);
+  const { data, error } = await supabase
+    .from("profiles")
+    .upsert(profile, { onConflict: "id" })
+    .select(PROFILE_COLUMNS)
+    .single();
+
+  if (error) {
+    throw new Error(error.message || "Unable to save user profile.");
   }
 
   return data;
