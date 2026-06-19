@@ -78,16 +78,26 @@ function getSupabaseAdminClient() {
   return supabaseAdminClient;
 }
 
+function requireSupabaseAdminClient() {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    const configError = new Error("Missing SUPABASE_SERVICE_ROLE_KEY.");
+    configError.statusCode = 500;
+    configError.publicMessage =
+      "Server is not configured to check existing accounts.";
+    throw configError;
+  }
+
+  return supabase;
+}
+
 export function isSupabaseAdminConfigured() {
   return Boolean(getSupabaseAdminClient());
 }
 
 export async function findSupabaseAuthUserByEmail(email) {
-  const supabase = getSupabaseAdminClient();
-
-  if (!supabase) {
-    return null;
-  }
+  const supabase = requireSupabaseAdminClient();
 
   const normalizedEmail = email.toLowerCase();
   const perPage = 1000;
@@ -128,11 +138,7 @@ export async function findSupabaseAuthUserByEmail(email) {
 }
 
 export async function findSupabaseProfileByPhone(phone) {
-  const supabase = getSupabaseAdminClient();
-
-  if (!supabase) {
-    return null;
-  }
+  const supabase = requireSupabaseAdminClient();
 
   const { data, error } = await supabase
     .from("profiles")
