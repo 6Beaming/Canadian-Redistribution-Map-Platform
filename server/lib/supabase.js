@@ -93,11 +93,29 @@ export async function upsertSupabaseProfile(accessToken, profile) {
 }
 
 export async function startSupabasePhoneVerification(accessToken, phone) {
-  const supabase = getSupabaseUserClient(accessToken);
-  const { data, error } = await supabase.auth.updateUser({ phone });
+  const { supabaseKey, supabaseUrl } = getSupabaseConfig();
+  const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    method: "PUT",
+    headers: {
+      apikey: supabaseKey,
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ phone })
+  });
 
-  if (error) {
-    throw new Error(error.message || "Unable to send phone verification code.");
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const verificationError = new Error(
+      data.msg ||
+        data.error_description ||
+        data.error ||
+        "Unable to send phone verification code."
+    );
+    verificationError.statusCode = 400;
+    verificationError.publicMessage = verificationError.message;
+    throw verificationError;
   }
 
   return data;
@@ -112,7 +130,12 @@ export async function verifySupabasePhoneChange(accessToken, phone, token) {
   });
 
   if (error) {
-    throw new Error(error.message || "Unable to verify phone code.");
+    const verificationError = new Error(
+      error.message || "Unable to verify phone code."
+    );
+    verificationError.statusCode = 400;
+    verificationError.publicMessage = verificationError.message;
+    throw verificationError;
   }
 
   return data;
