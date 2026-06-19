@@ -1,8 +1,8 @@
 # Actual Redistricting Data Guide
 
-This document describes the **actual** contents of `CRMP-full-data.zip`. It mirrors the structure of `../local/Raw_Data_redist-mini-guide.md` but reflects **what is on disk**, including paths and formats not listed in the canonical schema documents.
+This document describes the **actual** contents of `CRMP-full-data.zip`. It mirrors the structure of `CRMP-full-data/redist-mini-guide.md` but reflects **what is on disk**, including paths and formats not listed in the canonical schema documents.
 
-For **expected** (canonical) layout, see `../local/Raw_Data_Schema.md` and `../local/Raw_Data_redist-mini-guide.md`.  
+For **expected** (canonical) layout, see `CRMP-full-data/README.md` and `CRMP-full-data/redist-mini-guide.md`.  
 For **gaps vs expected**, see `Missing_Files.md` (this folder).
 
 ---

@@ -2,7 +2,8 @@
 
 **Bundle audited:** `CRMP-full-data.zip` (~863 MB unpacked; 212 files in archive inventory; additional files after nested zip extraction)  
 **Audit date:** 2026-06-19  
-**Reference documents (canonical expected layout):** `../local/Raw_Data_Schema.md`, `../local/Raw_Data_redist-mini-guide.md`
+**Reference documents (canonical expected layout):** `CRMP-full-data/README.md`, `CRMP-full-data/redist-mini-guide.md`
+**Audit source:** `CRMP-full-data/data_schema_audit_report.txt`
 
 This document lists files and folders **described in the canonical schema documents** that are **absent or incomplete** in the current zip. It is intended for **data collectors** repacking the bundle. Naming and paths match the schema documents exactly.
 
@@ -24,7 +25,7 @@ Top-level layout `CRMP-full-data/raw_data/...` is correct. Gaps are **missing fi
 
 ## 1. Missing — DA population CSVs (`006_dissemination_areas/`)
 
-Per `../local/Raw_Data_redist-mini-guide.md`, DA census profiles belong under:
+Per `CRMP-full-data/redist-mini-guide.md`, DA census profiles belong under:
 
 `raw_data/statistics_canada/census_profiles/profile_2021/006_dissemination_areas/`
 
@@ -59,7 +60,7 @@ Expected **six regional profile CSVs** (long format: one row per geography per c
 
 ## 2. Missing — FED 2023 Representation Order profiles (`029_feds_2023ro/`)
 
-Per `../local/Raw_Data_redist-mini-guide.md` and `../local/Raw_Data_Schema.md`:
+Per `CRMP-full-data/redist-mini-guide.md` and `CRMP-full-data/README.md`:
 
 | Path | Status |
 |------|--------|
@@ -71,7 +72,7 @@ Expected content: 2021 Census Profile tables at **federal electoral district (FE
 
 ## 3. Missing — ADA profile CSVs (`012_adas/`)
 
-Per `../local/Raw_Data_redist-mini-guide.md` (alternative building blocks):
+Per `CRMP-full-data/redist-mini-guide.md` (alternative building blocks):
 
 | Path | Status |
 |------|--------|
@@ -83,7 +84,7 @@ Expected: regional ADA profile CSVs (same long-format pattern as `006_disseminat
 
 ## 4. Missing — `{prov}_dissemination_areas.gpkg` by province
 
-Per `../local/Raw_Data_redist-mini-guide.md`:
+Per `CRMP-full-data/redist-mini-guide.md`:
 
 `raw_data/statistics_canada/census_boundaries/{prov}/{prov}_dissemination_areas.gpkg`
 
@@ -109,7 +110,7 @@ Each file should carry geometry plus identifiers (`DAUID`, `DGUID`, `LANDAREA`, 
 
 ## 5. Missing — electoral district GeoPackages (selected provinces)
 
-Per `../local/Raw_Data_redist-mini-guide.md`, expected under `census_boundaries/{prov}/`:
+Per `CRMP-full-data/redist-mini-guide.md`, expected under `census_boundaries/{prov}/`:
 
 - `{prov}_electoral_districts.gpkg` (current RO)
 - `{prov}_electoral_districts_2003ro.gpkg`
@@ -148,7 +149,7 @@ Present in `on/` (non-substitutes for redistricting building blocks):
 
 ## 6. Missing — other `profile_2021/` product folders (schema-implied)
 
-`../local/Raw_Data_Schema.md` describes `profile_2021/` as **2021 Census Profile tables by geography (numbered StatCan product folders)**. The current zip contains several numbered folders with **geo-index or metadata only**, not full profile CSVs:
+`CRMP-full-data/README.md` describes `profile_2021/` as **2021 Census Profile tables by geography (numbered StatCan product folders)**. The current zip contains several numbered folders with **geo-index or metadata only**, not full profile CSVs:
 
 | Folder | Present content | Expected (typical full bundle) |
 |--------|-----------------|--------------------------------|
@@ -166,7 +167,7 @@ Geo-index files use columns `Geo Code`, `Geo Name`, `Line Number` — **not** th
 
 ## 7. Present — items correctly described in schema (verification)
 
-These **are present** and match `../local/Raw_Data_Schema.md` (collectors should retain them in repacks):
+These **are present** and match `CRMP-full-data/README.md` (collectors should retain them in repacks):
 
 | Path | Notes |
 |------|-------|
