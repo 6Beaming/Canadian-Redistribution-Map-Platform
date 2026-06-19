@@ -37,7 +37,7 @@ export default function Header() {
 
       {isUsersPage && (
         <div className="flex-1 flex justify-end">
-          <Button variant="outline" className="rounded-full">
+          <Button variant="outline" className="rounded-full bg-black">
             A
           </Button>
         </div>
@@ -45,7 +45,7 @@ export default function Header() {
 
       {isAuthPage && (
         <div className="flex-1 flex justify-end">
-          <Button variant="outline" className="rounded-full">
+          <Button variant="outline" className="rounded-full bg-black">
             A
           </Button>
         </div>
@@ -57,7 +57,7 @@ export default function Header() {
             <Button
               onClick={viewSubmissions}
               variant="outline"
-              className="rounded-full"
+              className="rounded-full bg-black"
             >
               View Submissions
             </Button>
@@ -71,7 +71,7 @@ export default function Header() {
           <Button
             variant="outline"
             size="icon"
-            className="rounded-full absolute left-5.5"
+            className="rounded-full absolute left-5.5 bg-black"
             onClick={() => navigate("/users")}
           >
             <ArrowLeft className="w-5 h-5" />
@@ -81,7 +81,7 @@ export default function Header() {
           </div>
           <div className="flex-1" />
           <div className="asbolute right-5.5">
-            <Button variant="outline" className="rounded-full">
+            <Button variant="outline" className="rounded-full bg-black">
               A
             </Button>
           </div>
