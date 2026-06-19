@@ -3,6 +3,8 @@ import {
   clearAuthenticatedSessionCookies,
   clearPendingSessionCookies,
   clearSessionCookies,
+  getPendingProfileCookie,
+  setPendingProfileCookie,
   setPendingSessionCookies,
   setSessionCookies
 } from "../lib/cookies.js";
@@ -138,19 +140,19 @@ function publicUser(user, profile = null) {
   };
 }
 
-function pendingOtpState(profile) {
-  if (!profile?.phone || profile.profile_completed) {
+function pendingOtpState(pendingProfile) {
+  if (!pendingProfile?.phoneAuth) {
     return null;
   }
 
   return {
     otpRequired: true,
-    phoneMasked: maskPhoneNumber(profile.phone)
+    phoneMasked: maskPhoneNumber(pendingProfile.phoneAuth)
   };
 }
 
-function pendingProfileResponse(user, profile = null) {
-  const otpState = pendingOtpState(profile);
+function pendingProfileResponse(user, profile = null, pendingProfile = null) {
+  const otpState = pendingOtpState(pendingProfile);
 
   return {
     profileRequired: true,
@@ -254,6 +256,7 @@ router.post("/signup", async (req, res, next) => {
 router.get("/profile-session", requirePendingProfileAuth, async (req, res, next) => {
   try {
     const profile = await getSupabaseProfile(req.accessToken, req.user.id);
+    const pendingProfile = getPendingProfileCookie(req);
     const user = publicUser(req.user, profile);
 
     if (user.profileComplete) {
@@ -267,7 +270,7 @@ router.get("/profile-session", requirePendingProfileAuth, async (req, res, next)
       return;
     }
 
-    res.json(pendingProfileResponse(req.user, profile));
+    res.json(pendingProfileResponse(req.user, profile, pendingProfile));
   } catch (error) {
     next(error);
   }
@@ -291,21 +294,16 @@ router.post("/profile", requirePendingProfileAuth, async (req, res, next) => {
       postalCode,
       province
     } = validation.profile;
-    const existingProfile = await getSupabaseProfile(req.accessToken, req.user.id);
-
-    await upsertSupabaseProfile(req.accessToken, {
-      email: req.user.email,
-      first_name: firstName,
-      id: req.user.id,
-      last_name: lastName,
-      phone: phoneNational,
-      postal_code: postalCode,
-      profile_completed: false,
-      province,
-      role: existingProfile?.role || "public_user"
-    });
-
     await startSupabasePhoneVerification(req.accessToken, phoneAuth);
+    setPendingProfileCookie(res, {
+      firstName,
+      lastName,
+      phoneAuth,
+      phoneNational,
+      phoneNumber,
+      postalCode,
+      province
+    });
 
     res.status(202).json({
       message: "Verification code sent.",
@@ -328,10 +326,10 @@ router.post(
       return;
     }
 
-    const profile = await getSupabaseProfile(req.accessToken, req.user.id);
-    const phone = normalizePhoneNumber(profile?.phone);
+    const pendingProfile = getPendingProfileCookie(req);
+    const phone = normalizePhoneNumber(pendingProfile?.phoneAuth);
 
-    if (!profile?.phone || !phone) {
+    if (!pendingProfile || !phone) {
       res.status(409).json({ error: "Save your profile before entering a code." });
       return;
     }
@@ -339,16 +337,17 @@ router.post(
     try {
       await verifySupabasePhoneChange(req.accessToken, phone.auth, token);
 
+      const existingProfile = await getSupabaseProfile(req.accessToken, req.user.id);
       const completedProfile = await upsertSupabaseProfile(req.accessToken, {
         email: req.user.email,
-        first_name: profile.first_name,
+        first_name: pendingProfile.firstName,
         id: req.user.id,
-        last_name: profile.last_name,
-        phone: profile.phone,
-        postal_code: profile.postal_code,
+        last_name: pendingProfile.lastName,
+        phone: pendingProfile.phoneNational,
+        postal_code: pendingProfile.postalCode,
         profile_completed: true,
-        province: profile.province,
-        role: profile.role || "public_user"
+        province: pendingProfile.province,
+        role: existingProfile?.role || "public_user"
       });
 
       const user = publicUser(req.user, completedProfile);
