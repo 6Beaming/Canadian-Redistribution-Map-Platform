@@ -1,8 +1,10 @@
+import { Button } from "@/components/ui/button"
+
+
 export default function DashboardHome() {
   return (
-    <div>
-      <h1>About Page</h1>
-      <p>This is my new page</p>
-    </div>
+  <div>
+    <Button variant="outline">Button</Button>
+  </div>
   );
 }
