@@ -27,6 +27,30 @@ from typing import Iterable, Iterator, TextIO
 
 PROVINCES = ("on", "qc", "bc", "ab", "mb", "sk", "ns", "nb", "nl", "pe", "nt", "nu", "yt")
 
+# DGUID census-area prefix after "2021S" / "2021D" (5 chars) -> province
+DGUID_PREFIX_TO_PROV = {
+    "10001": "nl",
+    "11001": "pe",
+    "12001": "ns",
+    "13001": "nb",
+    "24001": "qc",
+    "35001": "on",
+    "46001": "mb",
+    "47001": "sk",
+    "48001": "ab",
+    "59001": "bc",
+    "05126": "yt",  # Yukon dissemination areas in 2021 DGUIDs
+    "61001": "nt",
+    "62001": "nu",
+}
+
+PILOT_FED_CANDIDATES = {
+    "60001": ("yt", "Yukon — MVP pilot; 74 DAs; DA gpkg present"),
+    "11001": ("pe", "PEI — smallest DA count among provinces with DA gpkg (319)"),
+    "10001": ("nl", "NL — Avalon; 1082 DAs; full boundary stack"),
+    "48001": ("ab", "AB — large but complete DA gpkg + prairies profile path"),
+}
+
 # --- Document expectations (from local/Raw_Data_Schema.md + local/Raw_Data_redist-mini-guide.md) ---
 
 DOC_DA_PROFILE_CSVS = (
@@ -87,6 +111,7 @@ class SchemaRecord:
         doc_mentions: list[str] | None = None,
         notes: list[str] | None = None,
         error: str | None = None,
+        extra: dict | None = None,
     ) -> None:
         self.rel_path = rel_path
         self.kind = kind
@@ -100,6 +125,7 @@ class SchemaRecord:
         self.doc_mentions = doc_mentions or []
         self.notes = notes or []
         self.error = error
+        self.extra = extra or {}
 
 
 def format_size(num_bytes: int) -> str:
@@ -257,6 +283,258 @@ def read_csv_sample(path: Path, max_rows: int = 3) -> tuple[list[str], list[dict
     return columns, rows, encoding
 
 
+def decode_csv_bytes(raw: bytes) -> tuple[str, str]:
+    for encoding in CSV_ENCODINGS:
+        try:
+            return raw.decode(encoding), encoding
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("latin-1", errors="replace"), "latin-1"
+
+
+CSV_ENCODINGS = ("utf-8-sig", "utf-8", "cp1252", "latin-1")
+
+
+def infer_prov_from_dguid(dguid: str) -> str | None:
+    dguid = dguid.strip()
+    if len(dguid) < 10 or not dguid.startswith("2021"):
+        return None
+    if dguid[4] not in {"S", "D"}:
+        return None
+    prefix = dguid[5:10]
+    if prefix in DGUID_PREFIX_TO_PROV:
+        return DGUID_PREFIX_TO_PROV[prefix]
+    pruid = dguid[5:7]
+    return {
+        "10": "nl",
+        "11": "pe",
+        "12": "ns",
+        "13": "nb",
+        "24": "qc",
+        "35": "on",
+        "46": "mb",
+        "47": "sk",
+        "48": "ab",
+        "59": "bc",
+        "60": "yt",
+        "61": "nt",
+        "62": "nu",
+    }.get(pruid)
+
+
+def inventory_profile_csv(path: Path) -> dict:
+    """
+    Stream a long-format Census Profile CSV — count geographies at CHARACTERISTIC_ID=1
+    without loading the full table into memory.
+    """
+    info: dict = {
+        "geo_levels": Counter(),
+        "provinces": Counter(),
+        "sample_names": [],
+        "population_rows": 0,
+    }
+    raw_head = path.read_bytes()[:8192]
+    text_head, encoding = decode_csv_bytes(raw_head)
+    reader_head = csv.DictReader(io.StringIO(text_head))
+    fieldnames = reader_head.fieldnames or []
+    colset = {c.upper() for c in fieldnames if c}
+
+    with path.open("r", encoding=encoding, errors="replace") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            if str(row.get("CHARACTERISTIC_ID", "")).strip() != "1":
+                continue
+            info["population_rows"] += 1
+            level = str(row.get("GEO_LEVEL", "")).strip() or "(blank)"
+            info["geo_levels"][level] += 1
+            dguid = str(row.get("DGUID", "")).strip()
+            prov = infer_prov_from_dguid(dguid)
+            if prov:
+                info["provinces"][prov] += 1
+            if len(info["sample_names"]) < 5:
+                info["sample_names"].append(
+                    {
+                        "DGUID": dguid,
+                        "GEO_NAME": str(row.get("GEO_NAME", "")).strip(),
+                        "GEO_LEVEL": level,
+                    }
+                )
+
+    info["unique_geographies"] = info["population_rows"]
+    info["encoding"] = encoding
+    info["has_da_profile_schema"] = SCHEMA_HINTS["da_profile_csv"].issubset(colset)
+    return info
+
+
+def read_fed_names_from_gpkg(path: Path) -> dict[str, str]:
+    """Read FEDUID/FEDNAME pairs from an electoral-district GeoPackage (no geometry)."""
+    names: dict[str, str] = {}
+    uri = f"file:{path.as_posix()}?mode=ro"
+    conn = sqlite3.connect(uri, uri=True)
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT table_name FROM gpkg_contents WHERE data_type = 'features' LIMIT 1"
+    )
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        return names
+    layer = row[0]
+    cur.execute(f'PRAGMA table_info("{layer}")')
+    columns = {r[1].upper(): r[1] for r in cur.fetchall()}
+    fed_col = columns.get("FEDUID") or columns.get("FED_NUM")
+    name_col = columns.get("FEDNAME") or columns.get("ED_NAME")
+    if not fed_col or not name_col:
+        conn.close()
+        return names
+    cur.execute(f'SELECT "{fed_col}", "{name_col}" FROM "{layer}"')
+    for fed_id, fed_name in cur.fetchall():
+        key = str(fed_id).strip()
+        label = str(fed_name).strip()
+        if key and label:
+            names[key] = label
+    conn.close()
+    return names
+
+
+def inventory_fed_name_sources(root: Path) -> dict:
+    """Summarize in-bundle sources for federal electoral district display names."""
+    sources: dict = {
+        "electoral_gpkg": {},
+        "fed2021_pd": {},
+        "pmtiles_has_name": False,
+        "merged_unique": {},
+    }
+
+    for prov in PROVINCES:
+        for pattern in (
+            f"{prov}_electoral_districts.gpkg",
+            f"{prov}_electoral_districts_2013ro.gpkg",
+            f"{prov}_electoral_districts_2003ro.gpkg",
+        ):
+            path = root / f"raw_data/statistics_canada/census_boundaries/{prov}/{pattern}"
+            if path.exists():
+                try:
+                    names = read_fed_names_from_gpkg(path)
+                    if names:
+                        sources["electoral_gpkg"][path.as_posix()] = len(names)
+                        sources["merged_unique"].update(names)
+                except sqlite3.Error:
+                    pass
+
+        pd_path = root / f"raw_data/elections_canada/fed2021_pd/fed2021_{prov}_polling_districts.gpkg"
+        if pd_path.exists():
+            try:
+                uri = f"file:{pd_path.as_posix()}?mode=ro"
+                conn = sqlite3.connect(uri, uri=True)
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT table_name FROM gpkg_contents WHERE data_type = 'features' LIMIT 1"
+                )
+                layer_row = cur.fetchone()
+                if layer_row:
+                    layer = layer_row[0]
+                    cur.execute(f'SELECT DISTINCT "FED_NUM", "ed_name" FROM "{layer}"')
+                    count = 0
+                    for fed_num, ed_name in cur.fetchall():
+                        key = str(fed_num).strip()
+                        label = str(ed_name).strip()
+                        if key and label:
+                            sources["merged_unique"].setdefault(key, label)
+                            count += 1
+                    sources["fed2021_pd"][prov] = count
+                conn.close()
+            except sqlite3.Error:
+                pass
+
+    pmtiles = root / "raw_data/elections_canada/historical/fed_boundaries_2023.pmtiles"
+    if pmtiles.exists():
+        rec = sniff_pmtiles(pmtiles)
+        sources["pmtiles_has_name"] = "name" in {c.lower() for c in rec.columns}
+
+    return sources
+
+
+def build_regional_matrix(root: Path, schemas: list[SchemaRecord]) -> list[dict]:
+    """Per-province readiness for DA redistricting: boundary, profile join, GEO_NAME."""
+    da_features: dict[str, int | None] = {}
+    for rec in schemas:
+        if rec.kind != "gpkg" or not rec.rel_path.endswith("_dissemination_areas.gpkg"):
+            continue
+        prov = Path(rec.rel_path).name.split("_", 1)[0]
+        da_features[prov] = rec.feature_count
+
+    profile_by_prov: dict[str, int] = Counter()
+    profile_levels: dict[str, set[str]] = defaultdict(set)
+    for rec in schemas:
+        if rec.kind != "csv" or not rec.rel_path.endswith("_English_CSV_data.csv"):
+            continue
+        inv = rec.extra.get("profile_inventory") or {}
+        for prov, count in (inv.get("provinces") or {}).items():
+            profile_by_prov[prov] += count
+        for level, count in (inv.get("geo_levels") or {}).items():
+            if count:
+                for prov in inv.get("provinces") or {}:
+                    profile_levels[prov].add(level)
+
+    has_territories_csv = (
+        root
+        / "raw_data/statistics_canada/census_profiles/profile_2021/006_dissemination_areas/territories.csv"
+    ).exists()
+    has_fed029 = (
+        root / "raw_data/statistics_canada/census_profiles/profile_2021/029_feds_2023ro"
+    ).exists()
+
+    rows: list[dict] = []
+    for prov in PROVINCES:
+        boundary = da_features.get(prov)
+        pop_rows = profile_by_prov.get(prov, 0)
+        levels = sorted(profile_levels.get(prov, set()))
+        da_level_profile = any("dissemination area" in level.lower() for level in levels)
+
+        pop_status = "missing"
+        if pop_rows > 0 and da_level_profile:
+            pop_status = "partial_raw_csv"
+        elif prov in {"yt", "nt", "nu"} and has_territories_csv:
+            pop_status = "canonical_csv"
+        elif prov in {"nb", "ns", "nl", "pe"}:
+            pop_status = "needs_atlantic_csv"
+        elif prov == "qc":
+            pop_status = "needs_quebec_csv"
+        elif prov == "on":
+            pop_status = "needs_ontario_csv"
+        elif prov in {"ab", "mb", "sk"}:
+            pop_status = "needs_prairies_csv"
+        elif prov == "bc":
+            pop_status = "needs_bc_csv"
+
+        geo_name_status = pop_status
+        if boundary and pop_rows == 0:
+            geo_name_status = "boundary_only_no_da_profile"
+
+        score = 0
+        if boundary:
+            score += 2
+        if pop_rows > 0 and da_level_profile:
+            score += 2
+        elif has_territories_csv and prov in {"yt", "nt", "nu"}:
+            score += 1
+
+        rows.append(
+            {
+                "prov": prov,
+                "da_boundary": boundary,
+                "profile_pop_rows": pop_rows,
+                "profile_geo_levels": levels,
+                "population": pop_status,
+                "geo_name": geo_name_status,
+                "readiness_score": score,
+            }
+        )
+    rows.sort(key=lambda r: (-r["readiness_score"], r["prov"]))
+    return rows
+
+
 def count_csv_rows_fast(path: Path, limit: int | None = 5000) -> int | str | None:
     try:
         with path.open("r", encoding="latin-1", errors="replace") as handle:
@@ -286,6 +564,25 @@ def sniff_csv(path: Path) -> SchemaRecord:
             missing = SCHEMA_HINTS["da_profile_csv"] - colset
             if missing:
                 rec.notes.append(f"Missing expected profile cols: {sorted(missing)}")
+            try:
+                inv = inventory_profile_csv(path)
+                rec.extra["profile_inventory"] = {
+                    "geo_levels": dict(inv["geo_levels"]),
+                    "provinces": dict(inv["provinces"]),
+                    "unique_geographies": inv["unique_geographies"],
+                    "sample_names": inv["sample_names"],
+                    "has_da_profile_schema": inv["has_da_profile_schema"],
+                }
+                levels = ", ".join(f"{k}={v}" for k, v in inv["geo_levels"].most_common(4))
+                provs = ", ".join(f"{k}={v}" for k, v in inv["provinces"].most_common(6))
+                rec.notes.append(
+                    f"Population rows (CHARACTERISTIC_ID=1): {inv['unique_geographies']}; "
+                    f"GEO_LEVEL: {levels or 'n/a'}"
+                )
+                if provs:
+                    rec.notes.append(f"DGUID province inference: {provs}")
+            except OSError as exc:
+                rec.notes.append(f"Profile inventory skipped: {exc}")
         elif "GEO_UID" in colset or "ALT_GEO_CODE" in colset:
             rec.notes.append("Looks like geo_index / geography listing (NOT the regional profile CSV)")
         elif path.name.endswith("_geo_index.csv"):
@@ -491,8 +788,9 @@ def write_schema_report(
     extract_records: list[ExtractRecord],
     schemas: list[SchemaRecord],
     doc_findings: dict[str, list[str]],
+    regional_matrix: list[dict] | None = None,
+    fed_sources: dict | None = None,
 ) -> None:
-    out.write("=" * 80 + "\n")
     out.write("CRMP DATA SCHEMA AUDIT REPORT\n")
     out.write("=" * 80 + "\n")
     out.write(f"Bundle root: {bundle_root}\n")
@@ -565,8 +863,15 @@ def write_schema_report(
             if rec.error:
                 out.write(f"  ERROR: {rec.error}\n")
 
+    write_availability_section(
+        out,
+        regional_matrix=regional_matrix or [],
+        fed_sources=fed_sources or {},
+        bundle_root=bundle_root,
+    )
+
     out.write("\n" + "-" * 80 + "\n")
-    out.write("4. DOC ACCURACY JUDGEMENT (automated hints — verify manually)\n")
+    out.write("8. DOC ACCURACY JUDGEMENT (automated hints — verify manually)\n")
     out.write("-" * 80 + "\n")
     hints = [
         "mini-guide lists 006_dissemination_areas/*.csv as atlantic.csv … territories.csv.",
@@ -576,12 +881,91 @@ def write_schema_report(
         "Ontario on_dissemination_areas.gpkg was missing — mini-guide path is correct, bundle is incomplete.",
         "polling_districts_results_2006_2023.csv exists but is not described in Schema/mini-guide.",
         "Folders 014_dissolved_csds, 016_028_province_csds exist with meta/geo_index only — extend Schema docs.",
+        "Profile CSV inventory (section 3 notes) uses CHARACTERISTIC_ID=1 row counts — not a full-table scan.",
     ]
     for hint in hints:
         out.write(f"  * {hint}\n")
 
     out.write("\n" + "=" * 80 + "\n")
     out.write(f"Files scanned: {len(schemas)}\n")
+
+
+def write_availability_section(
+    out: TextIO,
+    *,
+    regional_matrix: list[dict],
+    fed_sources: dict,
+    bundle_root: Path,
+) -> None:
+    out.write("\n" + "-" * 80 + "\n")
+    out.write("5. REGIONAL DATA AVAILABILITY (DA redistricting readiness)\n")
+    out.write("-" * 80 + "\n")
+    out.write(
+        "Columns: prov | DA features in gpkg | profile pop rows (CHAR=1) | "
+        "population path | geo_name path | score (0-4)\n\n"
+    )
+    for row in regional_matrix:
+        boundary = row["da_boundary"] if row["da_boundary"] is not None else "MISSING"
+        out.write(
+            f"  {row['prov']:>2}  boundary={str(boundary):>6}  profile_rows={row['profile_pop_rows']:>5}  "
+            f"pop={row['population']:<22} geo_name={row['geo_name']:<28} score={row['readiness_score']}\n"
+        )
+        if row["profile_geo_levels"]:
+            out.write(f"      GEO_LEVEL in raw CSV: {', '.join(row['profile_geo_levels'])}\n")
+
+    out.write("\n" + "-" * 80 + "\n")
+    out.write("6. FED DISPLAY NAME SOURCES (2023 RO map labels)\n")
+    out.write("-" * 80 + "\n")
+    out.write(f"  PMTiles carries name field: {fed_sources.get('pmtiles_has_name')}\n")
+    out.write(f"  Unique names merged from GPKG sources: {len(fed_sources.get('merged_unique', {}))}\n")
+    if fed_sources.get("electoral_gpkg"):
+        out.write("  Electoral district GPKG layers:\n")
+        for path, count in sorted(fed_sources["electoral_gpkg"].items()):
+            out.write(f"    - {path}: {count} names\n")
+    if fed_sources.get("fed2021_pd"):
+        out.write("  fed2021_pd distinct FED names per province:\n")
+        for prov, count in sorted(fed_sources["fed2021_pd"].items()):
+            out.write(f"    - {prov}: {count}\n")
+    fed029 = bundle_root / "raw_data/statistics_canada/census_profiles/profile_2021/029_feds_2023ro"
+    out.write(f"  Canonical 029_feds_2023ro present: {fed029.exists()}\n")
+
+    out.write("\n" + "-" * 80 + "\n")
+    out.write("7. RECOMMENDED SLIM BUNDLES (copy lists for scripts/data/bundle)\n")
+    out.write("-" * 80 + "\n")
+    out.write("\n### A. Yukon MVP bundle (map-mvp pilot, FED 60001)\n")
+    yukon_files = [
+        "raw_data/statistics_canada/census_boundaries/yt/yt_dissemination_areas.gpkg",
+        "raw_data/statistics_canada/census_boundaries/yt/yt_census_subdivisions.gpkg",
+        "raw_data/statistics_canada/census_profiles/profile_2021/006_dissemination_areas/territories.csv",
+        "raw_data/statistics_canada/census_profiles/profile_2021/006_dissemination_areas/territories_geo_index.csv",
+        "raw_data/elections_canada/historical/fed_boundaries_2023.pmtiles",
+        "raw_data/elections_canada/historical/fed_boundaries_2023.geojson (optional fallback)",
+    ]
+    for item in yukon_files:
+        exists = (bundle_root / item.split(" (")[0]).exists()
+        flag = "OK" if exists else "MISSING"
+        out.write(f"  [{flag}] {item}\n")
+    out.write(
+        "\n  Derive for map-mvp:\n"
+        "    single_fed_das.geojson  <- yt_dissemination_areas + territories.csv (DGUID, GEO_NAME, C1_COUNT_TOTAL)\n"
+        "    place_labels_yt.geojson <- yt_census_subdivisions centroids + territories_geo_index (CSD labels)\n"
+        "    fed_labels.geojson      <- fed_boundaries_2023 + merged FED names from electoral GPKG / fed2021_pd\n"
+    )
+
+    out.write("\n### B. Database expansion bundle (pick highest-readiness FED after Yukon)\n")
+    top = [r for r in regional_matrix if r["readiness_score"] >= 2][:5]
+    if not top:
+        top = regional_matrix[:5]
+    for row in top:
+        out.write(
+            f"  - {row['prov'].upper()}: boundary={row['da_boundary']}, "
+            f"profile_rows={row['profile_pop_rows']}, score={row['readiness_score']}\n"
+        )
+    out.write("\n  Suggested pilot FEDs (if profiles are added):\n")
+    for fed_num, (prov, note) in PILOT_FED_CANDIDATES.items():
+        match = next((r for r in regional_matrix if r["prov"] == prov), None)
+        score = match["readiness_score"] if match else 0
+        out.write(f"    - FED {fed_num} ({prov.upper()}) score={score}: {note}\n")
 
 
 def run_audit(
@@ -609,6 +993,10 @@ def run_audit(
         schemas.append(sniff_file(path, bundle_root))
 
     doc_findings = validate_against_docs(bundle_root)
+    print("[INFO] Building regional availability matrix...")
+    regional_matrix = build_regional_matrix(bundle_root, schemas)
+    print("[INFO] Inventorying FED name sources...")
+    fed_sources = inventory_fed_name_sources(bundle_root)
 
     buffer = io.StringIO()
     write_schema_report(
@@ -617,6 +1005,8 @@ def run_audit(
         extract_records=extract_records,
         schemas=schemas,
         doc_findings=doc_findings,
+        regional_matrix=regional_matrix,
+        fed_sources=fed_sources,
     )
     report = buffer.getvalue()
 

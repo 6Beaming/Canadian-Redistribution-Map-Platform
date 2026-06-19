@@ -1,269 +1,230 @@
 # CRMP Sprint Report — Map MVP Delivery & Integration Plan
 
 **Audience:** Project team only  
-**Sprint outcome:** Map rendering MVP on branch `feature/issues6-8/map-rendering-mvp` is **complete** and ready to merge as a **sub-feature** into the main React applications.  
-**Assumption:** `CRMP-full-data.zip` (audited 2026-06-19) **will not be updated** during the remainder of this development cycle.  
-**References:** `Actual_redist-mini-guide.md`, `Missing_Files.md`, `Proposal.pdf`
+**Branch:** `feature/issues6-8/map-rendering-mvp`  
+**Status:** Map MVP **deliverable** — standalone demo via Express; ready to merge into React apps.  
+**Assumption:** `CRMP-full-data.zip` (audited 2026-06-19) **will not be updated** this cycle. Yukon DA census attributes come from **external StatCan downloads**, not the zip.  
+**References:** `Actual_redist-mini-guide.md`, `Missing_Files.md`, `DATA_PROVENANCE.md`, `Proposal.pdf`
 
 ---
 
 ## 1. Team context — parallel workstreams
 
-Development is no longer a single standalone `map-mvp/` spike. Other teammates are actively building the application shell:
-
 | Workstream | Owner(s) | Stack | Status |
 |------------|----------|-------|--------|
-| **Public User + Commissioner auth** | Auth team | Supabase (registration, login, sessions) | In progress |
-| **Public User frontend layout** | Frontend team | React + Express; shell components; state in `localStorage` | In progress |
-| **Commissioner frontend layout** | Frontend team | React + Express; dashboard shell; state in `localStorage` | In progress |
-| **Map rendering MVP** | Map team | MapLibre GL JS v4, PMTiles, static GeoJSON (`map-mvp/`) | **Complete — this branch** |
+| **Public User + Commissioner auth** | Auth team | Supabase | In progress |
+| **Public User / Commissioner layout** | Frontend team | React + Express; `localStorage` | In progress |
+| **Map rendering MVP** | Map team | MapLibre GL JS v4, PMTiles, static assets (`map-mvp/`) | **Complete — deliverable** |
 
-The main app already uses **React + Express** per README. The map MVP was intentionally built as vanilla JS under `map-mvp/` to unblock rendering; **integration into both React frontends is the mandatory close-out task for this sprint.**
+The map MVP is vanilla JS under `map-mvp/`, served by **`server/index.js` (Express)** via `npm run dev:map`. Integration into both React frontends remains the next mandatory step for the full product.
 
-### 1.1 What changes after merge
+### 1.1 Target architecture after merge
 
 ```text
-┌──────────────────────────────────────────────────────────────────┐
-│  React apps (Public User + Commissioner) — parallel branches     │
-│  • Supabase Auth (login / register)                              │
-│  • App shell, routing, layout components                         │
-│  • UI state → localStorage (existing team convention)          │
-└────────────────────────────┬─────────────────────────────────────┘
-                             │ embed as sub-feature (THIS SPRINT)
-┌────────────────────────────▼─────────────────────────────────────┐
-│  Map module (from map-mvp/)                                      │
-│  • MapLibre map + PMTiles FED base + Yukon DA layer              │
-│  • Labels, side panel, pilot-region gating                       │
-│  • Assignment helpers → align with app localStorage / later API  │
-└────────────────────────────┬─────────────────────────────────────┘
-                             │
-┌────────────────────────────▼─────────────────────────────────────┐
-│  Express server (shared)                                         │
-│  • Static assets incl. PMTiles (Range headers) — exists today    │
-│  • REST API routes → Supabase          (TBD — see §5)            │
-└──────────────────────────────────────────────────────────────────┘
+React apps (Public User + Commissioner)
+  └── Map module (from map-mvp/)
+        ├── PMTiles FED base + Yukon DA layer
+        ├── Labels + side panel + pilot gating
+        └── Assignment helpers → localStorage / later Supabase API
+
+Express (shared)
+  ├── Static: map-mvp/data/* (PMTiles needs Range headers)
+  └── REST /api/* → Supabase                    (TBD)
 ```
-
-**Division of responsibility:**
-
-| Concern | This sprint (required) | Timeline TBD |
-|---------|------------------------|--------------|
-| Map UI inside React apps | **Yes — merge & embed** | — |
-| Auth flows | Auth team (already underway) | — |
-| App layout / navigation | Frontend team (already underway) | — |
-| Supabase **database** deploy (schema, seed ETL) | — | **TBD** — this sprint if capacity; else next sprint |
-| Express **API** refactor (`/api/*` → Supabase) | — | **TBD** — this sprint if capacity; else next sprint |
-
-Until the API layer lands, map-related persistence can continue via **`localStorage`** (consistent with the current frontend convention) or Supabase client calls from React if auth team exposes helpers — but **server-side validation and commissioner data access remain blocked** without the API + DB work.
 
 ---
 
-## 2. What we shipped (map MVP branch)
+## 2. Delivered — map MVP
 
 ### 2.1 Scope
 
-A **standalone map prototype** under `map-mvp/` proving the interaction model for one pilot region (**Yukon**, FED `60001`, **74 dissemination areas**) on a **national FED canvas** (343 districts). It is the reference implementation to port into React.
+Standalone prototype for **Yukon pilot** (FED `60001`, **74 dissemination areas**) on a **national FED canvas** (343 districts). Reference implementation for React port.
 
 ### 2.2 Runtime behaviour
 
 | Interaction | Behaviour |
 |-------------|-----------|
-| National view | 343 FED polygons from PMTiles (`fed_boundaries_2023.pmtiles`) on a white basemap |
-| FED labels | 343 riding names at centroids (`fed_labels.geojson`), zoom 3–8 |
-| Yukon zoom-in | 74 DA polygons (`single_fed_das.geojson`); community labels (`place_labels_yt.geojson`), zoom ≥ 8 |
-| DA click | Yellow highlight + side panel: `DGUID`, `C1_COUNT_TOTAL`, FED hint |
-| Non-pilot FED click | Side panel: **“Coming Soon!”** + `fed_num` |
-| Dev server | Express (`npm run dev:map`) with HTTP Range support for PMTiles |
+| National view | 343 FED polygons from `fed_boundaries_2023.pmtiles` (GeoJSON fallback if PMTiles unavailable) |
+| FED labels | 343 names from `fed_labels.geojson` (zoom 3–8) |
+| Yukon DA layer | 74 polygons from `single_fed_das.geojson`; map labels from `yt_da_profiles.json` (zoom ≥ 8) |
+| DA click — title | Named CSD: community name only (e.g. **Whitehorse**). Unorganized CSD: **Unnamed DA: DA {code}*** with footnote |
+| DA click — details | `DGUID`, DA code, population (2021), FED `60001`, StatCan source links |
+| Non-pilot FED | Side panel: riding name + **Coming Soon!** |
+| Dev server | `npm run dev:map` → Express on `http://127.0.0.1:8080/` |
 
-### 2.3 Implementation assets
+### 2.3 Raw bundle vs MVP data (audited architecture)
 
-| Asset | Role |
-|-------|------|
-| `map-mvp/js/map.js` | Map init, layers, byte-range probe, click handlers |
-| `map-mvp/js/panel.js` | Side panel content (replaceable by React panel component) |
-| `map-mvp/js/labels.js` | FED + place symbol layers |
-| `map-mvp/js/districts.js` | Assignment table helpers (stub — wire on merge) |
-| `map-mvp/data/*` | PMTiles, GeoJSON, label layers |
-| `scripts/extract_mvp_data.ipynb` | Colab → Yukon DA export |
-| `scripts/generate_map_labels.py` | Offline label generation from bundle CSVs |
+**`CRMP-full-data.zip` gaps (see `Missing_Files.md`):**
 
-Population join uses **`profile_2021/raw/*_English_CSV_data.csv`**, not the missing canonical `006_dissemination_areas/*.csv` files.
+| Expected in zip | Actual | MVP impact |
+|-----------------|--------|------------|
+| `006_dissemination_areas/*.csv` (6 regional + `territories.csv`) | **0 of 6**; only `*_geo_index.csv` stubs | No in-zip DA population / names |
+| `profile_2021/raw/` (4 StatCan products) | Present but **not DA-level** (CSD / ER only) | Cannot substitute for `006` |
+| `{prov}_dissemination_areas.gpkg` | Missing for `on`, `qc`, `ns`, `nb`, `nt`, `nu` | No national DA layer |
+| `029_feds_2023ro/` | Absent | No FED census profile panel |
 
-### 2.4 Integration notes for React merge
+**MVP runtime assets (`map-mvp/data/`):**
 
-When embedding into Public User and Commissioner apps:
+| File | Role | Source |
+|------|------|--------|
+| `fed_boundaries_2023.pmtiles` | FED geometry (no embedded names) | Bundle → copied |
+| `fed_boundaries_2023.geojson` | FED fallback if PMTiles probe fails | Same boundaries |
+| `single_fed_das.geojson` | Yukon DA polygons (`DGUID` + geometry only) | `scripts/extract_mvp_data.ipynb` |
+| `fed_labels.geojson` | FED label points | `scripts/generate_fed_labels.py` |
+| `yt_da_profiles.json` | Per-DA population, CSD community, panel titles | `scripts/collect_yt_da_profiles.py` |
 
-1. **Extract a `MapView` React component** — wrap MapLibre init lifecycle (`useRef` + `useEffect`); import logic from `map.js` / `labels.js` or convert incrementally.
-2. **Replace `panel.js` DOM writes** with React state passed from map click events (`onDaSelect`, `onFedSelect`).
-3. **Static asset paths** — serve `map-mvp/data/` from Express `public/` (or copy into React `public/data/`); PMTiles **requires** Range headers on the same origin.
-4. **Side panel placement** — Commissioner layout may use a different shell; map module should expose **events + props**, not hard-coded `#side-panel` IDs.
-5. **`districts.js`** — align `localStorage` key namespace with app convention (e.g. `crmp-assignment-v1`); later swap writer to Supabase when API exists.
-6. **Auth gate** — Public User map can render logged-in or anonymous per auth team; Commissioner map route stays behind commissioner role check (auth team).
+**External inputs (not in zip, not loaded at runtime):**
 
----
+| Input | Product | Purpose |
+|-------|---------|---------|
+| `98-401-X2021006` Territories CSV | StatCan Census Profile | DA population + DAUID (`GEO_NAME` in CSV) |
+| StatCan ArcGIS CSD layer | 2021 boundary web service | Community name at DA centroid |
+| `scripts/data/fed_names_2023.json` | Elections Canada 2023 RO list (343) | FED map labels |
 
-## 3. Proposal use cases vs missing data
+**Collection pipeline (validated 74/74):**
 
-From **Proposal.pdf**, mapped against `Missing_Files.md` and the **integrated** (not standalone) product.
+```bash
+python scripts/collect_yt_da_profiles.py \
+  --csv scripts/data/external/statcan/98-401-X2021006_English_CSV_data_Territories.csv
+python scripts/collect_yt_da_profiles.py --finalize-only   # relabel only
+python scripts/generate_fed_labels.py                        # optional FED label refresh
+```
 
-### UC1 — View regions, statistics, and redraw (citizen)
+No nearest-neighbour heuristics. **Unorganized** CSDs (5 DAs) use `Unnamed DA: DA {code}` + `*` footnote per StatCan geography rules.
 
-| Capability | Data required | Available now | Blocked by |
-|------------|---------------|---------------|------------|
-| Pan/zoom national FED map | PMTiles 2023 | Yes | — |
-| FED name labels | Derived labels | Yes | `029_feds_2023ro/` absent — mitigated |
-| Click DA → population | DA + profile join | **Yukon only** | 6 provinces missing DA GPKG |
-| Redraw / reassign DAs | DA layer + assignment | Yukon geometry | No national DA layer; adjacency not built |
-| FED-level statistics panel | `029_feds_2023ro/` | No | Folder absent |
+**Deferred (not MVP):** `scripts/data/bundle/compare_fed_names.py` — FED name audit vs bundle GPKG merge; run when DB migration starts.
 
-**Impact:** UC1 demonstrable **in Yukon** inside the Public User React app after merge. National context works; DA detail outside pilot region does not.
+### 2.4 Code layout
 
-### UC2 — Submit comments, objections, counter-proposals (citizen)
+| Path | Role |
+|------|------|
+| `server/index.js` | Express static server + byte-range headers for PMTiles |
+| `map-mvp/js/map.js` | Map init, layers, selection, hover |
+| `map-mvp/js/panel.js` | DA / FED side panel |
+| `map-mvp/js/labels.js` | FED + DA labels; profile lookup |
+| `map-mvp/js/districts.js` | Assignment stub (`localStorage`) |
+| `scripts/collect_yt_da_profiles.py` | Build / refresh `yt_da_profiles.json` |
+| `scripts/generate_fed_labels.py` | Build `fed_labels.geojson` |
+| `scripts/extract_mvp_data.ipynb` | Export Yukon DA geometry from bundle |
+| `scripts/audit_data_schema.py` | Bundle inventory (Colab notebook available) |
 
-| Capability | Data required | Available now | Blocked by |
-|------------|---------------|---------------|------------|
-| Map-linked submission UI | `DGUID`, `fed_num` | Yukon IDs valid | — |
-| Persist submission | Supabase `submissions` + API | Auth in progress; **DB/API TBD** | Schema not deployed yet |
-| Valid counter-proposal populations | Per-DA census | Yukon (post-join) | Missing provinces |
+**Removed from MVP:** `map-mvp/serve.py`, `derive_from_bundle.py`, `generate_map_labels.py`, `place_labels_*.geojson`, `scripts/data/yukon_places.json`, bundle MANIFEST / slim-copy pipeline.
 
-**Impact:** Submission **forms and layout** can ship in React with `localStorage` drafts; **server persistence** waits on DB + API sprint (TBD).
+### 2.5 How to run the demo
 
-### UC3 — Commissioner review (official)
+```bash
+npm install
+npm run dev:map
+# Open http://127.0.0.1:8080/
+```
 
-| Capability | Data required | Available now | Blocked by |
-|------------|---------------|---------------|------------|
-| Commissioner login | Supabase Auth | Auth team — in progress | — |
-| Dashboard layout | React shell | Frontend team — in progress | — |
-| Map context in review flow | Embedded map module | **After merge this sprint** | — |
-| Inbox / export from DB | Supabase tables + API | **TBD** | DB not deployed |
+PMTiles requires the Express server (Range requests). Do not open `index.html` directly from disk.
 
-**Impact:** Commissioner app can show **layout + embedded map** this sprint; live submission inbox requires DB + API (TBD).
+### 2.6 React merge checklist
 
-### Gap summary (`Missing_Files.md`)
-
-| Missing item | Scope | Features affected |
-|--------------|-------|-------------------|
-| `{prov}_dissemination_areas.gpkg` | `on`, `qc`, `ns`, `nb`, `nt`, `nu` | UC1 redraw, UC2 counter-proposals nationally |
-| `006_dissemination_areas/*.csv` | 0 of 6 canonical files | Join path (workaround exists in `raw/`) |
-| `029_feds_2023ro/` | Entire folder | FED statistics panel |
-| Ontario boundary stack | Nearly empty `on/` | Ontario persona demos |
-
----
-
-## 4. Supabase data plan (when DB deploy proceeds)
-
-**Quota:** ~500 MB PostgreSQL; reserve **≥ 350 MB** for user rows.  
-**Timeline:** **TBD** — design is ready; deployment and ETL are **not sprint blockers** for map merge.
-
-### 4.1 Tables to upload (derived, slim)
-
-| Table | Purpose | Yukon MVP size |
-|-------|---------|----------------|
-| `fed_ref` | `fed_num`, `fed_name_en`, `prov_code` | 343 rows |
-| `das` | `dguid`, `fed_num`, `pop_2021`, `geo_name`, `data_quality`, optional `geom` | 74 rows |
-| `yt_adjacency` | Contiguity edges for validation | ~O(74 × degree) |
-| `assignments` | User → `district_id` per `dguid` | grows with users |
-| `submissions` | UC2 public input | grows with users |
-| `commissioner_notes` | UC3 internal tags / notes | grows with review volume |
-
-Column-level detail unchanged from prior audit — see `Actual_redist-mini-guide.md` for source file mapping (`yt_dissemination_areas.gpkg`, `*_English_CSV_data.csv`, `fed_names_2023.json`).
-
-### 4.2 Keep static (do not load into Postgres)
-
-| Asset | ~Size | Serve via Express static |
-|-------|-------|--------------------------|
-| `fed_boundaries_2023.pmtiles` | 29 MB | Yes — Range required |
-| `single_fed_das.geojson` | 2 MB | Yes |
-| Label GeoJSON | < 0.1 MB | Yes |
-| Raw profile CSVs | 100+ MB | No — pre-join in Colab only |
-| `polling_districts_results_*.csv` | 528 MB | Omit |
-
-### 4.3 ETL sequence (when DB sprint starts)
-
-1. Verify Yukon profile join (74/74 `DGUID`s).
-2. Seed `fed_ref`, `das`, `yt_adjacency`.
-3. Apply migrations for `submissions`, `assignments`, `commissioner_notes`.
-4. Add Express `/api/*` routes — **API refactor bundled with this work**.
+1. Extract `MapView` from `map.js` / `labels.js` lifecycle.
+2. Replace `panel.js` DOM with React state (`onDaSelect`, `onFedSelect`).
+3. Serve `map-mvp/data/` from integrated static path with Range headers.
+4. Namespace `localStorage` keys with app convention.
+5. Ship committed `yt_da_profiles.json`; re-run collect script only when refreshing census data.
 
 ---
 
-## 5. Delivery strategies (data / geography)
+## 3. Proposal use cases vs data gaps
 
-Unchanged recommendation: **extend Yukon pilot** with real census data; national map as context; graceful degradation elsewhere.
+### UC1 — View regions, statistics, redraw
 
-| Strategy | Summary | When |
-|----------|---------|------|
-| **Primary — Yukon pilot** | Real geometry + population in FED `60001`; “Coming Soon” elsewhere | Current + next sprints |
-| **Alt A — National placeholders** | Use 7 provinces with DA GPKG + FED-level stats elsewhere; `data_quality` flags | Only if stakeholders require multi-province demo |
-| **Alt B — Fabricate data** | Synthetic DAs / populations | **Reject** for production |
+| Capability | Available now | Blocked by |
+|------------|---------------|------------|
+| National FED map + labels | Yes | — |
+| Yukon DA click → population + community label | Yes (74/74 profiles) | — |
+| Yukon redraw / validation | Geometry only | Adjacency graph not built |
+| Other provinces — DA detail | No | Missing DA GPKG + `006` CSVs |
+| FED statistics panel | No | `029_feds_2023ro/` absent |
 
-Strategy choice affects **map data and validation**, not the **React merge** — merge proceeds regardless.
+### UC2 — Submissions / counter-proposals
+
+| Capability | Available now | Blocked by |
+|------------|---------------|------------|
+| Map-linked IDs (`DGUID`, `fed_num`) | Yukon yes | — |
+| Server persistence | No | Supabase + API TBD |
+
+### UC3 — Commissioner review
+
+| Capability | Available now | Blocked by |
+|------------|---------------|------------|
+| Embedded map (post-merge) | After React integration | — |
+| Live submission inbox | No | DB + API TBD |
 
 ---
 
-## 6. Sprint plan — priorities
+## 4. Supabase plan (when DB deploy proceeds)
 
-### 6.1 Required this sprint
+**Timeline:** TBD — not a blocker for map MVP demo or React merge.
 
-| # | Task | Owner | Done when |
-|---|------|-------|-----------|
-| **M1** | **Merge `feature/issues6-8/map-rendering-mvp` into Public User React app** | Map + Frontend | Map renders in app route; assets served with Range |
-| **M2** | **Merge same map module into Commissioner React app** | Map + Frontend | Map available in commissioner map/review route |
-| **M3** | Extract reusable `MapView` (or equivalent) shared by both apps | Map | Single module; props for panel slot / callbacks |
-| **M4** | Express static config serves PMTiles from integrated `public/data/` | DevOps / Backend | `127.0.0.1` dev URL documented; no `localhost` port conflicts |
-| **M5** | Wire map click events to React state (replace `panel.js` DOM) | Frontend | DA / FED selection visible in app UI |
-| **M6** | Align assignment `localStorage` key with app convention | Frontend | No key collisions between shell and map |
-| **M7** | Pilot copy: “Yukon pilot region” in Public User map view | Product | Visible disclaimer |
+| Table | Seed from |
+|-------|-----------|
+| `fed_ref` | `fed_names_2023.json` |
+| `das` | `yt_da_profiles.json` + `single_fed_das.geojson` |
+| `yt_adjacency` | Offline build from DA polygons |
+| `submissions`, `assignments`, `commissioner_notes` | App layer |
 
-**Auth integration (parallel — auth team):** Map routes consume existing Supabase session; no duplicate auth implementation on map branch.
+Keep PMTiles and GeoJSON **static** on Express; do not load raw StatCan CSVs into Postgres.
 
-**Layout integration (parallel — frontend team):** Map mounts inside existing shell components; commissioner vs public routes per their layouts.
+---
 
-### 6.2 TBD — this sprint if capacity, else next sprint
+## 5. Next sprint priorities
 
-| # | Task | Dependency |
-|---|------|--------------|
-| **D1** | Deploy Supabase schema (`fed_ref`, `das`, `yt_adjacency`, `submissions`, `assignments`, `commissioner_notes`) | — |
-| **D2** | Yukon ETL / seed scripts | D1 |
-| **D3** | Express API refactor: `/api/submissions`, `/api/assignments`, commissioner read endpoints | D1, Auth |
-| **D4** | Replace `localStorage` submission drafts with API persistence | D3 |
-| **D5** | Backend validation (population equality, contiguity) | `yt_adjacency` seeded |
-| **D6** | Commissioner inbox fed from `submissions` table | D3, D4 |
+### Required — product integration
 
-If the sprint ends before D1 starts, **no regression**: merged React apps still demo map + auth + layout with client-side state only.
+| # | Task |
+|---|------|
+| M1 | Merge map module into Public User React app |
+| M2 | Merge map module into Commissioner React app |
+| M3 | Shared `MapView` component |
+| M4 | Express serves integrated static assets + Range |
+| M5 | Map events → React panel state |
+| M6 | Align `localStorage` key namespace |
+| M7 | Pilot disclaimer copy in UI |
 
-### 6.3 Explicitly out of scope (this cycle)
+### TBD — backend
+
+| # | Task |
+|---|------|
+| D1 | Deploy Supabase schema |
+| D2 | Seed from `yt_da_profiles.json` |
+| D3 | Express `/api/*` routes |
+| D4–D6 | Submissions persistence, validation, commissioner inbox |
+
+### Out of scope (this cycle)
 
 - National DA interaction beyond Yukon
-- Fabricated census data (Alt B)
-- Uploading 528 MB poll-results CSV to Supabase
-- Full Ontario stack without `on_dissemination_areas.gpkg`
+- Repacking `CRMP-full-data.zip`
+- FED GPKG name audit (`compare_fed_names.py`) until DB phase
+- Synthetic / heuristic census data
 
 ---
 
-## 7. Risk register
+## 6. Risk register
 
-| ID | Risk | Likelihood | Impact | Mitigation |
-|----|------|------------|--------|------------|
-| R1 | Map merge conflicts with parallel React layout branches | High | High | Shared `MapView` module; merge early; pair program with frontend team |
-| R2 | PMTiles break after asset path change in React `public/` | Medium | High | Keep Range headers on Express; test `bytes=0-1` → 206 after merge |
-| R3 | Duplicate Express servers on port 8080 (`localhost` vs `127.0.0.1`) | Medium | Medium | Single `npm run dev`; document `127.0.0.1`; kill stale processes |
-| R4 | Map `localStorage` keys collide with app shell keys | Medium | Medium | Namespace convention agreed at merge (M6) |
-| R5 | Stakeholders expect DB-backed submissions at sprint demo | Medium | Medium | Demo script: map + auth + layout; label persistence as “coming soon” if D1–D4 slip |
-| R6 | Auth ready but no API — users logged in with nowhere to POST | Medium | Low | `localStorage` drafts; disable submit or show “save locally” until D4 |
-| R7 | Wrong Yukon census product in profile join | Medium | High | Validate 74/74 `DGUID`s; `data_quality` column when D1 lands |
-| R8 | Commissioner map shown without submission data | Low | Low | UC3 inbox is TBD; map embed still valuable for geographic context |
-| R9 | Ontario / national DA expectations | High | High | Pilot disclaimer; Yukon demo path |
-| R10 | Supabase quota exceeded when D1 proceeds | Medium | Medium | Static geometry; slim rows; no raw CSV in DB |
+| ID | Risk | Mitigation |
+|----|------|------------|
+| R1 | React merge conflicts | Shared `MapView`; merge early |
+| R2 | PMTiles break after path change | Test Range `206` after merge |
+| R3 | Port / host confusion | Document `127.0.0.1:8080`; single `npm run dev:map` |
+| R4 | `localStorage` key collisions | Namespace at merge (M6) |
+| R5 | Stakeholders expect DB submissions | Demo script; label persistence as “coming soon” |
+| R6 | Unorganized DA naming confusion | `*` footnote + `Unnamed DA` title pattern |
+| R7 | Many DAs share “Whitehorse” on map | Map labels use DA code when CSD count > 3 |
+| R8 | National DA expectations | Pilot disclaimer; Yukon-only path |
 
 ---
 
-## 8. Document history
+## 7. Document history
 
 | Date | Change |
 |------|--------|
 | 2026-06-19 | Initial audit-driven report |
-| 2026-06-19 | MVP delivery, use cases, Supabase plan, data strategies |
-| 2026-06-19 | Parallel auth/layout workstreams; React merge as sprint requirement; DB + API marked TBD |
-
-*Update when map merge completes, DB deploy starts, or delivery strategy changes.*
+| 2026-06-19 | External DA profile pipeline; bundle pipeline removed |
+| 2026-06-19 | React merge requirements; Supabase TBD |
+| 2026-06-19 | **Delivery sign-off:** 74/74 profiles, CSD labels, panel UI, Express-only server, file cleanup |

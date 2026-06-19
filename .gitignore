@@ -1,2 +1,9 @@
 local/
 node_modules/
+__pycache__/
+*.py[cod]
+scripts/data/bundle/census_boundaries/
+scripts/data/bundle/elections_canada/
+scripts/data/bundle/output/
+scripts/data/external/statcan/*.csv
+scripts/data/external/statcan/*.CSV

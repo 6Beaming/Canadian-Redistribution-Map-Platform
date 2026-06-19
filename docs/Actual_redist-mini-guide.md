@@ -5,6 +5,8 @@ This document describes the **actual** contents of `CRMP-full-data.zip`. It mirr
 For **expected** (canonical) layout, see `CRMP-full-data/README.md` and `CRMP-full-data/redist-mini-guide.md`.  
 For **gaps vs expected**, see `Missing_Files.md` (this folder).
 
+**Audit reference:** `data_schema_audit_report.txt` (generated 2026-06-19; 210 files schema-sampled).
+
 ---
 
 ## What a redistricting dataset needs
@@ -60,79 +62,76 @@ Canonical path (per mini-guide):
 | `ab`, `bc`, `mb`, `sk`, `nl`, `pe`, `yt` | `{prov}_dissemination_areas.gpkg` | Present | varies by province/territory |
 | `on`, `qc`, `ns`, `nb`, `nt`, `nu` | `{prov}_dissemination_areas.gpkg` | **Absent** | — |
 
+**Note on New Brunswick:** `{prov}_aggregate_dissemination_areas.gpkg` is present (130 features) but standard `{prov}_dissemination_areas.gpkg` is absent.
+
 **Sample schema** (present files, layer `{prov}_dissemination_areas`):
 
 | Column (audit) | Role |
 |----------------|------|
 | Geometry | Polygon / MultiPolygon (WGS 84, EPSG:4326 per schema) |
 | `DGUID` | Primary join key to census profiles |
-| Other ID / area fields | Province/territory-specific naming in layer table (see audit per file) |
-
-Some provinces/territories also ship finer-than-DA boundary layers (e.g. `{prov}_dissemination_blocks.gpkg`) that are **not** part of the mini-guide DA recipe — optional reference only where present.
+| `DAUID`, `LANDAREA`, `PRUID` | Present on sampled Yukon layer |
+| `GEO_NAME` | **Not** on boundary GeoPackages — names come from profile tables only |
 
 ### Census numbers (actual paths)
 
 **Canonical expectation** (mini-guide):
 
 `raw_data/statistics_canada/census_profiles/profile_2021/006_dissemination_areas/`  
-→ six files: `atlantic.csv`, `quebec.csv`, `ontario.csv`, `prairies.csv`, `bc.csv`, `territories.csv`
+→ six regional profile CSVs: `atlantic.csv`, `quebec.csv`, `ontario.csv`, `prairies.csv`, `bc.csv`, `territories.csv`
 
 **Actual bundle at that path:**
 
-| File | Type | Columns | Usable for population join? |
-|------|------|---------|------------------------------|
+| File | Type | Columns | Usable for DA population join? |
+|------|------|---------|--------------------------------|
 | `quebec_geo_index.csv` | Geo index | `Geo Code`, `Geo Name`, `Line Number` | **No** |
-| `territories_geo_index.csv` | Geo index | same | **No** |
+| `territories_geo_index.csv` | Geo index | same (344 rows) | **No** — CSD-level names, not per-DA profiles |
 
-**Actual DA profile data (long format)** lives under extracted StatCan zips:
+**All six canonical regional profile CSVs are absent** (`atlantic.csv` … `territories.csv`). The two `*_geo_index.csv` files are **indexes** (name + line pointer), not long-format profile tables with `CHARACTERISTIC_ID` / `C1_COUNT_TOTAL`.
+
+### Raw StatCan product folders (`profile_2021/raw/`)
+
+Four nested products are extracted under `profile_2021/raw/`:
 
 ```text
-raw_data/statistics_canada/census_profiles/profile_2021/raw/
-├── 98-401-X2021008_eng_CSV.zip  →  98-401-X2021008_eng_CSV/
-├── 98-401-X2021018_eng_CSV.zip  →  98-401-X2021018_eng_CSV/
-├── 98-401-X2021026_eng_CSV.zip  →  98-401-X2021026_eng_CSV/
-└── 98-401-X2021028_eng_CSV.zip  →  98-401-X2021028_eng_CSV/
+98-401-X2021008_eng_CSV/
+98-401-X2021018_eng_CSV/
+98-401-X2021026_eng_CSV/
+98-401-X2021028_eng_CSV/
 ```
 
-Each extracted folder contains:
+Each contains `*_English_CSV_data.csv` (long format with `DGUID`, `GEO_LEVEL`, `GEO_NAME`, `CHARACTERISTIC_ID`, `C1_COUNT_TOTAL`).
 
-| File pattern | Purpose |
-|--------------|---------|
-| `*_English_CSV_data.csv` | **Profile table** — long format, joinable on `DGUID` |
-| `*_Geo_starting_row.CSV` | Geo index for that product |
-| `*_English_meta.txt`, `README_meta.txt` | StatCan metadata |
+**Critical audit finding (population rows with `CHARACTERISTIC_ID == 1`):**
 
-**Profile CSV schema** (all four `*_English_CSV_data.csv` files, audit sample):
+| Product folder | Pop rows | `GEO_LEVEL` distribution | DA-level? |
+|----------------|----------|--------------------------|-----------|
+| `98-401-X2021008` | 90 | Economic region 76, Province 10, Territory 3, Country 1 | **No** |
+| `98-401-X2021018` | 95 | Census subdivision 95 | **No** |
+| `98-401-X2021026` | 35 | Census subdivision 35 | **No** |
+| `98-401-X2021028` | 31 | Census subdivision 31 (Nunavut) | **No** |
 
-| Column | Meaning |
-|--------|---------|
-| `CENSUS_YEAR` | Census year |
-| `DGUID` | Join key — matches DA GeoPackage |
-| `ALT_GEO_CODE` | Alternate geography code |
-| `GEO_LEVEL` | Geography level label |
-| `GEO_NAME` | Human-readable place name |
-| `CHARACTERISTIC_ID` | Statistic ID (`1` = Population, 2021) |
-| `CHARACTERISTIC_NAME` | Statistic label |
-| `C1_COUNT_TOTAL` | Count value |
-| `SYMBOL`, rate columns | Quality / derived fields |
+**None of the four in-bundle raw profile CSVs contain dissemination-area rows.** They cannot substitute for the missing `006_dissemination_areas/*.csv` files (including `territories.csv` for Yukon’s 74 DAs).
 
-**Join recipe (same logic as mini-guide, different file path):**
+The canonical DA profile product for territories is StatCan table **98-401-X2021006** (`territories.csv` in the mini-guide) — that product folder / regional CSV is **not** present in the audited bundle.
+
+### Regional DA readiness (boundary vs profile)
+
+| Score | Meaning | Provinces / territories (`{prov}`) |
+|-------|---------|-------------------------------------|
+| 0 | No DA boundary GPKG | `on`, `qc`, `ns`, `nt`, `nu` |
+| 2 | DA boundary present; **no** DA profile CSV in bundle | `ab`, `bc`, `mb`, `sk`, `nl`, `pe`, `yt` |
+
+For every province with a DA GPKG, `profile_rows` at DA level = **0** in the audited bundle.
+
+**Join recipe (when canonical `006` CSVs exist):**
 
 1. Load `{prov}_dissemination_areas.gpkg`.
-2. Read relevant `*_English_CSV_data.csv`(s); filter `CHARACTERISTIC_ID == 1`.
-3. Keep `DGUID`, `C1_COUNT_TOTAL` (and optionally `GEO_NAME`).
+2. Read the matching regional `006/*.csv`; filter `CHARACTERISTIC_ID == 1`.
+3. Keep `DGUID`, `C1_COUNT_TOTAL`, and optionally `GEO_NAME`.
 4. Merge on `DGUID`.
 
-**Product split (approximate geo counts from geo-starting-row files):**
-
-| StatCan product folder | `*_Geo_starting_row` rows | Size of `*_English_CSV_data.csv` |
-|------------------------|---------------------------|-------------------------------------|
-| `98-401-X2021008_eng_CSV` | 91 | ~35 MB |
-| `98-401-X2021018_eng_CSV` | 96 | ~44 MB |
-| `98-401-X2021026_eng_CSV` | 36 | ~15 MB |
-| `98-401-X2021028_eng_CSV` | 32 | ~14 MB |
-
-Map each product to provinces/regions using `GEO_LEVEL` / `DGUID` filters in metadata — do not assume one file equals one mini-guide regional CSV.
+Until those CSVs are supplied, DA `GEO_NAME` and population must come from **external** StatCan downloads or APIs (see product 98-401-X2021006 for territories).
 
 ---
 
@@ -148,6 +147,8 @@ Path: `raw_data/elections_canada/historical/`
 | `fed_boundaries_2015.pmtiles` | `fed2015_districts` | `fed_num`, `prov_code`, `rep_order`, `year` |
 | `fed_boundaries_2023.pmtiles` | `fed2023_districts` | `fed_num`, `rep_order`, `year` |
 
+**PMTiles carry no riding name field** — labels require a separate name table.
+
 ### GeoPackage FED layers (actual)
 
 Per province under `census_boundaries/{prov}/`:
@@ -156,7 +157,18 @@ Per province under `census_boundaries/{prov}/`:
 - `{prov}_electoral_districts_2003ro.gpkg`
 - `{prov}_electoral_districts_2013ro.gpkg`
 
-Completeness varies; see `Missing_Files.md` for absent provinces.
+Completeness varies; Ontario’s electoral-district stack is largely absent. See `Missing_Files.md`.
+
+### FED display names (audit)
+
+| Source | Audit result |
+|--------|--------------|
+| PMTiles `fed_boundaries_2023` | No `name` / `FEDNAME` attribute |
+| Merged `{prov}_electoral_districts*.gpkg` + `fed2021_pd` (`ed_name`) | **338** unique `fed_num` → name pairs |
+| Expected 2023 RO district count | 343 (5 short — likely 2023 RO splits not in all GPKG layers) |
+| `029_feds_2023ro/` census profiles | **Folder absent** |
+
+`fed2021_pd` supplies distinct `ed_name` per province (e.g. ON 121, QC 78, BC 42). These names reflect the **2021 election** geography and may differ from 2023 RO boundaries in PMTiles.
 
 ### FED census profiles (actual)
 
@@ -172,27 +184,17 @@ Historical FED CSVs use multi-line StatCan headers; treat as FED-level profiles,
 
 ---
 
-## Geography name indexes (`016_028_province_csds/`)
+## Geography name indexes (not profile tables)
 
-Not described in the canonical mini-guide. Present in the actual bundle:
+Several `profile_2021/` folders contain **geo_index** CSVs only (`Geo Code`, `Geo Name`, `Line Number`):
 
-```text
-profile_2021/016_028_province_csds/
-├── ab_geo_index.csv
-├── nb_geo_index.csv
-├── nl_geo_index.csv
-├── ns_geo_index.csv
-├── on_geo_index.csv
-└── sk_geo_index.csv
-```
+| Location | Files (sample) | Row counts (audit) |
+|----------|----------------|--------------------|
+| `006_dissemination_areas/` | `quebec_geo_index.csv`, `territories_geo_index.csv` | large / 344 |
+| `016_028_province_csds/` | `ab`, `nb`, `nl`, `ns`, `on`, `sk` `*_geo_index.csv` | 96–952 per file |
+| `002_cmas_cas/`, `007_census_tracts/`, `009_population_centres/`, `011_designated_places/` | `data_geo_index.csv` each | varies |
 
-| Column | Meaning |
-|--------|---------|
-| `Geo Code` | Geography code |
-| `Geo Name` | **Human-readable name** (census subdivision / related unit) |
-| `Line Number` | Row pointer into profile products |
-
-These are **indexes**, not profile tables. Useful for labeling and lookup when joined to other geography codes; they do not replace `006` profile CSVs or `*_English_CSV_data.csv`.
+These support lookup and labeling at **indexed geography levels** (often CSD or higher). They do **not** provide per-DA `C1_COUNT_TOTAL` and are not substitutes for `006` regional profile CSVs.
 
 ---
 
@@ -206,6 +208,7 @@ These are **indexes**, not profile tables. Useful for labeling and lookup when j
 | `011_designated_places/` | `data_geo_index.csv` | Designated place index |
 | `013_fsas/` | `meta.txt` | Metadata only |
 | `014_dissolved_csds/` | `meta.txt` | Metadata only |
+| `012_adas/` | — | **Absent** (ADA profile CSVs not in bundle) |
 
 ---
 
@@ -215,15 +218,13 @@ These are **indexes**, not profile tables. Useful for labeling and lookup when j
 
 `raw_data/elections_canada/fed2021_pd/fed2021_{prov}_polling_districts.gpkg`
 
-Sample columns (audit): `pd_id`, `FED_NUM`, `PD_NUM`, `province`, `ed_name`, `electors_est`, `LPC`, `CPC`, `NDP`, `BQ`, `GPC`, `PPC`, `total_votes`, `election`, `path`.
+Sample columns (audit): `pd_id`, `FED_NUM`, `PD_NUM`, `province`, `ed_name`, `electors_est`, party vote columns, `total_votes`, `election`, `path`.
 
 CRS: Statistics Canada Lambert (EPSG:3347) — reproject before merging with census boundaries (EPSG:4326).
 
 ### Historical poll results (not in canonical schema)
 
-`raw_data/elections_canada/polling_districts/elections_canada/processed/polling_districts_results_2006_2023.csv`
-
-~528 MB; poll-station-level results 2006–2023. Columns include bilingual district names, candidate names, party labels, vote counts.
+`raw_data/elections_canada/polling_districts/elections_canada/processed/polling_districts_results_2006_2023.csv` — ~528 MB.
 
 ---
 
@@ -234,7 +235,7 @@ Canonical alternative (mini-guide):
 - Polygons: `{prov}_aggregate_dissemination_areas.gpkg`
 - Profiles: `profile_2021/012_adas/` regional CSVs
 
-**Actual:** ADA GeoPackages exist for several provinces and territories where boundary stacks are present (same `{prov}` set as DA layers above, plus others as listed in the audit). **`012_adas/` profile CSVs not present** in the audited bundle.
+**Actual:** ADA GeoPackages exist for several provinces where boundary stacks are present. **`012_adas/` profile CSVs not present** in the audited bundle.
 
 ---
 
@@ -253,27 +254,30 @@ flowchart TB
     FED["{prov}_electoral_districts*.gpkg"]
   end
   subgraph profiles [Census profiles]
-    CANON["006/*.csv — expected, mostly absent"]
-    RAW["profile_2021/raw/*_English_CSV_data.csv — actual DA stats"]
-    GEOIDX["016_028/*_geo_index.csv — names only"]
+    CANON["006/*.csv — expected, all absent"]
+    GEOIDX["006/*_geo_index.csv — names only"]
+    RAW["profile_2021/raw/* — CSD/ER level only in audit"]
   end
   subgraph ec [Elections Canada]
-    PMT["historical/*.pmtiles — national FED outlines"]
-    PD["fed2021_pd/*.gpkg — 2021 votes"]
+    PMT["historical/*.pmtiles — national FED outlines, no names"]
+    PD["fed2021_pd/*.gpkg — 2021 votes + ed_name"]
   end
-  DA -->|"join DGUID"| RAW
-  GEOIDX -.->|"Geo Name labels"| DA
-  PMT -->|"fed_num"| FED
+  DA -->|"needs external 006 or 98-401-X2021006"| CANON
+  GEOIDX -.->|"CSD-level index, not DA pop"| DA
+  PMT -->|"fed_num only"| FED
+  PD -->|"338 merged names"| FED
 ```
 
-| Need | Use (actual bundle) |
-|------|---------------------|
-| DA polygons | `{prov}_dissemination_areas.gpkg` where present |
-| DA population | `profile_2021/raw/*_English_CSV_data.csv`, filter `CHARACTERISTIC_ID == 1` |
-| Place names (CSD-level index) | `016_028_province_csds/*_geo_index.csv` or `GEO_NAME` in profile CSV |
-| National FED map (web tiles) | `historical/fed_boundaries_2023.pmtiles` |
-| FED polygons per province | `{prov}_electoral_districts*.gpkg` |
-| 2021 vote by polling district | `fed2021_{prov}_polling_districts.gpkg` |
+| Need | Use (actual bundle) | Gap |
+|------|---------------------|-----|
+| DA polygons | `{prov}_dissemination_areas.gpkg` where present | 6 provinces/territories missing |
+| DA population + `GEO_NAME` | `006_dissemination_areas/{regional}.csv` | **All 6 canonical files missing** |
+| Yukon DA profiles | `territories.csv` (product 98-401-X2021006) | **Missing**; raw zip products are not DA-level |
+| Place names (CSD index) | `territories_geo_index.csv`, `016_028/*_geo_index.csv` | Index only — not DA attributes |
+| National FED map (web tiles) | `historical/fed_boundaries_2023.pmtiles` | No embedded names |
+| FED names (approx.) | Electoral GPKG + `fed2021_pd` merge | 338/343; not 2023 RO census product |
+| FED census profiles (2023 RO) | `029_feds_2023ro/` | **Folder absent** |
+| 2021 vote by polling district | `fed2021_{prov}_polling_districts.gpkg` | Present (all provinces) |
 
 ---
 

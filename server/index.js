@@ -14,9 +14,12 @@ const MAP_MVP_ROOT = path.join(__dirname, "..", "map-mvp");
 
 app.use(
   express.static(MAP_MVP_ROOT, {
-    setHeaders(res) {
+    setHeaders(res, filePath) {
       res.setHeader("Accept-Ranges", "bytes");
       res.setHeader("Access-Control-Allow-Origin", "*");
+      if (filePath.endsWith(".js") || filePath.endsWith(".html")) {
+        res.setHeader("Cache-Control", "no-cache");
+      }
     },
   })
 );
