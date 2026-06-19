@@ -13,6 +13,7 @@ import {
   findSupabaseProfileByPhone,
   getSupabaseProfile,
   getSupabaseClient,
+  signUpSupabaseUser,
   startSupabasePhoneVerification,
   upsertSupabaseProfile,
   verifySupabasePhoneChange
@@ -267,30 +268,28 @@ router.post("/signup", async (req, res, next) => {
       return;
     }
 
-    const supabase = getSupabaseClient();
     const emailRedirectTo =
       process.env.SIGNUP_EMAIL_REDIRECT_URL || process.env.CLIENT_ORIGIN;
-    const { error } = await supabase.auth.signUp({
+
+    await signUpSupabaseUser({
       email,
       password,
-      options: {
-        ...(emailRedirectTo ? { emailRedirectTo } : {})
-      }
+      emailRedirectTo
     });
-
-    if (error) {
-      console.error("Supabase signup failed:", error.message);
-      res.status(400).json({
-        error: signupErrorMessage(error.message)
-      });
-      return;
-    }
 
     res.status(201).json({
       message:
         "Account created. Check your email to verify your address before signing in."
     });
   } catch (error) {
+    if (error.publicMessage) {
+      console.error("Supabase signup failed:", error.publicMessage);
+      res.status(error.statusCode || 400).json({
+        error: signupErrorMessage(error.publicMessage)
+      });
+      return;
+    }
+
     next(error);
   }
 });

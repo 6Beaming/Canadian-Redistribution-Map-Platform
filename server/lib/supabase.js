@@ -39,6 +39,41 @@ export function getSupabaseClient() {
   return supabaseClient;
 }
 
+export async function signUpSupabaseUser({ email, emailRedirectTo, password }) {
+  const { supabaseKey, supabaseUrl } = getSupabaseConfig();
+  const url = new URL(`${supabaseUrl}/auth/v1/signup`);
+
+  if (emailRedirectTo) {
+    url.searchParams.set("redirect_to", emailRedirectTo);
+  }
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      apikey: supabaseKey,
+      Authorization: `Bearer ${supabaseKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ email, password })
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const signupError = new Error(
+      data.msg ||
+        data.error_description ||
+        data.error ||
+        "Unable to create account."
+    );
+    signupError.statusCode = response.status;
+    signupError.publicMessage = signupError.message;
+    throw signupError;
+  }
+
+  return data;
+}
+
 function getSupabaseUserClient(accessToken) {
   const { supabaseKey, supabaseUrl } = getSupabaseConfig();
 
