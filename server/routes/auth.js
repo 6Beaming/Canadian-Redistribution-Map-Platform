@@ -240,7 +240,13 @@ router.post("/signup", async (req, res, next) => {
     });
 
     if (error) {
-      res.status(400).json({ error: "Unable to create account." });
+      console.error("Supabase signup failed:", error.message);
+      res.status(400).json({
+        error:
+          process.env.NODE_ENV === "production"
+            ? "Unable to create account."
+            : error.message || "Unable to create account."
+      });
       return;
     }
 
