@@ -8,7 +8,9 @@ import {
 } from "../lib/cookies.js";
 import {
   getSupabaseClient,
-  updateSupabaseUserMetadata
+  startSupabasePhoneVerification,
+  updateSupabaseUserMetadata,
+  verifySupabasePhoneChange
 } from "../lib/supabase.js";
 import {
   requireAuth,
@@ -16,6 +18,8 @@ import {
 } from "../middleware/requireAuth.js";
 
 const router = Router();
+
+const PENDING_PROFILE_METADATA_KEY = "pending_public_profile";
 
 const VALID_PROVINCES = new Set([
   "AB",
@@ -41,13 +45,31 @@ function normalizePostalCode(value) {
   return requiredString(value).toUpperCase().replace(/\s+/g, "");
 }
 
-function normalizeSin(value) {
-  return requiredString(value).replace(/\D/g, "");
+function normalizePhoneNumber(value) {
+  const digits = requiredString(value).replace(/\D/g, "");
+
+  if (digits.length === 10) {
+    return {
+      e164: `+1${digits}`,
+      national: digits
+    };
+  }
+
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return {
+      e164: `+${digits}`,
+      national: digits.slice(1)
+    };
+  }
+
+  return null;
 }
 
-function isValidDate(value) {
-  const date = new Date(value);
-  return value && !Number.isNaN(date.getTime()) && date <= new Date();
+function maskPhoneNumber(value) {
+  const digits = requiredString(value).replace(/\D/g, "");
+  const lastFour = digits.slice(-4);
+
+  return lastFour ? `***-***-${lastFour}` : "";
 }
 
 function validatePublicProfile(body) {
@@ -55,10 +77,9 @@ function validatePublicProfile(body) {
   const lastName = requiredString(body?.lastName);
   const province = requiredString(body?.province).toUpperCase();
   const postalCode = normalizePostalCode(body?.postalCode);
-  const sin = normalizeSin(body?.sin);
-  const dob = requiredString(body?.dob);
+  const phone = normalizePhoneNumber(body?.phoneNumber);
 
-  if (!firstName || !lastName || !province || !postalCode || !sin || !dob) {
+  if (!firstName || !lastName || !province || !postalCode || !phone) {
     return { error: "All profile fields are required." };
   }
 
@@ -74,34 +95,27 @@ function validatePublicProfile(body) {
     return { error: "Enter a valid Canadian postal code." };
   }
 
-  if (!/^\d{9}$/.test(sin)) {
-    return { error: "SIN must contain 9 digits." };
-  }
-
-  if (!isValidDate(dob)) {
-    return { error: "Enter a valid date of birth." };
-  }
-
   return {
     profile: {
-      dob,
       firstName,
       lastName,
+      phoneNumber: phone.e164,
+      phoneNational: phone.national,
       postalCode: `${postalCode.slice(0, 3)} ${postalCode.slice(3)}`,
-      province,
-      sin
+      province
     }
   };
 }
 
 function isPublicProfileComplete(metadata = {}) {
   return Boolean(
-    metadata.first_name &&
+    metadata.profile_complete &&
+      metadata.first_name &&
       metadata.last_name &&
       metadata.province &&
       metadata.postal_code &&
-      metadata.sin &&
-      metadata.dob
+      metadata.phone_number &&
+      metadata.phone_verified_at
   );
 }
 
@@ -114,12 +128,38 @@ function publicUser(user) {
     "public_user";
 
   return {
-    id: user.id,
     email: user.email,
+    emailVerified: Boolean(user.email_confirmed_at || user.confirmed_at),
+    id: user.id,
     name: metadata.full_name || metadata.name || null,
+    phoneNumber: metadata.phone_number || null,
     profileComplete:
       role === "public_user" ? isPublicProfileComplete(metadata) : true,
     role
+  };
+}
+
+function pendingOtpState(user) {
+  const pendingProfile =
+    user.user_metadata?.[PENDING_PROFILE_METADATA_KEY] || null;
+
+  if (!pendingProfile?.phone_number) {
+    return null;
+  }
+
+  return {
+    otpRequired: true,
+    phoneMasked: maskPhoneNumber(pendingProfile.phone_number)
+  };
+}
+
+function pendingProfileResponse(user) {
+  const otpState = pendingOtpState(user);
+
+  return {
+    profileRequired: true,
+    user: publicUser(user),
+    ...(otpState || {})
   };
 }
 
@@ -142,6 +182,15 @@ router.post("/login", async (req, res, next) => {
     });
 
     if (error || !data?.session || !data?.user) {
+      const message = error?.message || "";
+
+      if (message.toLowerCase().includes("email not confirmed")) {
+        res.status(403).json({
+          error: "Verify your email before signing in."
+        });
+        return;
+      }
+
       res.status(401).json({ error: "Invalid email or password." });
       return;
     }
@@ -151,7 +200,7 @@ router.post("/login", async (req, res, next) => {
     if (!user.profileComplete) {
       clearAuthenticatedSessionCookies(res);
       setPendingSessionCookies(res, data.session);
-      res.status(200).json({ profileRequired: true, user });
+      res.status(200).json(pendingProfileResponse(data.user));
       return;
     }
 
@@ -191,7 +240,7 @@ router.post("/signup", async (req, res, next) => {
         data: {
           account_created_at: new Date().toISOString(),
           profile_complete: false,
-          role: "public_user",
+          role: "public_user"
         }
       }
     });
@@ -203,7 +252,7 @@ router.post("/signup", async (req, res, next) => {
 
     res.status(201).json({
       message:
-        "Account created. Check your email to validate your address before signing in."
+        "Account created. Check your email to verify your address before signing in."
     });
   } catch (error) {
     next(error);
@@ -224,7 +273,7 @@ router.get("/profile-session", requirePendingProfileAuth, (req, res) => {
     return;
   }
 
-  res.json({ profileRequired: true, user });
+  res.json(pendingProfileResponse(req.user));
 });
 
 router.post("/profile", requirePendingProfileAuth, async (req, res, next) => {
@@ -236,35 +285,103 @@ router.post("/profile", requirePendingProfileAuth, async (req, res, next) => {
   }
 
   try {
-    const { dob, firstName, lastName, postalCode, province, sin } =
-      validation.profile;
-    const updated = await updateSupabaseUserMetadata(req.accessToken, {
-      ...(req.user.user_metadata || {}),
-      dob,
+    const {
+      firstName,
+      lastName,
+      phoneNational,
+      phoneNumber,
+      postalCode,
+      province
+    } = validation.profile;
+    const metadata = req.user.user_metadata || {};
+    const pendingProfile = {
       first_name: firstName,
       full_name: `${firstName} ${lastName}`,
       last_name: lastName,
+      phone_national: phoneNational,
+      phone_number: phoneNumber,
       postal_code: postalCode,
-      profile_complete: true,
-      profile_completed_at: new Date().toISOString(),
       province,
-      role: req.user.user_metadata?.role || "public_user",
-      sin
+      saved_at: new Date().toISOString()
+    };
+
+    await updateSupabaseUserMetadata(req.accessToken, {
+      ...metadata,
+      [PENDING_PROFILE_METADATA_KEY]: pendingProfile,
+      profile_complete: false,
+      role: metadata.role || "public_user"
     });
 
-    const user = publicUser(updated.user || updated);
+    await startSupabasePhoneVerification(req.accessToken, phoneNumber);
 
-    clearPendingSessionCookies(res);
-    setSessionCookies(res, {
-      access_token: req.accessToken,
-      expires_in: 3600,
-      refresh_token: req.refreshToken
+    res.status(202).json({
+      message: "Verification code sent.",
+      otpRequired: true,
+      phoneMasked: maskPhoneNumber(phoneNumber)
     });
-    res.status(200).json({ user });
   } catch (error) {
     next(error);
   }
 });
+
+router.post(
+  "/profile/phone-otp",
+  requirePendingProfileAuth,
+  async (req, res, next) => {
+    const token = requiredString(req.body?.token).replace(/\s+/g, "");
+
+    if (!/^\d{6}$/.test(token)) {
+      res.status(400).json({ error: "Enter the 6-digit verification code." });
+      return;
+    }
+
+    const metadata = req.user.user_metadata || {};
+    const pendingProfile = metadata[PENDING_PROFILE_METADATA_KEY];
+
+    if (!pendingProfile?.phone_number) {
+      res.status(409).json({ error: "Save your profile before entering a code." });
+      return;
+    }
+
+    try {
+      await verifySupabasePhoneChange(
+        req.accessToken,
+        pendingProfile.phone_number,
+        token
+      );
+
+      const {
+        [PENDING_PROFILE_METADATA_KEY]: _pendingProfile,
+        ...existingMetadata
+      } = metadata;
+      const updated = await updateSupabaseUserMetadata(req.accessToken, {
+        ...existingMetadata,
+        first_name: pendingProfile.first_name,
+        full_name: pendingProfile.full_name,
+        last_name: pendingProfile.last_name,
+        phone_number: pendingProfile.phone_number,
+        phone_verified_at: new Date().toISOString(),
+        postal_code: pendingProfile.postal_code,
+        profile_complete: true,
+        profile_completed_at: new Date().toISOString(),
+        province: pendingProfile.province,
+        role: metadata.role || "public_user"
+      });
+
+      const user = publicUser(updated.user || updated);
+
+      clearPendingSessionCookies(res);
+      setSessionCookies(res, {
+        access_token: req.accessToken,
+        expires_in: 3600,
+        refresh_token: req.refreshToken
+      });
+      res.status(200).json({ user });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 router.post("/password-reset", async (req, res, next) => {
   const email =

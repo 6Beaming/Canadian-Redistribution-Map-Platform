@@ -1,34 +1,37 @@
 import {
   ArrowLeft,
+  KeyRound,
   LogIn,
-  LogOut,
   Mail,
   ShieldCheck,
-  UserCircle,
   UserPlus
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
 import { authApi } from "../services/authApi.js";
 import { getPasswordRecoveryClient } from "../services/passwordRecoveryClient.js";
 
 const initialForm = {
+  confirmPassword: "",
   email: "",
-  password: "",
-  confirmPassword: ""
+  password: ""
 };
 
 const initialProfileForm = {
   firstName: "",
   lastName: "",
-  province: "",
+  phoneNumber: "",
   postalCode: "",
-  sin: "",
-  dob: ""
+  province: ""
+};
+
+const initialOtpForm = {
+  token: ""
 };
 
 const initialPasswordResetForm = {
-  password: "",
-  confirmPassword: ""
+  confirmPassword: "",
+  password: ""
 };
 
 const provinces = [
@@ -202,28 +205,19 @@ function ResetPasswordView() {
 function AuthPage() {
   const [form, setForm] = useState(initialForm);
   const [profileForm, setProfileForm] = useState(initialProfileForm);
+  const [otpForm, setOtpForm] = useState(initialOtpForm);
   const [authView, setAuthView] = useState("login");
+  const [pendingPhoneLabel, setPendingPhoneLabel] = useState("");
   const [pendingProfileUser, setPendingProfileUser] = useState(null);
-  const [user, setUser] = useState(null);
-  const [status, setStatus] = useState("checking");
+  const [sessionStatus, setSessionStatus] = useState("checking");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [signedInView, setSignedInView] = useState("dashboard");
   const isPasswordRecoveryRoute = window.location.pathname === "/reset-password";
-
-  const initials = useMemo(() => {
-    const source = user?.name || user?.email || "";
-    return source
-      .split(/[.@\s_-]/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase())
-      .join("");
-  }, [user]);
 
   useEffect(() => {
     if (isPasswordRecoveryRoute) {
-      setStatus("signed-out");
+      setSessionStatus("signed-out");
       return;
     }
 
@@ -234,9 +228,9 @@ function AuthPage() {
         const { user: currentUser } = await authApi.getCurrentUser();
 
         if (isMounted) {
-          setUser(currentUser);
           setPendingProfileUser(null);
-          setStatus("signed-in");
+          setPendingPhoneLabel("");
+          setSessionStatus(currentUser ? "signed-in" : "signed-out");
         }
 
         return;
@@ -248,9 +242,11 @@ function AuthPage() {
         const pendingResult = await authApi.getPendingProfileSession();
 
         if (isMounted && pendingResult?.profileRequired) {
-          setUser(null);
           setPendingProfileUser(pendingResult.user);
-          setStatus("profile-required");
+          setPendingPhoneLabel(pendingResult.phoneMasked || "");
+          setSessionStatus(
+            pendingResult.otpRequired ? "otp-required" : "profile-required"
+          );
           return;
         }
       } catch {
@@ -258,9 +254,9 @@ function AuthPage() {
       }
 
       if (isMounted) {
-        setUser(null);
         setPendingProfileUser(null);
-        setStatus("signed-out");
+        setPendingPhoneLabel("");
+        setSessionStatus("signed-out");
       }
     }
 
@@ -271,63 +267,70 @@ function AuthPage() {
     };
   }, [isPasswordRecoveryRoute]);
 
-  function handleChange(event) {
-    const { name, value } = event.target;
-    setForm((currentForm) => ({ ...currentForm, [name]: value }));
+  function clearMessages() {
     setError("");
     setNotice("");
   }
 
-  function handlePasswordChange(event) {
-    setForm((currentForm) => ({
-      ...currentForm,
-      password: event.target.value
-    }));
-    setError("");
-    setNotice("");
+  function handleChange(event) {
+    const { name, value } = event.target;
+    setForm((currentForm) => ({ ...currentForm, [name]: value }));
+    clearMessages();
+  }
+
+  function handleProfileChange(event) {
+    const { name, value } = event.target;
+    setProfileForm((currentForm) => ({ ...currentForm, [name]: value }));
+    clearMessages();
+  }
+
+  function handleOtpChange(event) {
+    const { value } = event.target;
+    setOtpForm({ token: value.replace(/\D/g, "").slice(0, 6) });
+    clearMessages();
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setStatus("submitting");
-    setError("");
-    setNotice("");
+    setIsSubmitting(true);
+    clearMessages();
 
     try {
       const result = await authApi.login(form);
       setForm(initialForm);
 
       if (result.profileRequired) {
-        setUser(null);
         setPendingProfileUser(result.user);
-        setStatus("profile-required");
+        setPendingPhoneLabel(result.phoneMasked || "");
+        setSessionStatus(result.otpRequired ? "otp-required" : "profile-required");
         return;
       }
 
       setPendingProfileUser(null);
-      setUser(result.user);
-      setStatus("signed-in");
+      setPendingPhoneLabel("");
+      setSessionStatus("signed-in");
     } catch (loginError) {
       setError(loginError.message);
-      setStatus("signed-out");
+      setSessionStatus("signed-out");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
   async function handleSignup(event) {
     event.preventDefault();
-    setStatus("submitting");
-    setError("");
-    setNotice("");
+    setIsSubmitting(true);
+    clearMessages();
 
     if (form.password.length < 8) {
       setError("Password must be at least 8 characters.");
-      setStatus("signed-out");
+      setIsSubmitting(false);
       return;
     }
 
     if (form.password !== form.confirmPassword) {
       setError("Passwords do not match.");
-      setStatus("signed-out");
+      setIsSubmitting(false);
       return;
     }
 
@@ -338,44 +341,60 @@ function AuthPage() {
       });
 
       setForm(initialForm);
+      setAuthView("login");
       setNotice(message);
-      setStatus("signed-out");
+      setSessionStatus("signed-out");
     } catch (signupError) {
       setError(signupError.message);
-      setStatus("signed-out");
+      setSessionStatus("signed-out");
+    } finally {
+      setIsSubmitting(false);
     }
-  }
-
-  function handleProfileChange(event) {
-    const { name, value } = event.target;
-    setProfileForm((currentForm) => ({ ...currentForm, [name]: value }));
-    setError("");
-    setNotice("");
   }
 
   async function handleCompleteProfile(event) {
     event.preventDefault();
-    setStatus("submitting");
-    setError("");
-    setNotice("");
+    setIsSubmitting(true);
+    clearMessages();
 
     try {
-      const { user: updatedUser } = await authApi.completeProfile(profileForm);
-      setPendingProfileUser(null);
-      setUser(updatedUser);
-      setProfileForm(initialProfileForm);
-      setStatus("signed-in");
+      const result = await authApi.completeProfile(profileForm);
+      setPendingPhoneLabel(result.phoneMasked || profileForm.phoneNumber);
+      setOtpForm(initialOtpForm);
+      setNotice(result.message || "Verification code sent.");
+      setSessionStatus("otp-required");
     } catch (profileError) {
       setError(profileError.message);
-      setStatus("profile-required");
+      setSessionStatus("profile-required");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleVerifyOtp(event) {
+    event.preventDefault();
+    setIsSubmitting(true);
+    clearMessages();
+
+    try {
+      await authApi.verifyProfileOtp(otpForm);
+      setPendingProfileUser(null);
+      setPendingPhoneLabel("");
+      setProfileForm(initialProfileForm);
+      setOtpForm(initialOtpForm);
+      setSessionStatus("signed-in");
+    } catch (otpError) {
+      setError(otpError.message);
+      setSessionStatus("otp-required");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
   async function handlePasswordReset(event) {
     event.preventDefault();
-    setStatus("submitting");
-    setError("");
-    setNotice("");
+    setIsSubmitting(true);
+    clearMessages();
 
     try {
       const { message } = await authApi.requestPasswordReset({
@@ -383,10 +402,12 @@ function AuthPage() {
       });
 
       setNotice(message);
-      setStatus("signed-out");
+      setSessionStatus("signed-out");
     } catch (resetError) {
       setError(resetError.message);
-      setStatus("signed-out");
+      setSessionStatus("signed-out");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -394,49 +415,53 @@ function AuthPage() {
     setAuthView("reset");
     setForm((currentForm) => ({
       ...currentForm,
-      password: "",
-      confirmPassword: ""
+      confirmPassword: "",
+      password: ""
     }));
-    setError("");
-    setNotice("");
+    clearMessages();
   }
 
   function showSignupForm() {
     setAuthView("signup");
     setForm((currentForm) => ({
       ...currentForm,
-      password: "",
-      confirmPassword: ""
+      confirmPassword: "",
+      password: ""
     }));
-    setError("");
-    setNotice("");
+    clearMessages();
   }
 
   function showLoginForm() {
     setAuthView("login");
     setForm((currentForm) => ({
       ...currentForm,
-      password: "",
-      confirmPassword: ""
+      confirmPassword: "",
+      password: ""
     }));
-    setError("");
-    setNotice("");
+    clearMessages();
+  }
+
+  function showProfileForm() {
+    setOtpForm(initialOtpForm);
+    setSessionStatus("profile-required");
+    clearMessages();
   }
 
   async function handleLogout() {
-    setStatus("submitting");
-    setError("");
-    setNotice("");
+    setIsSubmitting(true);
+    clearMessages();
 
     try {
       await authApi.logout();
-      setUser(null);
       setPendingProfileUser(null);
-      setSignedInView("dashboard");
-      setStatus("signed-out");
+      setPendingPhoneLabel("");
+      setProfileForm(initialProfileForm);
+      setOtpForm(initialOtpForm);
+      setSessionStatus("signed-out");
     } catch (logoutError) {
       setError(logoutError.message);
-      setStatus(user ? "signed-in" : "signed-out");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -444,7 +469,7 @@ function AuthPage() {
     return <ResetPasswordView />;
   }
 
-  if (status === "checking") {
+  if (sessionStatus === "checking") {
     return (
       <main className="screen-center">
         <div className="loading-mark" aria-label="Loading session" />
@@ -452,7 +477,11 @@ function AuthPage() {
     );
   }
 
-  if (pendingProfileUser && status === "profile-required") {
+  if (sessionStatus === "signed-in") {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (pendingProfileUser && sessionStatus === "profile-required") {
     return (
       <main className="auth-shell">
         <section className="auth-layout" aria-label="Complete profile">
@@ -461,8 +490,8 @@ function AuthPage() {
               <button
                 aria-label="Back to sign in"
                 className="icon-button"
+                disabled={isSubmitting}
                 onClick={handleLogout}
-                disabled={status === "submitting"}
                 type="button"
               >
                 <ArrowLeft aria-hidden="true" size={22} />
@@ -534,43 +563,31 @@ function AuthPage() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="dob">Date of Birth</label>
+                  <label htmlFor="phoneNumber">Phone Number</label>
                   <input
-                    autoComplete="bday"
-                    id="dob"
-                    name="dob"
+                    autoComplete="tel"
+                    id="phoneNumber"
+                    inputMode="tel"
+                    name="phoneNumber"
                     onChange={handleProfileChange}
+                    placeholder="647-555-0001"
                     required
-                    type="date"
-                    value={profileForm.dob}
+                    type="tel"
+                    value={profileForm.phoneNumber}
                   />
                 </div>
               </div>
 
-              <label htmlFor="sin">SIN</label>
-              <input
-                autoComplete="off"
-                id="sin"
-                inputMode="numeric"
-                name="sin"
-                onChange={handleProfileChange}
-                pattern="[0-9 -]{9,11}"
-                required
-                type="password"
-                value={profileForm.sin}
-              />
-
               {error ? <p className="form-error">{error}</p> : null}
+              {notice ? <p className="form-success">{notice}</p> : null}
 
               <button
                 className="primary-button"
-                disabled={status === "submitting"}
+                disabled={isSubmitting}
                 type="submit"
               >
                 <ShieldCheck aria-hidden="true" size={19} />
-                <span>
-                  {status === "submitting" ? "Saving profile" : "Continue"}
-                </span>
+                <span>{isSubmitting ? "Saving profile" : "Save profile"}</span>
               </button>
             </form>
           </div>
@@ -579,62 +596,70 @@ function AuthPage() {
     );
   }
 
-  if (user) {
+  if (pendingProfileUser && sessionStatus === "otp-required") {
     return (
-      <main className="dashboard-shell">
-        <header className="dashboard-header">
-          <div className="brand-lockup">
-            <div>
-              <h1>{signedInView === "profile" ? "Profile" : "Dashboard"}</h1>
+      <main className="auth-shell">
+        <section className="auth-layout" aria-label="Verify phone">
+          <div className="login-panel">
+            <div className="onboarding-header">
+              <button
+                aria-label="Back to profile"
+                className="icon-button"
+                disabled={isSubmitting}
+                onClick={showProfileForm}
+                type="button"
+              >
+                <ArrowLeft aria-hidden="true" size={22} />
+              </button>
+              <div className="brand-lockup">
+                <div>
+                  <h1>Verify Phone</h1>
+                </div>
+              </div>
             </div>
+
+            {pendingPhoneLabel ? (
+              <p className="otp-summary">Code sent to {pendingPhoneLabel}</p>
+            ) : null}
+
+            <form className="login-form" onSubmit={handleVerifyOtp}>
+              <label htmlFor="token">Verification Code</label>
+              <input
+                autoComplete="one-time-code"
+                id="token"
+                inputMode="numeric"
+                maxLength={6}
+                name="token"
+                onChange={handleOtpChange}
+                pattern="[0-9]{6}"
+                required
+                type="text"
+                value={otpForm.token}
+              />
+
+              {error ? <p className="form-error">{error}</p> : null}
+              {notice ? <p className="form-success">{notice}</p> : null}
+
+              <button
+                className="primary-button"
+                disabled={isSubmitting}
+                type="submit"
+              >
+                <KeyRound aria-hidden="true" size={19} />
+                <span>{isSubmitting ? "Verifying code" : "Verify code"}</span>
+              </button>
+
+              <button
+                className="text-button"
+                disabled={isSubmitting}
+                onClick={handleLogout}
+                type="button"
+              >
+                Back to sign in
+              </button>
+            </form>
           </div>
-          {signedInView === "profile" ? (
-            <button
-              className="ghost-button"
-              onClick={() => setSignedInView("dashboard")}
-              type="button"
-            >
-              <ArrowLeft aria-hidden="true" size={18} />
-              <span>Dashboard</span>
-            </button>
-          ) : (
-            <button
-              aria-label="Open profile"
-              className="profile-icon-button"
-              onClick={() => setSignedInView("profile")}
-              type="button"
-            >
-              <UserCircle aria-hidden="true" size={34} />
-            </button>
-          )}
-        </header>
-
-        {signedInView === "profile" ? (
-          <section className="profile-page" aria-label="Profile">
-            <div className="avatar" aria-hidden="true">
-              {initials || "C"}
-            </div>
-            <div>
-              <p className="panel-label">Signed in as</p>
-              <h2>{user.name || user.email}</h2>
-              <p>{user.email}</p>
-              <span className="role-pill">{user.role}</span>
-            </div>
-            <button
-              className="ghost-button sign-out-button"
-              onClick={handleLogout}
-              disabled={status === "submitting"}
-              type="button"
-            >
-              <LogOut aria-hidden="true" size={18} />
-              <span>{status === "submitting" ? "Signing out" : "Sign out"}</span>
-            </button>
-          </section>
-        ) : (
-          <section className="dashboard-empty" aria-label="Dashboard" />
-        )}
-
-        {error ? <p className="form-error">{error}</p> : null}
+        </section>
       </main>
     );
   }
@@ -678,23 +703,14 @@ function AuthPage() {
 
             {authView !== "reset" ? (
               <>
-                <label
-                  htmlFor={
-                    authView === "login" ? "signin-passcode" : "signup-password"
-                  }
-                >
-                  Password
-                </label>
+                <label htmlFor="password">Password</label>
                 <input
-                  data-1p-ignore={authView === "login" ? "true" : undefined}
-                  data-lpignore={authView === "login" ? "true" : undefined}
                   autoComplete={
-                    authView === "login" ? "one-time-code" : "new-password"
+                    authView === "login" ? "current-password" : "new-password"
                   }
-                  id={authView === "login" ? "signin-passcode" : "signup-password"}
-                  key={`${authView}-password`}
-                  name={authView === "login" ? "signin-passcode" : "password"}
-                  onChange={handlePasswordChange}
+                  id="password"
+                  name="password"
+                  onChange={handleChange}
                   required
                   type="password"
                   value={form.password}
@@ -730,7 +746,7 @@ function AuthPage() {
 
             <button
               className="primary-button"
-              disabled={status === "submitting"}
+              disabled={isSubmitting}
               type="submit"
             >
               {authView === "reset" ? (
@@ -742,16 +758,16 @@ function AuthPage() {
               )}
               <span>
                 {authView === "reset"
-                  ? status === "submitting"
+                  ? isSubmitting
                     ? "Sending link"
                     : "Send reset link"
                   : authView === "signup"
-                    ? status === "submitting"
+                    ? isSubmitting
                       ? "Creating account"
                       : "Sign up"
-                  : status === "submitting"
-                    ? "Signing in"
-                    : "Sign in"}
+                    : isSubmitting
+                      ? "Signing in"
+                      : "Sign in"}
               </span>
             </button>
 

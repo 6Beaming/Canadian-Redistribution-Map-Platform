@@ -46,6 +46,12 @@ export const authApi = {
       body: JSON.stringify(profile)
     });
   },
+  verifyProfileOtp({ token }) {
+    return request("/api/auth/profile/phone-otp", {
+      method: "POST",
+      body: JSON.stringify({ token })
+    });
+  },
   requestPasswordReset({ email }) {
     return request("/api/auth/password-reset", {
       method: "POST",

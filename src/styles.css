@@ -240,6 +240,12 @@ button:disabled {
   background: #eaf5ee;
 }
 
+.otp-summary {
+  margin: 18px 0 -14px;
+  color: #526157;
+  font-weight: 700;
+}
+
 .text-button {
   min-height: 36px;
   border: 0;
@@ -303,6 +309,16 @@ button:disabled {
 
 .dashboard-empty {
   min-height: 360px;
+  display: grid;
+  align-content: start;
+  border-top: 1px solid #d8ded6;
+  padding-top: 32px;
+}
+
+.dashboard-empty h2 {
+  margin: 0;
+  color: #28362d;
+  font-size: 1.45rem;
 }
 
 .profile-page {
@@ -349,6 +365,11 @@ button:disabled {
 
 .sign-out-button {
   margin-left: auto;
+}
+
+.dashboard-error {
+  width: min(100%, 1120px);
+  margin: 18px auto 0;
 }
 
 @keyframes spin {

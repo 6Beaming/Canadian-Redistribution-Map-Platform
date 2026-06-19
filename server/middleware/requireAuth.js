@@ -24,12 +24,13 @@ function hasCompletePublicProfile(user) {
   }
 
   return Boolean(
-    metadata.first_name &&
+    metadata.profile_complete &&
+      metadata.first_name &&
       metadata.last_name &&
       metadata.province &&
       metadata.postal_code &&
-      metadata.sin &&
-      metadata.dob
+      metadata.phone_number &&
+      metadata.phone_verified_at
   );
 }
 
