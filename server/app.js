@@ -37,7 +37,9 @@ app.use((_req, res) => {
 
 app.use((err, _req, res, _next) => {
   console.error(err);
-  res.status(500).json({ error: "Something went wrong. Please try again." });
+  res.status(err.statusCode || 500).json({
+    error: err.publicMessage || "Something went wrong. Please try again."
+  });
 });
 
 export default app;

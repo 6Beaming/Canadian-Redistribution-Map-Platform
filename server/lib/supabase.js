@@ -63,7 +63,9 @@ export async function getSupabaseProfile(accessToken, userId) {
     .maybeSingle();
 
   if (error) {
-    throw new Error(error.message || "Unable to load user profile.");
+    const profileError = new Error(error.message || "Unable to load user profile.");
+    profileError.statusCode = error.code === "42501" ? 403 : 500;
+    throw profileError;
   }
 
   return data;
@@ -78,7 +80,13 @@ export async function upsertSupabaseProfile(accessToken, profile) {
     .single();
 
   if (error) {
-    throw new Error(error.message || "Unable to save user profile.");
+    const profileError = new Error(error.message || "Unable to save user profile.");
+    profileError.statusCode = error.code === "42501" ? 403 : 500;
+    profileError.publicMessage =
+      error.code === "42501"
+        ? "Profiles table permissions need to allow users to save their own profile."
+        : "Unable to save user profile.";
+    throw profileError;
   }
 
   return data;
