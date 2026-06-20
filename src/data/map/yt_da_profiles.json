@@ -1,0 +1,1505 @@
+{
+  "_meta": {
+    "generated_at": "2026-06-19T21:07:15.879027+00:00",
+    "dguid_count": 74,
+    "ok": 74,
+    "partial": 0,
+    "missing": 0,
+    "sources": [
+      "csv:scripts\\data\\external\\statcan\\98-401-X2021006_English_CSV_data_Territories.csv"
+    ],
+    "missing_name_literal": "missing name",
+    "collection_pipeline": "csv_da_level_then_api",
+    "statcan_profile_source": {
+      "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+      "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+    },
+    "statcan_csd_source": {
+      "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+      "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+    },
+    "display_finalized_at": "2026-06-19T21:25:36.965538+00:00"
+  },
+  "profiles": {
+    "2021S051260010118": {
+      "da_code": "60010118",
+      "geo_name": "60010118",
+      "population": 236,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Old Crow",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Old Crow",
+      "community_display": "Old Crow",
+      "map_label": "Old Crow",
+      "is_unorganized": false,
+      "panel_title": "Old Crow"
+    },
+    "2021S051260010120": {
+      "da_code": "60010120",
+      "geo_name": "60010120",
+      "population": 40,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Destruction Bay",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Destruction Bay",
+      "community_display": "Destruction Bay",
+      "map_label": "Destruction Bay",
+      "is_unorganized": false,
+      "panel_title": "Destruction Bay"
+    },
+    "2021S051260010121": {
+      "da_code": "60010121",
+      "geo_name": "60010121",
+      "population": 78,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Beaver Creek",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Beaver Creek",
+      "community_display": "Beaver Creek",
+      "map_label": "Beaver Creek",
+      "is_unorganized": false,
+      "panel_title": "Beaver Creek"
+    },
+    "2021S051260010123": {
+      "da_code": "60010123",
+      "geo_name": "60010123",
+      "population": 0,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Moosehide Creek 2",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Moosehide Creek 2",
+      "community_display": "Moosehide Creek 2",
+      "map_label": "Moosehide Creek 2",
+      "is_unorganized": false,
+      "panel_title": "Moosehide Creek 2"
+    },
+    "2021S051260010126": {
+      "da_code": "60010126",
+      "geo_name": "60010126",
+      "population": 64,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Burwash Landing",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Burwash Landing",
+      "community_display": "Burwash Landing",
+      "map_label": "Burwash Landing",
+      "is_unorganized": false,
+      "panel_title": "Burwash Landing"
+    },
+    "2021S051260010128": {
+      "da_code": "60010128",
+      "geo_name": "60010128",
+      "population": 316,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Pelly Crossing",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Pelly Crossing",
+      "community_display": "Pelly Crossing",
+      "map_label": "Pelly Crossing",
+      "is_unorganized": false,
+      "panel_title": "Pelly Crossing"
+    },
+    "2021S051260010130": {
+      "da_code": "60010130",
+      "geo_name": "60010130",
+      "population": 311,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Tagish",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Tagish",
+      "community_display": "Tagish",
+      "map_label": "Tagish",
+      "is_unorganized": false,
+      "panel_title": "Tagish"
+    },
+    "2021S051260010132": {
+      "da_code": "60010132",
+      "geo_name": "60010132",
+      "population": 0,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Teslin",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Teslin",
+      "community_display": "Teslin",
+      "map_label": "Teslin",
+      "is_unorganized": false,
+      "panel_title": "Teslin"
+    },
+    "2021S051260010133": {
+      "da_code": "60010133",
+      "geo_name": "60010133",
+      "population": 355,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Ross River",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Ross River",
+      "community_display": "Ross River",
+      "map_label": "Ross River",
+      "is_unorganized": false,
+      "panel_title": "Ross River"
+    },
+    "2021S051260010135": {
+      "da_code": "60010135",
+      "geo_name": "60010135",
+      "population": 10,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Johnsons Crossing",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Johnsons Crossing",
+      "community_display": "Johnsons Crossing",
+      "map_label": "Johnsons Crossing",
+      "is_unorganized": false,
+      "panel_title": "Johnsons Crossing"
+    },
+    "2021S051260010138": {
+      "da_code": "60010138",
+      "geo_name": "60010138",
+      "population": 130,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Upper Liard",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Upper Liard",
+      "community_display": "Upper Liard",
+      "map_label": "Upper Liard",
+      "is_unorganized": false,
+      "panel_title": "Upper Liard"
+    },
+    "2021S051260010139": {
+      "da_code": "60010139",
+      "geo_name": "60010139",
+      "population": 440,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Faro",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Faro",
+      "community_display": "Faro",
+      "map_label": "Faro",
+      "is_unorganized": false,
+      "panel_title": "Faro"
+    },
+    "2021S051260010141": {
+      "da_code": "60010141",
+      "geo_name": "60010141",
+      "population": 24,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Lake Laberge 1",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Lake Laberge 1",
+      "community_display": "Lake Laberge 1",
+      "map_label": "Lake Laberge 1",
+      "is_unorganized": false,
+      "panel_title": "Lake Laberge 1"
+    },
+    "2021S051260010181": {
+      "da_code": "60010181",
+      "geo_name": "60010181",
+      "population": 523,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Ibex Valley",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Ibex Valley",
+      "community_display": "Ibex Valley",
+      "map_label": "Ibex Valley",
+      "is_unorganized": false,
+      "panel_title": "Ibex Valley"
+    },
+    "2021S051260010183": {
+      "da_code": "60010183",
+      "geo_name": "60010183",
+      "population": 468,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Mt. Lorne",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Mt. Lorne",
+      "community_display": "Mt. Lorne",
+      "map_label": "Mt. Lorne",
+      "is_unorganized": false,
+      "panel_title": "Mt. Lorne"
+    },
+    "2021S051260010184": {
+      "da_code": "60010184",
+      "geo_name": "60010184",
+      "population": 317,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Carcross",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Carcross",
+      "community_display": "Carcross",
+      "map_label": "Carcross",
+      "is_unorganized": false,
+      "panel_title": "Carcross"
+    },
+    "2021S051260010185": {
+      "da_code": "60010185",
+      "geo_name": "60010185",
+      "population": 37,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Carcross 4",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Carcross 4",
+      "community_display": "Carcross 4",
+      "map_label": "Carcross 4",
+      "is_unorganized": false,
+      "panel_title": "Carcross 4"
+    },
+    "2021S051260010188": {
+      "da_code": "60010188",
+      "geo_name": "60010188",
+      "population": 479,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Watson Lake",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Watson Lake",
+      "community_display": "Watson Lake",
+      "map_label": "Watson Lake",
+      "is_unorganized": false,
+      "panel_title": "Watson Lake"
+    },
+    "2021S051260010191": {
+      "da_code": "60010191",
+      "geo_name": "60010191",
+      "population": 10,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Stewart Crossing",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Stewart Crossing",
+      "community_display": "Stewart Crossing",
+      "map_label": "Stewart Crossing",
+      "is_unorganized": false,
+      "panel_title": "Stewart Crossing"
+    },
+    "2021S051260010192": {
+      "da_code": "60010192",
+      "geo_name": "60010192",
+      "population": 188,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Mayo",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Mayo",
+      "community_display": "Mayo",
+      "map_label": "Mayo",
+      "is_unorganized": false,
+      "panel_title": "Mayo"
+    },
+    "2021S051260010193": {
+      "da_code": "60010193",
+      "geo_name": "60010193",
+      "population": 20,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Keno Hill",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Keno Hill",
+      "community_display": "Keno Hill",
+      "map_label": "Keno Hill",
+      "is_unorganized": false,
+      "panel_title": "Keno Hill"
+    },
+    "2021S051260010194": {
+      "da_code": "60010194",
+      "geo_name": "60010194",
+      "population": 857,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Dawson",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Dawson",
+      "community_display": "Dawson",
+      "map_label": "Dawson",
+      "is_unorganized": false,
+      "panel_title": "Dawson"
+    },
+    "2021S051260010195": {
+      "da_code": "60010195",
+      "geo_name": "60010195",
+      "population": 720,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Dawson",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Dawson",
+      "community_display": "Dawson",
+      "map_label": "Dawson",
+      "is_unorganized": false,
+      "panel_title": "Dawson"
+    },
+    "2021S051260010203": {
+      "da_code": "60010203",
+      "geo_name": "60010203",
+      "population": 947,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010203",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010210": {
+      "da_code": "60010210",
+      "geo_name": "60010210",
+      "population": 437,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010210",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010223": {
+      "da_code": "60010223",
+      "geo_name": "60010223",
+      "population": 1001,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010223",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010228": {
+      "da_code": "60010228",
+      "geo_name": "60010228",
+      "population": 1945,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010228",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010236": {
+      "da_code": "60010236",
+      "geo_name": "60010236",
+      "population": 793,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010236",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010238": {
+      "da_code": "60010238",
+      "geo_name": "60010238",
+      "population": 411,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse, Unorganized",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "DA 60010238",
+      "community_display": null,
+      "map_label": "60010238",
+      "is_unorganized": true,
+      "panel_title": "Unnamed DA: DA 60010238"
+    },
+    "2021S051260010240": {
+      "da_code": "60010240",
+      "geo_name": "60010240",
+      "population": 1014,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Macpherson-Grizzly Valley",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Macpherson-Grizzly Valley",
+      "community_display": "Macpherson-Grizzly Valley",
+      "map_label": "Macpherson-Grizzly Valley",
+      "is_unorganized": false,
+      "panel_title": "Macpherson-Grizzly Valley"
+    },
+    "2021S051260010241": {
+      "da_code": "60010241",
+      "geo_name": "60010241",
+      "population": 746,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Marsh Lake",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Marsh Lake",
+      "community_display": "Marsh Lake",
+      "map_label": "Marsh Lake",
+      "is_unorganized": false,
+      "panel_title": "Marsh Lake"
+    },
+    "2021S051260010242": {
+      "da_code": "60010242",
+      "geo_name": "60010242",
+      "population": 872,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010242",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010243": {
+      "da_code": "60010243",
+      "geo_name": "60010243",
+      "population": 684,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010243",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010244": {
+      "da_code": "60010244",
+      "geo_name": "60010244",
+      "population": 630,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010244",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010245": {
+      "da_code": "60010245",
+      "geo_name": "60010245",
+      "population": 399,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010245",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010249": {
+      "da_code": "60010249",
+      "geo_name": "60010249",
+      "population": 862,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010249",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010250": {
+      "da_code": "60010250",
+      "geo_name": "60010250",
+      "population": 832,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010250",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010251": {
+      "da_code": "60010251",
+      "geo_name": "60010251",
+      "population": 1249,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010251",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010252": {
+      "da_code": "60010252",
+      "geo_name": "60010252",
+      "population": 1150,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010252",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010253": {
+      "da_code": "60010253",
+      "geo_name": "60010253",
+      "population": 845,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010253",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010256": {
+      "da_code": "60010256",
+      "geo_name": "60010256",
+      "population": 1151,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010256",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010257": {
+      "da_code": "60010257",
+      "geo_name": "60010257",
+      "population": 1422,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010257",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010258": {
+      "da_code": "60010258",
+      "geo_name": "60010258",
+      "population": 619,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010258",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010259": {
+      "da_code": "60010259",
+      "geo_name": "60010259",
+      "population": 1057,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010259",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010263": {
+      "da_code": "60010263",
+      "geo_name": "60010263",
+      "population": 1111,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010263",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010264": {
+      "da_code": "60010264",
+      "geo_name": "60010264",
+      "population": 1352,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010264",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010265": {
+      "da_code": "60010265",
+      "geo_name": "60010265",
+      "population": 420,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010265",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010269": {
+      "da_code": "60010269",
+      "geo_name": "60010269",
+      "population": 2727,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010269",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010270": {
+      "da_code": "60010270",
+      "geo_name": "60010270",
+      "population": 313,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010270",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010271": {
+      "da_code": "60010271",
+      "geo_name": "60010271",
+      "population": 772,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010271",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010272": {
+      "da_code": "60010272",
+      "geo_name": "60010272",
+      "population": 694,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010272",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010273": {
+      "da_code": "60010273",
+      "geo_name": "60010273",
+      "population": 863,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010273",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010275": {
+      "da_code": "60010275",
+      "geo_name": "60010275",
+      "population": 162,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Watson Lake",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Watson Lake",
+      "community_display": "Watson Lake",
+      "map_label": "Watson Lake",
+      "is_unorganized": false,
+      "panel_title": "Watson Lake"
+    },
+    "2021S051260010279": {
+      "da_code": "60010279",
+      "geo_name": "60010279",
+      "population": 492,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Watson Lake",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Watson Lake",
+      "community_display": "Watson Lake",
+      "map_label": "Watson Lake",
+      "is_unorganized": false,
+      "panel_title": "Watson Lake"
+    },
+    "2021S051260010280": {
+      "da_code": "60010280",
+      "geo_name": "60010280",
+      "population": 108,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Yukon, Unorganized",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "DA 60010280",
+      "community_display": null,
+      "map_label": "60010280",
+      "is_unorganized": true,
+      "panel_title": "Unnamed DA: DA 60010280"
+    },
+    "2021S051260010281": {
+      "da_code": "60010281",
+      "geo_name": "60010281",
+      "population": 128,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Yukon, Unorganized",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "DA 60010281",
+      "community_display": null,
+      "map_label": "60010281",
+      "is_unorganized": true,
+      "panel_title": "Unnamed DA: DA 60010281"
+    },
+    "2021S051260010282": {
+      "da_code": "60010282",
+      "geo_name": "60010282",
+      "population": 1448,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010282",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010283": {
+      "da_code": "60010283",
+      "geo_name": "60010283",
+      "population": 1606,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Whitehorse",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Whitehorse",
+      "community_display": "Whitehorse",
+      "map_label": "60010283",
+      "is_unorganized": false,
+      "panel_title": "Whitehorse"
+    },
+    "2021S051260010284": {
+      "da_code": "60010284",
+      "geo_name": "60010284",
+      "population": 5,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Macpherson-Grizzly Valley",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Macpherson-Grizzly Valley",
+      "community_display": "Macpherson-Grizzly Valley",
+      "map_label": "Macpherson-Grizzly Valley",
+      "is_unorganized": false,
+      "panel_title": "Macpherson-Grizzly Valley"
+    },
+    "2021S051260010285": {
+      "da_code": "60010285",
+      "geo_name": "60010285",
+      "population": 521,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Macpherson-Grizzly Valley",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Macpherson-Grizzly Valley",
+      "community_display": "Macpherson-Grizzly Valley",
+      "map_label": "Macpherson-Grizzly Valley",
+      "is_unorganized": false,
+      "panel_title": "Macpherson-Grizzly Valley"
+    },
+    "2021S051260010289": {
+      "da_code": "60010289",
+      "geo_name": "60010289",
+      "population": 22,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Champagne Landing 10",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Champagne Landing 10",
+      "community_display": "Champagne Landing 10",
+      "map_label": "Champagne Landing 10",
+      "is_unorganized": false,
+      "panel_title": "Champagne Landing 10"
+    },
+    "2021S051260010290": {
+      "da_code": "60010290",
+      "geo_name": "60010290",
+      "population": 30,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Carmacks",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Carmacks",
+      "community_display": "Carmacks",
+      "map_label": "Carmacks",
+      "is_unorganized": false,
+      "panel_title": "Carmacks"
+    },
+    "2021S051260010291": {
+      "da_code": "60010291",
+      "geo_name": "60010291",
+      "population": 166,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Carmacks",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Carmacks",
+      "community_display": "Carmacks",
+      "map_label": "Carmacks",
+      "is_unorganized": false,
+      "panel_title": "Carmacks"
+    },
+    "2021S051260010292": {
+      "da_code": "60010292",
+      "geo_name": "60010292",
+      "population": 392,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Carmacks",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Carmacks",
+      "community_display": "Carmacks",
+      "map_label": "Carmacks",
+      "is_unorganized": false,
+      "panel_title": "Carmacks"
+    },
+    "2021S051260010293": {
+      "da_code": "60010293",
+      "geo_name": "60010293",
+      "population": 0,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Kloo Lake",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Kloo Lake",
+      "community_display": "Kloo Lake",
+      "map_label": "Kloo Lake",
+      "is_unorganized": false,
+      "panel_title": "Kloo Lake"
+    },
+    "2021S051260010294": {
+      "da_code": "60010294",
+      "geo_name": "60010294",
+      "population": 0,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Kloo Lake",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Kloo Lake",
+      "community_display": "Kloo Lake",
+      "map_label": "Kloo Lake",
+      "is_unorganized": false,
+      "panel_title": "Kloo Lake"
+    },
+    "2021S051260010295": {
+      "da_code": "60010295",
+      "geo_name": "60010295",
+      "population": 448,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Yukon, Unorganized",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "DA 60010295",
+      "community_display": null,
+      "map_label": "60010295",
+      "is_unorganized": true,
+      "panel_title": "Unnamed DA: DA 60010295"
+    },
+    "2021S051260010298": {
+      "da_code": "60010298",
+      "geo_name": "60010298",
+      "population": 5,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Swift River",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Swift River",
+      "community_display": "Swift River",
+      "map_label": "Swift River",
+      "is_unorganized": false,
+      "panel_title": "Swift River"
+    },
+    "2021S051260010300": {
+      "da_code": "60010300",
+      "geo_name": "60010300",
+      "population": 19,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Teslin Post 13",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Teslin Post 13",
+      "community_display": "Teslin Post 13",
+      "map_label": "Teslin Post 13",
+      "is_unorganized": false,
+      "panel_title": "Teslin Post 13"
+    },
+    "2021S051260010301": {
+      "da_code": "60010301",
+      "geo_name": "60010301",
+      "population": 239,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Teslin",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Teslin",
+      "community_display": "Teslin",
+      "map_label": "Teslin",
+      "is_unorganized": false,
+      "panel_title": "Teslin"
+    },
+    "2021S051260010302": {
+      "da_code": "60010302",
+      "geo_name": "60010302",
+      "population": 626,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Haines Junction",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Haines Junction",
+      "community_display": "Haines Junction",
+      "map_label": "Haines Junction",
+      "is_unorganized": false,
+      "panel_title": "Haines Junction"
+    },
+    "2021S051260010303": {
+      "da_code": "60010303",
+      "geo_name": "60010303",
+      "population": 62,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Haines Junction",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "Haines Junction",
+      "community_display": "Haines Junction",
+      "map_label": "Haines Junction",
+      "is_unorganized": false,
+      "panel_title": "Haines Junction"
+    },
+    "2021S051260010304": {
+      "da_code": "60010304",
+      "geo_name": "60010304",
+      "population": 812,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "Yukon, Unorganized",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "DA 60010304",
+      "community_display": null,
+      "map_label": "60010304",
+      "is_unorganized": true,
+      "panel_title": "Unnamed DA: DA 60010304"
+    },
+    "2021S051260010305": {
+      "da_code": "60010305",
+      "geo_name": "60010305",
+      "population": 0,
+      "status": "ok",
+      "source": {
+        "label": "Statistics Canada — Census Profile 2021 (98-401-X2021006, Territories)",
+        "url": "https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006"
+      },
+      "community_name": "North Slope",
+      "community_source": {
+        "label": "Statistics Canada — 2021 census subdivision boundaries (spatial lookup)",
+        "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9"
+      },
+      "display_label": "North Slope",
+      "community_display": "North Slope",
+      "map_label": "North Slope",
+      "is_unorganized": false,
+      "panel_title": "North Slope"
+    }
+  }
+}
