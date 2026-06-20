@@ -11,6 +11,7 @@ import {
 import {
   findSupabaseAuthUserByEmail,
   findSupabaseProfileByPhone,
+  createSupabaseCommissionerUser,
   getSupabaseProfile,
   getSupabaseClient,
   signUpSupabaseUser,
@@ -109,6 +110,37 @@ function validatePublicProfile(body) {
       phoneNumber: phone.e164,
       phoneNational: phone.national,
       postalCode: `${postalCode.slice(0, 3)} ${postalCode.slice(3)}`,
+      province
+    }
+  };
+}
+
+function validateCommissionerSignup(body) {
+  const email =
+    typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+  const password = typeof body?.password === "string" ? body.password : "";
+  const firstName = requiredString(body?.firstName);
+  const lastName = requiredString(body?.lastName);
+  const province = requiredString(body?.province).toUpperCase();
+
+  if (!email || !password || !firstName || !lastName || !province) {
+    return { error: "All commissioner signup fields are required." };
+  }
+
+  if (password.length < 8) {
+    return { error: "Password must be at least 8 characters." };
+  }
+
+  if (!VALID_PROVINCES.has(province)) {
+    return { error: "Select a valid province or territory." };
+  }
+
+  return {
+    account: {
+      email,
+      firstName,
+      lastName,
+      password,
       province
     }
   };
@@ -320,6 +352,41 @@ router.post("/signup", async (req, res, next) => {
       res.status(error.statusCode || 400).json({
         error: signupErrorMessage(error.publicMessage)
       });
+      return;
+    }
+
+    next(error);
+  }
+});
+
+router.post("/commissioner-signup", async (req, res, next) => {
+  const validation = validateCommissionerSignup(req.body);
+
+  if (validation.error) {
+    res.status(400).json({ error: validation.error });
+    return;
+  }
+
+  try {
+    const existingUser = await findSupabaseAuthUserByEmail(
+      validation.account.email
+    );
+
+    if (existingUser) {
+      res.status(409).json({
+        error: "An account with this email already exists. Please sign in."
+      });
+      return;
+    }
+
+    await createSupabaseCommissionerUser(validation.account);
+
+    res.status(201).json({
+      message: "Commissioner account created. You can now sign in."
+    });
+  } catch (error) {
+    if (error.publicMessage) {
+      res.status(error.statusCode || 400).json({ error: error.publicMessage });
       return;
     }
 

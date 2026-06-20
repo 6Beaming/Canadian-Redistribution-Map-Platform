@@ -4,7 +4,7 @@ let supabaseClient;
 let supabaseAdminClient;
 
 const PROFILE_COLUMNS =
-  "id,email,first_name,last_name,province,postal_code,phone,role,profile_completed,created_at";
+  "id,email,first_name,last_name,province,postal_code,phone,role,profile_completed,invited_by,created_at";
 
 function getSupabaseConfig() {
   const supabaseUrl = process.env.SUPABASE_URL;
@@ -191,6 +191,69 @@ export async function findSupabaseProfileByPhone(phone) {
   }
 
   return data?.[0] || null;
+}
+
+export async function createSupabaseCommissionerUser({
+  email,
+  firstName,
+  invitedBy = null,
+  lastName,
+  password,
+  province
+}) {
+  const supabase = requireSupabaseAdminClient();
+
+  const { data: userData, error: createError } =
+    await supabase.auth.admin.createUser({
+      email,
+      email_confirm: true,
+      password
+    });
+
+  if (createError || !userData?.user) {
+    const authError = new Error(
+      createError?.message || "Unable to create commissioner account."
+    );
+    authError.statusCode = createError?.status || 400;
+    authError.publicMessage = authError.message;
+    throw authError;
+  }
+
+  const profile = {
+    email,
+    first_name: firstName,
+    id: userData.user.id,
+    invited_by: invitedBy,
+    last_name: lastName,
+    profile_completed: true,
+    province,
+    role: "commissioner"
+  };
+
+  const { data: profileData, error: profileError } = await supabase
+    .from("profiles")
+    .upsert(profile, { onConflict: "id" })
+    .select(PROFILE_COLUMNS)
+    .single();
+
+  if (profileError) {
+    await supabase.auth.admin.deleteUser(userData.user.id);
+
+    const saveError = new Error(
+      profileError.message || "Unable to save commissioner profile."
+    );
+    saveError.statusCode = profileError.code === "23505" ? 409 : 500;
+    saveError.publicMessage =
+      profileError.code === "23505"
+        ? "A profile already exists for this account."
+        : "Unable to save commissioner profile.";
+    throw saveError;
+  }
+
+  return {
+    profile: profileData,
+    user: userData.user
+  };
 }
 
 export async function getSupabaseProfile(accessToken, userId) {

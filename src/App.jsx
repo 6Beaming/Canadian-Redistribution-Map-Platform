@@ -1,4 +1,5 @@
 import { Routes, Route } from "react-router-dom";
+import CommissionerSignUpPage from "./pages/CommissionerSignUpPage.jsx";
 import DashboardCommissioner from "./pages/DashboardCommissioner.jsx";
 import DashboardPublicUser from "./pages/DashboardPublicUser.jsx";
 import PasswordRecoveryPage from "./pages/PasswordRecoveryPage.jsx";
@@ -12,6 +13,7 @@ function App() {
       <Route path="/" element={<DashboardPublicUser />} />
       <Route path="/sign-in" element={<SignInPage />} />
       <Route path="/sign-up" element={<SignUpPage />} />
+      <Route path="/commissioner/sign-up" element={<CommissionerSignUpPage />} />
       <Route path="/forgot-password" element={<ResetPasswordRequestPage />} />
       <Route path="/reset-password" element={<PasswordRecoveryPage />} />
       <Route path="/commissioner" element={<DashboardCommissioner />} />
