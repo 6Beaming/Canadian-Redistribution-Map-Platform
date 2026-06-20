@@ -35,7 +35,7 @@ export default function DashboardPublicUser() {
 
   async function handleAuthAction() {
     if (sessionStatus !== "signed-in") {
-      navigate("/auth?view=login");
+      navigate("/sign-in");
       return;
     }
 
