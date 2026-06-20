@@ -379,10 +379,14 @@ router.post("/commissioner-signup", async (req, res, next) => {
       return;
     }
 
-    await createSupabaseCommissionerUser(validation.account);
+    await createSupabaseCommissionerUser({
+      ...validation.account,
+      emailRedirectTo: getSignupEmailRedirectUrl()
+    });
 
     res.status(201).json({
-      message: "Commissioner account created. You can now sign in."
+      message:
+        "Commissioner account created. Check your email to verify your address before signing in."
     });
   } catch (error) {
     if (error.publicMessage) {

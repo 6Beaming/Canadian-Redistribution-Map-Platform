@@ -195,6 +195,7 @@ export async function findSupabaseProfileByPhone(phone) {
 
 export async function createSupabaseCommissionerUser({
   email,
+  emailRedirectTo,
   firstName,
   invitedBy = null,
   lastName,
@@ -202,19 +203,16 @@ export async function createSupabaseCommissionerUser({
   province
 }) {
   const supabase = requireSupabaseAdminClient();
+  const signupData = await signUpSupabaseUser({
+    email,
+    emailRedirectTo,
+    password
+  });
+  const user = signupData.user || signupData;
 
-  const { data: userData, error: createError } =
-    await supabase.auth.admin.createUser({
-      email,
-      email_confirm: true,
-      password
-    });
-
-  if (createError || !userData?.user) {
-    const authError = new Error(
-      createError?.message || "Unable to create commissioner account."
-    );
-    authError.statusCode = createError?.status || 400;
+  if (!user?.id) {
+    const authError = new Error("Unable to create commissioner account.");
+    authError.statusCode = 400;
     authError.publicMessage = authError.message;
     throw authError;
   }
@@ -222,7 +220,7 @@ export async function createSupabaseCommissionerUser({
   const profile = {
     email,
     first_name: firstName,
-    id: userData.user.id,
+    id: user.id,
     invited_by: invitedBy,
     last_name: lastName,
     profile_completed: true,
@@ -237,7 +235,7 @@ export async function createSupabaseCommissionerUser({
     .single();
 
   if (profileError) {
-    await supabase.auth.admin.deleteUser(userData.user.id);
+    await supabase.auth.admin.deleteUser(user.id);
 
     const saveError = new Error(
       profileError.message || "Unable to save commissioner profile."
@@ -252,7 +250,7 @@ export async function createSupabaseCommissionerUser({
 
   return {
     profile: profileData,
-    user: userData.user
+    user
   };
 }
 
