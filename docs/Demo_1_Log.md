@@ -109,7 +109,7 @@ Store file: `server/map-api-service/store/assignments.json` (gitignored).
 
 **Two product surfaces (as planned):** Public User (map + view + submission) and Commissioner (dashboard + map + analytics). Public User surface is not yet on `main`; map module currently lives on `/dashboard` as integration staging.
 
-**[#ff0000] Important: Waiting for: Merging of completed auth feature and frontends for Public User and Commissioner.**
+**![#ff0000](https://placehold.co/15x15/ff0000/ff0000.png) Important: Waiting for: Merging of completed auth feature and frontends for Public User and Commissioner.**
 
 ---
 
