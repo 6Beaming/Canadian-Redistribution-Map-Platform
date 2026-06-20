@@ -1,8 +1,8 @@
 {
   "$schema": "https://ui.shadcn.com/schema.json",
-  "style": "radix-vega",
+  "style": "radix-nova",
   "rsc": false,
-  "tsx": true,
+  "tsx": false,
   "tailwind": {
     "config": "",
     "css": "src/styles/globals.css",
