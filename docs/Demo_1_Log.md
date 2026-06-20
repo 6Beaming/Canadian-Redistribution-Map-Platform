@@ -11,11 +11,10 @@
 
 Replace the standalone `map-mvp/` vanilla-JS prototype with React components inside the shared Vite app, backed by a decoupled Express **map-api-service**. The map module is temporarily hosted on the commissioner dashboard shell (`/dashboard`) until Public User and Commissioner layouts are fully split.
 
-**Out of scope this sprint:** Auth completion, Public User app merge, Supabase submission persistence, assignment UI on map clicks.
 
 ---
 
-## 2. Delivered map module
+## 2. Delivered map module (Updated by Erfang with Merged feature/issues6-8/map-rendering-mvp)
 
 ### 2.1 UI components (`src/components/non_prebuilt/`)
 
@@ -87,6 +86,14 @@ Store file: `server/map-api-service/store/assignments.json` (gitignored).
 - `server/serve-map-mvp.js`
 - `npm run dev:map` script
 
+### 2.7 Conclusion
+
+1. Map MVP is **production-ready as a React module** with API-backed data — no separate static server.
+2. PMTiles byte-range is preserved through `map-api-service` asset routes (`absoluteAssetUrl` for MapLibre protocol).
+3. Assignment persistence moved from `localStorage` to server API (UI wiring for redistricting clicks still deferred).
+4. Adaptive label layers reduce stacking in dense DA areas and keep FED names visible at high zoom.
+5. Next integration step: extract shared map module for Public User route once that app shell exists.
+
 ---
 
 ## 3. Brief project architecture (other team work)
@@ -94,40 +101,19 @@ Store file: `server/map-api-service/store/assignments.json` (gitignored).
 | Layer | Stack | Current state |
 |-------|-------|---------------|
 | **Frontend** | React 19, Vite, Tailwind 4, shadcn/ui (`src/components/ui`) | Auth page at `/`; commissioner graphs at `/dashboard/graphs` (mock data) |
-| **Backend** | Express ESM, Supabase auth routes (`/api/auth/*`) | Auth incomplete — deferred |
+| **Backend** | Express ESM, Supabase auth routes (`/api/auth/*`) | Auth incomplete — waiting for merging |
 | **Database** | Supabase (PostgreSQL) | Planned; not wired to map module |
 | **Data tooling** | `scripts/` Python notebooks & collectors | Bundle audit, Yukon profile pipeline, FED labels |
 
 **Component convention:** `src/components/ui` = shadcn prebuilt; `src/components/non_prebuilt` = team-built (map, submission graphs).
 
-**Two product surfaces (planned):** Public User (map + feedback) and Commissioner (dashboard + analytics). Public User surface is not yet on `main`; map module currently lives on `/dashboard` as integration staging.
+**Two product surfaces (as planned):** Public User (map + view + submission) and Commissioner (dashboard + map + analytics). Public User surface is not yet on `main`; map module currently lives on `/dashboard` as integration staging.
+
+**![#ff0000](https://placehold.co/15x15/ff0000/ff0000.png) Important: Waiting for merging of completed auth feature and frontends for Public User and Commissioner.**
 
 ---
 
-## 4. Sprint conclusions
-
-1. Map MVP is **production-ready as a React module** with API-backed data — no separate static server.
-2. PMTiles byte-range is preserved through `map-api-service` asset routes (`absoluteAssetUrl` for MapLibre protocol).
-3. Assignment persistence moved from `localStorage` to server API (UI wiring for redistricting clicks still deferred).
-4. Adaptive label layers reduce stacking in dense DA areas and keep FED names visible at high zoom.
-5. Auth and role-based routing remain **future work**; `/dashboard` is intentionally open for demo.
-6. Next integration step: extract shared map module for Public User route once that app shell exists.
-
----
-
-## 5. Verification
-
-```bash
-npm run dev
-# http://localhost:5173/dashboard
-
-curl -I -H "Range: bytes=0-1" http://localhost:3000/api/map/assets/fed_boundaries_2023.pmtiles
-# Expect 206 Partial Content
-```
-
----
-
-## 6. Document history
+## 5. Document history
 
 | Date | Change |
 |------|--------|
