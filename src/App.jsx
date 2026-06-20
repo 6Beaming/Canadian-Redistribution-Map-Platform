@@ -1,15 +1,15 @@
 import { Routes, Route } from "react-router-dom";
 import AuthPage from "./pages/AuthPage.jsx";
-import DashboardHome from "./pages/DashboardHome.jsx";
+import DashboardCommissioner from "./pages/DashboardCommissioner.jsx";
 import DashboardPublicUser from "./pages/DashboardPublicUser.jsx";
 
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<AuthPage />} />
+      <Route path="/" element={<DashboardPublicUser />} />
+      <Route path="/auth" element={<AuthPage />} />
       <Route path="/reset-password" element={<AuthPage />} />
-      <Route path="/dashboard" element={<DashboardHome />} />
-      <Route path="/dashboard-public-user" element={<DashboardPublicUser />} />
+      <Route path="/commissioner" element={<DashboardCommissioner />} />
     </Routes>
   );
 }

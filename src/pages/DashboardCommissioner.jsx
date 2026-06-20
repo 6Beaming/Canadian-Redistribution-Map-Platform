@@ -2,9 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "../services/authApi.js";
 
-export default function DashboardPublicUser() {
+export default function DashboardCommissioner() {
   const navigate = useNavigate();
-  const [sessionStatus, setSessionStatus] = useState("checking");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -12,16 +11,14 @@ export default function DashboardPublicUser() {
 
     async function restoreSession() {
       try {
-        await authApi.getCurrentUser();
+        const { user } = await authApi.getCurrentUser();
 
-        if (!isMounted) {
-          return;
+        if (isMounted && user?.role !== "commissioner") {
+          navigate("/", { replace: true });
         }
-
-        setSessionStatus("signed-in");
       } catch {
         if (isMounted) {
-          setSessionStatus("signed-out");
+          navigate("/", { replace: true });
         }
       }
     }
@@ -33,17 +30,11 @@ export default function DashboardPublicUser() {
     };
   }, [navigate]);
 
-  async function handleAuthAction() {
-    if (sessionStatus !== "signed-in") {
-      navigate("/auth?view=login");
-      return;
-    }
-
+  async function handleSignOut() {
     setIsSubmitting(true);
 
     try {
       await authApi.logout();
-      setSessionStatus("signed-out");
       navigate("/", { replace: true });
     } finally {
       setIsSubmitting(false);
@@ -55,16 +46,16 @@ export default function DashboardPublicUser() {
       <header className="dashboard-header">
         <div className="brand-lockup">
           <div>
-            <h1>Public User Dashboard</h1>
+            <h1>Commissioner Dashboard</h1>
           </div>
         </div>
         <button
           className="ghost-button sign-out-button"
-          disabled={sessionStatus === "checking" || isSubmitting}
-          onClick={handleAuthAction}
+          disabled={isSubmitting}
+          onClick={handleSignOut}
           type="button"
         >
-          {sessionStatus === "signed-in" ? "Sign Out" : "Sign In"}
+          Sign Out
         </button>
       </header>
     </main>

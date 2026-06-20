@@ -7,7 +7,7 @@ import {
   UserPlus
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { authApi } from "../services/authApi.js";
 import { getPasswordRecoveryClient } from "../services/passwordRecoveryClient.js";
 
@@ -49,6 +49,16 @@ const provinces = [
   ["SK", "Saskatchewan"],
   ["YT", "Yukon"]
 ];
+
+function getInitialAuthView() {
+  const view = new URLSearchParams(window.location.search).get("view");
+
+  if (view === "login" || view === "reset" || view === "signup") {
+    return view;
+  }
+
+  return "signup";
+}
 
 function ResetPasswordView() {
   const [form, setForm] = useState(initialPasswordResetForm);
@@ -224,10 +234,11 @@ function ResetPasswordView() {
 }
 
 function AuthPage() {
+  const navigate = useNavigate();
   const [form, setForm] = useState(initialForm);
   const [profileForm, setProfileForm] = useState(initialProfileForm);
   const [otpForm, setOtpForm] = useState(initialOtpForm);
-  const [authView, setAuthView] = useState("login");
+  const [authView, setAuthView] = useState(getInitialAuthView);
   const [pendingPhoneLabel, setPendingPhoneLabel] = useState("");
   const [pendingProfileUser, setPendingProfileUser] = useState(null);
   const [sessionStatus, setSessionStatus] = useState("checking");
@@ -235,6 +246,12 @@ function AuthPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const isPasswordRecoveryRoute = window.location.pathname === "/reset-password";
+
+  function navigateToRoleHome(user) {
+    navigate(user?.role === "commissioner" ? "/commissioner" : "/", {
+      replace: true
+    });
+  }
 
   useEffect(() => {
     if (isPasswordRecoveryRoute) {
@@ -248,10 +265,15 @@ function AuthPage() {
       try {
         const { user: currentUser } = await authApi.getCurrentUser();
 
-        if (isMounted) {
+        if (isMounted && currentUser) {
           setPendingProfileUser(null);
           setPendingPhoneLabel("");
-          setSessionStatus(currentUser ? "signed-in" : "signed-out");
+          navigateToRoleHome(currentUser);
+          return;
+        }
+
+        if (isMounted) {
+          setSessionStatus("signed-out");
         }
 
         return;
@@ -329,7 +351,7 @@ function AuthPage() {
 
       setPendingProfileUser(null);
       setPendingPhoneLabel("");
-      setSessionStatus("signed-in");
+      navigateToRoleHome(result.user);
     } catch (loginError) {
       setError(loginError.message);
       setSessionStatus("signed-out");
@@ -362,9 +384,7 @@ function AuthPage() {
       });
 
       setForm(initialForm);
-      setAuthView("login");
-      setNotice(message);
-      setSessionStatus("signed-out");
+      navigate("/", { replace: true, state: { notice: message } });
     } catch (signupError) {
       setError(signupError.message);
       setSessionStatus("signed-out");
@@ -398,12 +418,12 @@ function AuthPage() {
     clearMessages();
 
     try {
-      await authApi.verifyProfileOtp(otpForm);
+      const result = await authApi.verifyProfileOtp(otpForm);
       setPendingProfileUser(null);
       setPendingPhoneLabel("");
       setProfileForm(initialProfileForm);
       setOtpForm(initialOtpForm);
-      setSessionStatus("signed-in");
+      navigateToRoleHome(result.user);
     } catch (otpError) {
       setError(otpError.message);
       setSessionStatus("otp-required");
@@ -440,6 +460,7 @@ function AuthPage() {
       password: ""
     }));
     clearMessages();
+    navigate("/auth?view=reset", { replace: true });
   }
 
   function showSignupForm() {
@@ -450,6 +471,7 @@ function AuthPage() {
       password: ""
     }));
     clearMessages();
+    navigate("/auth?view=signup", { replace: true });
   }
 
   function showLoginForm() {
@@ -460,6 +482,7 @@ function AuthPage() {
       password: ""
     }));
     clearMessages();
+    navigate("/auth?view=login", { replace: true });
   }
 
   function showProfileForm() {
@@ -479,6 +502,7 @@ function AuthPage() {
       setProfileForm(initialProfileForm);
       setOtpForm(initialOtpForm);
       setSessionStatus("signed-out");
+      navigate("/", { replace: true });
     } catch (logoutError) {
       setError(logoutError.message);
     } finally {
@@ -496,10 +520,6 @@ function AuthPage() {
         <div className="loading-mark" aria-label="Loading session" />
       </main>
     );
-  }
-
-  if (sessionStatus === "signed-in") {
-    return <Navigate to="/dashboard-public-user" replace />;
   }
 
   if (pendingProfileUser && sessionStatus === "profile-required") {
@@ -690,6 +710,17 @@ function AuthPage() {
       <section className="auth-layout" aria-label="User sign in">
         <div className="login-panel">
           <div className="brand-lockup">
+            {authView === "login" ? (
+              <button
+                aria-label="Back to public user dashboard"
+                className="icon-button"
+                disabled={isSubmitting}
+                onClick={() => navigate("/")}
+                type="button"
+              >
+                <ArrowLeft aria-hidden="true" size={22} />
+              </button>
+            ) : null}
             <div>
               <h1>
                 {authView === "reset"
