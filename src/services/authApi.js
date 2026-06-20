@@ -1,12 +1,31 @@
-async function request(path, options = {}) {
-  const response = await fetch(path, {
-    credentials: "include",
-    ...options,
-    headers: {
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...options.headers
-    }
+const transientStatuses = new Set([502, 503, 504]);
+
+function wait(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
   });
+}
+
+function isTransientRequestError(error) {
+  return error.name === "TypeError" || transientStatuses.has(error.status);
+}
+
+async function request(path, options = {}) {
+  let response;
+
+  try {
+    response = await fetch(path, {
+      credentials: "include",
+      ...options,
+      headers: {
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...options.headers
+      }
+    });
+  } catch (networkError) {
+    networkError.status = 0;
+    throw networkError;
+  }
 
   if (response.status === 204) {
     return null;
@@ -15,10 +34,30 @@ async function request(path, options = {}) {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(data.error || "Request failed.");
+    const error = new Error(
+      data.error ||
+        (transientStatuses.has(response.status)
+          ? "Server is still starting. Please try again."
+          : "Request failed.")
+    );
+    error.status = response.status;
+    throw error;
   }
 
   return data;
+}
+
+async function requestWithTransientRetry(path, options = {}) {
+  try {
+    return await request(path, options);
+  } catch (error) {
+    if (!isTransientRequestError(error)) {
+      throw error;
+    }
+
+    await wait(500);
+    return request(path, options);
+  }
 }
 
 export const authApi = {
@@ -29,7 +68,7 @@ export const authApi = {
     return request("/api/auth/profile-session");
   },
   login(credentials) {
-    return request("/api/auth/login", {
+    return requestWithTransientRetry("/api/auth/login", {
       method: "POST",
       body: JSON.stringify(credentials)
     });
