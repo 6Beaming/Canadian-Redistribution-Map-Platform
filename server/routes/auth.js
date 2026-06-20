@@ -186,6 +186,47 @@ function signupErrorMessage(message = "") {
   return "Unable to create account.";
 }
 
+function getSignupEmailRedirectUrl() {
+  const configuredRedirect = requiredString(process.env.SIGNUP_EMAIL_REDIRECT_URL);
+
+  if (configuredRedirect) {
+    const redirectUrl = new URL(configuredRedirect);
+
+    if (
+      redirectUrl.pathname === "/" ||
+      redirectUrl.pathname === "" ||
+      redirectUrl.pathname === "/auth/callback"
+    ) {
+      redirectUrl.pathname = "/sign-in";
+    }
+
+    return redirectUrl.toString();
+  }
+
+  const clientOrigin = requiredString(process.env.CLIENT_ORIGIN);
+
+  if (!clientOrigin) {
+    return undefined;
+  }
+
+  return new URL("/sign-in", clientOrigin).toString();
+}
+
+async function applySessionCookiesForUser(res, session, user) {
+  const profile = await getSupabaseProfile(session.access_token, user.id);
+  const publicUserData = publicUser(user, profile);
+
+  if (!publicUserData.profileComplete) {
+    clearAuthenticatedSessionCookies(res);
+    setPendingSessionCookies(res, session);
+    return pendingProfileResponse(user, profile);
+  }
+
+  clearPendingSessionCookies(res);
+  setSessionCookies(res, session);
+  return { user: publicUserData };
+}
+
 async function phoneBelongsToAnotherUser(phoneNational, userId) {
   const existingProfile = await findSupabaseProfileByPhone(phoneNational);
 
@@ -224,19 +265,12 @@ router.post("/login", async (req, res, next) => {
       return;
     }
 
-    const profile = await getSupabaseProfile(data.session.access_token, data.user.id);
-    const user = publicUser(data.user, profile);
-
-    if (!user.profileComplete) {
-      clearAuthenticatedSessionCookies(res);
-      setPendingSessionCookies(res, data.session);
-      res.status(200).json(pendingProfileResponse(data.user, profile));
-      return;
-    }
-
-    clearPendingSessionCookies(res);
-    setSessionCookies(res, data.session);
-    res.status(200).json({ user });
+    const responseBody = await applySessionCookiesForUser(
+      res,
+      data.session,
+      data.user
+    );
+    res.status(200).json(responseBody);
   } catch (error) {
     next(error);
   }
@@ -268,8 +302,7 @@ router.post("/signup", async (req, res, next) => {
       return;
     }
 
-    const emailRedirectTo =
-      process.env.SIGNUP_EMAIL_REDIRECT_URL || process.env.CLIENT_ORIGIN;
+    const emailRedirectTo = getSignupEmailRedirectUrl();
 
     await signUpSupabaseUser({
       email,

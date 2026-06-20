@@ -35,7 +35,7 @@ export default function DashboardCommissioner() {
 
     try {
       await authApi.logout();
-      navigate("/", { replace: true });
+      navigate("/sign-in", { replace: true });
     } finally {
       setIsSubmitting(false);
     }

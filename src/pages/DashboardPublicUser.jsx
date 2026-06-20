@@ -44,7 +44,7 @@ export default function DashboardPublicUser() {
     try {
       await authApi.logout();
       setSessionStatus("signed-out");
-      navigate("/", { replace: true });
+      navigate("/sign-in", { replace: true });
     } finally {
       setIsSubmitting(false);
     }

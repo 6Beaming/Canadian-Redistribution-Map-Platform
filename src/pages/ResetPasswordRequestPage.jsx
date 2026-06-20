@@ -2,9 +2,9 @@ import { Mail } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "../services/authApi.js";
-import AuthOnboarding from "./auth_helpers/AuthOnboarding.jsx";
-import AuthPanel from "./auth_helpers/AuthPanel.jsx";
-import useAuthOnboarding from "./auth_helpers/useAuthOnboarding.js";
+import AuthOnboarding from "./auth/AuthOnboarding.jsx";
+import AuthPanel from "./auth/AuthPanel.jsx";
+import useAuthOnboarding from "./auth/useAuthOnboarding.js";
 
 const initialResetRequestForm = {
   email: ""

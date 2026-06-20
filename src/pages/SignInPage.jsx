@@ -2,9 +2,9 @@ import { LogIn } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { authApi } from "../services/authApi.js";
-import AuthOnboarding from "./auth_helpers/AuthOnboarding.jsx";
-import AuthPanel from "./auth_helpers/AuthPanel.jsx";
-import useAuthOnboarding from "./auth_helpers/useAuthOnboarding.js";
+import AuthOnboarding from "./auth/AuthOnboarding.jsx";
+import AuthPanel from "./auth/AuthPanel.jsx";
+import useAuthOnboarding from "./auth/useAuthOnboarding.js";
 
 const initialSignInForm = {
   email: "",
@@ -25,6 +25,35 @@ export default function SignInPage() {
       setNotice(location.state.notice);
     }
   }, [location.state]);
+
+  useEffect(() => {
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    const queryParams = new URLSearchParams(location.search);
+    const hasVerificationParams =
+      hashParams.has("access_token") ||
+      hashParams.has("error") ||
+      queryParams.has("access_token") ||
+      queryParams.has("error") ||
+      queryParams.has("token_hash") ||
+      queryParams.get("type") === "signup";
+
+    if (!hasVerificationParams) {
+      return;
+    }
+
+    const verificationError =
+      hashParams.get("error_description") ||
+      queryParams.get("error_description");
+
+    window.history.replaceState({}, "", "/sign-in");
+
+    if (verificationError) {
+      setError(verificationError);
+      return;
+    }
+
+    setNotice((currentNotice) => currentNotice || "Email verified. Sign in to continue.");
+  }, [location.search]);
 
   function clearMessages() {
     setError("");
