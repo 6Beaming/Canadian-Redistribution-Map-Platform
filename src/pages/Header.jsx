@@ -36,6 +36,10 @@ export default function Header() {
       )}
 
       {isUsersPage && (
+        <p className="absolute left-6 text-lg font-semibold">Home</p>
+      )}
+
+      {isUsersPage && (
         <div className="flex-1 flex justify-end">
           <Button variant="outline" className="rounded-full bg-black">
             A
