@@ -1,7 +1,8 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import {Routes, Route} from "react-router-dom";
 import AuthPage from "./pages/AuthPage.jsx";
 import DashboardHome from "./pages/DashboardHome.jsx";
 import DashboardGraphs from "./pages/DashboardGraphs.jsx";
+import DashBoardSubmissionsPage from "./pages/DashboardSubmissionsTable/DashboardSubmissionsPage.jsx";
 
 function App() {
   return (
@@ -9,6 +10,7 @@ function App() {
       <Route path="/" element={<AuthPage/>} />
       <Route path="/dashboard" element={<DashboardHome />} />
       <Route path="/dashboard/graphs" element={<DashboardGraphs />} />
+      <Route path="/dashboard/submissionsTable" element={<DashBoardSubmissionsPage />} />
     </Routes>
 
   );
