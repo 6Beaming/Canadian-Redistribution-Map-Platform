@@ -1,6 +1,7 @@
 /* source from https://ui.shadcn.com/docs/components/radix/data-table#basic-table */
 
-
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 import columns from "./SubmissionsColumns"
 import SubmissionsTable from "./SubmissionsTable"
@@ -253,9 +254,21 @@ const submissions = [
 
 
 export default function DashBoardSubmissionsPage() {
+  const navigate = useNavigate();
   return (
-    <div>
-      <SubmissionsTable columns={columns} data={submissions} />
+
+    <div >
+      <div className="w-full flex justify-center bg-white py-10 ">
+        <h1 className="text-5xl font-bold text-primary">
+          All Submissions
+        </h1>
+      </div>
+      <div className="px-15">
+        <Button onClick={() => navigate(-1)}>
+          Back
+        </Button>
+        <SubmissionsTable columns={columns} data={submissions} />
+      </div>
     </div>
   )
 }
