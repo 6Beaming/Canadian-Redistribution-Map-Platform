@@ -1,5 +1,6 @@
 import cors from "cors";
 import express from "express";
+import { mountMapApiService } from "./map-api-service/index.js";
 import authRouter from "./routes/auth.js";
 
 const app = express();
@@ -30,6 +31,8 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api/auth", authRouter);
+
+mountMapApiService(app);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Route not found." });
