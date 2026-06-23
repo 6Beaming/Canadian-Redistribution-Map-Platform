@@ -932,7 +932,7 @@ def write_availability_section(
     out.write("\n" + "-" * 80 + "\n")
     out.write("7. RECOMMENDED SLIM BUNDLES (copy lists for scripts/data/bundle)\n")
     out.write("-" * 80 + "\n")
-    out.write("\n### A. Yukon MVP bundle (map-mvp pilot, FED 60001)\n")
+    out.write("\n### A. Yukon MVP bundle (Yukon pilot, FED 60001 → src/data/map)\n")
     yukon_files = [
         "raw_data/statistics_canada/census_boundaries/yt/yt_dissemination_areas.gpkg",
         "raw_data/statistics_canada/census_boundaries/yt/yt_census_subdivisions.gpkg",
@@ -946,7 +946,7 @@ def write_availability_section(
         flag = "OK" if exists else "MISSING"
         out.write(f"  [{flag}] {item}\n")
     out.write(
-        "\n  Derive for map-mvp:\n"
+        "\n  Derive for src/data/map:\n"
         "    single_fed_das.geojson  <- yt_dissemination_areas + territories.csv (DGUID, GEO_NAME, C1_COUNT_TOTAL)\n"
         "    place_labels_yt.geojson <- yt_census_subdivisions centroids + territories_geo_index (CSD labels)\n"
         "    fed_labels.geojson      <- fed_boundaries_2023 + merged FED names from electoral GPKG / fed2021_pd\n"

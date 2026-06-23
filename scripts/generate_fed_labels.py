@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate map-mvp/data/fed_labels.geojson from external FED name table.
+"""Generate src/data/map/fed_labels.geojson from external FED name table.
 
 MVP FED labels use scripts/data/fed_names_2023.json (Elections Canada 2023 RO
 name list, 343 entries) — not the bundle-derived 338-name merge.
@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA_DIR = ROOT / "map-mvp" / "data"
+DATA_DIR = ROOT / "src" / "data" / "map"
 FED_NAMES = Path(__file__).resolve().parent / "data" / "fed_names_2023.json"
 FED_GEOJSON = DATA_DIR / "fed_boundaries_2023.geojson"
 FED_LABELS_OUT = DATA_DIR / "fed_labels.geojson"

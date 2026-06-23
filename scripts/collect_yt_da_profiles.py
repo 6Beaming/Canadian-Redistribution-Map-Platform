@@ -2,7 +2,7 @@
 """Collect per-DA GEO_NAME and 2021 population for Yukon DAs (external sources).
 
 The CRMP bundle does not include 006/territories.csv. This script fills
-map-mvp/data/yt_da_profiles.json from **outside** the zip:
+src/data/map/yt_da_profiles.json from **outside** the zip:
 
   1. StatCan Census Profile CSV (recommended) — must contain **Dissemination area**
      rows (`GEO_LEVEL`). For Yukon that is product **98-401-X2021006** (territories,
@@ -38,8 +38,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DA_GEOJSON = ROOT / "map-mvp" / "data" / "single_fed_das.geojson"
-PROFILES_OUT = ROOT / "map-mvp" / "data" / "yt_da_profiles.json"
+DA_GEOJSON = ROOT / "src" / "data" / "map" / "single_fed_das.geojson"
+PROFILES_OUT = ROOT / "src" / "data" / "map" / "yt_da_profiles.json"
 
 MISSING_NAME = "missing name"
 
