@@ -5,6 +5,7 @@ import { authApi } from "../services/authApi.js";
 import AuthOnboarding from "./auth/AuthOnboarding.jsx";
 import AuthPanel from "./auth/AuthPanel.jsx";
 import useAuthOnboarding from "./auth/useAuthOnboarding.js";
+import { useAuth } from "../contexts/AuthContext.jsx";
 
 const initialSignInForm = {
   email: "",
@@ -15,6 +16,7 @@ export default function SignInPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const onboarding = useAuthOnboarding();
+  const { markSignedIn } = useAuth();
   const [form, setForm] = useState(initialSignInForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -81,6 +83,7 @@ export default function SignInPage() {
       }
 
       onboarding.clearPendingProfile();
+      markSignedIn(result.user);
       onboarding.navigateToRoleHome(result.user);
     } catch (loginError) {
       setError(loginError.message);

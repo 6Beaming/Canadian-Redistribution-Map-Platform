@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "../../services/authApi.js";
+import { useAuth } from "../../contexts/AuthContext.jsx";
 
 const initialProfileForm = {
   firstName: "",
@@ -17,6 +18,12 @@ const initialOtpForm = {
 // shared onboarding behavior/state
 export default function useAuthOnboarding() {
   const navigate = useNavigate();
+  const {
+    markSignedIn,
+    sessionStatus: appSessionStatus,
+    signOut,
+    user: currentUser
+  } = useAuth();
   const [profileForm, setProfileForm] = useState(initialProfileForm);
   const [otpForm, setOtpForm] = useState(initialOtpForm);
   const [pendingPhoneLabel, setPendingPhoneLabel] = useState("");
@@ -36,22 +43,14 @@ export default function useAuthOnboarding() {
     let isMounted = true;
 
     async function restoreSession() {
-      try {
-        const { user: currentUser } = await authApi.getCurrentUser();
-
-        if (isMounted && currentUser) {
-          clearPendingProfile();
-          navigateToRoleHome(currentUser);
-          return;
-        }
-
-        if (isMounted) {
-          setSessionStatus("signed-out");
-        }
-
+      if (appSessionStatus === "checking") {
         return;
-      } catch {
-        // No complete app session; check for an onboarding-only session.
+      }
+
+      if (currentUser) {
+        clearPendingProfile();
+        navigateToRoleHome(currentUser);
+        return;
       }
 
       try {
@@ -76,7 +75,7 @@ export default function useAuthOnboarding() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [appSessionStatus, currentUser]);
 
   function clearMessages() {
     setError("");
@@ -135,6 +134,7 @@ export default function useAuthOnboarding() {
       clearPendingProfile();
       setProfileForm(initialProfileForm);
       setOtpForm(initialOtpForm);
+      markSignedIn(result.user);
       navigateToRoleHome(result.user);
     } catch (otpError) {
       setError(otpError.message);
@@ -155,7 +155,7 @@ export default function useAuthOnboarding() {
     clearMessages();
 
     try {
-      await authApi.logout();
+      await signOut();
       clearPendingProfile();
       setProfileForm(initialProfileForm);
       setOtpForm(initialOtpForm);

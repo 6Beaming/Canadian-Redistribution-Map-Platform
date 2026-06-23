@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { authApi } from "../services/authApi.js";
+import { useAuth } from "../contexts/AuthContext.jsx";
 
 // AI generated dummy data
 const submissions = [
@@ -96,31 +96,13 @@ const columns = [
 export default function MySubmissions() {
   const navigate = useNavigate();
   const [sorting, setSorting] = useState([{ id: "submittedAt", desc: true }]);
-  const [isAuthorized, setIsAuthorized] = useState(false);
+  const { sessionStatus } = useAuth();
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function requireSession() {
-      try {
-        await authApi.getCurrentUser();
-
-        if (isMounted) {
-          setIsAuthorized(true);
-        }
-      } catch {
-        if (isMounted) {
-          navigate("/sign-in", { replace: true });
-        }
-      }
+    if (sessionStatus === "signed-out") {
+      navigate("/sign-in", { replace: true });
     }
-
-    requireSession();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [navigate]);
+  }, [navigate, sessionStatus]);
 
   const table = useReactTable({
     data: submissions,
@@ -133,7 +115,7 @@ export default function MySubmissions() {
     initialState: { pagination: { pageSize: 7 } },
   });
 
-  if (!isAuthorized) {
+  if (sessionStatus !== "signed-in") {
     return null;
   }
 

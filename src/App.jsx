@@ -12,10 +12,11 @@ import PasswordRecoveryPage from "./pages/PasswordRecoveryPage.jsx";
 import ResetPasswordRequestPage from "./pages/ResetPasswordRequestPage.jsx";
 import SignInPage from "./pages/SignInPage.jsx";
 import SignUpPage from "./pages/SignUpPage.jsx";
+import { AuthProvider } from "./contexts/AuthContext.jsx";
 
 function App() {
   return (
-    <>
+    <AuthProvider>
       <Header />
       <Routes>
         <Route path="/" element={<UserHome />} />
@@ -31,7 +32,7 @@ function App() {
         <Route path="/dashboard/graphs" element={<DashboardGraphs />} />
         <Route path="/dashboard/submissionsTable" element={<DashBoardSubmissionsPage />} />
       </Routes>
-    </>
+    </AuthProvider>
   );
 }
 

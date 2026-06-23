@@ -1,44 +1,40 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { authApi } from "../services/authApi.js";
+import { useAuth } from "../contexts/AuthContext.jsx";
 
 export default function DashboardCommissioner() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { sessionStatus, signOut, user } = useAuth();
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function restoreSession() {
-      try {
-        const { user } = await authApi.getCurrentUser();
-
-        if (isMounted && user?.role !== "commissioner") {
-          navigate("/", { replace: true });
-        }
-      } catch {
-        if (isMounted) {
-          navigate("/", { replace: true });
-        }
-      }
+    if (sessionStatus === "checking") {
+      return;
     }
 
-    restoreSession();
+    if (sessionStatus === "signed-out") {
+      navigate("/sign-in", { replace: true });
+      return;
+    }
 
-    return () => {
-      isMounted = false;
-    };
-  }, [navigate]);
+    if (user?.role !== "commissioner") {
+      navigate("/", { replace: true });
+    }
+  }, [navigate, sessionStatus, user]);
 
   async function handleSignOut() {
     setIsSubmitting(true);
 
     try {
-      await authApi.logout();
+      await signOut();
       navigate("/sign-in", { replace: true });
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  if (sessionStatus !== "signed-in" || user?.role !== "commissioner") {
+    return null;
   }
 
   return (

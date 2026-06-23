@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, LogIn, LogOut } from "lucide-react";
-import { authApi } from "../services/authApi.js";
+import { useAuth } from "../contexts/AuthContext.jsx";
 
 function viewSubmissions() {
   // Implement the logic to navigate to the commissioners' view submissions overview page
@@ -16,32 +16,8 @@ export default function Header() {
   const isUsersPage = location.pathname === "/" || location.pathname === "/users";
   const isDashboardPage = location.pathname === "/dashboard";
   const isSubmissionsPage = location.pathname === "/submissions";
-  const [sessionStatus, setSessionStatus] = useState("signed-out");
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function restoreSession() {
-      try {
-        await authApi.getCurrentUser();
-
-        if (isMounted) {
-          setSessionStatus("signed-in");
-        }
-      } catch {
-        if (isMounted) {
-          setSessionStatus("signed-out");
-        }
-      }
-    }
-
-    restoreSession();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [location.pathname]);
+  const { sessionStatus, signOut } = useAuth();
 
   async function handleAuthAction() {
     if (sessionStatus !== "signed-in") {
@@ -52,8 +28,7 @@ export default function Header() {
     setIsSubmitting(true);
 
     try {
-      await authApi.logout();
-      setSessionStatus("signed-out");
+      await signOut();
       navigate("/sign-in", { replace: true });
     } finally {
       setIsSubmitting(false);
