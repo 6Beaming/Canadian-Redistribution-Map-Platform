@@ -13,6 +13,21 @@ import SignInPage from "./pages/SignInPage.jsx";
 import SignUpPage from "./pages/SignUpPage.jsx";
 import { AuthProvider } from "./contexts/AuthContext.jsx";
 
+// route guard -- make sure only commissioner can use route like 'dashboard'
+// function RequireCommissioner({ children }) {
+//   const { sessionStatus, user } = useAuth();
+//   if (sessionStatus === "checking") {
+//     return null;
+//   }
+//   if (sessionStatus === "signed-out") {
+//     return <Navigate to="/sign-in" replace />;
+//   }
+//   if (user?.role !== "commissioner") {
+//     return <Navigate to="/" replace />;
+//   }
+//   return children;
+// }
+
 function App() {
   return (
     <AuthProvider>
@@ -36,4 +51,3 @@ function App() {
 }
 
 export default App;
-

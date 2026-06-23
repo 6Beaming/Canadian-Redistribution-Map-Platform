@@ -12,9 +12,7 @@ export default function Header() {
   const isDashboardPage = location.pathname.startsWith("/dashboard");
   const isSubmissionsPage = location.pathname === "/submissions";
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { sessionStatus, signOut, user } = useAuth();
-  const canUseCommissionerNav =
-    isDashboardPage && sessionStatus === "signed-in" && user?.role === "commissioner";
+  const { sessionStatus, signOut } = useAuth();
 
   async function handleAuthAction() {
     if (sessionStatus !== "signed-in") {
@@ -54,7 +52,7 @@ export default function Header() {
     );
   }
 
-  if (canUseCommissionerNav) {
+  if (isDashboardPage) {
     return (
       <div className="grid h-16 w-full grid-cols-[1fr_auto_1fr] items-center border-b border-gray-700 bg-gray-800 px-6 text-white">
         <div />
