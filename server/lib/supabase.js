@@ -74,6 +74,24 @@ export async function signUpSupabaseUser({ email, emailRedirectTo, password }) {
   return data;
 }
 
+export async function resendSupabaseSignupConfirmation({ email, emailRedirectTo }) {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: emailRedirectTo ? { emailRedirectTo } : undefined
+  });
+
+  if (error) {
+    const resendError = new Error(
+      error.message || "Unable to resend verification email."
+    );
+    resendError.statusCode = error.status || 400;
+    resendError.publicMessage = resendError.message;
+    throw resendError;
+  }
+}
+
 function getSupabaseUserClient(accessToken) {
   const { supabaseKey, supabaseUrl } = getSupabaseConfig();
 
