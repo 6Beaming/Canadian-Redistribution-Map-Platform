@@ -14,6 +14,7 @@ import {
   createSupabaseCommissionerUser,
   getSupabaseProfile,
   getSupabaseClient,
+  resendSupabaseSignupConfirmation,
   signUpSupabaseUser,
   startSupabasePhoneVerification,
   upsertSupabaseProfile,
@@ -218,6 +219,10 @@ function signupErrorMessage(message = "") {
   return "Unable to create account.";
 }
 
+function isEmailVerified(user) {
+  return Boolean(user?.email_confirmed_at || user?.confirmed_at);
+}
+
 function getSignupEmailRedirectUrl() {
   const configuredRedirect = requiredString(process.env.SIGNUP_EMAIL_REDIRECT_URL);
 
@@ -326,15 +331,27 @@ router.post("/signup", async (req, res, next) => {
 
   try {
     const existingUser = await findSupabaseAuthUserByEmail(email);
+    const emailRedirectTo = getSignupEmailRedirectUrl();
 
     if (existingUser) {
+      if (!isEmailVerified(existingUser)) {
+        await resendSupabaseSignupConfirmation({
+          email,
+          emailRedirectTo
+        });
+
+        res.status(200).json({
+          message:
+            "A verification email was already pending. We sent a new verification link to your email."
+        });
+        return;
+      }
+
       res.status(409).json({
         error: "An account with this email already exists. Please sign in."
       });
       return;
     }
-
-    const emailRedirectTo = getSignupEmailRedirectUrl();
 
     await signUpSupabaseUser({
       email,
@@ -371,8 +388,22 @@ router.post("/commissioner-signup", async (req, res, next) => {
     const existingUser = await findSupabaseAuthUserByEmail(
       validation.account.email
     );
+    const emailRedirectTo = getSignupEmailRedirectUrl();
 
     if (existingUser) {
+      if (!isEmailVerified(existingUser)) {
+        await resendSupabaseSignupConfirmation({
+          email: validation.account.email,
+          emailRedirectTo
+        });
+
+        res.status(200).json({
+          message:
+            "A commissioner verification email was already pending. We sent a new verification link to your email."
+        });
+        return;
+      }
+
       res.status(409).json({
         error: "An account with this email already exists. Please sign in."
       });
@@ -381,7 +412,7 @@ router.post("/commissioner-signup", async (req, res, next) => {
 
     await createSupabaseCommissionerUser({
       ...validation.account,
-      emailRedirectTo: getSignupEmailRedirectUrl()
+      emailRedirectTo
     });
 
     res.status(201).json({
