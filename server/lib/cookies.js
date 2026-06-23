@@ -10,7 +10,11 @@ export const PENDING_ACCESS_COOKIE =
 export const PENDING_REFRESH_COOKIE =
   process.env.PENDING_REFRESH_COOKIE_NAME || "crmp_pending_refresh_token";
 
+export const PENDING_PROFILE_COOKIE =
+  process.env.PENDING_PROFILE_COOKIE_NAME || "crmp_pending_profile";
+
 const REFRESH_TOKEN_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const PENDING_PROFILE_MAX_AGE_MS = 10 * 60 * 1000;
 
 function cookieSameSite() {
   const value = (process.env.COOKIE_SAME_SITE || "lax").toLowerCase();
@@ -45,6 +49,20 @@ export function getCookie(req, name) {
   return decodeURIComponent(cookie.slice(name.length + 1));
 }
 
+export function getPendingProfileCookie(req) {
+  const value = getCookie(req, PENDING_PROFILE_COOKIE);
+
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
 function setCookiePair(res, session, accessCookieName, refreshCookieName) {
   const accessTokenMaxAgeMs =
     Math.max(Number(session.expires_in || 3600) - 30, 60) * 1000;
@@ -70,6 +88,13 @@ export function setPendingSessionCookies(res, session) {
   setCookiePair(res, session, PENDING_ACCESS_COOKIE, PENDING_REFRESH_COOKIE);
 }
 
+export function setPendingProfileCookie(res, profile) {
+  res.cookie(PENDING_PROFILE_COOKIE, JSON.stringify(profile), {
+    ...baseCookieOptions(),
+    maxAge: PENDING_PROFILE_MAX_AGE_MS
+  });
+}
+
 function clearCookiePair(res, accessCookieName, refreshCookieName) {
   res.clearCookie(accessCookieName, baseCookieOptions());
   res.clearCookie(refreshCookieName, baseCookieOptions());
@@ -81,6 +106,7 @@ export function clearAuthenticatedSessionCookies(res) {
 
 export function clearPendingSessionCookies(res) {
   clearCookiePair(res, PENDING_ACCESS_COOKIE, PENDING_REFRESH_COOKIE);
+  res.clearCookie(PENDING_PROFILE_COOKIE, baseCookieOptions());
 }
 
 export function clearSessionCookies(res) {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext.jsx";
 
 // AI generated dummy data
 const submissions = [
@@ -92,7 +94,15 @@ const columns = [
 ];
 
 export default function MySubmissions() {
+  const navigate = useNavigate();
   const [sorting, setSorting] = useState([{ id: "submittedAt", desc: true }]);
+  const { sessionStatus } = useAuth();
+
+  useEffect(() => {
+    if (sessionStatus === "signed-out") {
+      navigate("/sign-in", { replace: true });
+    }
+  }, [navigate, sessionStatus]);
 
   const table = useReactTable({
     data: submissions,
@@ -104,6 +114,10 @@ export default function MySubmissions() {
     state: { sorting },
     initialState: { pagination: { pageSize: 7 } },
   });
+
+  if (sessionStatus !== "signed-in") {
+    return null;
+  }
 
   return (
     <div className="p-6 max-w-4xl mx-auto flex flex-col gap-4">

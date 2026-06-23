@@ -1,0 +1,262 @@
+.loading-mark {
+  width: 44px;
+  height: 44px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #111827;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.auth-shell {
+  display: grid;
+  place-items: center;
+  min-height: calc(100vh - 4rem);
+  padding: 40px 24px;
+  color: #111827;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-synthesis: none;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+}
+
+.auth-shell button,
+.auth-shell input,
+.auth-shell select {
+  font: inherit;
+}
+
+.auth-layout {
+  display: grid;
+  width: min(100%, 560px);
+  min-height: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
+  box-shadow:
+    0 1px 2px rgba(17, 24, 39, 0.06),
+    0 10px 30px rgba(17, 24, 39, 0.08);
+}
+
+.login-panel {
+  padding: 32px;
+}
+
+.login-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.brand-lockup h1 {
+  margin: 0;
+}
+
+.brand-lockup h1 {
+  color: #111827;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.onboarding-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14px;
+}
+
+.login-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 40px;
+}
+
+.login-form label {
+  color: #374151;
+  font-size: 0.94rem;
+  font-weight: 700;
+}
+
+.login-form input,
+.login-form select {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #111827;
+  background: #ffffff;
+}
+
+.login-form input:focus,
+.login-form select:focus {
+  border-color: #111827;
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.14);
+  outline: none;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.form-row > div {
+  display: grid;
+  gap: 10px;
+}
+
+.primary-button,
+.text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 44px;
+  border-radius: 8px;
+  font-weight: 800;
+}
+
+.primary-button {
+  margin-top: 14px;
+  border: 0;
+  color: #ffffff;
+  background: #111827;
+}
+
+.primary-button,
+.text-button,
+.inline-text-button,
+.icon-button {
+  cursor: pointer;
+}
+
+.primary-button:disabled,
+.text-button:disabled,
+.inline-text-button:disabled,
+.icon-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.primary-button:hover:not(:disabled) {
+  background: #1f2937;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #d1d5db;
+  border-radius: 50%;
+  color: #111827;
+  background: #ffffff;
+}
+
+.icon-button:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.form-error {
+  margin: 6px 0 0;
+  border-left: 4px solid #dc2626;
+  padding: 10px 12px;
+  border-radius: 4px;
+  color: #991b1b;
+  background: #fef2f2;
+}
+
+.form-success {
+  margin: 6px 0 0;
+  border-left: 4px solid #16a34a;
+  padding: 10px 12px;
+  border-radius: 4px;
+  color: #166534;
+  background: #f0fdf4;
+}
+
+.otp-summary {
+  margin: 18px 0 -14px;
+  color: #4b5563;
+  font-weight: 700;
+}
+
+.text-button {
+  min-height: 36px;
+  border: 0;
+  color: #2563eb;
+  background: transparent;
+}
+
+.text-button:hover:not(:disabled) {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+.inline-text-button {
+  display: inline;
+  min-height: auto;
+  border: 0;
+  padding: 0;
+  color: #2563eb;
+  background: transparent;
+  font-weight: 800;
+}
+
+.inline-text-button:hover:not(:disabled) {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+.text-button:focus-visible,
+.inline-text-button:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+}
+
+.forgot-password-button {
+  justify-self: end;
+  margin-top: -2px;
+}
+
+.auth-prompt {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  color: #374151;
+  font-weight: 700;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 760px) {
+  .auth-shell {
+    padding: 18px;
+  }
+
+  .auth-layout {
+    min-height: auto;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+

@@ -9,28 +9,27 @@ import {
   setPendingSessionCookies,
   setSessionCookies
 } from "../lib/cookies.js";
-import { getSupabaseClient } from "../lib/supabase.js";
+import { getSupabaseClient, getSupabaseProfile } from "../lib/supabase.js";
 
-function hasCompletePublicProfile(user) {
-  const metadata = user.user_metadata || {};
-  const role =
-    user.app_metadata?.role ||
-    metadata.role ||
-    user.app_metadata?.user_role ||
-    "public_user";
+function hasCompletePublicProfile(user, profile = null) {
+  const role = profile?.role || "public_user";
 
   if (role !== "public_user") {
     return true;
   }
 
-  return Boolean(
-    metadata.first_name &&
-      metadata.last_name &&
-      metadata.province &&
-      metadata.postal_code &&
-      metadata.sin &&
-      metadata.dob
-  );
+  if (profile) {
+    return Boolean(
+      profile.profile_completed &&
+        profile.first_name &&
+        profile.last_name &&
+        profile.province &&
+        profile.postal_code &&
+        profile.phone
+    );
+  }
+
+  return false;
 }
 
 async function loadSession(req, res, options) {
@@ -72,33 +71,40 @@ async function loadSession(req, res, options) {
 }
 
 export async function requireAuth(req, res, next) {
-  const session = await loadSession(req, res, {
-    accessCookieName: ACCESS_COOKIE,
-    clearCookies: clearAuthenticatedSessionCookies,
-    refreshCookieName: REFRESH_COOKIE,
-    setCookies: setSessionCookies
-  });
-
-  if (!session) {
-    res.status(401).json({ error: "Authentication is required." });
-    return;
-  }
-
-  if (!hasCompletePublicProfile(session.user)) {
-    clearAuthenticatedSessionCookies(res);
-    setPendingSessionCookies(res, {
-      access_token: session.accessToken,
-      expires_in: 3600,
-      refresh_token: session.refreshToken
+  try {
+    const session = await loadSession(req, res, {
+      accessCookieName: ACCESS_COOKIE,
+      clearCookies: clearAuthenticatedSessionCookies,
+      refreshCookieName: REFRESH_COOKIE,
+      setCookies: setSessionCookies
     });
-    res.status(403).json({ error: "Profile completion is required." });
-    return;
-  }
 
-  req.accessToken = session.accessToken;
-  req.refreshToken = session.refreshToken;
-  req.user = session.user;
-  next();
+    if (!session) {
+      res.status(401).json({ error: "Authentication is required." });
+      return;
+    }
+
+    const profile = await getSupabaseProfile(session.accessToken, session.user.id);
+
+    if (!hasCompletePublicProfile(session.user, profile)) {
+      clearAuthenticatedSessionCookies(res);
+      setPendingSessionCookies(res, {
+        access_token: session.accessToken,
+        expires_in: 3600,
+        refresh_token: session.refreshToken
+      });
+      res.status(403).json({ error: "Profile completion is required." });
+      return;
+    }
+
+    req.accessToken = session.accessToken;
+    req.refreshToken = session.refreshToken;
+    req.profile = profile;
+    req.user = session.user;
+    next();
+  } catch (error) {
+    next(error);
+  }
 }
 
 export async function requirePendingProfileAuth(req, res, next) {

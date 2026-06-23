@@ -1,32 +1,80 @@
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
-
-function mySubmissions() {
-  // Implement the logic to navigate to the user's submissions page
-  console.log("Navigating to My Submissions");
-  window.location.href = "/submissions";
-}
-
-function viewSubmissions() {
-  // Implement the logic to navigate to the commissioners' view submissions overview page
-  console.log("Navigating to View Submissions");
-}
+import { ArrowLeft, LogIn, LogOut } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext.jsx";
 
 export default function Header() {
   const navigate = useNavigate();
 
   const location = useLocation();
-  const isUsersPage = location.pathname === "/users";
-  const isAuthPage = location.pathname === "/auth";
-  const isDashboardPage = location.pathname === "/dashboard";
+  const isUsersPage = location.pathname === "/" || location.pathname === "/users";
+  const isDashboardPage = location.pathname.startsWith("/dashboard");
   const isSubmissionsPage = location.pathname === "/submissions";
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { sessionStatus, signOut } = useAuth();
+
+  async function handleAuthAction() {
+    if (sessionStatus !== "signed-in") {
+      navigate("/sign-in");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await signOut();
+      navigate("/sign-in", { replace: true });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function AuthActionButton() {
+    const isSignedIn = sessionStatus === "signed-in";
+    const Icon = isSignedIn ? LogOut : LogIn;
+    const label = isSubmitting
+      ? "Signing Out"
+      : isSignedIn
+        ? "Sign Out"
+        : "Sign In";
+
+    return (
+      <Button
+        variant="outline"
+        className="min-w-28 border-white bg-transparent text-white hover:bg-gray-700 hover:text-white"
+        disabled={isSubmitting}
+        onClick={handleAuthAction}
+      >
+        <Icon className="h-4 w-4" />
+        {label}
+      </Button>
+    );
+  }
+
+  if (isDashboardPage) {
+    return (
+      <div className="grid h-16 w-full grid-cols-[1fr_auto_1fr] items-center border-b border-gray-700 bg-gray-800 px-6 text-white">
+        <div />
+        <Button
+          variant="outline"
+          className="justify-self-center border-white bg-transparent text-white hover:bg-gray-700 hover:text-white"
+          onClick={() => navigate("/dashboard/submissionsTable")}
+        >
+          All Submissions
+        </Button>
+        <div className="justify-self-end">
+          <AuthActionButton />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-16 bg-gray-800 text-white flex items-center px-6 border-b border-gray-700">
       <div className="flex-1" />
 
-      {isUsersPage && (
+      {isUsersPage && sessionStatus === "signed-in" && (
         <Button
           onClick={() => navigate("/submissions")}
           className="bg-transparent border border-white text-white hover:bg-gray-700"
@@ -41,33 +89,8 @@ export default function Header() {
 
       {isUsersPage && (
         <div className="flex-1 flex justify-end">
-          <Button variant="outline" className="rounded-full bg-black">
-            A
-          </Button>
+          <AuthActionButton />
         </div>
-      )}
-
-      {isAuthPage && (
-        <div className="flex-1 flex justify-end">
-          <Button variant="outline" className="rounded-full bg-black">
-            A
-          </Button>
-        </div>
-      )}
-
-      {isDashboardPage && (
-        <>
-          <div className="flex-1 flex justify-center">
-            <Button
-              onClick={viewSubmissions}
-              variant="outline"
-              className="rounded-full bg-black"
-            >
-              View Submissions
-            </Button>
-          </div>
-          <div className="flex-1" />
-        </>
       )}
 
       {isSubmissionsPage && (
@@ -84,10 +107,8 @@ export default function Header() {
             <p className="text-lg font-semibold">My Submissions</p>
           </div>
           <div className="flex-1" />
-          <div className="asbolute right-5.5">
-            <Button variant="outline" className="rounded-full bg-black">
-              A
-            </Button>
+          <div className="absolute right-6">
+            <AuthActionButton />
           </div>
         </>
       )}
