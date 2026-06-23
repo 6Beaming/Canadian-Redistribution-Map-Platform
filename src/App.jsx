@@ -1,4 +1,4 @@
-import {Routes, Route, Navigate} from "react-router-dom";
+import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import DashboardHome from "./pages/DashboardHome.jsx";
 import DashboardGraphs from "./pages/DashboardGraphs.jsx";
 import DashBoardSubmissionsPage from "./pages/DashboardSubmissionsTable/DashboardSubmissionsPage.jsx";
@@ -11,22 +11,26 @@ import PasswordRecoveryPage from "./pages/PasswordRecoveryPage.jsx";
 import ResetPasswordRequestPage from "./pages/ResetPasswordRequestPage.jsx";
 import SignInPage from "./pages/SignInPage.jsx";
 import SignUpPage from "./pages/SignUpPage.jsx";
-import { AuthProvider } from "./contexts/AuthContext.jsx";
+import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
 
-// route guard -- make sure only commissioner can use route like 'dashboard'
-// function RequireCommissioner({ children }) {
-//   const { sessionStatus, user } = useAuth();
-//   if (sessionStatus === "checking") {
-//     return null;
-//   }
-//   if (sessionStatus === "signed-out") {
-//     return <Navigate to="/sign-in" replace />;
-//   }
-//   if (user?.role !== "commissioner") {
-//     return <Navigate to="/" replace />;
-//   }
-//   return children;
-// }
+// route guard for commissioner only
+function RequireCommissioner() {
+  const { sessionStatus, user } = useAuth();
+
+  if (sessionStatus === "checking") {
+    return null;
+  }
+
+  if (sessionStatus === "signed-out") {
+    return <Navigate to="/sign-in" replace />;
+  }
+
+  if (user?.role !== "commissioner") {
+    return <Navigate to="/users" replace />;
+  }
+
+  return <Outlet />;
+}
 
 function App() {
   return (
@@ -36,14 +40,19 @@ function App() {
         <Route path="/" element={<UserHome />} />
         <Route path="/users" element={<UserHome />} />
         <Route path="/submissions" element={<MySubmissions />} />
-        <Route path="/dashboard" element={<DashboardHome />} />
         <Route path="/sign-in" element={<SignInPage />} />
         <Route path="/sign-up" element={<SignUpPage />} />
         <Route path="/commissioner/sign-up" element={<CommissionerSignUpPage />} />
         <Route path="/forgot-password" element={<ResetPasswordRequestPage />} />
         <Route path="/reset-password" element={<PasswordRecoveryPage />} />
-        <Route path="/dashboard/graphs" element={<DashboardGraphs />} />
-        <Route path="/dashboard/submissionsTable" element={<DashBoardSubmissionsPage />} />
+        <Route element={<RequireCommissioner />}>
+          <Route path="/dashboard" element={<DashboardHome />} />
+          <Route path="/dashboard/graphs" element={<DashboardGraphs />} />
+          <Route
+            path="/dashboard/submissionsTable"
+            element={<DashBoardSubmissionsPage />}
+          />
+        </Route>
       </Routes>
     </AuthProvider>
   );
