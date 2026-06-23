@@ -195,12 +195,12 @@
 .text-button {
   min-height: 36px;
   border: 0;
-  color: #111827;
+  color: #2563eb;
   background: transparent;
 }
 
 .text-button:hover:not(:disabled) {
-  color: #374151;
+  color: #1d4ed8;
   text-decoration: underline;
 }
 
@@ -209,14 +209,21 @@
   min-height: auto;
   border: 0;
   padding: 0;
-  color: #111827;
+  color: #2563eb;
   background: transparent;
   font-weight: 800;
 }
 
 .inline-text-button:hover:not(:disabled) {
-  color: #374151;
+  color: #1d4ed8;
   text-decoration: underline;
+}
+
+.text-button:focus-visible,
+.inline-text-button:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
 }
 
 .forgot-password-button {
