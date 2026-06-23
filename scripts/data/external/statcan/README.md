@@ -10,7 +10,7 @@ scripts/data/external/statcan/98-401-X2021006_English_CSV_data_Territories.csv
 
 Catalogue: https://www150.statcan.gc.ca/n1/en/catalogue/98-401-X2021006
 
-Large CSV files are gitignored; the committed runtime artifact is `map-mvp/data/yt_da_profiles.json`.
+Large CSV files are gitignored; the committed runtime artifact is `src/data/map/yt_da_profiles.json`.
 
 ## Regenerate
 

@@ -16,6 +16,38 @@ Replace the standalone `map-mvp/` vanilla-JS prototype with React components ins
 
 ## 2. Delivered map module (Updated by Erfang with Merged feature/issues6-8/map-rendering-mvp)
 
+### 2.0 Map data scripts (`scripts/`)
+
+All map runtime assets live in **`src/data/map/`** and are served at runtime by **`map-api-service`** (`GET /api/map/assets/:file`, `GET /api/map/da-profiles`). The scripts below regenerate those files offline; they do **not** call the Express API.
+
+**Typical regeneration order**
+
+```text
+CRMP-full-data.zip  →  extract_mvp_data.ipynb  →  single_fed_das.geojson
+                                                    ↓
+                         collect_yt_da_profiles.py  →  yt_da_profiles.json
+fed_boundaries_2023.geojson (from bundle)  →  generate_fed_labels.py  →  fed_labels.geojson
+```
+
+| Script | Inputs | Output (`src/data/map/`) | Behaviour | External APIs |
+|--------|--------|--------------------------|-----------|---------------|
+| **`extract_mvp_data.ipynb`** | `CRMP-full-data.zip` on Google Drive (Colab); streams `yt_dissemination_areas.gpkg`, clips to Yukon FED `60001` | `single_fed_das.geojson` | Exports **DGUID + geometry only** (no census attributes on features). Downloads via Colab browser; copy into repo. | None (reads zip on Drive) |
+| **`collect_yt_da_profiles.py`** | `single_fed_das.geojson` (DGUID list); optional StatCan territories CSV (`98-401-X2021006`) | `yt_da_profiles.json` | Builds per-DA panel/map metadata: `geo_name`, `population`, `community_name`, `display_label`, `map_label`, `panel_title`. CSV first; `--api` fills gaps; CSD enrichment via ArcGIS at DA centroid; `--finalize-only` recomputes labels offline. | **StatCan Census Profile WDS** `api.statcan.gc.ca/census-recensement/profile/sdmx/rest/data/STC_CP,DF_DA/{DGUID}…`; **profile HTML** `www12.statcan.gc.ca/…/prof/details/page.cfm?DGUID=…`; **ArcGIS CSD lookup** `geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9/query` |
+| **`generate_fed_labels.py`** | `fed_boundaries_2023.geojson`; `scripts/data/fed_names_2023.json` (343 Elections Canada 2023 RO names) | `fed_labels.geojson` | Computes polygon centroid per FED; writes Point features with `name`, `fed_num`. | None (local files only) |
+| **`audit_data_schema.py`** / **`.ipynb`** | `CRMP-full-data.zip` (Colab or local) | `data_schema_audit_report.txt` (docs/) | Audits bundle structure vs project docs; recommends slim copy lists for Yukon pilot. Does not write map assets. | None |
+| **`data/bundle/compare_fed_names.py`** | Electoral GPKG copies under `scripts/data/bundle/`; `fed_names_2023.json` | `scripts/data/bundle/output/fed_names_comparison.*` | Audit-only: compares bundle-derived FED names (338) vs external 343-name table. Not used by the map UI. | None |
+
+**StatCan CSV (recommended for profiles):** place territories download under `scripts/data/external/statcan/` — see `scripts/data/external/statcan/README.md`.
+
+```bash
+# Regenerate DA profiles (after single_fed_das.geojson exists)
+python scripts/collect_yt_da_profiles.py \
+  --csv scripts/data/external/statcan/98-401-X2021006_English_CSV_data_Territories.csv
+
+# Regenerate FED label points (after fed_boundaries_2023.geojson exists)
+python scripts/generate_fed_labels.py
+```
+
 ### 2.1 UI components (`src/components/non_prebuilt/`)
 
 | Component | Replaces | Role |
@@ -49,7 +81,7 @@ Replace the standalone `map-mvp/` vanilla-JS prototype with React components ins
 | `fed_labels.geojson` | 343 FED name labels |
 | `yt_da_profiles.json` | 74/74 DA profiles (population, community, panel titles) |
 
-Data collection scripts under `scripts/` are **unchanged**; they may still write to legacy paths until updated in a later sprint.
+Regenerate with `scripts/` (see **§2.0**); outputs target this directory.
 
 ### 2.4 map-api-service (`server/map-api-service/`)
 
@@ -131,3 +163,4 @@ curl -I -H "Range: bytes=0-1" http://localhost:3000/api/map/assets/fed_boundarie
 |------|--------|
 | 2026-06-17 | Initial Demo 1 log; React refactor delivered on `/dashboard` |
 | 2026-06-17 | Layout 75/25; four label layers; fullscreen; PMTiles `absoluteAssetUrl` |
+| 2026-06-17 | Map scripts updated to write `src/data/map/`; §2.0 script pipeline documented |
