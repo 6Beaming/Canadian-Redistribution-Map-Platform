@@ -37,7 +37,6 @@ function App() {
         <Route path="/users" element={<UserHome />} />
         <Route path="/submissions" element={<MySubmissions />} />
         <Route path="/dashboard" element={<DashboardHome />} />
-        <Route path="/commissioner" element={<Navigate to="/dashboard" replace />} /> 
         <Route path="/sign-in" element={<SignInPage />} />
         <Route path="/sign-up" element={<SignUpPage />} />
         <Route path="/commissioner/sign-up" element={<CommissionerSignUpPage />} />
