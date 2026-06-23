@@ -86,7 +86,7 @@ export default function Header() {
     <div className="relative w-full h-16 bg-gray-800 text-white flex items-center px-6 border-b border-gray-700">
       <div className="flex-1" />
 
-      {isUsersPage && (
+      {isUsersPage && sessionStatus === "signed-in" && (
         <Button
           onClick={() => navigate("/submissions")}
           className="bg-transparent border border-white text-white hover:bg-gray-700"
