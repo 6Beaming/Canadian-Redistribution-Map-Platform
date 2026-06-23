@@ -1,0 +1,1807 @@
+CRMP DATA SCHEMA AUDIT REPORT
+================================================================================
+Bundle root: /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data
+Generated: 2026-06-19T19:37:29
+
+--------------------------------------------------------------------------------
+1. NESTED ZIP EXTRACTION (same parent -> {zip_stem}/)
+--------------------------------------------------------------------------------
+(no zip files processed)
+
+--------------------------------------------------------------------------------
+2. DOCUMENT VALIDATION (Schema + mini-guide expectations)
+--------------------------------------------------------------------------------
+
+### MISSING (documented but not in bundle)
+  - 006_dissemination_areas/atlantic.csv (mini-guide expected regional profile CSV)
+  - 006_dissemination_areas/quebec.csv (mini-guide expected regional profile CSV)
+  - 006_dissemination_areas/ontario.csv (mini-guide expected regional profile CSV)
+  - 006_dissemination_areas/prairies.csv (mini-guide expected regional profile CSV)
+  - 006_dissemination_areas/bc.csv (mini-guide expected regional profile CSV)
+  - 006_dissemination_areas/territories.csv (mini-guide expected regional profile CSV)
+  - profile_2021/029_feds_2023ro/ (mini-guide + Schema expected folder — absent)
+
+### MISSING DA GeoPackage by province
+  - on/on_dissemination_areas.gpkg
+  - qc/qc_dissemination_areas.gpkg
+  - ns/ns_dissemination_areas.gpkg
+  - nb/nb_dissemination_areas.gpkg
+  - nt/nt_dissemination_areas.gpkg
+  - nu/nu_dissemination_areas.gpkg
+
+### MISPLACED / WRONG NAME at 006_dissemination_areas
+  - 006_dissemination_areas/quebec_geo_index.csv — present but NOT a mini-guide profile filename (expected ['atlantic.csv', 'quebec.csv', 'ontario.csv', 'prairies.csv', 'bc.csv', 'territories.csv'])
+  - 006_dissemination_areas/territories_geo_index.csv — present but NOT a mini-guide profile filename (expected ['atlantic.csv', 'quebec.csv', 'ontario.csv', 'prairies.csv', 'bc.csv', 'territories.csv'])
+
+### PRESENT but NOT in Schema/mini-guide
+  - raw_data/elections_canada/polling_districts/elections_canada/processed/polling_districts_results_2006_2023.csv
+  - raw_data/statistics_canada/census_profiles/profile_2021/014_dissolved_csds/meta.txt
+
+### Nested zip extract notes
+  - profile_2021/raw/ has 4 extracted folder(s) — check for profile CSVs inside
+
+--------------------------------------------------------------------------------
+3. PER-FILE SCHEMA SAMPLES (not full data scan)
+--------------------------------------------------------------------------------
+
+### .csv (27 files)
+
+  PATH: raw_data/data/statistics_canada/census/statscan_2013_fednum_profiles_census_2011.csv
+  SIZE: 16.82 MB
+  DOC:  Schema: historical FED census profiles (statscan_*_fednum_*)
+  COLUMNS (1): ['Census Profile - Federal electoral districts (FEDs) - 2013 Representation Order']
+  SUMMARY: encoding≈latin-1; columns=1; rows≈>5000
+
+  PATH: raw_data/data/statistics_canada/census/statscan_2013_fednum_profiles_census_2011_nhs.csv
+  SIZE: 33.93 MB
+  DOC:  Schema: historical FED census profiles (statscan_*_fednum_*)
+  COLUMNS (1): ['National Household Survey Profile - Federal Electoral Districts (2013 representation order)']
+  SUMMARY: encoding≈latin-1; columns=1; rows≈>5000
+
+  PATH: raw_data/elections_canada/polling_districts/elections_canada/processed/polling_districts_results_2006_2023.csv
+  SIZE: 528.27 MB
+  DOC:  UNDOCUMENTED in Schema/mini-guide (found in bundle)
+  COLUMNS (39): ['Electoral District Number/Numéro de circonscription', 'Electoral District Name_English/Nom de circonscription_Anglais', 'Electoral District Name_French/Nom de circonscription_Français', 'Polling Station Number/Numéro du bureau de scrutin', 'Polling Station Name/Nom du bureau de scrutin', 'Void Poll Indicator/Indicateur de bureau supprimé', 'No Poll Held Indicator/Indicateur de bureau sans scrutin', 'Merge With/Fusionné avec', 'Rejected Ballots for Polling Station/Bulletins rejetés du bureau', 'Electors for Polling Station/Électeurs du bureau', "Candidate's Family Name/Nom de famille du candidat", "Candidate's Middle Name/Second prénom du candidat", "Candidate's First Name/Prénom du candidat", 'Political Affiliation Name_English/Appartenance politique_Anglais', 'Political Affiliation Name_French/Appartenance politique_Français', 'Incumbent Indicator/Indicateur_Candidat sortant', 'Elected Candidate Indicator/Indicateur du candidat élu', 'Candidate Poll Votes Count/Votes du candidat pour le bureau', 'void_poll', 'ed_name'] ...
+  SUMMARY: encoding≈utf-8-sig; columns=39; rows≈>5000
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/002_cmas_cas/data_geo_index.csv
+  SIZE: 5.8 KB
+  DOC:  Bundle index CSV (geo_index — not the profile table mini-guide names)
+  COLUMNS (3): ['Geo Code', 'Geo Name', 'Line Number']
+  ROWS (sampled): 161
+  SUMMARY: encoding≈latin-1; columns=3; rows≈161
+  NOTE: geo_index file — index only, not ontario.csv-style profile data
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/006_dissemination_areas/quebec_geo_index.csv
+  SIZE: 610.8 KB
+  DOC:  mini-guide: DA census profile CSV (006); Bundle index CSV (geo_index — not the profile table mini-guide names)
+  COLUMNS (3): ['Geo Code', 'Geo Name', 'Line Number']
+  SUMMARY: encoding≈latin-1; columns=3; rows≈>5000
+  NOTE: geo_index file — index only, not ontario.csv-style profile data
+  NOTE: Path is 006_dissemination_areas but filename 'quebec_geo_index.csv' is NOT one of mini-guide names: ['atlantic.csv', 'quebec.csv', 'ontario.csv', 'prairies.csv', 'bc.csv', 'territories.csv']
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/006_dissemination_areas/territories_geo_index.csv
+  SIZE: 13.3 KB
+  DOC:  mini-guide: DA census profile CSV (006); Bundle index CSV (geo_index — not the profile table mini-guide names)
+  COLUMNS (3): ['Geo Code', 'Geo Name', 'Line Number']
+  ROWS (sampled): 344
+  SUMMARY: encoding≈latin-1; columns=3; rows≈344
+  NOTE: geo_index file — index only, not ontario.csv-style profile data
+  NOTE: Path is 006_dissemination_areas but filename 'territories_geo_index.csv' is NOT one of mini-guide names: ['atlantic.csv', 'quebec.csv', 'ontario.csv', 'prairies.csv', 'bc.csv', 'territories.csv']
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/007_census_tracts/data_geo_index.csv
+  SIZE: 272.3 KB
+  DOC:  Bundle index CSV (geo_index — not the profile table mini-guide names)
+  COLUMNS (3): ['Geo Code', 'Geo Name', 'Line Number']
+  SUMMARY: encoding≈utf-8-sig; columns=3; rows≈>5000
+  NOTE: geo_index file — index only, not ontario.csv-style profile data
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/009_population_centres/data_geo_index.csv
+  SIZE: 37.9 KB
+  DOC:  Bundle index CSV (geo_index — not the profile table mini-guide names)
+  COLUMNS (3): ['Geo Code', 'Geo Name', 'Line Number']
+  ROWS (sampled): 1027
+  SUMMARY: encoding≈latin-1; columns=3; rows≈1027
+  NOTE: geo_index file — index only, not ontario.csv-style profile data
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/011_designated_places/data_geo_index.csv
+  SIZE: 69.3 KB
+  DOC:  Bundle index CSV (geo_index — not the profile table mini-guide names)
+  COLUMNS (3): ['Geo Code', 'Geo Name', 'Line Number']
+  ROWS (sampled): 1686
+  SUMMARY: encoding≈latin-1; columns=3; rows≈1686
+  NOTE: geo_index file — index only, not ontario.csv-style profile data
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/016_028_province_csds/ab_geo_index.csv
+  SIZE: 17.4 KB
+  DOC:  UNDOCUMENTED folder (016_028_province_csds); Bundle index CSV (geo_index — not the profile table mini-guide names)
+  COLUMNS (3): ['Geo Code', 'Geo Name', 'Line Number']
+  ROWS (sampled): 424
+  SUMMARY: encoding≈latin-1; columns=3; rows≈424
+  NOTE: geo_index file — index only, not ontario.csv-style profile data
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/016_028_province_csds/nb_geo_index.csv
+  SIZE: 10.4 KB
+  DOC:  UNDOCUMENTED folder (016_028_province_csds); Bundle index CSV (geo_index — not the profile table mini-guide names)
+  COLUMNS (3): ['Geo Code', 'Geo Name', 'Line Number']
+  ROWS (sampled): 267
+  SUMMARY: encoding≈latin-1; columns=3; rows≈267
+  NOTE: geo_index file — index only, not ontario.csv-style profile data
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/016_028_province_csds/nl_geo_index.csv
+  SIZE: 16.5 KB
+  DOC:  UNDOCUMENTED folder (016_028_province_csds); Bundle index CSV (geo_index — not the profile table mini-guide names)
+  COLUMNS (3): ['Geo Code', 'Geo Name', 'Line Number']
+  ROWS (sampled): 373
+  SUMMARY: encoding≈utf-8-sig; columns=3; rows≈373
+  NOTE: geo_index file — index only, not ontario.csv-style profile data
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/016_028_province_csds/ns_geo_index.csv
+  SIZE: 4.0 KB
+  DOC:  UNDOCUMENTED folder (016_028_province_csds); Bundle index CSV (geo_index — not the profile table mini-guide names)
+  COLUMNS (3): ['Geo Code', 'Geo Name', 'Line Number']
+  ROWS (sampled): 96
+  SUMMARY: encoding≈utf-8-sig; columns=3; rows≈96
+  NOTE: geo_index file — index only, not ontario.csv-style profile data
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/016_028_province_csds/on_geo_index.csv
+  SIZE: 24.4 KB
+  DOC:  UNDOCUMENTED folder (016_028_province_csds); Bundle index CSV (geo_index — not the profile table mini-guide names)
+  COLUMNS (3): ['Geo Code', 'Geo Name', 'Line Number']
+  ROWS (sampled): 578
+  SUMMARY: encoding≈latin-1; columns=3; rows≈578
+  NOTE: geo_index file — index only, not ontario.csv-style profile data
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/016_028_province_csds/sk_geo_index.csv
+  SIZE: 40.1 KB
+  DOC:  UNDOCUMENTED folder (016_028_province_csds); Bundle index CSV (geo_index — not the profile table mini-guide names)
+  COLUMNS (3): ['Geo Code', 'Geo Name', 'Line Number']
+  ROWS (sampled): 952
+  SUMMARY: encoding≈latin-1; columns=3; rows≈952
+  NOTE: geo_index file — index only, not ontario.csv-style profile data
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/raw/98-401-X2021008_eng_CSV/98-401-X2021008_English_CSV_data.csv
+  SIZE: 35.37 MB
+  DOC:  Schema: profile_2021/raw nested StatCan product zips
+  COLUMNS (23): ['CENSUS_YEAR', 'DGUID', 'ALT_GEO_CODE', 'GEO_LEVEL', 'GEO_NAME', 'TNR_SF', 'TNR_LF', 'DATA_QUALITY_FLAG', 'CHARACTERISTIC_ID', 'CHARACTERISTIC_NAME', 'CHARACTERISTIC_NOTE', 'C1_COUNT_TOTAL', 'SYMBOL', 'C2_COUNT_MEN+', 'SYMBOL', 'C3_COUNT_WOMEN+', 'SYMBOL', 'C10_RATE_TOTAL', 'SYMBOL', 'C11_RATE_MEN+'] ...
+  SUMMARY: encoding≈utf-8-sig; columns=23; rows≈>5000
+  NOTE: Looks like long-format Census Profile (matches mini-guide 006 pattern)
+  NOTE: Population rows (CHARACTERISTIC_ID=1): 90; GEO_LEVEL: Economic region=76, Province=10, Territory=3, Country=1
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/raw/98-401-X2021008_eng_CSV/98-401-X2021008_Geo_starting_row.CSV
+  SIZE: 3.7 KB
+  DOC:  Schema: profile_2021/raw nested StatCan product zips
+  COLUMNS (3): ['Geo Code', 'Geo Name', 'Line Number']
+  ROWS (sampled): 91
+  SUMMARY: encoding≈latin-1; columns=3; rows≈91
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/raw/98-401-X2021018_eng_CSV/98-401-X2021018_English_CSV_data.csv
+  SIZE: 44.43 MB
+  DOC:  Schema: profile_2021/raw nested StatCan product zips
+  COLUMNS (23): ['CENSUS_YEAR', 'DGUID', 'ALT_GEO_CODE', 'GEO_LEVEL', 'GEO_NAME', 'TNR_SF', 'TNR_LF', 'DATA_QUALITY_FLAG', 'CHARACTERISTIC_ID', 'CHARACTERISTIC_NAME', 'CHARACTERISTIC_NOTE', 'C1_COUNT_TOTAL', 'SYMBOL', 'C2_COUNT_MEN+', 'SYMBOL', 'C3_COUNT_WOMEN+', 'SYMBOL', 'C10_RATE_TOTAL', 'SYMBOL', 'C11_RATE_MEN+'] ...
+  SUMMARY: encoding≈utf-8-sig; columns=23; rows≈>5000
+  NOTE: Looks like long-format Census Profile (matches mini-guide 006 pattern)
+  NOTE: Population rows (CHARACTERISTIC_ID=1): 95; GEO_LEVEL: Census subdivision=95
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/raw/98-401-X2021018_eng_CSV/98-401-X2021018_Geo_starting_row.CSV
+  SIZE: 4.0 KB
+  DOC:  Schema: profile_2021/raw nested StatCan product zips
+  COLUMNS (3): ['Geo Code', 'Geo Name', 'Line Number']
+  ROWS (sampled): 96
+  SUMMARY: encoding≈utf-8-sig; columns=3; rows≈96
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/raw/98-401-X2021026_eng_CSV/98-401-X2021026_English_CSV_data.csv
+  SIZE: 15.46 MB
+  DOC:  Schema: profile_2021/raw nested StatCan product zips
+  COLUMNS (23): ['CENSUS_YEAR', 'DGUID', 'ALT_GEO_CODE', 'GEO_LEVEL', 'GEO_NAME', 'TNR_SF', 'TNR_LF', 'DATA_QUALITY_FLAG', 'CHARACTERISTIC_ID', 'CHARACTERISTIC_NAME', 'CHARACTERISTIC_NOTE', 'C1_COUNT_TOTAL', 'SYMBOL', 'C2_COUNT_MEN+', 'SYMBOL', 'C3_COUNT_WOMEN+', 'SYMBOL', 'C10_RATE_TOTAL', 'SYMBOL', 'C11_RATE_MEN+'] ...
+  SUMMARY: encoding≈utf-8-sig; columns=23; rows≈>5000
+  NOTE: Looks like long-format Census Profile (matches mini-guide 006 pattern)
+  NOTE: Population rows (CHARACTERISTIC_ID=1): 35; GEO_LEVEL: Census subdivision=35
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/raw/98-401-X2021026_eng_CSV/98-401-X2021026_Geo_starting_row.CSV
+  SIZE: 1.4 KB
+  DOC:  Schema: profile_2021/raw nested StatCan product zips
+  COLUMNS (3): ['Geo Code', 'Geo Name', 'Line Number']
+  ROWS (sampled): 36
+  SUMMARY: encoding≈utf-8-sig; columns=3; rows≈36
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/raw/98-401-X2021028_eng_CSV/98-401-X2021028_English_CSV_data.csv
+  SIZE: 13.58 MB
+  DOC:  Schema: profile_2021/raw nested StatCan product zips
+  COLUMNS (23): ['CENSUS_YEAR', 'DGUID', 'ALT_GEO_CODE', 'GEO_LEVEL', 'GEO_NAME', 'TNR_SF', 'TNR_LF', 'DATA_QUALITY_FLAG', 'CHARACTERISTIC_ID', 'CHARACTERISTIC_NAME', 'CHARACTERISTIC_NOTE', 'C1_COUNT_TOTAL', 'SYMBOL', 'C2_COUNT_MEN+', 'SYMBOL', 'C3_COUNT_WOMEN+', 'SYMBOL', 'C10_RATE_TOTAL', 'SYMBOL', 'C11_RATE_MEN+'] ...
+  SUMMARY: encoding≈utf-8-sig; columns=23; rows≈>5000
+  NOTE: Looks like long-format Census Profile (matches mini-guide 006 pattern)
+  NOTE: Population rows (CHARACTERISTIC_ID=1): 31; GEO_LEVEL: Census subdivision=31
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/raw/98-401-X2021028_eng_CSV/98-401-X2021028_Geo_starting_row.CSV
+  SIZE: 1.3 KB
+  DOC:  Schema: profile_2021/raw nested StatCan product zips
+  COLUMNS (3): ['Geo Code', 'Geo Name', 'Line Number']
+  ROWS (sampled): 32
+  SUMMARY: encoding≈utf-8-sig; columns=3; rows≈32
+
+  PATH: raw_data/statistics_canada/census_profiles/statscan_2003_fednum_profiles_census_2006.csv
+  SIZE: 42.71 MB
+  DOC:  Schema: historical FED census profiles (statscan_*_fednum_*)
+  COLUMNS (1): ['Census Profile - Federal electoral districts (FEDs) - 2003 Representation Order']
+  SUMMARY: encoding≈latin-1; columns=1; rows≈>5000
+
+  PATH: raw_data/statistics_canada/census_profiles/statscan_2003_fednum_profiles_census_2011.csv
+  SIZE: 18.57 MB
+  DOC:  Schema: historical FED census profiles (statscan_*_fednum_*)
+  COLUMNS (1): ['Census Profile - Federal electoral districts (FEDs) - 2003 Representation Order']
+  SUMMARY: encoding≈latin-1; columns=1; rows≈>5000
+
+  PATH: raw_data/statistics_canada/census_profiles/statscan_2013_fednum_profiles_census_2011.csv
+  SIZE: 16.82 MB
+  DOC:  Schema: historical FED census profiles (statscan_*_fednum_*)
+  COLUMNS (1): ['Census Profile - Federal electoral districts (FEDs) - 2013 Representation Order']
+  SUMMARY: encoding≈latin-1; columns=1; rows≈>5000
+
+  PATH: raw_data/statistics_canada/census_profiles/statscan_2013_fednum_profiles_census_2011_nhs.csv
+  SIZE: 33.93 MB
+  DOC:  Schema: historical FED census profiles (statscan_*_fednum_*)
+  COLUMNS (1): ['National Household Survey Profile - Federal Electoral Districts (2013 representation order)']
+  SUMMARY: encoding≈latin-1; columns=1; rows≈>5000
+
+### .gpkg (167 files)
+
+  PATH: raw_data/elections_canada/fed2021_pd/fed2021_ab_polling_districts.gpkg
+  SIZE: 15.78 MB
+  DOC:  Schema + mini-guide: 2021 polling districts
+  LAYERS: ['fed2021_ab_polling_districts']
+  COLUMNS (17): ['fid', 'geom', 'pd_id', 'FED_NUM', 'PD_NUM', 'province', 'ed_name', 'electors_est', 'LPC', 'CPC', 'NDP', 'BQ', 'GPC', 'PPC', 'total_votes', 'election', 'path']
+  FEATURES: 7462
+  SUMMARY: layers=['fed2021_ab_polling_districts']; features≈7462; cols=17
+  NOTE: fed2021_pd missing some vote cols: ['total_votes']
+
+  PATH: raw_data/elections_canada/fed2021_pd/fed2021_bc_polling_districts.gpkg
+  SIZE: 23.39 MB
+  DOC:  Schema + mini-guide: 2021 polling districts
+  LAYERS: ['fed2021_bc_polling_districts']
+  COLUMNS (17): ['fid', 'geom', 'pd_id', 'FED_NUM', 'PD_NUM', 'province', 'ed_name', 'electors_est', 'LPC', 'CPC', 'NDP', 'BQ', 'GPC', 'PPC', 'total_votes', 'election', 'path']
+  FEATURES: 8646
+  SUMMARY: layers=['fed2021_bc_polling_districts']; features≈8646; cols=17
+  NOTE: fed2021_pd missing some vote cols: ['total_votes']
+
+  PATH: raw_data/elections_canada/fed2021_pd/fed2021_mb_polling_districts.gpkg
+  SIZE: 11.65 MB
+  DOC:  Schema + mini-guide: 2021 polling districts
+  LAYERS: ['fed2021_mb_polling_districts']
+  COLUMNS (17): ['fid', 'geom', 'pd_id', 'FED_NUM', 'PD_NUM', 'province', 'ed_name', 'electors_est', 'LPC', 'CPC', 'NDP', 'BQ', 'GPC', 'PPC', 'total_votes', 'election', 'path']
+  FEATURES: 2655
+  SUMMARY: layers=['fed2021_mb_polling_districts']; features≈2655; cols=17
+  NOTE: fed2021_pd missing some vote cols: ['total_votes']
+
+  PATH: raw_data/elections_canada/fed2021_pd/fed2021_nb_polling_districts.gpkg
+  SIZE: 9.50 MB
+  DOC:  Schema + mini-guide: 2021 polling districts
+  LAYERS: ['fed2021_nb_polling_districts']
+  COLUMNS (17): ['fid', 'geom', 'pd_id', 'FED_NUM', 'PD_NUM', 'province', 'ed_name', 'electors_est', 'LPC', 'CPC', 'NDP', 'BQ', 'GPC', 'PPC', 'total_votes', 'election', 'path']
+  FEATURES: 1939
+  SUMMARY: layers=['fed2021_nb_polling_districts']; features≈1939; cols=17
+  NOTE: fed2021_pd missing some vote cols: ['total_votes']
+
+  PATH: raw_data/elections_canada/fed2021_pd/fed2021_nl_polling_districts.gpkg
+  SIZE: 6.53 MB
+  DOC:  Schema + mini-guide: 2021 polling districts
+  LAYERS: ['fed2021_nl_polling_districts']
+  COLUMNS (17): ['fid', 'geom', 'pd_id', 'FED_NUM', 'PD_NUM', 'province', 'ed_name', 'electors_est', 'LPC', 'CPC', 'NDP', 'BQ', 'GPC', 'PPC', 'total_votes', 'election', 'path']
+  FEATURES: 1323
+  SUMMARY: layers=['fed2021_nl_polling_districts']; features≈1323; cols=17
+  NOTE: fed2021_pd missing some vote cols: ['total_votes']
+
+  PATH: raw_data/elections_canada/fed2021_pd/fed2021_ns_polling_districts.gpkg
+  SIZE: 12.61 MB
+  DOC:  Schema + mini-guide: 2021 polling districts
+  LAYERS: ['fed2021_ns_polling_districts']
+  COLUMNS (17): ['fid', 'geom', 'pd_id', 'FED_NUM', 'PD_NUM', 'province', 'ed_name', 'electors_est', 'LPC', 'CPC', 'NDP', 'BQ', 'GPC', 'PPC', 'total_votes', 'election', 'path']
+  FEATURES: 2238
+  SUMMARY: layers=['fed2021_ns_polling_districts']; features≈2238; cols=17
+  NOTE: fed2021_pd missing some vote cols: ['total_votes']
+
+  PATH: raw_data/elections_canada/fed2021_pd/fed2021_nt_polling_districts.gpkg
+  SIZE: 868.0 KB
+  DOC:  Schema + mini-guide: 2021 polling districts
+  LAYERS: ['fed2021_nt_polling_districts']
+  COLUMNS (17): ['fid', 'geom', 'pd_id', 'FED_NUM', 'PD_NUM', 'province', 'ed_name', 'electors_est', 'LPC', 'CPC', 'NDP', 'BQ', 'GPC', 'PPC', 'total_votes', 'election', 'path']
+  FEATURES: 93
+  SUMMARY: layers=['fed2021_nt_polling_districts']; features≈93; cols=17
+  NOTE: fed2021_pd missing some vote cols: ['total_votes']
+
+  PATH: raw_data/elections_canada/fed2021_pd/fed2021_nu_polling_districts.gpkg
+  SIZE: 1.75 MB
+  DOC:  Schema + mini-guide: 2021 polling districts
+  LAYERS: ['fed2021_nu_polling_districts']
+  COLUMNS (17): ['fid', 'geom', 'pd_id', 'FED_NUM', 'PD_NUM', 'province', 'ed_name', 'electors_est', 'LPC', 'CPC', 'NDP', 'BQ', 'GPC', 'PPC', 'total_votes', 'election', 'path']
+  FEATURES: 25
+  SUMMARY: layers=['fed2021_nu_polling_districts']; features≈25; cols=17
+  NOTE: fed2021_pd missing some vote cols: ['total_votes']
+
+  PATH: raw_data/elections_canada/fed2021_pd/fed2021_on_polling_districts.gpkg
+  SIZE: 49.83 MB
+  DOC:  Schema + mini-guide: 2021 polling districts
+  LAYERS: ['fed2021_on_polling_districts']
+  COLUMNS (17): ['fid', 'geom', 'pd_id', 'FED_NUM', 'PD_NUM', 'province', 'ed_name', 'electors_est', 'LPC', 'CPC', 'NDP', 'BQ', 'GPC', 'PPC', 'total_votes', 'election', 'path']
+  FEATURES: 25199
+  SUMMARY: layers=['fed2021_on_polling_districts']; features≈25199; cols=17
+  NOTE: fed2021_pd missing some vote cols: ['total_votes']
+
+  PATH: raw_data/elections_canada/fed2021_pd/fed2021_pe_polling_districts.gpkg
+  SIZE: 1.08 MB
+  DOC:  Schema + mini-guide: 2021 polling districts
+  LAYERS: ['fed2021_pe_polling_districts']
+  COLUMNS (17): ['fid', 'geom', 'pd_id', 'FED_NUM', 'PD_NUM', 'province', 'ed_name', 'electors_est', 'LPC', 'CPC', 'NDP', 'BQ', 'GPC', 'PPC', 'total_votes', 'election', 'path']
+  FEATURES: 336
+  SUMMARY: layers=['fed2021_pe_polling_districts']; features≈336; cols=17
+  NOTE: fed2021_pd missing some vote cols: ['total_votes']
+
+  PATH: raw_data/elections_canada/fed2021_pd/fed2021_qc_polling_districts.gpkg
+  SIZE: 50.74 MB
+  DOC:  Schema + mini-guide: 2021 polling districts
+  LAYERS: ['fed2021_qc_polling_districts']
+  COLUMNS (17): ['fid', 'geom', 'pd_id', 'FED_NUM', 'PD_NUM', 'province', 'ed_name', 'electors_est', 'LPC', 'CPC', 'NDP', 'BQ', 'GPC', 'PPC', 'total_votes', 'election', 'path']
+  FEATURES: 17631
+  SUMMARY: layers=['fed2021_qc_polling_districts']; features≈17631; cols=17
+  NOTE: fed2021_pd missing some vote cols: ['total_votes']
+
+  PATH: raw_data/elections_canada/fed2021_pd/fed2021_sk_polling_districts.gpkg
+  SIZE: 8.58 MB
+  DOC:  Schema + mini-guide: 2021 polling districts
+  LAYERS: ['fed2021_sk_polling_districts']
+  COLUMNS (17): ['fid', 'geom', 'pd_id', 'FED_NUM', 'PD_NUM', 'province', 'ed_name', 'electors_est', 'LPC', 'CPC', 'NDP', 'BQ', 'GPC', 'PPC', 'total_votes', 'election', 'path']
+  FEATURES: 2382
+  SUMMARY: layers=['fed2021_sk_polling_districts']; features≈2382; cols=17
+  NOTE: fed2021_pd missing some vote cols: ['total_votes']
+
+  PATH: raw_data/elections_canada/fed2021_pd/fed2021_yt_polling_districts.gpkg
+  SIZE: 860.0 KB
+  DOC:  Schema + mini-guide: 2021 polling districts
+  LAYERS: ['fed2021_yt_polling_districts']
+  COLUMNS (17): ['fid', 'geom', 'pd_id', 'FED_NUM', 'PD_NUM', 'province', 'ed_name', 'electors_est', 'LPC', 'CPC', 'NDP', 'BQ', 'GPC', 'PPC', 'total_votes', 'election', 'path']
+  FEATURES: 68
+  SUMMARY: layers=['fed2021_yt_polling_districts']; features≈68; cols=17
+  NOTE: fed2021_pd missing some vote cols: ['total_votes']
+
+  PATH: raw_data/statistics_canada/census_boundaries/ab/ab_aggregate_dissemination_areas.gpkg
+  SIZE: 5.73 MB
+  DOC:  mini-guide + Schema: DA polygons ({prov}_dissemination_areas.gpkg)
+  LAYERS: ['ab_aggregate_dissemination_areas']
+  COLUMNS (7): ['fid', 'geom', 'ADAUID', 'DGUID', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 529
+  SUMMARY: layers=['ab_aggregate_dissemination_areas']; features≈529; cols=7
+  NOTE: DA gpkg missing expected cols: ['DAUID']
+
+  PATH: raw_data/statistics_canada/census_boundaries/ab/ab_agricultural_regions.gpkg
+  SIZE: 1.65 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ab_agricultural_regions']
+  COLUMNS (9): ['fid', 'geom', 'CARUID', 'DGUID', 'CARENAME', 'CARFNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 8
+  SUMMARY: layers=['ab_agricultural_regions']; features≈8; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/ab/ab_census_divisions.gpkg
+  SIZE: 1.98 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ab_census_divisions']
+  COLUMNS (9): ['fid', 'geom', 'CDUID', 'DGUID', 'CDNAME', 'CDTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 19
+  SUMMARY: layers=['ab_census_divisions']; features≈19; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/ab/ab_census_metropolitan_areas.gpkg
+  SIZE: 636.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ab_census_metropolitan_areas']
+  COLUMNS (11): ['fid', 'geom', 'CMAUID', 'CMAPUID', 'DGUID', 'DGUIDP', 'CMANAME', 'CMATYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 17
+  SUMMARY: layers=['ab_census_metropolitan_areas']; features≈17; cols=11
+
+  PATH: raw_data/statistics_canada/census_boundaries/ab/ab_census_subdivisions.gpkg
+  SIZE: 5.54 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ab_census_subdivisions']
+  COLUMNS (9): ['fid', 'geom', 'CSDUID', 'DGUID', 'CSDNAME', 'CSDTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 423
+  SUMMARY: layers=['ab_census_subdivisions']; features≈423; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/ab/ab_census_tracts.gpkg
+  SIZE: 2.60 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ab_census_tracts']
+  COLUMNS (8): ['fid', 'geom', 'CTUID', 'DGUID', 'CTNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 797
+  SUMMARY: layers=['ab_census_tracts']; features≈797; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/ab/ab_consolidated_subdivisions.gpkg
+  SIZE: 3.83 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ab_consolidated_subdivisions']
+  COLUMNS (8): ['fid', 'geom', 'CCSUID', 'DGUID', 'CCSNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 72
+  SUMMARY: layers=['ab_consolidated_subdivisions']; features≈72; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/ab/ab_designated_places.gpkg
+  SIZE: 496.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ab_designated_places']
+  COLUMNS (9): ['fid', 'geom', 'DPLUID', 'DGUID', 'DPLNAME', 'DPLTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 311
+  SUMMARY: layers=['ab_designated_places']; features≈311; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/ab/ab_dissemination_areas.gpkg
+  SIZE: 16.05 MB
+  DOC:  mini-guide + Schema: DA polygons ({prov}_dissemination_areas.gpkg)
+  LAYERS: ['ab_dissemination_areas']
+  COLUMNS (7): ['fid', 'geom', 'DAUID', 'DGUID', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 6203
+  SUMMARY: layers=['ab_dissemination_areas']; features≈6203; cols=7
+
+  PATH: raw_data/statistics_canada/census_boundaries/ab/ab_economic_regions.gpkg
+  SIZE: 1.50 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ab_economic_regions']
+  COLUMNS (8): ['fid', 'geom', 'ERUID', 'DGUID', 'ERNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 8
+  SUMMARY: layers=['ab_economic_regions']; features≈8; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/ab/ab_electoral_districts.gpkg
+  SIZE: 2.08 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ab_electoral_districts']
+  COLUMNS (10): ['fid', 'geom', 'FEDUID', 'DGUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 34
+  SUMMARY: layers=['ab_electoral_districts']; features≈34; cols=10
+
+  PATH: raw_data/statistics_canada/census_boundaries/ab/ab_electoral_districts_2003ro.gpkg
+  SIZE: 1.93 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ab_electoral_districts_2003ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 28
+  SUMMARY: layers=['ab_electoral_districts_2003ro']; features≈28; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/ab/ab_electoral_districts_2013ro.gpkg
+  SIZE: 1.16 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ab_electoral_districts_2013ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 34
+  SUMMARY: layers=['ab_electoral_districts_2013ro']; features≈34; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/ab/ab_forward_sortation_areas.gpkg
+  SIZE: 4.15 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ab_forward_sortation_areas']
+  COLUMNS (8): ['fid', 'geom', 'CFSAUID', 'DGUID', 'PRUID', 'PRNAME', 'LANDAREA', 'path']
+  FEATURES: 154
+  SUMMARY: layers=['ab_forward_sortation_areas']; features≈154; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/ab/ab_polling_divisions.gpkg
+  SIZE: 15.98 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ab_polling_divisions']
+  COLUMNS (12): ['fid', 'geom', 'OBJECTID', 'PD_NBR_SFX', 'PD_TYPE', 'FED_NUM', 'ADV_POLL_N', 'PD_NUM', 'SHAPE_Leng', 'SHAPE_Area', 'PD_NUM_SFX', 'path']
+  FEATURES: 7462
+  SUMMARY: layers=['ab_polling_divisions']; features≈7462; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/ab/ab_population_centres.gpkg
+  SIZE: 620.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ab_population_centres']
+  COLUMNS (12): ['fid', 'geom', 'PCUID', 'PCPUID', 'DGUID', 'DGUIDP', 'PCNAME', 'PCTYPE', 'PCCLASS', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 119
+  SUMMARY: layers=['ab_population_centres']; features≈119; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/ab/ab_province.gpkg
+  SIZE: 368.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ab_province']
+  COLUMNS (11): ['fid', 'geom', 'PRUID', 'DGUID', 'PRNAME', 'PRENAME', 'PRFNAME', 'PREABBR', 'PRFABBR', 'LANDAREA', 'path']
+  FEATURES: 1
+  SUMMARY: layers=['ab_province']; features≈1; cols=11
+
+  PATH: raw_data/statistics_canada/census_boundaries/bc/bc_census_divisions.gpkg
+  SIZE: 61.18 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['bc_census_divisions']
+  COLUMNS (9): ['fid', 'geom', 'CDUID', 'DGUID', 'CDNAME', 'CDTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 29
+  SUMMARY: layers=['bc_census_divisions']; features≈29; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/bc/bc_census_metropolitan_areas.gpkg
+  SIZE: 8.28 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['bc_census_metropolitan_areas']
+  COLUMNS (11): ['fid', 'geom', 'CMAUID', 'CMAPUID', 'DGUID', 'DGUIDP', 'CMANAME', 'CMATYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 28
+  SUMMARY: layers=['bc_census_metropolitan_areas']; features≈28; cols=11
+
+  PATH: raw_data/statistics_canada/census_boundaries/bc/bc_census_subdivisions.gpkg
+  SIZE: 56.67 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['bc_census_subdivisions']
+  COLUMNS (9): ['fid', 'geom', 'CSDUID', 'DGUID', 'CSDNAME', 'CSDTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 751
+  SUMMARY: layers=['bc_census_subdivisions']; features≈751; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/bc/bc_census_tracts.gpkg
+  SIZE: 3.88 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['bc_census_tracts']
+  COLUMNS (8): ['fid', 'geom', 'CTUID', 'DGUID', 'CTNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 844
+  SUMMARY: layers=['bc_census_tracts']; features≈844; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/bc/bc_consolidated_subdivisions.gpkg
+  SIZE: 53.53 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['bc_consolidated_subdivisions']
+  COLUMNS (8): ['fid', 'geom', 'CCSUID', 'DGUID', 'CCSNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 132
+  SUMMARY: layers=['bc_consolidated_subdivisions']; features≈132; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/bc/bc_designated_places.gpkg
+  SIZE: 3.31 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['bc_designated_places']
+  COLUMNS (9): ['fid', 'geom', 'DPLUID', 'DGUID', 'DPLNAME', 'DPLTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 332
+  SUMMARY: layers=['bc_designated_places']; features≈332; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/bc/bc_dissemination_areas.gpkg
+  SIZE: 69.91 MB
+  DOC:  mini-guide + Schema: DA polygons ({prov}_dissemination_areas.gpkg)
+  LAYERS: ['bc_dissemination_areas']
+  COLUMNS (7): ['fid', 'geom', 'DAUID', 'DGUID', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 7848
+  SUMMARY: layers=['bc_dissemination_areas']; features≈7848; cols=7
+
+  PATH: raw_data/statistics_canada/census_boundaries/bc/bc_economic_regions.gpkg
+  SIZE: 67.19 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['bc_economic_regions']
+  COLUMNS (8): ['fid', 'geom', 'ERUID', 'DGUID', 'ERNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 8
+  SUMMARY: layers=['bc_economic_regions']; features≈8; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/bc/bc_electoral_districts_2003ro.gpkg
+  SIZE: 9.71 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['bc_electoral_districts_2003ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 36
+  SUMMARY: layers=['bc_electoral_districts_2003ro']; features≈36; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/bc/bc_electoral_districts_2013ro.gpkg
+  SIZE: 9.71 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['bc_electoral_districts_2013ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 42
+  SUMMARY: layers=['bc_electoral_districts_2013ro']; features≈42; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/bc/bc_forward_sortation_areas.gpkg
+  SIZE: 66.94 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['bc_forward_sortation_areas']
+  COLUMNS (8): ['fid', 'geom', 'CFSAUID', 'DGUID', 'PRUID', 'PRNAME', 'LANDAREA', 'path']
+  FEATURES: 191
+  SUMMARY: layers=['bc_forward_sortation_areas']; features≈191; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/bc/bc_polling_divisions.gpkg
+  SIZE: 23.58 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['bc_polling_divisions']
+  COLUMNS (12): ['fid', 'geom', 'OBJECTID', 'PD_NBR_SFX', 'PD_TYPE', 'FED_NUM', 'ADV_POLL_N', 'PD_NUM', 'SHAPE_Leng', 'SHAPE_Area', 'PD_NUM_SFX', 'path']
+  FEATURES: 8646
+  SUMMARY: layers=['bc_polling_divisions']; features≈8646; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/bc/bc_population_centres.gpkg
+  SIZE: 1.96 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['bc_population_centres']
+  COLUMNS (12): ['fid', 'geom', 'PCUID', 'PCPUID', 'DGUID', 'DGUIDP', 'PCNAME', 'PCTYPE', 'PCCLASS', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 108
+  SUMMARY: layers=['bc_population_centres']; features≈108; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/mb/mb_aggregate_dissemination_areas.gpkg
+  SIZE: 7.26 MB
+  DOC:  mini-guide + Schema: DA polygons ({prov}_dissemination_areas.gpkg)
+  LAYERS: ['mb_aggregate_dissemination_areas']
+  COLUMNS (7): ['fid', 'geom', 'ADAUID', 'DGUID', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 238
+  SUMMARY: layers=['mb_aggregate_dissemination_areas']; features≈238; cols=7
+  NOTE: DA gpkg missing expected cols: ['DAUID']
+
+  PATH: raw_data/statistics_canada/census_boundaries/mb/mb_agricultural_regions.gpkg
+  SIZE: 3.67 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['mb_agricultural_regions']
+  COLUMNS (9): ['fid', 'geom', 'CARUID', 'DGUID', 'CARENAME', 'CARFNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 12
+  SUMMARY: layers=['mb_agricultural_regions']; features≈12; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/mb/mb_census_divisions.gpkg
+  SIZE: 4.61 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['mb_census_divisions']
+  COLUMNS (9): ['fid', 'geom', 'CDUID', 'DGUID', 'CDNAME', 'CDTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 23
+  SUMMARY: layers=['mb_census_divisions']; features≈23; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/mb/mb_census_metropolitan_areas.gpkg
+  SIZE: 440.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['mb_census_metropolitan_areas']
+  COLUMNS (11): ['fid', 'geom', 'CMAUID', 'CMAPUID', 'DGUID', 'DGUIDP', 'CMANAME', 'CMATYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 6
+  SUMMARY: layers=['mb_census_metropolitan_areas']; features≈6; cols=11
+
+  PATH: raw_data/statistics_canada/census_boundaries/mb/mb_census_subdivisions.gpkg
+  SIZE: 8.46 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['mb_census_subdivisions']
+  COLUMNS (9): ['fid', 'geom', 'CSDUID', 'DGUID', 'CSDNAME', 'CSDTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 239
+  SUMMARY: layers=['mb_census_subdivisions']; features≈239; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/mb/mb_census_tracts.gpkg
+  SIZE: 764.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['mb_census_tracts']
+  COLUMNS (8): ['fid', 'geom', 'CTUID', 'DGUID', 'CTNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 187
+  SUMMARY: layers=['mb_census_tracts']; features≈187; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/mb/mb_consolidated_subdivisions.gpkg
+  SIZE: 6.14 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['mb_consolidated_subdivisions']
+  COLUMNS (8): ['fid', 'geom', 'CCSUID', 'DGUID', 'CCSNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 105
+  SUMMARY: layers=['mb_consolidated_subdivisions']; features≈105; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/mb/mb_designated_places.gpkg
+  SIZE: 1.02 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['mb_designated_places']
+  COLUMNS (9): ['fid', 'geom', 'DPLUID', 'DGUID', 'DPLNAME', 'DPLTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 148
+  SUMMARY: layers=['mb_designated_places']; features≈148; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/mb/mb_dissemination_areas.gpkg
+  SIZE: 10.62 MB
+  DOC:  mini-guide + Schema: DA polygons ({prov}_dissemination_areas.gpkg)
+  LAYERS: ['mb_dissemination_areas']
+  COLUMNS (7): ['fid', 'geom', 'DAUID', 'DGUID', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 2223
+  SUMMARY: layers=['mb_dissemination_areas']; features≈2223; cols=7
+
+  PATH: raw_data/statistics_canada/census_boundaries/mb/mb_economic_regions.gpkg
+  SIZE: 4.79 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['mb_economic_regions']
+  COLUMNS (8): ['fid', 'geom', 'ERUID', 'DGUID', 'ERNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 8
+  SUMMARY: layers=['mb_economic_regions']; features≈8; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/mb/mb_electoral_districts.gpkg
+  SIZE: 4.75 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['mb_electoral_districts']
+  COLUMNS (10): ['fid', 'geom', 'FEDUID', 'DGUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 14
+  SUMMARY: layers=['mb_electoral_districts']; features≈14; cols=10
+
+  PATH: raw_data/statistics_canada/census_boundaries/mb/mb_electoral_districts_2003ro.gpkg
+  SIZE: 2.00 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['mb_electoral_districts_2003ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 14
+  SUMMARY: layers=['mb_electoral_districts_2003ro']; features≈14; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/mb/mb_electoral_districts_2013ro.gpkg
+  SIZE: 840.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['mb_electoral_districts_2013ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 14
+  SUMMARY: layers=['mb_electoral_districts_2013ro']; features≈14; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/mb/mb_forward_sortation_areas.gpkg
+  SIZE: 3.62 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['mb_forward_sortation_areas']
+  COLUMNS (8): ['fid', 'geom', 'CFSAUID', 'DGUID', 'PRUID', 'PRNAME', 'LANDAREA', 'path']
+  FEATURES: 74
+  SUMMARY: layers=['mb_forward_sortation_areas']; features≈74; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/mb/mb_polling_divisions.gpkg
+  SIZE: 12.21 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['mb_polling_divisions']
+  COLUMNS (12): ['fid', 'geom', 'OBJECTID', 'PD_NBR_SFX', 'PD_TYPE', 'FED_NUM', 'ADV_POLL_N', 'PD_NUM', 'SHAPE_Leng', 'SHAPE_Area', 'PD_NUM_SFX', 'path']
+  FEATURES: 2655
+  SUMMARY: layers=['mb_polling_divisions']; features≈2655; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/mb/mb_population_centres.gpkg
+  SIZE: 328.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['mb_population_centres']
+  COLUMNS (12): ['fid', 'geom', 'PCUID', 'PCPUID', 'DGUID', 'DGUIDP', 'PCNAME', 'PCTYPE', 'PCCLASS', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 54
+  SUMMARY: layers=['mb_population_centres']; features≈54; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/mb/mb_province.gpkg
+  SIZE: 1.35 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['mb_province']
+  COLUMNS (11): ['fid', 'geom', 'PRUID', 'DGUID', 'PRNAME', 'PRENAME', 'PRFNAME', 'PREABBR', 'PRFABBR', 'LANDAREA', 'path']
+  FEATURES: 1
+  SUMMARY: layers=['mb_province']; features≈1; cols=11
+
+  PATH: raw_data/statistics_canada/census_boundaries/nb/nb_aggregate_dissemination_areas.gpkg
+  SIZE: 3.66 MB
+  DOC:  mini-guide + Schema: DA polygons ({prov}_dissemination_areas.gpkg)
+  LAYERS: ['nb_aggregate_dissemination_areas']
+  COLUMNS (7): ['fid', 'geom', 'ADAUID', 'DGUID', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 130
+  SUMMARY: layers=['nb_aggregate_dissemination_areas']; features≈130; cols=7
+  NOTE: DA gpkg missing expected cols: ['DAUID']
+
+  PATH: raw_data/statistics_canada/census_boundaries/nb/nb_agricultural_regions.gpkg
+  SIZE: 3.15 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nb_agricultural_regions']
+  COLUMNS (9): ['fid', 'geom', 'CARUID', 'DGUID', 'CARENAME', 'CARFNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 4
+  SUMMARY: layers=['nb_agricultural_regions']; features≈4; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/nb/nb_census_divisions.gpkg
+  SIZE: 3.10 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nb_census_divisions']
+  COLUMNS (9): ['fid', 'geom', 'CDUID', 'DGUID', 'CDNAME', 'CDTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 15
+  SUMMARY: layers=['nb_census_divisions']; features≈15; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/nb/nb_census_metropolitan_areas.gpkg
+  SIZE: 816.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nb_census_metropolitan_areas']
+  COLUMNS (11): ['fid', 'geom', 'CMAUID', 'CMAPUID', 'DGUID', 'DGUIDP', 'CMANAME', 'CMATYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 7
+  SUMMARY: layers=['nb_census_metropolitan_areas']; features≈7; cols=11
+
+  PATH: raw_data/statistics_canada/census_boundaries/nb/nb_census_subdivisions.gpkg
+  SIZE: 3.81 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nb_census_subdivisions']
+  COLUMNS (9): ['fid', 'geom', 'CSDUID', 'DGUID', 'CSDNAME', 'CSDTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 266
+  SUMMARY: layers=['nb_census_subdivisions']; features≈266; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/nb/nb_census_tracts.gpkg
+  SIZE: 1.09 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nb_census_tracts']
+  COLUMNS (8): ['fid', 'geom', 'CTUID', 'DGUID', 'CTNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 119
+  SUMMARY: layers=['nb_census_tracts']; features≈119; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/nb/nb_consolidated_subdivisions.gpkg
+  SIZE: 3.30 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nb_consolidated_subdivisions']
+  COLUMNS (8): ['fid', 'geom', 'CCSUID', 'DGUID', 'CCSNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 87
+  SUMMARY: layers=['nb_consolidated_subdivisions']; features≈87; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/nb/nb_designated_places.gpkg
+  SIZE: 1.16 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nb_designated_places']
+  COLUMNS (9): ['fid', 'geom', 'DPLUID', 'DGUID', 'DPLNAME', 'DPLTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 161
+  SUMMARY: layers=['nb_designated_places']; features≈161; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/nb/nb_economic_regions.gpkg
+  SIZE: 3.17 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nb_economic_regions']
+  COLUMNS (8): ['fid', 'geom', 'ERUID', 'DGUID', 'ERNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 5
+  SUMMARY: layers=['nb_economic_regions']; features≈5; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/nb/nb_electoral_districts.gpkg
+  SIZE: 3.33 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nb_electoral_districts']
+  COLUMNS (10): ['fid', 'geom', 'FEDUID', 'DGUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 10
+  SUMMARY: layers=['nb_electoral_districts']; features≈10; cols=10
+
+  PATH: raw_data/statistics_canada/census_boundaries/nb/nb_electoral_districts_2003ro.gpkg
+  SIZE: 1.38 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nb_electoral_districts_2003ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 10
+  SUMMARY: layers=['nb_electoral_districts_2003ro']; features≈10; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/nb/nb_electoral_districts_2013ro.gpkg
+  SIZE: 1.56 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nb_electoral_districts_2013ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 10
+  SUMMARY: layers=['nb_electoral_districts_2013ro']; features≈10; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/nb/nb_forward_sortation_areas.gpkg
+  SIZE: 4.04 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nb_forward_sortation_areas']
+  COLUMNS (8): ['fid', 'geom', 'CFSAUID', 'DGUID', 'PRUID', 'PRNAME', 'LANDAREA', 'path']
+  FEATURES: 110
+  SUMMARY: layers=['nb_forward_sortation_areas']; features≈110; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/nb/nb_population_centres.gpkg
+  SIZE: 712.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nb_population_centres']
+  COLUMNS (12): ['fid', 'geom', 'PCUID', 'PCPUID', 'DGUID', 'DGUIDP', 'PCNAME', 'PCTYPE', 'PCCLASS', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 31
+  SUMMARY: layers=['nb_population_centres']; features≈31; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/nb/nb_province.gpkg
+  SIZE: 4.63 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nb_province']
+  COLUMNS (11): ['fid', 'geom', 'PRUID', 'DGUID', 'PRNAME', 'PRENAME', 'PRFNAME', 'PREABBR', 'PRFABBR', 'LANDAREA', 'path']
+  FEATURES: 1
+  SUMMARY: layers=['nb_province']; features≈1; cols=11
+
+  PATH: raw_data/statistics_canada/census_boundaries/nl/nl_aggregate_dissemination_areas.gpkg
+  SIZE: 23.12 MB
+  DOC:  mini-guide + Schema: DA polygons ({prov}_dissemination_areas.gpkg)
+  LAYERS: ['nl_aggregate_dissemination_areas']
+  COLUMNS (7): ['fid', 'geom', 'ADAUID', 'DGUID', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 86
+  SUMMARY: layers=['nl_aggregate_dissemination_areas']; features≈86; cols=7
+  NOTE: DA gpkg missing expected cols: ['DAUID']
+
+  PATH: raw_data/statistics_canada/census_boundaries/nl/nl_agricultural_regions.gpkg
+  SIZE: 30.01 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nl_agricultural_regions']
+  COLUMNS (9): ['fid', 'geom', 'CARUID', 'DGUID', 'CARENAME', 'CARFNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 3
+  SUMMARY: layers=['nl_agricultural_regions']; features≈3; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/nl/nl_census_divisions.gpkg
+  SIZE: 25.21 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nl_census_divisions']
+  COLUMNS (9): ['fid', 'geom', 'CDUID', 'DGUID', 'CDNAME', 'CDTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 11
+  SUMMARY: layers=['nl_census_divisions']; features≈11; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/nl/nl_census_metropolitan_areas.gpkg
+  SIZE: 528.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nl_census_metropolitan_areas']
+  COLUMNS (11): ['fid', 'geom', 'CMAUID', 'CMAPUID', 'DGUID', 'DGUIDP', 'CMANAME', 'CMATYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 4
+  SUMMARY: layers=['nl_census_metropolitan_areas']; features≈4; cols=11
+
+  PATH: raw_data/statistics_canada/census_boundaries/nl/nl_census_subdivisions.gpkg
+  SIZE: 24.28 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nl_census_subdivisions']
+  COLUMNS (9): ['fid', 'geom', 'CSDUID', 'DGUID', 'CSDNAME', 'CSDTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 372
+  SUMMARY: layers=['nl_census_subdivisions']; features≈372; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/nl/nl_census_tracts.gpkg
+  SIZE: 492.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nl_census_tracts']
+  COLUMNS (8): ['fid', 'geom', 'CTUID', 'DGUID', 'CTNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 53
+  SUMMARY: layers=['nl_census_tracts']; features≈53; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/nl/nl_consolidated_subdivisions.gpkg
+  SIZE: 22.64 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nl_consolidated_subdivisions']
+  COLUMNS (8): ['fid', 'geom', 'CCSUID', 'DGUID', 'CCSNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 20
+  SUMMARY: layers=['nl_consolidated_subdivisions']; features≈20; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/nl/nl_designated_places.gpkg
+  SIZE: 1.41 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nl_designated_places']
+  COLUMNS (9): ['fid', 'geom', 'DPLUID', 'DGUID', 'DPLNAME', 'DPLTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 207
+  SUMMARY: layers=['nl_designated_places']; features≈207; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/nl/nl_dissemination_areas.gpkg
+  SIZE: 25.84 MB
+  DOC:  mini-guide + Schema: DA polygons ({prov}_dissemination_areas.gpkg)
+  LAYERS: ['nl_dissemination_areas']
+  COLUMNS (7): ['fid', 'geom', 'DAUID', 'DGUID', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 1082
+  SUMMARY: layers=['nl_dissemination_areas']; features≈1082; cols=7
+
+  PATH: raw_data/statistics_canada/census_boundaries/nl/nl_economic_regions.gpkg
+  SIZE: 30.04 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nl_economic_regions']
+  COLUMNS (8): ['fid', 'geom', 'ERUID', 'DGUID', 'ERNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 4
+  SUMMARY: layers=['nl_economic_regions']; features≈4; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/nl/nl_electoral_districts.gpkg
+  SIZE: 28.10 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nl_electoral_districts']
+  COLUMNS (10): ['fid', 'geom', 'FEDUID', 'DGUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 7
+  SUMMARY: layers=['nl_electoral_districts']; features≈7; cols=10
+
+  PATH: raw_data/statistics_canada/census_boundaries/nl/nl_electoral_districts_2003ro.gpkg
+  SIZE: 5.36 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nl_electoral_districts_2003ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 7
+  SUMMARY: layers=['nl_electoral_districts_2003ro']; features≈7; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/nl/nl_electoral_districts_2013ro.gpkg
+  SIZE: 5.18 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nl_electoral_districts_2013ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 7
+  SUMMARY: layers=['nl_electoral_districts_2013ro']; features≈7; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/nl/nl_forward_sortation_areas.gpkg
+  SIZE: 26.33 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nl_forward_sortation_areas']
+  COLUMNS (8): ['fid', 'geom', 'CFSAUID', 'DGUID', 'PRUID', 'PRNAME', 'LANDAREA', 'path']
+  FEATURES: 35
+  SUMMARY: layers=['nl_forward_sortation_areas']; features≈35; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/nl/nl_polling_divisions.gpkg
+  SIZE: 6.73 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nl_polling_divisions']
+  COLUMNS (12): ['fid', 'geom', 'OBJECTID', 'PD_NBR_SFX', 'PD_TYPE', 'FED_NUM', 'ADV_POLL_N', 'PD_NUM', 'SHAPE_Leng', 'SHAPE_Area', 'PD_NUM_SFX', 'path']
+  FEATURES: 1323
+  SUMMARY: layers=['nl_polling_divisions']; features≈1323; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/nl/nl_population_centres.gpkg
+  SIZE: 444.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nl_population_centres']
+  COLUMNS (12): ['fid', 'geom', 'PCUID', 'PCPUID', 'DGUID', 'DGUIDP', 'PCNAME', 'PCTYPE', 'PCCLASS', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 27
+  SUMMARY: layers=['nl_population_centres']; features≈27; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/nl/nl_province.gpkg
+  SIZE: 37.45 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nl_province']
+  COLUMNS (11): ['fid', 'geom', 'PRUID', 'DGUID', 'PRNAME', 'PRENAME', 'PRFNAME', 'PREABBR', 'PRFABBR', 'LANDAREA', 'path']
+  FEATURES: 1
+  SUMMARY: layers=['nl_province']; features≈1; cols=11
+
+  PATH: raw_data/statistics_canada/census_boundaries/ns/ns_agricultural_regions.gpkg
+  SIZE: 6.33 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ns_agricultural_regions']
+  COLUMNS (9): ['fid', 'geom', 'CARUID', 'DGUID', 'CARENAME', 'CARFNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 5
+  SUMMARY: layers=['ns_agricultural_regions']; features≈5; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/ns/ns_census_metropolitan_areas.gpkg
+  SIZE: 2.36 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ns_census_metropolitan_areas']
+  COLUMNS (11): ['fid', 'geom', 'CMAUID', 'CMAPUID', 'DGUID', 'DGUIDP', 'CMANAME', 'CMATYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 5
+  SUMMARY: layers=['ns_census_metropolitan_areas']; features≈5; cols=11
+
+  PATH: raw_data/statistics_canada/census_boundaries/ns/ns_census_subdivisions.gpkg
+  SIZE: 6.35 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ns_census_subdivisions']
+  COLUMNS (9): ['fid', 'geom', 'CSDUID', 'DGUID', 'CSDNAME', 'CSDTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 95
+  SUMMARY: layers=['ns_census_subdivisions']; features≈95; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/ns/ns_census_tracts.gpkg
+  SIZE: 2.09 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ns_census_tracts']
+  COLUMNS (8): ['fid', 'geom', 'CTUID', 'DGUID', 'CTNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 108
+  SUMMARY: layers=['ns_census_tracts']; features≈108; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/ns/ns_consolidated_subdivisions.gpkg
+  SIZE: 6.13 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ns_consolidated_subdivisions']
+  COLUMNS (8): ['fid', 'geom', 'CCSUID', 'DGUID', 'CCSNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 39
+  SUMMARY: layers=['ns_consolidated_subdivisions']; features≈39; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/ns/ns_designated_places.gpkg
+  SIZE: 476.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ns_designated_places']
+  COLUMNS (9): ['fid', 'geom', 'DPLUID', 'DGUID', 'DPLNAME', 'DPLTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 70
+  SUMMARY: layers=['ns_designated_places']; features≈70; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/ns/ns_electoral_districts_2003ro.gpkg
+  SIZE: 3.10 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ns_electoral_districts_2003ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 11
+  SUMMARY: layers=['ns_electoral_districts_2003ro']; features≈11; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/ns/ns_electoral_districts_2013ro.gpkg
+  SIZE: 3.25 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ns_electoral_districts_2013ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 11
+  SUMMARY: layers=['ns_electoral_districts_2013ro']; features≈11; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/ns/ns_forward_sortation_areas.gpkg
+  SIZE: 8.56 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ns_forward_sortation_areas']
+  COLUMNS (8): ['fid', 'geom', 'CFSAUID', 'DGUID', 'PRUID', 'PRNAME', 'LANDAREA', 'path']
+  FEATURES: 77
+  SUMMARY: layers=['ns_forward_sortation_areas']; features≈77; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/ns/ns_population_centres.gpkg
+  SIZE: 872.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ns_population_centres']
+  COLUMNS (12): ['fid', 'geom', 'PCUID', 'PCPUID', 'DGUID', 'DGUIDP', 'PCNAME', 'PCTYPE', 'PCCLASS', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 37
+  SUMMARY: layers=['ns_population_centres']; features≈37; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/ns/ns_province.gpkg
+  SIZE: 9.16 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['ns_province']
+  COLUMNS (11): ['fid', 'geom', 'PRUID', 'DGUID', 'PRNAME', 'PRENAME', 'PRFNAME', 'PREABBR', 'PRFABBR', 'LANDAREA', 'path']
+  FEATURES: 1
+  SUMMARY: layers=['ns_province']; features≈1; cols=11
+
+  PATH: raw_data/statistics_canada/census_boundaries/nt/nt_census_metropolitan_areas.gpkg
+  SIZE: 108.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nt_census_metropolitan_areas']
+  COLUMNS (11): ['fid', 'geom', 'CMAUID', 'CMAPUID', 'DGUID', 'DGUIDP', 'CMANAME', 'CMATYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 1
+  SUMMARY: layers=['nt_census_metropolitan_areas']; features≈1; cols=11
+
+  PATH: raw_data/statistics_canada/census_boundaries/nt/nt_electoral_districts_2003ro.gpkg
+  SIZE: 2.27 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nt_electoral_districts_2003ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 1
+  SUMMARY: layers=['nt_electoral_districts_2003ro']; features≈1; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/nt/nt_electoral_districts_2013ro.gpkg
+  SIZE: 2.27 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nt_electoral_districts_2013ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 1
+  SUMMARY: layers=['nt_electoral_districts_2013ro']; features≈1; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/nt/nt_polling_divisions.gpkg
+  SIZE: 1.05 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nt_polling_divisions']
+  COLUMNS (12): ['fid', 'geom', 'OBJECTID', 'PD_NBR_SFX', 'PD_TYPE', 'FED_NUM', 'ADV_POLL_N', 'PD_NUM', 'SHAPE_Leng', 'SHAPE_Area', 'PD_NUM_SFX', 'path']
+  FEATURES: 93
+  SUMMARY: layers=['nt_polling_divisions']; features≈93; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/nt/nt_population_centres.gpkg
+  SIZE: 136.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nt_population_centres']
+  COLUMNS (12): ['fid', 'geom', 'PCUID', 'PCPUID', 'DGUID', 'DGUIDP', 'PCNAME', 'PCTYPE', 'PCCLASS', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 4
+  SUMMARY: layers=['nt_population_centres']; features≈4; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/nu/nu_designated_places.gpkg
+  SIZE: 104.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nu_designated_places']
+  COLUMNS (9): ['fid', 'geom', 'DPLUID', 'DGUID', 'DPLNAME', 'DPLTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 1
+  SUMMARY: layers=['nu_designated_places']; features≈1; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/nu/nu_polling_divisions.gpkg
+  SIZE: 2.93 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nu_polling_divisions']
+  COLUMNS (12): ['fid', 'geom', 'OBJECTID', 'PD_NBR_SFX', 'PD_TYPE', 'FED_NUM', 'ADV_POLL_N', 'PD_NUM', 'SHAPE_Leng', 'SHAPE_Area', 'PD_NUM_SFX', 'path']
+  FEATURES: 25
+  SUMMARY: layers=['nu_polling_divisions']; features≈25; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/nu/nu_population_centres.gpkg
+  SIZE: 136.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['nu_population_centres']
+  COLUMNS (12): ['fid', 'geom', 'PCUID', 'PCPUID', 'DGUID', 'DGUIDP', 'PCNAME', 'PCTYPE', 'PCCLASS', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 6
+  SUMMARY: layers=['nu_population_centres']; features≈6; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/on/on_designated_places.gpkg
+  SIZE: 8.97 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['on_designated_places']
+  COLUMNS (9): ['fid', 'geom', 'DPLUID', 'DGUID', 'DPLNAME', 'DPLTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 135
+  SUMMARY: layers=['on_designated_places']; features≈135; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/on/on_population_centres.gpkg
+  SIZE: 12.06 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['on_population_centres']
+  COLUMNS (12): ['fid', 'geom', 'PCUID', 'PCPUID', 'DGUID', 'DGUIDP', 'PCNAME', 'PCTYPE', 'PCCLASS', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 298
+  SUMMARY: layers=['on_population_centres']; features≈298; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/pe/pe_aggregate_dissemination_areas.gpkg
+  SIZE: 1.02 MB
+  DOC:  mini-guide + Schema: DA polygons ({prov}_dissemination_areas.gpkg)
+  LAYERS: ['pe_aggregate_dissemination_areas']
+  COLUMNS (7): ['fid', 'geom', 'ADAUID', 'DGUID', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 23
+  SUMMARY: layers=['pe_aggregate_dissemination_areas']; features≈23; cols=7
+  NOTE: DA gpkg missing expected cols: ['DAUID']
+
+  PATH: raw_data/statistics_canada/census_boundaries/pe/pe_agricultural_regions.gpkg
+  SIZE: 1.09 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['pe_agricultural_regions']
+  COLUMNS (9): ['fid', 'geom', 'CARUID', 'DGUID', 'CARENAME', 'CARFNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 3
+  SUMMARY: layers=['pe_agricultural_regions']; features≈3; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/pe/pe_census_divisions.gpkg
+  SIZE: 1.09 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['pe_census_divisions']
+  COLUMNS (9): ['fid', 'geom', 'CDUID', 'DGUID', 'CDNAME', 'CDTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 3
+  SUMMARY: layers=['pe_census_divisions']; features≈3; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/pe/pe_census_metropolitan_areas.gpkg
+  SIZE: 436.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['pe_census_metropolitan_areas']
+  COLUMNS (11): ['fid', 'geom', 'CMAUID', 'CMAPUID', 'DGUID', 'DGUIDP', 'CMANAME', 'CMATYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 2
+  SUMMARY: layers=['pe_census_metropolitan_areas']; features≈2; cols=11
+
+  PATH: raw_data/statistics_canada/census_boundaries/pe/pe_census_subdivisions.gpkg
+  SIZE: 1.13 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['pe_census_subdivisions']
+  COLUMNS (9): ['fid', 'geom', 'CSDUID', 'DGUID', 'CSDNAME', 'CSDTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 98
+  SUMMARY: layers=['pe_census_subdivisions']; features≈98; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/pe/pe_consolidated_subdivisions.gpkg
+  SIZE: 1016.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['pe_consolidated_subdivisions']
+  COLUMNS (8): ['fid', 'geom', 'CCSUID', 'DGUID', 'CCSNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 34
+  SUMMARY: layers=['pe_consolidated_subdivisions']; features≈34; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/pe/pe_dissemination_areas.gpkg
+  SIZE: 1.59 MB
+  DOC:  mini-guide + Schema: DA polygons ({prov}_dissemination_areas.gpkg)
+  LAYERS: ['pe_dissemination_areas']
+  COLUMNS (7): ['fid', 'geom', 'DAUID', 'DGUID', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 319
+  SUMMARY: layers=['pe_dissemination_areas']; features≈319; cols=7
+
+  PATH: raw_data/statistics_canada/census_boundaries/pe/pe_economic_regions.gpkg
+  SIZE: 1.41 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['pe_economic_regions']
+  COLUMNS (8): ['fid', 'geom', 'ERUID', 'DGUID', 'ERNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 1
+  SUMMARY: layers=['pe_economic_regions']; features≈1; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/pe/pe_electoral_districts.gpkg
+  SIZE: 1.02 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['pe_electoral_districts']
+  COLUMNS (10): ['fid', 'geom', 'FEDUID', 'DGUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 4
+  SUMMARY: layers=['pe_electoral_districts']; features≈4; cols=10
+
+  PATH: raw_data/statistics_canada/census_boundaries/pe/pe_electoral_districts_2003ro.gpkg
+  SIZE: 492.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['pe_electoral_districts_2003ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 4
+  SUMMARY: layers=['pe_electoral_districts_2003ro']; features≈4; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/pe/pe_electoral_districts_2013ro.gpkg
+  SIZE: 488.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['pe_electoral_districts_2013ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 4
+  SUMMARY: layers=['pe_electoral_districts_2013ro']; features≈4; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/pe/pe_forward_sortation_areas.gpkg
+  SIZE: 1.13 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['pe_forward_sortation_areas']
+  COLUMNS (8): ['fid', 'geom', 'CFSAUID', 'DGUID', 'PRUID', 'PRNAME', 'LANDAREA', 'path']
+  FEATURES: 7
+  SUMMARY: layers=['pe_forward_sortation_areas']; features≈7; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/pe/pe_polling_divisions.gpkg
+  SIZE: 1.09 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['pe_polling_divisions']
+  COLUMNS (12): ['fid', 'geom', 'OBJECTID', 'PD_NBR_SFX', 'PD_TYPE', 'FED_NUM', 'ADV_POLL_N', 'PD_NUM', 'SHAPE_Leng', 'SHAPE_Area', 'PD_NUM_SFX', 'path']
+  FEATURES: 336
+  SUMMARY: layers=['pe_polling_divisions']; features≈336; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/pe/pe_population_centres.gpkg
+  SIZE: 168.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['pe_population_centres']
+  COLUMNS (12): ['fid', 'geom', 'PCUID', 'PCPUID', 'DGUID', 'DGUIDP', 'PCNAME', 'PCTYPE', 'PCCLASS', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 4
+  SUMMARY: layers=['pe_population_centres']; features≈4; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/pe/pe_province.gpkg
+  SIZE: 1.41 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['pe_province']
+  COLUMNS (11): ['fid', 'geom', 'PRUID', 'DGUID', 'PRNAME', 'PRENAME', 'PRFNAME', 'PREABBR', 'PRFABBR', 'LANDAREA', 'path']
+  FEATURES: 1
+  SUMMARY: layers=['pe_province']; features≈1; cols=11
+
+  PATH: raw_data/statistics_canada/census_boundaries/qc/qc_census_metropolitan_areas.gpkg
+  SIZE: 5.62 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['qc_census_metropolitan_areas']
+  COLUMNS (11): ['fid', 'geom', 'CMAUID', 'CMAPUID', 'DGUID', 'DGUIDP', 'CMANAME', 'CMATYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 32
+  SUMMARY: layers=['qc_census_metropolitan_areas']; features≈32; cols=11
+
+  PATH: raw_data/statistics_canada/census_boundaries/qc/qc_designated_places.gpkg
+  SIZE: 800.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['qc_designated_places']
+  COLUMNS (9): ['fid', 'geom', 'DPLUID', 'DGUID', 'DPLNAME', 'DPLTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 120
+  SUMMARY: layers=['qc_designated_places']; features≈120; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/qc/qc_electoral_districts_2003ro.gpkg
+  SIZE: 6.19 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['qc_electoral_districts_2003ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 75
+  SUMMARY: layers=['qc_electoral_districts_2003ro']; features≈75; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/qc/qc_electoral_districts_2013ro.gpkg
+  SIZE: 5.79 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['qc_electoral_districts_2013ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 78
+  SUMMARY: layers=['qc_electoral_districts_2013ro']; features≈78; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/qc/qc_population_centres.gpkg
+  SIZE: 5.34 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['qc_population_centres']
+  COLUMNS (12): ['fid', 'geom', 'PCUID', 'PCPUID', 'DGUID', 'DGUIDP', 'PCNAME', 'PCTYPE', 'PCCLASS', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 275
+  SUMMARY: layers=['qc_population_centres']; features≈275; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/sk/sk_aggregate_dissemination_areas.gpkg
+  SIZE: 3.17 MB
+  DOC:  mini-guide + Schema: DA polygons ({prov}_dissemination_areas.gpkg)
+  LAYERS: ['sk_aggregate_dissemination_areas']
+  COLUMNS (7): ['fid', 'geom', 'ADAUID', 'DGUID', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 309
+  SUMMARY: layers=['sk_aggregate_dissemination_areas']; features≈309; cols=7
+  NOTE: DA gpkg missing expected cols: ['DAUID']
+
+  PATH: raw_data/statistics_canada/census_boundaries/sk/sk_agricultural_regions.gpkg
+  SIZE: 896.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['sk_agricultural_regions']
+  COLUMNS (9): ['fid', 'geom', 'CARUID', 'DGUID', 'CARENAME', 'CARFNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 7
+  SUMMARY: layers=['sk_agricultural_regions']; features≈7; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/sk/sk_census_divisions.gpkg
+  SIZE: 1.06 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['sk_census_divisions']
+  COLUMNS (9): ['fid', 'geom', 'CDUID', 'DGUID', 'CDNAME', 'CDTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 18
+  SUMMARY: layers=['sk_census_divisions']; features≈18; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/sk/sk_census_metropolitan_areas.gpkg
+  SIZE: 288.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['sk_census_metropolitan_areas']
+  COLUMNS (11): ['fid', 'geom', 'CMAUID', 'CMAPUID', 'DGUID', 'DGUIDP', 'CMANAME', 'CMATYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 10
+  SUMMARY: layers=['sk_census_metropolitan_areas']; features≈10; cols=11
+
+  PATH: raw_data/statistics_canada/census_boundaries/sk/sk_census_subdivisions.gpkg
+  SIZE: 5.91 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['sk_census_subdivisions']
+  COLUMNS (9): ['fid', 'geom', 'CSDUID', 'DGUID', 'CSDNAME', 'CSDTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 951
+  SUMMARY: layers=['sk_census_subdivisions']; features≈951; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/sk/sk_census_tracts.gpkg
+  SIZE: 456.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['sk_census_tracts']
+  COLUMNS (8): ['fid', 'geom', 'CTUID', 'DGUID', 'CTNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 126
+  SUMMARY: layers=['sk_census_tracts']; features≈126; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/sk/sk_consolidated_subdivisions.gpkg
+  SIZE: 3.75 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['sk_consolidated_subdivisions']
+  COLUMNS (8): ['fid', 'geom', 'CCSUID', 'DGUID', 'CCSNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 297
+  SUMMARY: layers=['sk_consolidated_subdivisions']; features≈297; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/sk/sk_designated_places.gpkg
+  SIZE: 268.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['sk_designated_places']
+  COLUMNS (9): ['fid', 'geom', 'DPLUID', 'DGUID', 'DPLNAME', 'DPLTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 198
+  SUMMARY: layers=['sk_designated_places']; features≈198; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/sk/sk_dissemination_areas.gpkg
+  SIZE: 7.66 MB
+  DOC:  mini-guide + Schema: DA polygons ({prov}_dissemination_areas.gpkg)
+  LAYERS: ['sk_dissemination_areas']
+  COLUMNS (7): ['fid', 'geom', 'DAUID', 'DGUID', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 2625
+  SUMMARY: layers=['sk_dissemination_areas']; features≈2625; cols=7
+
+  PATH: raw_data/statistics_canada/census_boundaries/sk/sk_economic_regions.gpkg
+  SIZE: 804.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['sk_economic_regions']
+  COLUMNS (8): ['fid', 'geom', 'ERUID', 'DGUID', 'ERNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 6
+  SUMMARY: layers=['sk_economic_regions']; features≈6; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/sk/sk_electoral_districts.gpkg
+  SIZE: 1.00 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['sk_electoral_districts']
+  COLUMNS (10): ['fid', 'geom', 'FEDUID', 'DGUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 14
+  SUMMARY: layers=['sk_electoral_districts']; features≈14; cols=10
+
+  PATH: raw_data/statistics_canada/census_boundaries/sk/sk_electoral_districts_2003ro.gpkg
+  SIZE: 3.76 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['sk_electoral_districts_2003ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 14
+  SUMMARY: layers=['sk_electoral_districts_2003ro']; features≈14; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/sk/sk_electoral_districts_2013ro.gpkg
+  SIZE: 2.65 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['sk_electoral_districts_2013ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 14
+  SUMMARY: layers=['sk_electoral_districts_2013ro']; features≈14; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/sk/sk_forward_sortation_areas.gpkg
+  SIZE: 1.51 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['sk_forward_sortation_areas']
+  COLUMNS (8): ['fid', 'geom', 'CFSAUID', 'DGUID', 'PRUID', 'PRNAME', 'LANDAREA', 'path']
+  FEATURES: 52
+  SUMMARY: layers=['sk_forward_sortation_areas']; features≈52; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/sk/sk_polling_divisions.gpkg
+  SIZE: 8.64 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['sk_polling_divisions']
+  COLUMNS (12): ['fid', 'geom', 'OBJECTID', 'PD_NBR_SFX', 'PD_TYPE', 'FED_NUM', 'ADV_POLL_N', 'PD_NUM', 'SHAPE_Leng', 'SHAPE_Area', 'PD_NUM_SFX', 'path']
+  FEATURES: 2382
+  SUMMARY: layers=['sk_polling_divisions']; features≈2382; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/sk/sk_population_centres.gpkg
+  SIZE: 316.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['sk_population_centres']
+  COLUMNS (12): ['fid', 'geom', 'PCUID', 'PCPUID', 'DGUID', 'DGUIDP', 'PCNAME', 'PCTYPE', 'PCCLASS', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 65
+  SUMMARY: layers=['sk_population_centres']; features≈65; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/sk/sk_province.gpkg
+  SIZE: 304.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['sk_province']
+  COLUMNS (11): ['fid', 'geom', 'PRUID', 'DGUID', 'PRNAME', 'PRENAME', 'PRFNAME', 'PREABBR', 'PRFABBR', 'LANDAREA', 'path']
+  FEATURES: 1
+  SUMMARY: layers=['sk_province']; features≈1; cols=11
+
+  PATH: raw_data/statistics_canada/census_boundaries/yt/yt_aggregate_dissemination_areas.gpkg
+  SIZE: 624.0 KB
+  DOC:  mini-guide + Schema: DA polygons ({prov}_dissemination_areas.gpkg)
+  LAYERS: ['yt_aggregate_dissemination_areas']
+  COLUMNS (7): ['fid', 'geom', 'ADAUID', 'DGUID', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 31
+  SUMMARY: layers=['yt_aggregate_dissemination_areas']; features≈31; cols=7
+  NOTE: DA gpkg missing expected cols: ['DAUID']
+
+  PATH: raw_data/statistics_canada/census_boundaries/yt/yt_agricultural_regions.gpkg
+  SIZE: 504.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['yt_agricultural_regions']
+  COLUMNS (9): ['fid', 'geom', 'CARUID', 'DGUID', 'CARENAME', 'CARFNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 1
+  SUMMARY: layers=['yt_agricultural_regions']; features≈1; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/yt/yt_census_divisions.gpkg
+  SIZE: 504.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['yt_census_divisions']
+  COLUMNS (9): ['fid', 'geom', 'CDUID', 'DGUID', 'CDNAME', 'CDTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 1
+  SUMMARY: layers=['yt_census_divisions']; features≈1; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/yt/yt_census_metropolitan_areas.gpkg
+  SIZE: 116.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['yt_census_metropolitan_areas']
+  COLUMNS (11): ['fid', 'geom', 'CMAUID', 'CMAPUID', 'DGUID', 'DGUIDP', 'CMANAME', 'CMATYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 1
+  SUMMARY: layers=['yt_census_metropolitan_areas']; features≈1; cols=11
+
+  PATH: raw_data/statistics_canada/census_boundaries/yt/yt_census_subdivisions.gpkg
+  SIZE: 808.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['yt_census_subdivisions']
+  COLUMNS (9): ['fid', 'geom', 'CSDUID', 'DGUID', 'CSDNAME', 'CSDTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 35
+  SUMMARY: layers=['yt_census_subdivisions']; features≈35; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/yt/yt_consolidated_subdivisions.gpkg
+  SIZE: 504.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['yt_consolidated_subdivisions']
+  COLUMNS (8): ['fid', 'geom', 'CCSUID', 'DGUID', 'CCSNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 1
+  SUMMARY: layers=['yt_consolidated_subdivisions']; features≈1; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/yt/yt_designated_places.gpkg
+  SIZE: 112.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['yt_designated_places']
+  COLUMNS (9): ['fid', 'geom', 'DPLUID', 'DGUID', 'DPLNAME', 'DPLTYPE', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 2
+  SUMMARY: layers=['yt_designated_places']; features≈2; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/yt/yt_dissemination_areas.gpkg
+  SIZE: 1.02 MB
+  DOC:  mini-guide + Schema: DA polygons ({prov}_dissemination_areas.gpkg)
+  LAYERS: ['yt_dissemination_areas']
+  COLUMNS (7): ['fid', 'geom', 'DAUID', 'DGUID', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 74
+  SUMMARY: layers=['yt_dissemination_areas']; features≈74; cols=7
+
+  PATH: raw_data/statistics_canada/census_boundaries/yt/yt_dissemination_blocks.gpkg
+  SIZE: 4.33 MB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['yt_dissemination_blocks']
+  COLUMNS (9): ['fid', 'geom', 'DBUID', 'DGUID', 'DBRPLAMX', 'DBRPLAMY', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 1437
+  SUMMARY: layers=['yt_dissemination_blocks']; features≈1437; cols=9
+
+  PATH: raw_data/statistics_canada/census_boundaries/yt/yt_economic_regions.gpkg
+  SIZE: 504.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['yt_economic_regions']
+  COLUMNS (8): ['fid', 'geom', 'ERUID', 'DGUID', 'ERNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 1
+  SUMMARY: layers=['yt_economic_regions']; features≈1; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/yt/yt_electoral_districts.gpkg
+  SIZE: 504.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['yt_electoral_districts']
+  COLUMNS (10): ['fid', 'geom', 'FEDUID', 'DGUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 1
+  SUMMARY: layers=['yt_electoral_districts']; features≈1; cols=10
+
+  PATH: raw_data/statistics_canada/census_boundaries/yt/yt_electoral_districts_2003ro.gpkg
+  SIZE: 192.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['yt_electoral_districts_2003ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 1
+  SUMMARY: layers=['yt_electoral_districts_2003ro']; features≈1; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/yt/yt_electoral_districts_2013ro.gpkg
+  SIZE: 192.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['yt_electoral_districts_2013ro']
+  COLUMNS (8): ['fid', 'geom', 'FEDUID', 'FEDNAME', 'FEDENAME', 'FEDFNAME', 'PRUID', 'PRNAME']
+  FEATURES: 1
+  SUMMARY: layers=['yt_electoral_districts_2013ro']; features≈1; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/yt/yt_forward_sortation_areas.gpkg
+  SIZE: 680.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['yt_forward_sortation_areas']
+  COLUMNS (8): ['fid', 'geom', 'CFSAUID', 'DGUID', 'PRUID', 'PRNAME', 'LANDAREA', 'path']
+  FEATURES: 3
+  SUMMARY: layers=['yt_forward_sortation_areas']; features≈3; cols=8
+
+  PATH: raw_data/statistics_canada/census_boundaries/yt/yt_polling_divisions.gpkg
+  SIZE: 960.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['yt_polling_divisions']
+  COLUMNS (12): ['fid', 'geom', 'OBJECTID', 'PD_NBR_SFX', 'PD_TYPE', 'FED_NUM', 'ADV_POLL_N', 'PD_NUM', 'SHAPE_Leng', 'SHAPE_Area', 'PD_NUM_SFX', 'path']
+  FEATURES: 68
+  SUMMARY: layers=['yt_polling_divisions']; features≈68; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/yt/yt_population_centres.gpkg
+  SIZE: 120.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['yt_population_centres']
+  COLUMNS (12): ['fid', 'geom', 'PCUID', 'PCPUID', 'DGUID', 'DGUIDP', 'PCNAME', 'PCTYPE', 'PCCLASS', 'LANDAREA', 'PRUID', 'path']
+  FEATURES: 2
+  SUMMARY: layers=['yt_population_centres']; features≈2; cols=12
+
+  PATH: raw_data/statistics_canada/census_boundaries/yt/yt_province.gpkg
+  SIZE: 504.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  LAYERS: ['yt_province']
+  COLUMNS (11): ['fid', 'geom', 'PRUID', 'DGUID', 'PRNAME', 'PRENAME', 'PRFNAME', 'PREABBR', 'PRFABBR', 'LANDAREA', 'path']
+  FEATURES: 1
+  SUMMARY: layers=['yt_province']; features≈1; cols=11
+
+### .md (3 files)
+
+  PATH: README.md
+  SIZE: 8.0 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  SUMMARY: # Canadian Electoral & Census Geospatial Data Bundle  Open-licensed Canadian boundary and demographic data for the 2021 census and the 2003 / 2013 / 2023 federal Representation Orders.  ## Structure  
+
+  PATH: raw_data/statistics_canada/census_profiles/README.md
+  SIZE: 2.4 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  SUMMARY: # Census Profiles — Federal Electoral Districts  Statistics Canada census profile CSVs tabulated by Federal Electoral District (FED) for each redistribution cycle (Representation Order).  ## Inventory
+
+  PATH: redist-mini-guide.md
+  SIZE: 4.4 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  SUMMARY: # Redistricting App  Census-driven: districts are built and judged on population and demographics. Election results are an optional add-on, covered in their own section at the end.  ## What a redistri
+
+### .pmtiles (3 files)
+
+  PATH: raw_data/elections_canada/historical/fed_boundaries_2003.pmtiles
+  SIZE: 23.18 MB
+  DOC:  Schema: FED boundary PMTiles; Schema: PMTiles
+  SUMMARY: PMTiles metadata read failed
+  ERROR: 'utf-8' codec can't decode byte 0x8b in position 1: invalid start byte
+
+  PATH: raw_data/elections_canada/historical/fed_boundaries_2015.pmtiles
+  SIZE: 30.62 MB
+  DOC:  Schema: FED boundary PMTiles; Schema: PMTiles
+  SUMMARY: PMTiles metadata read failed
+  ERROR: 'utf-8' codec can't decode byte 0x8b in position 1: invalid start byte
+
+  PATH: raw_data/elections_canada/historical/fed_boundaries_2023.pmtiles
+  SIZE: 28.50 MB
+  DOC:  Schema: FED boundary PMTiles; Schema: PMTiles
+  SUMMARY: PMTiles metadata read failed
+  ERROR: 'utf-8' codec can't decode byte 0x8b in position 1: invalid start byte
+
+### .txt (10 files)
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/013_fsas/meta.txt
+  SIZE: 234.6 KB
+  DOC:  Other / not explicitly named in Schema or mini-guide
+  SUMMARY: *********************************************************************************** **	General Information ***********************************************************************************  Census P
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/014_dissolved_csds/meta.txt
+  SIZE: 234.6 KB
+  DOC:  UNDOCUMENTED folder (014_dissolved_csds)
+  SUMMARY: *********************************************************************************** **	General Information ***********************************************************************************  Census P
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/raw/98-401-X2021008_eng_CSV/98-401-X2021008_English_meta.txt
+  SIZE: 234.6 KB
+  DOC:  Schema: profile_2021/raw nested StatCan product zips
+  SUMMARY: *********************************************************************************** **	General Information ***********************************************************************************  Census P
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/raw/98-401-X2021008_eng_CSV/README_meta.txt
+  SIZE: 1.4 KB
+  DOC:  Schema: profile_2021/raw nested StatCan product zips
+  SUMMARY: ﻿This zipped file contains the following files:  *_meta.txt – contains the metadata for the data file, including general information, geography notes, definitions and footnotes.  *CSV_data.csv – conta
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/raw/98-401-X2021018_eng_CSV/98-401-X2021018_English_meta.txt
+  SIZE: 234.6 KB
+  DOC:  Schema: profile_2021/raw nested StatCan product zips
+  SUMMARY: *********************************************************************************** **	General Information ***********************************************************************************  Census P
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/raw/98-401-X2021018_eng_CSV/README_meta.txt
+  SIZE: 1.4 KB
+  DOC:  Schema: profile_2021/raw nested StatCan product zips
+  SUMMARY: ﻿This zipped file contains the following files:  *_meta.txt – contains the metadata for the data file, including general information, geography notes, definitions and footnotes.  *CSV_data.csv – conta
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/raw/98-401-X2021026_eng_CSV/98-401-X2021026_English_meta.txt
+  SIZE: 234.6 KB
+  DOC:  Schema: profile_2021/raw nested StatCan product zips
+  SUMMARY: *********************************************************************************** **	General Information ***********************************************************************************  Census P
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/raw/98-401-X2021026_eng_CSV/README_meta.txt
+  SIZE: 1.4 KB
+  DOC:  Schema: profile_2021/raw nested StatCan product zips
+  SUMMARY: ﻿This zipped file contains the following files:  *_meta.txt – contains the metadata for the data file, including general information, geography notes, definitions and footnotes.  *CSV_data.csv – conta
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/raw/98-401-X2021028_eng_CSV/98-401-X2021028_English_meta.txt
+  SIZE: 234.6 KB
+  DOC:  Schema: profile_2021/raw nested StatCan product zips
+  SUMMARY: *********************************************************************************** **	General Information ***********************************************************************************  Census P
+
+  PATH: raw_data/statistics_canada/census_profiles/profile_2021/raw/98-401-X2021028_eng_CSV/README_meta.txt
+  SIZE: 1.4 KB
+  DOC:  Schema: profile_2021/raw nested StatCan product zips
+  SUMMARY: ﻿This zipped file contains the following files:  *_meta.txt – contains the metadata for the data file, including general information, geography notes, definitions and footnotes.  *CSV_data.csv – conta
+
+--------------------------------------------------------------------------------
+5. REGIONAL DATA AVAILABILITY (DA redistricting readiness)
+--------------------------------------------------------------------------------
+Columns: prov | DA features in gpkg | profile pop rows (CHAR=1) | population path | geo_name path | score (0-4)
+
+  ab  boundary=  6203  profile_rows=    0  pop=needs_prairies_csv     geo_name=boundary_only_no_da_profile  score=2
+  bc  boundary=  7848  profile_rows=    0  pop=needs_bc_csv           geo_name=boundary_only_no_da_profile  score=2
+  mb  boundary=  2223  profile_rows=    0  pop=needs_prairies_csv     geo_name=boundary_only_no_da_profile  score=2
+  nb  boundary=   130  profile_rows=    0  pop=needs_atlantic_csv     geo_name=boundary_only_no_da_profile  score=2
+  nl  boundary=  1082  profile_rows=    0  pop=needs_atlantic_csv     geo_name=boundary_only_no_da_profile  score=2
+  pe  boundary=   319  profile_rows=    0  pop=needs_atlantic_csv     geo_name=boundary_only_no_da_profile  score=2
+  sk  boundary=  2625  profile_rows=    0  pop=needs_prairies_csv     geo_name=boundary_only_no_da_profile  score=2
+  yt  boundary=    74  profile_rows=    0  pop=missing                geo_name=boundary_only_no_da_profile  score=2
+  ns  boundary=MISSING  profile_rows=    0  pop=needs_atlantic_csv     geo_name=needs_atlantic_csv           score=0
+  nt  boundary=MISSING  profile_rows=    0  pop=missing                geo_name=missing                      score=0
+  nu  boundary=MISSING  profile_rows=    0  pop=missing                geo_name=missing                      score=0
+  on  boundary=MISSING  profile_rows=    0  pop=needs_ontario_csv      geo_name=needs_ontario_csv            score=0
+  qc  boundary=MISSING  profile_rows=    0  pop=needs_quebec_csv       geo_name=needs_quebec_csv             score=0
+
+--------------------------------------------------------------------------------
+6. FED DISPLAY NAME SOURCES (2023 RO map labels)
+--------------------------------------------------------------------------------
+  PMTiles carries name field: False
+  Unique names merged from GPKG sources: 338
+  Electoral district GPKG layers:
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/ab/ab_electoral_districts.gpkg: 34 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/ab/ab_electoral_districts_2003ro.gpkg: 28 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/ab/ab_electoral_districts_2013ro.gpkg: 34 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/bc/bc_electoral_districts_2003ro.gpkg: 36 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/bc/bc_electoral_districts_2013ro.gpkg: 42 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/mb/mb_electoral_districts.gpkg: 14 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/mb/mb_electoral_districts_2003ro.gpkg: 14 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/mb/mb_electoral_districts_2013ro.gpkg: 14 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/nb/nb_electoral_districts.gpkg: 10 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/nb/nb_electoral_districts_2003ro.gpkg: 10 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/nb/nb_electoral_districts_2013ro.gpkg: 10 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/nl/nl_electoral_districts.gpkg: 7 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/nl/nl_electoral_districts_2003ro.gpkg: 7 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/nl/nl_electoral_districts_2013ro.gpkg: 7 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/ns/ns_electoral_districts_2003ro.gpkg: 11 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/ns/ns_electoral_districts_2013ro.gpkg: 11 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/nt/nt_electoral_districts_2003ro.gpkg: 1 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/nt/nt_electoral_districts_2013ro.gpkg: 1 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/pe/pe_electoral_districts.gpkg: 4 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/pe/pe_electoral_districts_2003ro.gpkg: 4 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/pe/pe_electoral_districts_2013ro.gpkg: 4 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/qc/qc_electoral_districts_2003ro.gpkg: 75 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/qc/qc_electoral_districts_2013ro.gpkg: 78 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/sk/sk_electoral_districts.gpkg: 14 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/sk/sk_electoral_districts_2003ro.gpkg: 14 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/sk/sk_electoral_districts_2013ro.gpkg: 14 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/yt/yt_electoral_districts.gpkg: 1 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/yt/yt_electoral_districts_2003ro.gpkg: 1 names
+    - /content/drive/MyDrive/CSCC01 - Group Project/Data/CRMP-full-data/CRMP-full-data/raw_data/statistics_canada/census_boundaries/yt/yt_electoral_districts_2013ro.gpkg: 1 names
+  fed2021_pd distinct FED names per province:
+    - ab: 34
+    - bc: 42
+    - mb: 14
+    - nb: 10
+    - nl: 7
+    - ns: 11
+    - nt: 1
+    - nu: 1
+    - on: 121
+    - pe: 4
+    - qc: 78
+    - sk: 14
+    - yt: 1
+  Canonical 029_feds_2023ro present: False
+
+--------------------------------------------------------------------------------
+7. RECOMMENDED SLIM BUNDLES (copy lists for scripts/data/bundle)
+--------------------------------------------------------------------------------
+
+### A. Yukon MVP bundle (map-mvp pilot, FED 60001)
+  [OK] raw_data/statistics_canada/census_boundaries/yt/yt_dissemination_areas.gpkg
+  [OK] raw_data/statistics_canada/census_boundaries/yt/yt_census_subdivisions.gpkg
+  [MISSING] raw_data/statistics_canada/census_profiles/profile_2021/006_dissemination_areas/territories.csv
+  [OK] raw_data/statistics_canada/census_profiles/profile_2021/006_dissemination_areas/territories_geo_index.csv
+  [OK] raw_data/elections_canada/historical/fed_boundaries_2023.pmtiles
+  [MISSING] raw_data/elections_canada/historical/fed_boundaries_2023.geojson (optional fallback)
+
+  Derive for map-mvp:
+    single_fed_das.geojson  <- yt_dissemination_areas + territories.csv (DGUID, GEO_NAME, C1_COUNT_TOTAL)
+    place_labels_yt.geojson <- yt_census_subdivisions centroids + territories_geo_index (CSD labels)
+    fed_labels.geojson      <- fed_boundaries_2023 + merged FED names from electoral GPKG / fed2021_pd
+
+### B. Database expansion bundle (pick highest-readiness FED after Yukon)
+  - AB: boundary=6203, profile_rows=0, score=2
+  - BC: boundary=7848, profile_rows=0, score=2
+  - MB: boundary=2223, profile_rows=0, score=2
+  - NB: boundary=130, profile_rows=0, score=2
+  - NL: boundary=1082, profile_rows=0, score=2
+
+  Suggested pilot FEDs (if profiles are added):
+    - FED 60001 (YT) score=2: Yukon — MVP pilot; 74 DAs; DA gpkg present
+    - FED 11001 (PE) score=2: PEI — smallest DA count among provinces with DA gpkg (319)
+    - FED 10001 (NL) score=2: NL — Avalon; 1082 DAs; full boundary stack
+    - FED 48001 (AB) score=2: AB — large but complete DA gpkg + prairies profile path
+
+--------------------------------------------------------------------------------
+8. DOC ACCURACY JUDGEMENT (automated hints — verify manually)
+--------------------------------------------------------------------------------
+  * mini-guide lists 006_dissemination_areas/*.csv as atlantic.csv … territories.csv.
+  * Bundle often has *_geo_index.csv instead — population profiles may live under profile_2021/raw/*.zip.
+  * After nested zip extraction, re-scan 006 and raw/ subfolders for Characteristic long-format CSVs.
+  * 029_feds_2023ro/ is documented but was missing from the 212-file zip inventory.
+  * Ontario on_dissemination_areas.gpkg was missing — mini-guide path is correct, bundle is incomplete.
+  * polling_districts_results_2006_2023.csv exists but is not described in Schema/mini-guide.
+  * Folders 014_dissolved_csds, 016_028_province_csds exist with meta/geo_index only — extend Schema docs.
+  * Profile CSV inventory (section 3 notes) uses CHARACTERISTIC_ID=1 row counts — not a full-table scan.
+
+================================================================================
+Files scanned: 210

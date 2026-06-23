@@ -1,4 +1,11 @@
-import { Routes, Route } from "react-router-dom";
+import {Routes, Route} from "react-router-dom";
+import DashboardHome from "./pages/DashboardHome.jsx";
+import DashboardGraphs from "./pages/DashboardGraphs.jsx";
+import DashBoardSubmissionsPage from "./pages/DashboardSubmissionsTable/DashboardSubmissionsPage.jsx";
+import UserHome from "./pages/UserHome.jsx";
+import Header from "./pages/Header.jsx";
+import MySubmissions from "./pages/MySubmissions.jsx";
+
 import CommissionerSignUpPage from "./pages/CommissionerSignUpPage.jsx";
 import DashboardCommissioner from "./pages/DashboardCommissioner.jsx";
 import DashboardPublicUser from "./pages/DashboardPublicUser.jsx";
@@ -9,16 +16,29 @@ import SignUpPage from "./pages/SignUpPage.jsx";
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<DashboardPublicUser />} />
-      <Route path="/sign-in" element={<SignInPage />} />
-      <Route path="/sign-up" element={<SignUpPage />} />
-      <Route path="/commissioner/sign-up" element={<CommissionerSignUpPage />} />
-      <Route path="/forgot-password" element={<ResetPasswordRequestPage />} />
-      <Route path="/reset-password" element={<PasswordRecoveryPage />} />
-      <Route path="/commissioner" element={<DashboardCommissioner />} />
-    </Routes>
+    <>
+      <Header />
+      <Routes>
+        <Route path="/" element={<DashboardPublicUser />} />
+        <Route path="/submissions" element={<MySubmissions />} />
+        <Route path="/users" element={<UserHome />} />
+        <Route path="/sign-in" element={<SignInPage />} />
+        <Route path="/sign-up" element={<SignUpPage />} />
+        <Route path="/commissioner/sign-up" element={<CommissionerSignUpPage />} />
+        <Route path="/forgot-password" element={<ResetPasswordRequestPage />} />
+        <Route path="/reset-password" element={<PasswordRecoveryPage />} />
+        <Route path="/commissioner" element={<DashboardCommissioner />} /> 
+        <Route path="/dashboard" element={<DashboardHome />} />
+        <Route path="/dashboard/graphs" element={<DashboardGraphs />} />
+        <Route path="/dashboard/submissionsTable" element={<DashBoardSubmissionsPage />} />
+      </Routes>
+    </>
+    // <Routes>
+    //   
+      
+    // </Routes>
   );
 }
 
 export default App;
+
