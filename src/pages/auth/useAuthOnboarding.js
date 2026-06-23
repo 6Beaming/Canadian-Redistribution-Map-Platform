@@ -34,7 +34,7 @@ export default function useAuthOnboarding() {
   const [notice, setNotice] = useState("");
 
   function navigateToRoleHome(user) {
-    navigate(user?.role === "commissioner" ? "/commissioner" : "/", {
+    navigate(user?.role === "commissioner" ? "/dashboard" : "/", {
       replace: true
     });
   }

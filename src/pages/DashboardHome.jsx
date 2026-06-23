@@ -6,14 +6,38 @@ import { buildProfileIndex } from "@/lib/map/profileUtils.js";
 import "@/styles/map.css";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { LogOut } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext.jsx";
 
 export default function DashboardHome() {
+  const navigate = useNavigate();
+  const { sessionStatus, signOut, user } = useAuth();
   const [status, setStatus] = useState("Loading map…");
   const [selection, setSelection] = useState(null);
   const [profilesByDguid, setProfilesByDguid] = useState(new Map());
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
+    if (sessionStatus === "checking") {
+      return;
+    }
+
+    if (sessionStatus === "signed-out") {
+      navigate("/sign-in", { replace: true });
+      return;
+    }
+
+    if (user?.role !== "commissioner") {
+      navigate("/", { replace: true });
+    }
+  }, [navigate, sessionStatus, user]);
+
+  useEffect(() => {
+    if (sessionStatus !== "signed-in" || user?.role !== "commissioner") {
+      return undefined;
+    }
+
     let isMounted = true;
 
     mapApi
@@ -33,7 +57,7 @@ export default function DashboardHome() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [sessionStatus, user]);
 
   useEffect(() => {
     if (!isFullscreen) return undefined;
@@ -73,14 +97,37 @@ export default function DashboardHome() {
 
   const panelSelection = useMemo(() => selection, [selection]);
 
-  const navigate = useNavigate();
+  async function handleSignOut() {
+    setIsSigningOut(true);
+
+    try {
+      await signOut();
+      navigate("/sign-in", { replace: true });
+    } finally {
+      setIsSigningOut(false);
+    }
+  }
+
+  if (sessionStatus !== "signed-in" || user?.role !== "commissioner") {
+    return null;
+  }
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="w-full flex justify-center bg-white py-10 ">
+      <div className="w-full flex items-center justify-between gap-4 bg-white px-15 py-10">
+        <div className="w-28" />
         <h1 className="text-5xl font-bold text-primary">
           Dashboard Home
         </h1>
+        <Button
+          variant="outline"
+          className="min-w-28"
+          disabled={isSigningOut}
+          onClick={handleSignOut}
+        >
+          <LogOut className="h-4 w-4" />
+          {isSigningOut ? "Signing Out" : "Sign Out"}
+        </Button>
       </div>
       <div className="px-15">
         <div className="flex gap-2">
