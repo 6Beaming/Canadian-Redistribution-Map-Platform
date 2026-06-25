@@ -33,7 +33,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 
-export default function SubmissionsTable({ columns, data, }) {
+export default function SubmissionsTable({ columns, data, onRowClick }) {
 
     const [sorting, setSorting] = React.useState([])
     const [columnFilters, setColumnFilters] = React.useState([])
@@ -161,6 +161,12 @@ export default function SubmissionsTable({ columns, data, }) {
                                 <TableRow
                                     key={row.id}
                                     data-state={row.getIsSelected() && "selected"}
+                                    className={onRowClick ? "cursor-pointer" : undefined}
+                                    onClick={
+                                        onRowClick
+                                            ? () => onRowClick(row.original)
+                                            : undefined
+                                    }
                                 >
                                     {row.getVisibleCells().map((cell) => (
                                         <TableCell key={cell.id}>
