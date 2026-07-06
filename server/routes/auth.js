@@ -513,14 +513,14 @@ router.post("/commissioner-invites", requireAuth, async (req, res, next) => {
   }
 
   try {
-    await inviteSupabaseCommissioner({
+    const invitation = await inviteSupabaseCommissioner({
       email: validation.email,
       invitedBy: req.user.id,
       redirectTo: getCommissionerInviteRedirectUrl()
     });
 
     res.status(201).json({
-      message: `Invitation sent to ${validation.email}.`
+      message: `Invitation ${invitation.resent ? "resent" : "sent"} to ${validation.email}.`
     });
   } catch (error) {
     next(error);

@@ -217,44 +217,117 @@ export async function inviteSupabaseCommissioner({
   redirectTo
 }) {
   const supabase = requireSupabaseAdminClient();
-  const { error: insertError } = await supabase
-    .from("pending_invites")
-    .insert({
-      email,
-      invited_by: invitedBy
-    });
+  const normalizedEmail = email.toLowerCase();
+  const { data: existingPendingInvite, error: pendingLookupError } =
+    await supabase
+      .from("pending_invites")
+      .select("email,invited_by")
+      .eq("email", normalizedEmail)
+      .maybeSingle();
 
-  if (insertError) {
+  if (pendingLookupError) {
     const inviteError = new Error(
-      insertError.message || "Unable to record commissioner invitation."
+      pendingLookupError.message || "Unable to check pending invitation."
     );
-    inviteError.statusCode = insertError.code === "23505" ? 409 : 400;
-    inviteError.publicMessage =
-      insertError.code === "23505"
-        ? "An invitation is already pending for this email."
-        : "Unable to record commissioner invitation.";
+    inviteError.statusCode = 500;
+    inviteError.publicMessage = "Unable to check pending invitation.";
     throw inviteError;
   }
 
+  const existingUser = await findSupabaseAuthUserByEmail(normalizedEmail);
+
+  if (existingPendingInvite) {
+    if (existingPendingInvite.invited_by !== invitedBy) {
+      const inviteError = new Error(
+        "This email already has an invitation from another commissioner."
+      );
+      inviteError.statusCode = 409;
+      inviteError.publicMessage = inviteError.message;
+      throw inviteError;
+    }
+
+    if (existingUser) {
+      const existingProfile = await getSupabaseProfileAsAdmin(existingUser.id);
+      const hasAcceptedInvite = Boolean(
+        existingProfile ||
+          existingUser.email_confirmed_at ||
+          existingUser.confirmed_at
+      );
+
+      if (hasAcceptedInvite) {
+        const inviteError = new Error(
+          "This invitation has already been accepted. The colleague can sign in to continue."
+        );
+        inviteError.statusCode = 409;
+        inviteError.publicMessage = inviteError.message;
+        throw inviteError;
+      }
+
+      const { error: deleteError } =
+        await supabase.auth.admin.deleteUser(existingUser.id);
+
+      if (deleteError) {
+        const inviteError = new Error(
+          deleteError.message || "Unable to refresh expired invitation."
+        );
+        inviteError.statusCode = 500;
+        inviteError.publicMessage = "Unable to refresh expired invitation.";
+        throw inviteError;
+      }
+    }
+  } else if (existingUser) {
+    const inviteError = new Error("An account with this email already exists.");
+    inviteError.statusCode = 409;
+    inviteError.publicMessage = inviteError.message;
+    throw inviteError;
+  }
+
+  let createdPendingInvite = false;
+
+  if (!existingPendingInvite) {
+    const { error: insertError } = await supabase
+      .from("pending_invites")
+      .insert({
+        email: normalizedEmail,
+        invited_by: invitedBy
+      });
+
+    if (insertError) {
+      const inviteError = new Error(
+        insertError.message || "Unable to record commissioner invitation."
+      );
+      inviteError.statusCode = insertError.code === "23505" ? 409 : 400;
+      inviteError.publicMessage =
+        insertError.code === "23505"
+          ? "An invitation was created by another request. Please try again."
+          : "Unable to record commissioner invitation.";
+      throw inviteError;
+    }
+
+    createdPendingInvite = true;
+  }
+
   const { data, error: emailError } =
-    await supabase.auth.admin.inviteUserByEmail(email, {
+    await supabase.auth.admin.inviteUserByEmail(normalizedEmail, {
       redirectTo
     });
 
-  if (emailError) {
+  if (emailError && createdPendingInvite) {
     const { error: cleanupError } = await supabase
       .from("pending_invites")
       .delete()
-      .eq("email", email)
+      .eq("email", normalizedEmail)
       .eq("invited_by", invitedBy);
 
     if (cleanupError) {
       console.error(
-        `Unable to roll back pending invite for ${email}:`,
+        `Unable to roll back pending invite for ${normalizedEmail}:`,
         cleanupError.message
       );
     }
+  }
 
+  if (emailError) {
     const inviteError = new Error(
       emailError.message || "Unable to send commissioner invitation."
     );
@@ -266,7 +339,10 @@ export async function inviteSupabaseCommissioner({
     throw inviteError;
   }
 
-  return data;
+  return {
+    data,
+    resent: Boolean(existingPendingInvite)
+  };
 }
 
 export async function getPendingCommissionerInvite(email) {
