@@ -70,4 +70,5 @@ router.delete("/:commentId", async (req, res) => {
   res.json({ ok: true });
 });
 
+
 export default router;
