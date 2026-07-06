@@ -1,6 +1,8 @@
 import { ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext.jsx";
+import { authApi } from "@/services/authApi.js";
 import { getAuthLinkClient } from "@/services/authLinkClient.js";
 
 const initialPasswordForm = {
@@ -10,6 +12,7 @@ const initialPasswordForm = {
 
 export default function PasswordSetupPage({ mode }) {
   const navigate = useNavigate();
+  const { clearSession } = useAuth();
   const isInviteFlow = mode === "invite";
   const [form, setForm] = useState(initialPasswordForm);
   const [authClient, setAuthClient] = useState(null);
@@ -20,6 +23,22 @@ export default function PasswordSetupPage({ mode }) {
     let isMounted = true;
 
     try {
+      const hashParams = new URLSearchParams(window.location.hash.slice(1));
+      const queryParams = new URLSearchParams(window.location.search);
+      const linkError =
+        hashParams.get("error_description") ||
+        queryParams.get("error_description");
+
+      if (linkError) {
+        setError(
+          isInviteFlow
+            ? `${linkError} Ask a commissioner to send a new invitation.`
+            : linkError
+        );
+        setStatus("error");
+        return undefined;
+      }
+
       const client = getAuthLinkClient();
       setAuthClient(client);
 
@@ -93,6 +112,12 @@ export default function PasswordSetupPage({ mode }) {
       }
 
       await authClient.auth.signOut();
+
+      if (isInviteFlow) {
+        await authApi.logout();
+        clearSession();
+      }
+
       setForm(initialPasswordForm);
       navigate("/sign-in", {
         replace: true,
