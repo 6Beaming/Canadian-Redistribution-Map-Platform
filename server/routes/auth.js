@@ -17,6 +17,7 @@ import {
   resendSupabaseSignupConfirmation,
   signUpSupabaseUser,
   startSupabasePhoneVerification,
+  updateSupabaseProfile,
   upsertSupabaseProfile,
   verifySupabasePhoneChange
 } from "../lib/supabase.js";
@@ -147,6 +148,22 @@ function validateCommissionerSignup(body) {
   };
 }
 
+function validateCommissionerProfile(body) {
+  const firstName = requiredString(body?.firstName);
+  const lastName = requiredString(body?.lastName);
+
+  if (!firstName || !lastName) {
+    return { error: "First name and last name are required." };
+  }
+
+  return {
+    profile: {
+      firstName,
+      lastName
+    }
+  };
+}
+
 function isPublicProfileComplete(profile) {
   return Boolean(
     profile?.profile_completed &&
@@ -167,11 +184,14 @@ function publicUser(user, profile = null) {
   return {
     email: user.email,
     emailVerified: Boolean(user.email_confirmed_at || user.confirmed_at),
+    firstName: profile?.first_name || null,
     id: user.id,
+    lastName: profile?.last_name || null,
     name: fullName || null,
     phoneNumber: profile?.phone || null,
     profileComplete:
       role === "public_user" ? isPublicProfileComplete(profile) : true,
+    province: profile?.province || null,
     role
   };
 }
@@ -588,6 +608,40 @@ router.post("/password-reset", async (req, res, next) => {
 
 router.get("/me", requireAuth, (req, res) => {
   res.json({ user: publicUser(req.user, req.profile) });
+});
+
+router.patch("/me", requireAuth, async (req, res, next) => {
+  if (req.profile?.role !== "commissioner") {
+    res.status(403).json({
+      error: "Only commissioners can update a commissioner profile."
+    });
+    return;
+  }
+
+  const validation = validateCommissionerProfile(req.body);
+
+  if (validation.error) {
+    res.status(400).json({ error: validation.error });
+    return;
+  }
+
+  try {
+    const updatedProfile = await updateSupabaseProfile(
+      req.accessToken,
+      req.user.id,
+      {
+        first_name: validation.profile.firstName,
+        last_name: validation.profile.lastName
+      }
+    );
+
+    res.json({
+      message: "Profile information updated.",
+      user: publicUser(req.user, updatedProfile)
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.post("/logout", (_req, res) => {

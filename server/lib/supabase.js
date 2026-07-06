@@ -289,6 +289,30 @@ export async function getSupabaseProfile(accessToken, userId) {
   return data;
 }
 
+export async function updateSupabaseProfile(accessToken, userId, updates) {
+  const supabase = getSupabaseUserClient(accessToken);
+  const { data, error } = await supabase
+    .from("profiles")
+    .update(updates)
+    .eq("id", userId)
+    .select(PROFILE_COLUMNS)
+    .single();
+
+  if (error) {
+    const profileError = new Error(
+      error.message || "Unable to update user profile."
+    );
+    profileError.statusCode = error.code === "42501" ? 403 : 500;
+    profileError.publicMessage =
+      error.code === "42501"
+        ? "Profiles table permissions need to allow users to update their own profile."
+        : "Unable to update user profile.";
+    throw profileError;
+  }
+
+  return data;
+}
+
 export async function upsertSupabaseProfile(accessToken, profile) {
   const supabase = getSupabaseUserClient(accessToken);
   const { data, error } = await supabase

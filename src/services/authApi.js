@@ -64,6 +64,12 @@ export const authApi = {
   getCurrentUser() {
     return request("/api/auth/me");
   },
+  updateCommissionerProfile(profile) {
+    return request("/api/auth/me", {
+      method: "PATCH",
+      body: JSON.stringify(profile)
+    });
+  },
   getPendingProfileSession() {
     return request("/api/auth/profile-session");
   },
