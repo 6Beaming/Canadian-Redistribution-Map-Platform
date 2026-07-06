@@ -9,9 +9,9 @@ import {
   setSessionCookies
 } from "../lib/cookies.js";
 import {
+  consumePendingCommissionerInvite,
   findSupabaseAuthUserByEmail,
   findSupabaseProfileByPhone,
-  createSupabaseCommissionerUser,
   getPendingCommissionerInvite,
   getSupabaseProfileAsAdmin,
   getSupabaseProfile,
@@ -115,37 +115,6 @@ function validatePublicProfile(body) {
       phoneNumber: phone.e164,
       phoneNational: phone.national,
       postalCode: `${postalCode.slice(0, 3)} ${postalCode.slice(3)}`,
-      province
-    }
-  };
-}
-
-function validateCommissionerSignup(body) {
-  const email =
-    typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
-  const password = typeof body?.password === "string" ? body.password : "";
-  const firstName = requiredString(body?.firstName);
-  const lastName = requiredString(body?.lastName);
-  const province = requiredString(body?.province).toUpperCase();
-
-  if (!email || !password || !firstName || !lastName || !province) {
-    return { error: "All commissioner signup fields are required." };
-  }
-
-  if (password.length < 8) {
-    return { error: "Password must be at least 8 characters." };
-  }
-
-  if (!VALID_PROVINCES.has(province)) {
-    return { error: "Select a valid province or territory." };
-  }
-
-  return {
-    account: {
-      email,
-      firstName,
-      lastName,
-      password,
       province
     }
   };
@@ -439,59 +408,6 @@ router.post("/signup", async (req, res, next) => {
   }
 });
 
-router.post("/commissioner-signup", async (req, res, next) => {
-  const validation = validateCommissionerSignup(req.body);
-
-  if (validation.error) {
-    res.status(400).json({ error: validation.error });
-    return;
-  }
-
-  try {
-    const existingUser = await findSupabaseAuthUserByEmail(
-      validation.account.email
-    );
-    const emailRedirectTo = getSignupEmailRedirectUrl();
-
-    if (existingUser) {
-      if (!isEmailVerified(existingUser)) {
-        await resendSupabaseSignupConfirmation({
-          email: validation.account.email,
-          emailRedirectTo
-        });
-
-        res.status(200).json({
-          message:
-            "A commissioner verification email was already pending. We sent a new verification link to your email."
-        });
-        return;
-      }
-
-      res.status(409).json({
-        error: "An account with this email already exists. Please sign in."
-      });
-      return;
-    }
-
-    await createSupabaseCommissionerUser({
-      ...validation.account,
-      emailRedirectTo
-    });
-
-    res.status(201).json({
-      message:
-        "Commissioner account created. Check your email to verify your address before signing in."
-    });
-  } catch (error) {
-    if (error.publicMessage) {
-      res.status(error.statusCode || 400).json({ error: error.publicMessage });
-      return;
-    }
-
-    next(error);
-  }
-});
-
 router.post("/commissioner-invites", requireAuth, async (req, res, next) => {
   if (req.profile?.role !== "commissioner") {
     res.status(403).json({
@@ -631,6 +547,17 @@ router.post(
       const inviterProfile = pendingInvite
         ? await getSupabaseProfileAsAdmin(pendingInvite.invited_by)
         : null;
+
+      if (
+        pendingInvite &&
+        (!inviterProfile || inviterProfile.role !== "commissioner")
+      ) {
+        res.status(403).json({
+          error: "The commissioner invitation is no longer valid."
+        });
+        return;
+      }
+
       const completedProfile = await upsertSupabaseProfile(req.accessToken, {
         email: req.user.email,
         first_name: pendingProfile.firstName,
@@ -641,8 +568,17 @@ router.post(
         postal_code: pendingProfile.postalCode,
         profile_completed: true,
         province: inviterProfile?.province || pendingProfile.province,
-        role: existingProfile?.role || "public_user"
+        role: pendingInvite
+          ? "commissioner"
+          : existingProfile?.role || "public_user"
       });
+
+      if (pendingInvite) {
+        await consumePendingCommissionerInvite(
+          req.user.email,
+          pendingInvite.invited_by
+        );
+      }
 
       const user = publicUser(req.user, completedProfile);
 

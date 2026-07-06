@@ -365,6 +365,25 @@ export async function getPendingCommissionerInvite(email) {
   return data;
 }
 
+export async function consumePendingCommissionerInvite(email, invitedBy) {
+  const supabase = requireSupabaseAdminClient();
+  const { error } = await supabase
+    .from("pending_invites")
+    .delete()
+    .eq("email", email.toLowerCase())
+    .eq("invited_by", invitedBy);
+
+  if (error) {
+    console.error(
+      `Unable to consume pending invite for ${email}:`,
+      error.message
+    );
+    return false;
+  }
+
+  return true;
+}
+
 export async function getSupabaseProfileAsAdmin(userId) {
   const supabase = requireSupabaseAdminClient();
   const { data, error } = await supabase
@@ -383,67 +402,6 @@ export async function getSupabaseProfileAsAdmin(userId) {
   }
 
   return data;
-}
-
-export async function createSupabaseCommissionerUser({
-  email,
-  emailRedirectTo,
-  firstName,
-  invitedBy = null,
-  lastName,
-  password,
-  province
-}) {
-  const supabase = requireSupabaseAdminClient();
-  const signupData = await signUpSupabaseUser({
-    email,
-    emailRedirectTo,
-    password
-  });
-  const user = signupData.user || signupData;
-
-  if (!user?.id) {
-    const authError = new Error("Unable to create commissioner account.");
-    authError.statusCode = 400;
-    authError.publicMessage = authError.message;
-    throw authError;
-  }
-
-  const profile = {
-    email,
-    first_name: firstName,
-    id: user.id,
-    invited_by: invitedBy,
-    last_name: lastName,
-    profile_completed: true,
-    province,
-    role: "commissioner"
-  };
-
-  const { data: profileData, error: profileError } = await supabase
-    .from("profiles")
-    .upsert(profile, { onConflict: "id" })
-    .select(PROFILE_COLUMNS)
-    .single();
-
-  if (profileError) {
-    await supabase.auth.admin.deleteUser(user.id);
-
-    const saveError = new Error(
-      profileError.message || "Unable to save commissioner profile."
-    );
-    saveError.statusCode = profileError.code === "23505" ? 409 : 500;
-    saveError.publicMessage =
-      profileError.code === "23505"
-        ? "A profile already exists for this account."
-        : "Unable to save commissioner profile.";
-    throw saveError;
-  }
-
-  return {
-    profile: profileData,
-    user
-  };
 }
 
 export async function getSupabaseProfile(accessToken, userId) {

@@ -91,12 +91,6 @@ export const authApi = {
       body: JSON.stringify({ email, password })
     });
   },
-  commissionerSignup(account) {
-    return request("/api/auth/commissioner-signup", {
-      method: "POST",
-      body: JSON.stringify(account)
-    });
-  },
   completeProfile(profile) {
     return request("/api/auth/profile", {
       method: "POST",
