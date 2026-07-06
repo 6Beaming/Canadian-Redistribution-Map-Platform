@@ -12,7 +12,8 @@ import Header from "./pages/Header.jsx";
 import MySubmissions from "./pages/MySubmissions.jsx";
 
 import CommissionerSignUpPage from "./pages/CommissionerSignUpPage.jsx";
-import PasswordRecoveryPage from "./pages/PasswordRecoveryPage.jsx";
+import AcceptInvitePage from "./pages/AcceptInvitePage.jsx";
+import PasswordRecoveryPage from "./pages/PasswordRecoveryPage.jsx";
 import ResetPasswordRequestPage from "./pages/ResetPasswordRequestPage.jsx";
 import SignInPage from "./pages/SignInPage.jsx";
 import SignUpPage from "./pages/SignUpPage.jsx";
@@ -81,7 +82,8 @@ function App() {
         <Route path="/sign-up" element={<SignUpPage />} />
         <Route path="/commissioner/sign-up" element={<CommissionerSignUpPage />} />
         <Route path="/forgot-password" element={<ResetPasswordRequestPage />} />
-        <Route path="/reset-password" element={<PasswordRecoveryPage />} />
+        <Route path="/accept-invite" element={<AcceptInvitePage />} />
+        <Route path="/reset-password" element={<PasswordRecoveryPage />} />
         <Route element={<RequireCommissioner />}>
           <Route path="/dashboard" element={<DashboardHome />} />
           <Route path="/dashboard/graphs" element={<DashboardGraphs />} />

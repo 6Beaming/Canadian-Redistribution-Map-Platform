@@ -12,8 +12,11 @@ import {
   findSupabaseAuthUserByEmail,
   findSupabaseProfileByPhone,
   createSupabaseCommissionerUser,
+  getPendingCommissionerInvite,
+  getSupabaseProfileAsAdmin,
   getSupabaseProfile,
   getSupabaseClient,
+  inviteSupabaseCommissioner,
   resendSupabaseSignupConfirmation,
   signUpSupabaseUser,
   startSupabasePhoneVerification,
@@ -164,6 +167,29 @@ function validateCommissionerProfile(body) {
   };
 }
 
+function validateCommissionerInvite(body) {
+  if (
+    !body ||
+    typeof body !== "object" ||
+    Array.isArray(body) ||
+    Object.keys(body).length !== 1 ||
+    !Object.hasOwn(body, "email")
+  ) {
+    return { error: "Only an email address may be submitted." };
+  }
+
+  const email = requiredString(body.email).toLowerCase();
+
+  if (
+    email.length > 254 ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  ) {
+    return { error: "Enter a valid email address." };
+  }
+
+  return { email };
+}
+
 function isPublicProfileComplete(profile) {
   return Boolean(
     profile?.profile_completed &&
@@ -176,7 +202,8 @@ function isPublicProfileComplete(profile) {
 }
 
 function publicUser(user, profile = null) {
-  const role = profile?.role || "public_user";
+  const storedRole = profile?.role || "public_user";
+  const role = storedRole === "user" ? "public_user" : storedRole;
   const fullName = profile
     ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim()
     : "";
@@ -267,6 +294,22 @@ function getSignupEmailRedirectUrl() {
   }
 
   return new URL("/sign-in", clientOrigin).toString();
+}
+
+function getCommissionerInviteRedirectUrl() {
+  const configuredRedirect = requiredString(
+    process.env.COMMISSIONER_INVITE_REDIRECT_URL
+  );
+
+  if (configuredRedirect) {
+    return new URL(configuredRedirect).toString();
+  }
+
+  const clientOrigin = requiredString(process.env.CLIENT_ORIGIN);
+
+  return clientOrigin
+    ? new URL("/accept-invite", clientOrigin).toString()
+    : undefined;
 }
 
 async function applySessionCookiesForUser(res, session, user) {
@@ -449,6 +492,41 @@ router.post("/commissioner-signup", async (req, res, next) => {
   }
 });
 
+router.post("/commissioner-invites", requireAuth, async (req, res, next) => {
+  if (req.profile?.role !== "commissioner") {
+    res.status(403).json({
+      error: "Only commissioners can invite a new commissioner."
+    });
+    return;
+  }
+
+  const validation = validateCommissionerInvite(req.body);
+
+  if (validation.error) {
+    res.status(400).json({ error: validation.error });
+    return;
+  }
+
+  if (validation.email === requiredString(req.user.email).toLowerCase()) {
+    res.status(400).json({ error: "You cannot invite your own email." });
+    return;
+  }
+
+  try {
+    await inviteSupabaseCommissioner({
+      email: validation.email,
+      invitedBy: req.user.id,
+      redirectTo: getCommissionerInviteRedirectUrl()
+    });
+
+    res.status(201).json({
+      message: `Invitation sent to ${validation.email}.`
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get("/profile-session", requirePendingProfileAuth, async (req, res, next) => {
   try {
     const profile = await getSupabaseProfile(req.accessToken, req.user.id);
@@ -549,15 +627,20 @@ router.post(
       await verifySupabasePhoneChange(req.accessToken, phone.auth, token);
 
       const existingProfile = await getSupabaseProfile(req.accessToken, req.user.id);
+      const pendingInvite = await getPendingCommissionerInvite(req.user.email);
+      const inviterProfile = pendingInvite
+        ? await getSupabaseProfileAsAdmin(pendingInvite.invited_by)
+        : null;
       const completedProfile = await upsertSupabaseProfile(req.accessToken, {
         email: req.user.email,
         first_name: pendingProfile.firstName,
         id: req.user.id,
+        invited_by: pendingInvite?.invited_by || null,
         last_name: pendingProfile.lastName,
         phone: pendingProfile.phoneNational,
         postal_code: pendingProfile.postalCode,
         profile_completed: true,
-        province: pendingProfile.province,
+        province: inviterProfile?.province || pendingProfile.province,
         role: existingProfile?.role || "public_user"
       });
 

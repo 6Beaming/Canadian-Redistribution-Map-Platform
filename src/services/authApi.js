@@ -70,6 +70,12 @@ export const authApi = {
       body: JSON.stringify(profile)
     });
   },
+  inviteCommissioner(email) {
+    return request("/api/auth/commissioner-invites", {
+      method: "POST",
+      body: JSON.stringify({ email })
+    });
+  },
   getPendingProfileSession() {
     return request("/api/auth/profile-session");
   },

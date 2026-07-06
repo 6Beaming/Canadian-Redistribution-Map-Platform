@@ -211,6 +211,104 @@ export async function findSupabaseProfileByPhone(phone) {
   return data?.[0] || null;
 }
 
+export async function inviteSupabaseCommissioner({
+  email,
+  invitedBy,
+  redirectTo
+}) {
+  const supabase = requireSupabaseAdminClient();
+  const { error: insertError } = await supabase
+    .from("pending_invites")
+    .insert({
+      email,
+      invited_by: invitedBy
+    });
+
+  if (insertError) {
+    const inviteError = new Error(
+      insertError.message || "Unable to record commissioner invitation."
+    );
+    inviteError.statusCode = insertError.code === "23505" ? 409 : 400;
+    inviteError.publicMessage =
+      insertError.code === "23505"
+        ? "An invitation is already pending for this email."
+        : "Unable to record commissioner invitation.";
+    throw inviteError;
+  }
+
+  const { data, error: emailError } =
+    await supabase.auth.admin.inviteUserByEmail(email, {
+      redirectTo
+    });
+
+  if (emailError) {
+    const { error: cleanupError } = await supabase
+      .from("pending_invites")
+      .delete()
+      .eq("email", email)
+      .eq("invited_by", invitedBy);
+
+    if (cleanupError) {
+      console.error(
+        `Unable to roll back pending invite for ${email}:`,
+        cleanupError.message
+      );
+    }
+
+    const inviteError = new Error(
+      emailError.message || "Unable to send commissioner invitation."
+    );
+    inviteError.statusCode = emailError.status || 400;
+    inviteError.publicMessage =
+      emailError.message?.toLowerCase().includes("already")
+        ? "An account with this email already exists."
+        : "Unable to send commissioner invitation.";
+    throw inviteError;
+  }
+
+  return data;
+}
+
+export async function getPendingCommissionerInvite(email) {
+  const supabase = requireSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("pending_invites")
+    .select("email,invited_by")
+    .eq("email", email.toLowerCase())
+    .maybeSingle();
+
+  if (error) {
+    const inviteError = new Error(
+      error.message || "Unable to verify commissioner invitation."
+    );
+    inviteError.statusCode = 500;
+    inviteError.publicMessage = "Unable to verify commissioner invitation.";
+    throw inviteError;
+  }
+
+  return data;
+}
+
+export async function getSupabaseProfileAsAdmin(userId) {
+  const supabase = requireSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(PROFILE_COLUMNS)
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    const profileError = new Error(
+      error.message || "Unable to load commissioner profile."
+    );
+    profileError.statusCode = 500;
+    profileError.publicMessage = "Unable to verify commissioner team.";
+    throw profileError;
+  }
+
+  return data;
+}
+
 export async function createSupabaseCommissionerUser({
   email,
   emailRedirectTo,
