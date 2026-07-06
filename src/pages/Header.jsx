@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { HeaderAuthButton } from "@/components/non_prebuilt/HeaderAuthButton.jsx";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, LogIn, LogOut, UserPlus } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext.jsx";
 
 export default function Header() {
@@ -20,46 +20,7 @@ export default function Header() {
   const isSubmissionDetailPage = pathname.startsWith("/submissions/");
   const isWorkspacePage = pathname === "/dashboard/workspace";
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { sessionStatus, signOut } = useAuth();
-
-  async function handleAuthAction() {
-    if (sessionStatus !== "signed-in") {
-      navigate("/sign-in");
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      await signOut();
-      navigate("/sign-in", { replace: true });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  function AuthActionButton() {
-    const isSignedIn = sessionStatus === "signed-in";
-    const Icon = isSignedIn ? LogOut : LogIn;
-    const label = isSubmitting
-      ? "Signing Out"
-      : isSignedIn
-        ? "Sign Out"
-        : "Sign In";
-
-    return (
-      <Button
-        variant="outline"
-        className="min-w-28 border-white bg-transparent text-white hover:bg-gray-700 hover:text-white"
-        disabled={isSubmitting}
-        onClick={handleAuthAction}
-      >
-        <Icon className="h-4 w-4" />
-        {label}
-      </Button>
-    );
-  }
+  const { sessionStatus } = useAuth();
 
   if (isWorkspacePage) {
     return null;
@@ -77,15 +38,7 @@ export default function Header() {
           All Submissions
         </Button>
         <div className="justify-self-end flex items-center gap-2">
-          <Button
-            variant="outline"
-            className="border-white bg-transparent text-white hover:bg-gray-700 hover:text-white"
-            onClick={() => navigate("/dashboard/invite")}
-          >
-            <UserPlus className="h-4 w-4" />
-            Invite a new colleague
-          </Button>
-          <AuthActionButton />
+          <HeaderAuthButton />
         </div>
       </div>
     );
@@ -110,14 +63,7 @@ export default function Header() {
 
       {isUserSurface && (
         <div className="flex-1 flex justify-end items-center gap-2">
-          <Button
-            variant="outline"
-            className="border-white bg-transparent text-white hover:bg-gray-700 hover:text-white"
-            onClick={() => navigate("/users/profile")}
-          >
-            My Profile
-          </Button>
-          <AuthActionButton />
+          <HeaderAuthButton />
         </div>
       )}
 
@@ -136,7 +82,7 @@ export default function Header() {
           </div>
           <div className="flex-1" />
           <div className="absolute right-6">
-            <AuthActionButton />
+            <HeaderAuthButton />
           </div>
         </>
       )}
@@ -156,7 +102,7 @@ export default function Header() {
           </div>
           <div className="flex-1" />
           <div className="absolute right-6">
-            <AuthActionButton />
+            <HeaderAuthButton />
           </div>
         </>
       )}

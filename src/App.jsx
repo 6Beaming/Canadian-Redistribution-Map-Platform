@@ -4,10 +4,10 @@ import DashboardGraphs from "./pages/DashboardGraphs.jsx";
 import DashBoardSubmissionsPage from "./pages/DashboardSubmissionsTable/DashboardSubmissionsPage.jsx";
 import UserHome from "./pages/UserHome.jsx";
 import UserSearchDA from "./pages/UserSearchDA.jsx";
-import UserProfile from "./pages/UserProfile.jsx";
+import UserProfile from "./pages/UserProfile.jsx";
+import CommissionerProfile from "./pages/CommissionerProfile.jsx";
 import UserResumeSubmission from "./pages/UserResumeSubmission.jsx";
 import CommissionerWorkspace from "./pages/CommissionerWorkspace.jsx";
-import CommissionerInvitation from "./pages/CommissionerInvitation.jsx";
 import Header from "./pages/Header.jsx";
 import MySubmissions from "./pages/MySubmissions.jsx";
 
@@ -36,7 +36,33 @@ function RequireCommissioner() {
   return <Outlet />;
 }
 
-function App() {
+function RequirePublicUser() {
+
+  const { sessionStatus, user } = useAuth();
+
+  if (sessionStatus === "checking") {
+
+    return null;
+
+  }
+
+  if (sessionStatus === "signed-out") {
+
+    return <Navigate to="/sign-in" replace />;
+
+  }
+
+  if (user?.role === "commissioner") {
+
+    return <Navigate to="/dashboard/profile" replace />;
+
+  }
+
+  return <Outlet />;
+
+}
+
+function App() {
   return (
     <AuthProvider>
       <Header />
@@ -44,7 +70,11 @@ function App() {
         <Route path="/" element={<UserHome />} />
         <Route path="/users" element={<UserHome />} />
         <Route path="/users/search-da" element={<UserSearchDA />} />
-        <Route path="/users/profile" element={<UserProfile />} />
+        <Route element={<RequirePublicUser />}>
+
+          <Route path="/users/profile" element={<UserProfile />} />
+
+        </Route>
         <Route path="/submissions" element={<MySubmissions />} />
         <Route path="/submissions/:submissionId" element={<UserResumeSubmission />} />
         <Route path="/sign-in" element={<SignInPage />} />
@@ -59,7 +89,15 @@ function App() {
             path="/dashboard/submissionsTable"
             element={<DashBoardSubmissionsPage />}
           />
-          <Route path="/dashboard/invite" element={<CommissionerInvitation />} />
+          <Route path="/dashboard/profile" element={<CommissionerProfile />} />
+
+          <Route
+
+            path="/dashboard/invite"
+
+            element={<Navigate to="/dashboard/profile" replace />}
+
+          />
           <Route path="/dashboard/workspace" element={<CommissionerWorkspace />} />
         </Route>
       </Routes>
