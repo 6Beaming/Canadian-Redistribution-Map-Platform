@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
 import { MapInfoPanel } from "@/components/non_prebuilt/MapInfoPanel.jsx";
+import UserMenuLeft from "@/components/non_prebuilt/UserMenuLeft.jsx";
 import { mapApi } from "@/services/mapApi.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
 import "@/styles/map.css";
@@ -64,41 +65,40 @@ export default function UserHome() {
     setIsFullscreen((current) => !current);
   }, []);
 
-  return (
-    <div className="p-6 flex flex-col gap-6 max-w-screen-xl mx-auto">
-      {!isFullscreen ? (
-        <div className="flex flex-col gap-1">
-          <p className="text-sm text-gray-500">
-            Click a dissemination area on the map to view its census data.
-          </p>
-        </div>
-      ) : null}
+  const panelSelection = useMemo(() => selection, [selection]);
 
-      <div
-        className={
-          isFullscreen
-            ? undefined
-            : "rounded-xl border border-gray-300 shadow-md overflow-hidden h-[700px]"
-        }
-      >
-        <div
-          className={`map-dashboard h-full${isFullscreen ? " map-dashboard--fullscreen" : ""}`}
-        >
-          <section className="map-dashboard__main h-full" aria-label="Map workspace">
-            <div className="map-dashboard__map-wrap h-full">
-              <div className="map-dashboard__status" aria-live="polite">
-                {status}
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="px-15 py-6">
+        <div className="map-workspace">
+          <UserMenuLeft />
+          <div
+            className={`map-dashboard${isFullscreen ? " map-dashboard--fullscreen" : ""}`}
+          >
+            <section className="map-dashboard__main" aria-label="Map workspace">
+              {!isFullscreen ? (
+                <div className="map-dashboard__spacer" aria-hidden="true" />
+              ) : null}
+              <div className="map-dashboard__map-wrap">
+                <div className="map-dashboard__status" aria-live="polite">
+                  {status}
+                </div>
+                <MapCanvas
+                  isFullscreen={isFullscreen}
+                  onDaSelect={handleDaSelect}
+                  onFedSelect={handleFedSelect}
+                  onStatusChange={handleStatusChange}
+                  onToggleFullscreen={handleToggleFullscreen}
+                />
               </div>
-              <MapCanvas
-                isFullscreen={isFullscreen}
-                onDaSelect={handleDaSelect}
-                onFedSelect={handleFedSelect}
-                onStatusChange={handleStatusChange}
-                onToggleFullscreen={handleToggleFullscreen}
-              />
-            </div>
-          </section>
-          <MapInfoPanel selection={selection} profilesByDguid={profilesByDguid} />
+            </section>
+
+            <MapInfoPanel
+              variant="user"
+              selection={panelSelection}
+              profilesByDguid={profilesByDguid}
+            />
+          </div>
         </div>
       </div>
     </div>

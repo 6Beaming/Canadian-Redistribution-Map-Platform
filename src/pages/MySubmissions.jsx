@@ -137,7 +137,11 @@ export default function MySubmissions() {
           <TableBody>
             {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} className="hover:bg-gray-50 transition-colors">
+                <TableRow
+                  key={row.id}
+                  className="hover:bg-gray-50 transition-colors cursor-pointer"
+                  onClick={() => navigate(`/submissions/${row.original.id}`)}
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}

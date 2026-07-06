@@ -267,7 +267,11 @@ export default function DashBoardSubmissionsPage() {
         <Button onClick={() => navigate(-1)}>
           Back
         </Button>
-        <SubmissionsTable columns={columns} data={submissions} />
+        <SubmissionsTable
+          columns={columns}
+          data={submissions}
+          onRowClick={() => navigate("/dashboard/workspace")}
+        />
       </div>
     </div>
   )
