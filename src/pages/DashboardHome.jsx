@@ -92,6 +92,15 @@ export default function DashboardHome() {
               View Graphs
             </Button>
           </div>
+          <div className="bg-white border rounded-lg p-4 text-center shadow-sm">
+            <p className="text-sm text-muted-foreground">Audit Log</p>
+            <Button
+              className="mt-3"
+              onClick={() => navigate("/dashboard/auditlog")}
+            >
+              View Audit Log
+            </Button>
+          </div>
         </div>
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">Support vs Oppose</p>
