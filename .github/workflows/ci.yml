@@ -1,5 +1,5 @@
 name: CI
-
+# It runs automatically on pushes to the 'main' branch or when a pull request is opened
 on:
   push:
     branches:
