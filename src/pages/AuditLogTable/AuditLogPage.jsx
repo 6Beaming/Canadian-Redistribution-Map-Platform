@@ -255,11 +255,6 @@ export default function AuditLogPage() {
     return (
         <div className="px-4 py-6 md:px-6">
             <div className="mx-auto flex max-w-6xl flex-col gap-6">
-            <div className="w-full flex justify-center rounded-[28px] border border-[#d7e6fb] bg-white/92 py-10 shadow-[0_18px_42px_rgba(26,115,232,0.08)]">
-                <h1 className="text-5xl font-bold text-primary">
-                    Audit Log
-                </h1>
-            </div>
             <div>
                 <AuditLogTable
                     columns={columns}

@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 const MENU_ITEMS = [
   { id: "all-submission", label: "All Submission", path: "/dashboard/submissionsTable" },
   { id: "view-graphs", label: "View Graphs", path: "/dashboard/graphs" },
+  { id: "auditlog", label: "Audit Log", path: "/dashboard/auditlog" },
 ];
 
 export default function CommissionerMenuLeft() {

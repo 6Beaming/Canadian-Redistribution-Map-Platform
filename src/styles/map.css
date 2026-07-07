@@ -1,3 +1,9 @@
+/*chat gpt design for heatmap button*/
+.heatmap-button.active {
+  outline: 2px solid #006064;
+}
+
+
 .map-page {
   box-sizing: border-box;
   height: calc(100dvh - 64px);
