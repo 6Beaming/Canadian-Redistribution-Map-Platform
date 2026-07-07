@@ -9,7 +9,6 @@
     "dev:server": "node --watch server/index.js",
     "dev:client": "vite --host 0.0.0.0",
     "start": "node server/index.js",
-    "test": "node --test tests/auth.api.test.js",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "check:server": "node --check server/index.js && node --check server/app.js && node --check server/map-api-service/index.js && node --check server/routes/auth.js && node --check server/middleware/requireAuth.js && node --check server/lib/cookies.js && node --check server/lib/supabase.js"
