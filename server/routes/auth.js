@@ -227,6 +227,17 @@ function publicProfileUpdates(user, profile) {
   };
 }
 
+function publicProfileInformationUpdates(user, profile) {
+  return {
+    email: user.email,
+    first_name: profile.firstName,
+    last_name: profile.lastName,
+    postal_code: profile.postalCode,
+    province: profile.province,
+    role: "public_user"
+  };
+}
+
 function pendingOtpState(pendingProfile) {
   if (!pendingProfile?.phoneAuth) {
     return null;
@@ -793,6 +804,12 @@ router.patch("/me", requireAuth, async (req, res, next) => {
     const phoneChanged = requiredString(req.profile?.phone) !== phoneNational;
 
     if (phoneChanged) {
+      const updatedProfile = await updateSupabaseProfile(
+        req.accessToken,
+        req.user.id,
+        publicProfileInformationUpdates(req.user, validation.profile)
+      );
+
       await startSupabasePhoneVerification(
         req.accessToken,
         validation.profile.phoneAuth
@@ -800,9 +817,10 @@ router.patch("/me", requireAuth, async (req, res, next) => {
       setPendingProfileUpdateCookie(res, validation.profile);
 
       res.status(202).json({
-        message: "Verification code sent.",
+        message: "Profile information saved. Verification code sent.",
         otpRequired: true,
-        phoneMasked: maskPhoneNumber(phoneNumber)
+        phoneMasked: maskPhoneNumber(phoneNumber),
+        user: publicUser(req.user, updatedProfile)
       });
       return;
     }
