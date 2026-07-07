@@ -1,5 +1,10 @@
 # Canadian Redistribution Map Platform (CRMP)
 
+## Release
+The current software release is [CRMP v0.1.0](https://github.com/UTSC-CSCC01-Software-Engineering-I/course-project-five-guys/releases/tag/v0.1.0).
+
+This release was verified with `npm test`, `npm run check:server`, and `npm run build`.
+
 ## Background
 Every ten years, the Canadian government redraws the lines for federal voting districts (ridings). Currently, if citizens want to provide feedback or object to new boundaries, they must submit emails or physical letters. This project provides a map-centered web application where people can view proposed electoral maps, submit feedback, or even draw better lines directly on the screen.
 
