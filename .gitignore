@@ -8,7 +8,8 @@ scripts/data/bundle/output/
 scripts/data/external/statcan/*.csv
 scripts/data/external/statcan/*.CSV
 dist/
-.env
+coverage/
+
 .env.local
 npm-debug.log*
 yarn-debug.log*

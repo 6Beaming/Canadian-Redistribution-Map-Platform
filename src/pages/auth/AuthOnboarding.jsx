@@ -17,7 +17,6 @@ const provinces = [
   ["YT", "Yukon"]
 ];
 
-// shared onboarding screens
 export default function AuthOnboarding({
   error,
   isSubmitting,
@@ -30,9 +29,12 @@ export default function AuthOnboarding({
   onVerifyOtp,
   otpForm,
   pendingPhoneLabel,
+  pendingUser,
   profileForm,
   sessionStatus
 }) {
+  const isCommissionerOnboarding = pendingUser?.role === "commissioner";
+
   if (sessionStatus === "profile-required") {
     return (
       <main className="auth-shell">
@@ -44,15 +46,19 @@ export default function AuthOnboarding({
                 className="rounded-full"
                 disabled={isSubmitting}
                 onClick={onLogout}
+                size="icon"
                 type="button"
                 variant="outline"
-                size="icon"
               >
                 <ArrowLeft aria-hidden="true" size={22} />
               </Button>
               <div className="brand-lockup">
                 <div>
-                  <h1>Complete Profile</h1>
+                  <h1>
+                    {isCommissionerOnboarding
+                      ? "Commissioner Profile"
+                      : "Complete Profile"}
+                  </h1>
                 </div>
               </div>
             </div>
@@ -102,35 +108,37 @@ export default function AuthOnboarding({
                 ))}
               </select>
 
-              <div className="form-row">
-                <div>
-                  <label htmlFor="postalCode">Postal Code</label>
-                  <input
-                    autoComplete="postal-code"
-                    id="postalCode"
-                    name="postalCode"
-                    onChange={onProfileChange}
-                    placeholder="A1A 1A1"
-                    required
-                    type="text"
-                    value={profileForm.postalCode}
-                  />
+              {!isCommissionerOnboarding ? (
+                <div className="form-row">
+                  <div>
+                    <label htmlFor="postalCode">Postal Code</label>
+                    <input
+                      autoComplete="postal-code"
+                      id="postalCode"
+                      name="postalCode"
+                      onChange={onProfileChange}
+                      placeholder="A1A 1A1"
+                      required
+                      type="text"
+                      value={profileForm.postalCode}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="phoneNumber">Phone Number</label>
+                    <input
+                      autoComplete="tel"
+                      id="phoneNumber"
+                      inputMode="tel"
+                      name="phoneNumber"
+                      onChange={onProfileChange}
+                      placeholder="647-555-0001"
+                      required
+                      type="tel"
+                      value={profileForm.phoneNumber}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label htmlFor="phoneNumber">Phone Number</label>
-                  <input
-                    autoComplete="tel"
-                    id="phoneNumber"
-                    inputMode="tel"
-                    name="phoneNumber"
-                    onChange={onProfileChange}
-                    placeholder="647-555-0001"
-                    required
-                    type="tel"
-                    value={profileForm.phoneNumber}
-                  />
-                </div>
-              </div>
+              ) : null}
 
               {error ? <p className="form-error">{error}</p> : null}
               {notice ? <p className="form-success">{notice}</p> : null}
@@ -141,7 +149,13 @@ export default function AuthOnboarding({
                 type="submit"
               >
                 <ShieldCheck aria-hidden="true" size={19} />
-                <span>{isSubmitting ? "Saving profile" : "Save profile"}</span>
+                <span>
+                  {isSubmitting
+                    ? "Saving profile"
+                    : isCommissionerOnboarding
+                      ? "Save commissioner profile"
+                      : "Save profile"}
+                </span>
               </Button>
             </form>
           </div>
@@ -161,9 +175,9 @@ export default function AuthOnboarding({
                 className="rounded-full"
                 disabled={isSubmitting}
                 onClick={onShowProfileForm}
+                size="icon"
                 type="button"
                 variant="outline"
-                size="icon"
               >
                 <ArrowLeft aria-hidden="true" size={22} />
               </Button>
@@ -206,12 +220,12 @@ export default function AuthOnboarding({
               </Button>
 
               <Button
+                className="justify-self-center"
                 disabled={isSubmitting}
                 onClick={onLogout}
+                size="sm"
                 type="button"
                 variant="link"
-                size="sm"
-                className="justify-self-center"
               >
                 Back to sign in
               </Button>

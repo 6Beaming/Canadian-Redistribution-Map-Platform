@@ -78,6 +78,7 @@ export default function SignUpPage() {
         onVerifyOtp={onboarding.handleVerifyOtp}
         otpForm={onboarding.otpForm}
         pendingPhoneLabel={onboarding.pendingPhoneLabel}
+        pendingUser={onboarding.pendingProfileUser}
         profileForm={onboarding.profileForm}
         sessionStatus={onboarding.sessionStatus}
       />

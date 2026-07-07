@@ -51,7 +51,9 @@ export default function Header() {
     <header
       className={`header relative h-16 w-full border-b border-[#d7e6fb] bg-[#f6efdf] text-[#17324d]${isUserMapSurface ? " header--user-map-surface" : ""}${isDashboardPage ? " header--dashboard-surface" : ""}`}
     >
-      <div className={`header__left-slot absolute inset-y-0 left-0 flex items-center gap-3 ${isUserMapSurface || isDashboardPage ? "" : "px-4 md:px-6"}`}>
+      <div
+        className={`header__left-slot absolute inset-y-0 left-0 flex items-center gap-3 ${isUserMapSurface || isDashboardPage ? "" : "px-4 md:px-6"}`}
+      >
         {isDashboardPage ? (
           <ProfileControl
             user={user}
@@ -59,7 +61,7 @@ export default function Header() {
             isSubmitting={isSubmitting}
             onSignIn={() => navigate("/sign-in")}
             onSignOut={handleSignOut}
-            onPrimaryAction={() => navigate("/dashboard/invite")}
+            onPrimaryAction={() => navigate("/dashboard/profile")}
             primaryActionLabel="Invite A New Colleague"
             primaryActionIcon={UserPlus}
             edgeAligned
@@ -118,9 +120,7 @@ export default function Header() {
           />
         ) : null}
 
-        {!isDashboardPage && !isUserSurface ? (
-          <div className="h-10 w-10" />
-        ) : null}
+        {!isDashboardPage && !isUserSurface ? <div className="h-10 w-10" /> : null}
       </div>
     </header>
   );

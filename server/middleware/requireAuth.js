@@ -12,7 +12,8 @@ import {
 import { getSupabaseClient, getSupabaseProfile } from "../lib/supabase.js";
 
 function hasCompletePublicProfile(user, profile = null) {
-  const role = profile?.role || "public_user";
+  const storedRole = profile?.role || "public_user";
+  const role = storedRole === "user" ? "public_user" : storedRole;
 
   if (role !== "public_user") {
     return true;
@@ -20,8 +21,7 @@ function hasCompletePublicProfile(user, profile = null) {
 
   if (profile) {
     return Boolean(
-      profile.profile_completed &&
-        profile.first_name &&
+      profile.first_name &&
         profile.last_name &&
         profile.province &&
         profile.postal_code &&

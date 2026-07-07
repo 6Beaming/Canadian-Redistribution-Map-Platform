@@ -1,22 +1,29 @@
 import { Router } from "express";
 import {
   clearAuthenticatedSessionCookies,
+  clearPendingProfileUpdateCookie,
   clearPendingSessionCookies,
   clearSessionCookies,
   getPendingProfileCookie,
+  getPendingProfileUpdateCookie,
   setPendingProfileCookie,
+  setPendingProfileUpdateCookie,
   setPendingSessionCookies,
   setSessionCookies
 } from "../lib/cookies.js";
 import {
+  consumePendingCommissionerInvite,
   findSupabaseAuthUserByEmail,
   findSupabaseProfileByPhone,
-  createSupabaseCommissionerUser,
+  getPendingCommissionerInvite,
+  getSupabaseProfileAsAdmin,
   getSupabaseProfile,
   getSupabaseClient,
+  inviteSupabaseCommissioner,
   resendSupabaseSignupConfirmation,
   signUpSupabaseUser,
   startSupabasePhoneVerification,
+  updateSupabaseProfile,
   upsertSupabaseProfile,
   verifySupabasePhoneChange
 } from "../lib/supabase.js";
@@ -116,20 +123,28 @@ function validatePublicProfile(body) {
   };
 }
 
-function validateCommissionerSignup(body) {
-  const email =
-    typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
-  const password = typeof body?.password === "string" ? body.password : "";
+function validateCommissionerProfile(body) {
   const firstName = requiredString(body?.firstName);
   const lastName = requiredString(body?.lastName);
-  const province = requiredString(body?.province).toUpperCase();
 
-  if (!email || !password || !firstName || !lastName || !province) {
-    return { error: "All commissioner signup fields are required." };
+  if (!firstName || !lastName) {
+    return { error: "First name and last name are required." };
   }
 
-  if (password.length < 8) {
-    return { error: "Password must be at least 8 characters." };
+  return {
+    profile: {
+      firstName,
+      lastName
+    }
+  };
+}
+
+function validateCommissionerOnboardingProfile(body) {
+  const validation = validateCommissionerProfile(body);
+  const province = requiredString(body?.province).toUpperCase();
+
+  if (validation.error) {
+    return validation;
   }
 
   if (!VALID_PROVINCES.has(province)) {
@@ -137,20 +152,39 @@ function validateCommissionerSignup(body) {
   }
 
   return {
-    account: {
-      email,
-      firstName,
-      lastName,
-      password,
+    profile: {
+      ...validation.profile,
       province
     }
   };
 }
 
+function validateCommissionerInvite(body) {
+  if (
+    !body ||
+    typeof body !== "object" ||
+    Array.isArray(body) ||
+    Object.keys(body).length !== 1 ||
+    !Object.hasOwn(body, "email")
+  ) {
+    return { error: "Only an email address may be submitted." };
+  }
+
+  const email = requiredString(body.email).toLowerCase();
+
+  if (
+    email.length > 254 ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  ) {
+    return { error: "Enter a valid email address." };
+  }
+
+  return { email };
+}
+
 function isPublicProfileComplete(profile) {
   return Boolean(
-    profile?.profile_completed &&
-      profile.first_name &&
+    profile?.first_name &&
       profile.last_name &&
       profile.province &&
       profile.postal_code &&
@@ -159,7 +193,8 @@ function isPublicProfileComplete(profile) {
 }
 
 function publicUser(user, profile = null) {
-  const role = profile?.role || "public_user";
+  const storedRole = profile?.role || "public_user";
+  const role = storedRole === "user" ? "public_user" : storedRole;
   const fullName = profile
     ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim()
     : "";
@@ -167,12 +202,39 @@ function publicUser(user, profile = null) {
   return {
     email: user.email,
     emailVerified: Boolean(user.email_confirmed_at || user.confirmed_at),
+    firstName: profile?.first_name || null,
     id: user.id,
+    lastName: profile?.last_name || null,
     name: fullName || null,
     phoneNumber: profile?.phone || null,
+    postalCode: profile?.postal_code || null,
     profileComplete:
       role === "public_user" ? isPublicProfileComplete(profile) : true,
+    province: profile?.province || null,
     role
+  };
+}
+
+function publicProfileUpdates(user, profile) {
+  return {
+    email: user.email,
+    first_name: profile.firstName,
+    last_name: profile.lastName,
+    phone: profile.phoneNational,
+    postal_code: profile.postalCode,
+    province: profile.province,
+    role: "public_user"
+  };
+}
+
+function publicProfileInformationUpdates(user, profile) {
+  return {
+    email: user.email,
+    first_name: profile.firstName,
+    last_name: profile.lastName,
+    postal_code: profile.postalCode,
+    province: profile.province,
+    role: "public_user"
   };
 }
 
@@ -187,12 +249,23 @@ function pendingOtpState(pendingProfile) {
   };
 }
 
-function pendingProfileResponse(user, profile = null, pendingProfile = null) {
-  const otpState = pendingOtpState(pendingProfile);
+function pendingProfileResponse(
+  user,
+  profile = null,
+  pendingProfile = null,
+  pendingInvite = null
+) {
+  const otpState = pendingInvite ? null : pendingOtpState(pendingProfile);
+  const pendingUser = publicUser(user, profile);
+
+  if (pendingInvite) {
+    pendingUser.role = "commissioner";
+    pendingUser.profileComplete = false;
+  }
 
   return {
     profileRequired: true,
-    user: publicUser(user, profile),
+    user: pendingUser,
     ...(otpState || {})
   };
 }
@@ -249,14 +322,32 @@ function getSignupEmailRedirectUrl() {
   return new URL("/sign-in", clientOrigin).toString();
 }
 
+function getCommissionerInviteRedirectUrl() {
+  const configuredRedirect = requiredString(
+    process.env.COMMISSIONER_INVITE_REDIRECT_URL
+  );
+
+  if (configuredRedirect) {
+    return new URL(configuredRedirect).toString();
+  }
+
+  const clientOrigin = requiredString(process.env.CLIENT_ORIGIN);
+
+  return clientOrigin
+    ? new URL("/accept-invite", clientOrigin).toString()
+    : undefined;
+}
+
 async function applySessionCookiesForUser(res, session, user) {
   const profile = await getSupabaseProfile(session.access_token, user.id);
   const publicUserData = publicUser(user, profile);
 
   if (!publicUserData.profileComplete) {
+    const pendingInvite = await getPendingCommissionerInvite(user.email);
+
     clearAuthenticatedSessionCookies(res);
     setPendingSessionCookies(res, session);
-    return pendingProfileResponse(user, profile);
+    return pendingProfileResponse(user, profile, null, pendingInvite);
   }
 
   clearPendingSessionCookies(res);
@@ -376,55 +467,37 @@ router.post("/signup", async (req, res, next) => {
   }
 });
 
-router.post("/commissioner-signup", async (req, res, next) => {
-  const validation = validateCommissionerSignup(req.body);
+router.post("/commissioner-invites", requireAuth, async (req, res, next) => {
+  if (req.profile?.role !== "commissioner") {
+    res.status(403).json({
+      error: "Only commissioners can invite a new commissioner."
+    });
+    return;
+  }
+
+  const validation = validateCommissionerInvite(req.body);
 
   if (validation.error) {
     res.status(400).json({ error: validation.error });
     return;
   }
 
+  if (validation.email === requiredString(req.user.email).toLowerCase()) {
+    res.status(400).json({ error: "You cannot invite your own email." });
+    return;
+  }
+
   try {
-    const existingUser = await findSupabaseAuthUserByEmail(
-      validation.account.email
-    );
-    const emailRedirectTo = getSignupEmailRedirectUrl();
-
-    if (existingUser) {
-      if (!isEmailVerified(existingUser)) {
-        await resendSupabaseSignupConfirmation({
-          email: validation.account.email,
-          emailRedirectTo
-        });
-
-        res.status(200).json({
-          message:
-            "A commissioner verification email was already pending. We sent a new verification link to your email."
-        });
-        return;
-      }
-
-      res.status(409).json({
-        error: "An account with this email already exists. Please sign in."
-      });
-      return;
-    }
-
-    await createSupabaseCommissionerUser({
-      ...validation.account,
-      emailRedirectTo
+    const invitation = await inviteSupabaseCommissioner({
+      email: validation.email,
+      invitedBy: req.user.id,
+      redirectTo: getCommissionerInviteRedirectUrl()
     });
 
     res.status(201).json({
-      message:
-        "Commissioner account created. Check your email to verify your address before signing in."
+      message: `Invitation ${invitation.resent ? "resent" : "sent"} to ${validation.email}.`
     });
   } catch (error) {
-    if (error.publicMessage) {
-      res.status(error.statusCode || 400).json({ error: error.publicMessage });
-      return;
-    }
-
     next(error);
   }
 });
@@ -446,21 +519,76 @@ router.get("/profile-session", requirePendingProfileAuth, async (req, res, next)
       return;
     }
 
-    res.json(pendingProfileResponse(req.user, profile, pendingProfile));
+    const pendingInvite = await getPendingCommissionerInvite(req.user.email);
+
+    res.json(
+      pendingProfileResponse(req.user, profile, pendingProfile, pendingInvite)
+    );
   } catch (error) {
     next(error);
   }
 });
 
 router.post("/profile", requirePendingProfileAuth, async (req, res, next) => {
-  const validation = validatePublicProfile(req.body);
-
-  if (validation.error) {
-    res.status(400).json({ error: validation.error });
-    return;
-  }
-
   try {
+    const pendingInvite = await getPendingCommissionerInvite(req.user.email);
+
+    if (pendingInvite) {
+      const validation = validateCommissionerOnboardingProfile(req.body);
+
+      if (validation.error) {
+        res.status(400).json({ error: validation.error });
+        return;
+      }
+
+      const inviterProfile = await getSupabaseProfileAsAdmin(
+        pendingInvite.invited_by
+      );
+
+      if (!inviterProfile || inviterProfile.role !== "commissioner") {
+        res.status(403).json({
+          error: "The commissioner invitation is no longer valid."
+        });
+        return;
+      }
+
+      const completedProfile = await upsertSupabaseProfile(req.accessToken, {
+        email: req.user.email,
+        first_name: validation.profile.firstName,
+        id: req.user.id,
+        invited_by: pendingInvite.invited_by,
+        last_name: validation.profile.lastName,
+        province: validation.profile.province,
+        role: "commissioner"
+      });
+
+      await consumePendingCommissionerInvite(
+        req.user.email,
+        pendingInvite.invited_by
+      );
+
+      const user = publicUser(req.user, completedProfile);
+
+      clearPendingSessionCookies(res);
+      setSessionCookies(res, {
+        access_token: req.accessToken,
+        expires_in: 3600,
+        refresh_token: req.refreshToken
+      });
+      res.status(200).json({
+        message: "Commissioner profile completed.",
+        user
+      });
+      return;
+    }
+
+    const validation = validatePublicProfile(req.body);
+
+    if (validation.error) {
+      res.status(400).json({ error: validation.error });
+      return;
+    }
+
     const {
       firstName,
       lastName,
@@ -529,17 +657,49 @@ router.post(
       await verifySupabasePhoneChange(req.accessToken, phone.auth, token);
 
       const existingProfile = await getSupabaseProfile(req.accessToken, req.user.id);
+      const pendingInvite = await getPendingCommissionerInvite(req.user.email);
+      const invitedAsCommissioner = pendingProfile.invitedAsCommissioner === true;
+      const inviterProfile = pendingInvite
+        ? await getSupabaseProfileAsAdmin(pendingInvite.invited_by)
+        : null;
+
+      if (invitedAsCommissioner && !pendingInvite) {
+        res.status(403).json({
+          error: "The commissioner invitation is no longer valid."
+        });
+        return;
+      }
+
+      if (
+        pendingInvite &&
+        (!inviterProfile || inviterProfile.role !== "commissioner")
+      ) {
+        res.status(403).json({
+          error: "The commissioner invitation is no longer valid."
+        });
+        return;
+      }
+
       const completedProfile = await upsertSupabaseProfile(req.accessToken, {
         email: req.user.email,
         first_name: pendingProfile.firstName,
         id: req.user.id,
+        invited_by: pendingInvite?.invited_by || null,
         last_name: pendingProfile.lastName,
         phone: pendingProfile.phoneNational,
         postal_code: pendingProfile.postalCode,
-        profile_completed: true,
-        province: pendingProfile.province,
-        role: existingProfile?.role || "public_user"
+        province: inviterProfile?.province || pendingProfile.province,
+        role: pendingInvite
+          ? "commissioner"
+          : existingProfile?.role || "public_user"
       });
+
+      if (pendingInvite) {
+        await consumePendingCommissionerInvite(
+          req.user.email,
+          pendingInvite.invited_by
+        );
+      }
 
       const user = publicUser(req.user, completedProfile);
 
@@ -588,6 +748,157 @@ router.post("/password-reset", async (req, res, next) => {
 
 router.get("/me", requireAuth, (req, res) => {
   res.json({ user: publicUser(req.user, req.profile) });
+});
+
+router.patch("/me", requireAuth, async (req, res, next) => {
+  try {
+    const profileRole = req.profile?.role || "public_user";
+
+    if (profileRole === "commissioner") {
+      const validation = validateCommissionerProfile(req.body);
+
+      if (validation.error) {
+        res.status(400).json({ error: validation.error });
+        return;
+      }
+
+      const updatedProfile = await updateSupabaseProfile(
+        req.accessToken,
+        req.user.id,
+        {
+          first_name: validation.profile.firstName,
+          last_name: validation.profile.lastName
+        }
+      );
+
+      res.json({
+        message: "Profile information updated.",
+        user: publicUser(req.user, updatedProfile)
+      });
+      return;
+    }
+
+    if (!["public_user", "user"].includes(profileRole)) {
+      res.status(403).json({
+        error: "Only public users can update a public profile."
+      });
+      return;
+    }
+
+    const validation = validatePublicProfile(req.body);
+
+    if (validation.error) {
+      res.status(400).json({ error: validation.error });
+      return;
+    }
+
+    const { phoneNational, phoneNumber } = validation.profile;
+
+    if (await phoneBelongsToAnotherUser(phoneNational, req.user.id)) {
+      res.status(409).json({
+        error: "This phone number is already linked to another account."
+      });
+      return;
+    }
+
+    const phoneChanged = requiredString(req.profile?.phone) !== phoneNational;
+
+    if (phoneChanged) {
+      const updatedProfile = await updateSupabaseProfile(
+        req.accessToken,
+        req.user.id,
+        publicProfileInformationUpdates(req.user, validation.profile)
+      );
+
+      await startSupabasePhoneVerification(
+        req.accessToken,
+        validation.profile.phoneAuth
+      );
+      setPendingProfileUpdateCookie(res, validation.profile);
+
+      res.status(202).json({
+        message: "Profile information saved. Verification code sent.",
+        otpRequired: true,
+        phoneMasked: maskPhoneNumber(phoneNumber),
+        user: publicUser(req.user, updatedProfile)
+      });
+      return;
+    }
+
+    const updatedProfile = await updateSupabaseProfile(
+      req.accessToken,
+      req.user.id,
+      publicProfileUpdates(req.user, validation.profile)
+    );
+
+    clearPendingProfileUpdateCookie(res);
+    res.json({
+      message: "Profile information updated.",
+      user: publicUser(req.user, updatedProfile)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/me/phone-otp", requireAuth, async (req, res, next) => {
+  const profileRole = req.profile?.role || "public_user";
+
+  if (!["public_user", "user"].includes(profileRole)) {
+    res.status(403).json({
+      error: "Only public users can verify a public profile phone change."
+    });
+    return;
+  }
+
+  const token = requiredString(req.body?.token).replace(/\s+/g, "");
+
+  if (!/^\d{6}$/.test(token)) {
+    res.status(400).json({ error: "Enter the 6-digit verification code." });
+    return;
+  }
+
+  const pendingProfile = getPendingProfileUpdateCookie(req);
+  const validation = validatePublicProfile(pendingProfile);
+
+  if (!pendingProfile || validation.error) {
+    res.status(409).json({ error: "Save your profile before entering a code." });
+    return;
+  }
+
+  try {
+    if (
+      await phoneBelongsToAnotherUser(
+        validation.profile.phoneNational,
+        req.user.id
+      )
+    ) {
+      res.status(409).json({
+        error: "This phone number is already linked to another account."
+      });
+      return;
+    }
+
+    await verifySupabasePhoneChange(
+      req.accessToken,
+      validation.profile.phoneAuth,
+      token
+    );
+
+    const updatedProfile = await updateSupabaseProfile(
+      req.accessToken,
+      req.user.id,
+      publicProfileUpdates(req.user, validation.profile)
+    );
+
+    clearPendingProfileUpdateCookie(res);
+    res.json({
+      message: "Profile information updated.",
+      user: publicUser(req.user, updatedProfile)
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.post("/logout", (_req, res) => {
