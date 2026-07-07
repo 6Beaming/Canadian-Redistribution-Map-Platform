@@ -1,105 +1,96 @@
-import * as React from "react"
+import * as React from "react";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
-function Card({
-  className,
-  size = "default",
-  ...props
-}) {
+const cardSizeClasses = {
+  default: "max-w-[360px] gap-6 p-6",
+  sm: "max-w-[320px] gap-5 p-5",
+};
+
+function Card({ className, size = "default", ...props }) {
+  const resolvedSize = cardSizeClasses[size] ? size : "default";
+
   return (
     <div
       data-slot="card"
-      data-size={size}
+      data-size={resolvedSize}
       className={cn(
-        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl bg-card py-(--card-spacing) text-sm text-card-foreground ring-1 ring-foreground/10 [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
-        className
+        "group/card w-full rounded-[16px] border border-[#e8f0fe] bg-white text-left text-[#1a1d20] shadow-[0_4px_20px_rgba(0,0,0,0.02)] transition-[transform,box-shadow] duration-300 ease-[cubic-bezier(0.25,0.8,0.25,1)] hover:-translate-y-1.5 hover:shadow-[0_12px_32px_rgba(26,115,232,0.12)]",
+        cardSizeClasses[resolvedSize],
+        className,
       )}
-      {...props} />
+      {...props}
+    />
   );
 }
 
-function CardHeader({
-  className,
-  ...props
-}) {
+function CardHeader({ className, ...props }) {
   return (
     <div
       data-slot="card-header"
-      className={cn(
-        "group/card-header @container/card-header grid auto-rows-min items-start gap-1 rounded-t-xl px-(--card-spacing) has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [.border-b]:pb-(--card-spacing)",
-        className
-      )}
-      {...props} />
+      className={cn("flex flex-col gap-4", className)}
+      {...props}
+    />
   );
 }
 
-function CardTitle({
-  className,
-  ...props
-}) {
+function CardAccent({ className, ...props }) {
+  return (
+    <div
+      data-slot="card-accent"
+      className={cn("h-1 w-10 rounded-[2px] bg-[#4285f4]", className)}
+      {...props}
+    />
+  );
+}
+
+function CardTitle({ className, ...props }) {
   return (
     <div
       data-slot="card-title"
-      className={cn(
-        "font-heading text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",
-        className
-      )}
-      {...props} />
+      className={cn("m-0 text-[18px] font-semibold text-[#1a1d20]", className)}
+      {...props}
+    />
   );
 }
 
-function CardDescription({
-  className,
-  ...props
-}) {
+function CardDescription({ className, ...props }) {
   return (
     <div
       data-slot="card-description"
-      className={cn("text-sm text-muted-foreground", className)}
-      {...props} />
+      className={cn("m-0 text-[14px] leading-[1.6] text-[#5f6368]", className)}
+      {...props}
+    />
   );
 }
 
-function CardAction({
-  className,
-  ...props
-}) {
+function CardAction({ className, ...props }) {
   return (
     <div
       data-slot="card-action"
-      className={cn(
-        "col-start-2 row-span-2 row-start-1 self-start justify-self-end",
-        className
-      )}
-      {...props} />
+      className={cn("flex items-center justify-end", className)}
+      {...props}
+    />
   );
 }
 
-function CardContent({
-  className,
-  ...props
-}) {
+function CardContent({ className, ...props }) {
   return (
     <div
       data-slot="card-content"
-      className={cn("px-(--card-spacing)", className)}
-      {...props} />
+      className={cn("flex flex-col gap-4", className)}
+      {...props}
+    />
   );
 }
 
-function CardFooter({
-  className,
-  ...props
-}) {
+function CardFooter({ className, ...props }) {
   return (
     <div
       data-slot="card-footer"
-      className={cn(
-        "flex items-center rounded-b-xl border-t bg-muted/50 p-(--card-spacing)",
-        className
-      )}
-      {...props} />
+      className={cn("flex items-center gap-3 pt-2", className)}
+      {...props}
+    />
   );
 }
 
@@ -111,4 +102,5 @@ export {
   CardAction,
   CardDescription,
   CardContent,
-}
+  CardAccent,
+};

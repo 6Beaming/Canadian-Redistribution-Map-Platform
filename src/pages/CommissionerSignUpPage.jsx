@@ -1,4 +1,5 @@
 import { UserPlus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "../services/authApi.js";
@@ -167,12 +168,12 @@ export default function CommissionerSignUpPage() {
 
         {error ? <p className="form-error">{error}</p> : null}
 
-        <button className="primary-button" disabled={isSubmitting} type="submit">
+        <Button className="mt-3 w-full" disabled={isSubmitting} type="submit">
           <UserPlus aria-hidden="true" size={19} />
           <span>
             {isSubmitting ? "Creating account" : "Create commissioner account"}
           </span>
-        </button>
+        </Button>
       </form>
     </AuthPanel>
   );

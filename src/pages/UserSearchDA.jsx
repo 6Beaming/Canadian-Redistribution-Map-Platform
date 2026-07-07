@@ -16,7 +16,7 @@ export default function UserSearchDA() {
         <ArrowLeft className="h-4 w-4" />
         Back to map
       </Button>
-      <FeaturePlaceholder title="Search for your DA" />
+      <FeaturePlaceholder title="Search For My DA" />
     </div>
   );
 }

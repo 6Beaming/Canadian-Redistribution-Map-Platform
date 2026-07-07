@@ -1,8 +1,5 @@
 /* source from https://ui.shadcn.com/docs/components/radix/data-table#basic-table */
 
-
-import { MoreHorizontal } from "lucide-react"
-
 import { Button } from "@/components/ui/button"
 import {
     DropdownMenu,
@@ -35,11 +32,8 @@ const columns = [
 
             return (
                 <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                        </Button>
+                    <DropdownMenuTrigger className="min-w-[116px] px-4 py-2 text-[14px]">
+                        Actions
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>

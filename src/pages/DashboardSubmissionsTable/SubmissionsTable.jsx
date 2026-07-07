@@ -80,10 +80,8 @@ export default function SubmissionsTable({ columns, data, onRowClick }) {
                 <DatePickerSimple date = {dateStart} setDate={setDateStart}/>
                 <DatePickerSimple date = {dateEnd} setDate={setDateEnd}/>
                 <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="ml-auto">
-                            Submission Type
-                        </Button>
+                    <DropdownMenuTrigger className="ml-auto">
+                        Submission Type
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
 

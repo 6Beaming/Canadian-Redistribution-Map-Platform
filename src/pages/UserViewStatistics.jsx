@@ -50,7 +50,7 @@ function DaStatistics({ dguid, profile }) {
   return (
     <>
       <header className="map-info-panel__header">
-        <h2 className="map-info-panel__title">
+        <h2 className="map-info-panel__title map-info-panel__title--centered">
           {panelTitle.text}
           {panelTitle.unorganized ? (
             <sup className="map-info-panel__title-mark" aria-hidden="true">
@@ -140,7 +140,7 @@ function FedStatistics({ fedNum, fedName }) {
   return (
     <>
       <header className="map-info-panel__header">
-        <h2 className="map-info-panel__title">{name}</h2>
+        <h2 className="map-info-panel__title map-info-panel__title--centered">{name}</h2>
       </header>
       <div className="map-info-panel__body">
         <dl className="map-info-panel__details">
@@ -164,7 +164,7 @@ export default function UserViewStatistics({ selection, profilesByDguid }) {
     return (
       <>
         <header className="map-info-panel__header">
-          <h2 className="map-info-panel__title">Region details</h2>
+          <h2 className="map-info-panel__title map-info-panel__title--centered">Region details</h2>
         </header>
         <div className="map-info-panel__body">
           <p className="map-info-panel__empty">

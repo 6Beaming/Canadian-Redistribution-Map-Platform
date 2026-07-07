@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import { Protocol } from "pmtiles";
 import { mapApi } from "@/services/mapApi.js";
@@ -31,6 +31,11 @@ import {
   FED_LABEL_ZOOM,
   labelScreenScale
 } from "@/lib/map/labelLayout.js";
+import {
+  getAllRolloutAreas,
+  getRolloutAreas,
+  getRolloutColor,
+} from "@/lib/map/rolloutPlan.js";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 const EXPAND_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5"/><path d="M20 9V4h-5"/><path d="M4 15v5h5"/><path d="M20 15v5h-5"/></svg>`;
@@ -109,15 +114,26 @@ function fedFillPaint() {
       SELECTED_COLOR,
       ["boolean", ["feature-state", "hover"], false],
       HOVER_COLOR,
+      ["boolean", ["feature-state", "rolloutVisible"], false],
+      ["coalesce", ["feature-state", "rolloutColor"], "#ffffff"],
       "#ffffff"
     ],
-    "fill-outline-color": ["case", fedNumMatch(), "#0d2137", "#2a2a2a"],
+    "fill-outline-color": [
+      "case",
+      ["boolean", ["feature-state", "rolloutVisible"], false],
+      ["coalesce", ["feature-state", "rolloutColor"], "#2a2a2a"],
+      fedNumMatch(),
+      "#0d2137",
+      "#2a2a2a"
+    ],
     "fill-opacity": [
       "case",
       ["boolean", ["feature-state", "selected"], false],
       0.85,
       ["boolean", ["feature-state", "hover"], false],
       0.75,
+      ["boolean", ["feature-state", "rolloutVisible"], false],
+      ["case", ["boolean", ["feature-state", "blinkHidden"], false], 0.24, 0.82],
       1
     ],
     "fill-antialias": true
@@ -126,7 +142,14 @@ function fedFillPaint() {
 
 function fedOutlinePaint() {
   return {
-    "line-color": ["case", fedNumMatch(), "#0d2137", "#2a2a2a"],
+    "line-color": [
+      "case",
+      ["boolean", ["feature-state", "rolloutVisible"], false],
+      ["coalesce", ["feature-state", "rolloutColor"], "#2a2a2a"],
+      fedNumMatch(),
+      "#0d2137",
+      "#2a2a2a"
+    ],
     "line-width": [
       "interpolate",
       ["linear"],
@@ -138,7 +161,12 @@ function fedOutlinePaint() {
       10,
       ["case", fedNumMatch(), 3.5, 2.4]
     ],
-    "line-opacity": 1
+    "line-opacity": [
+      "case",
+      ["boolean", ["feature-state", "rolloutVisible"], false],
+      ["case", ["boolean", ["feature-state", "blinkHidden"], false], 0.35, 1],
+      1
+    ]
   };
 }
 
@@ -161,7 +189,9 @@ export function MapCanvas({
   onDaSelect,
   onFedSelect,
   onStatusChange,
-  onToggleFullscreen
+  onToggleFullscreen,
+  rolloutEnabled = false,
+  rolloutCategoryId = null
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
@@ -172,6 +202,10 @@ export function MapCanvas({
   const selectionRef = useRef({ da: null, fed: null });
   const hoverRef = useRef({ da: null, fed: null });
   const fedSourceModeRef = useRef("pmtiles");
+  const setFedStateRef = useRef(null);
+  const blinkIntervalRef = useRef(null);
+  const isMapReadyRef = useRef(false);
+  const [mapReadyTick, setMapReadyTick] = useState(0);
 
   onToggleFullscreenRef.current = onToggleFullscreen;
   isFullscreenRef.current = isFullscreen;
@@ -200,6 +234,76 @@ export function MapCanvas({
 
     return () => cancelAnimationFrame(frame);
   }, [isFullscreen]);
+
+  useEffect(() => {
+    const setFedState = setFedStateRef.current;
+
+    if (!setFedState || !isMapReadyRef.current) {
+      return undefined;
+    }
+
+    const safeSetFedState = (fedNum, state) => {
+      try {
+        setFedState(fedNum, state);
+      } catch {
+        return;
+      }
+    };
+
+    if (blinkIntervalRef.current) {
+      window.clearInterval(blinkIntervalRef.current);
+      blinkIntervalRef.current = null;
+    }
+
+    const allAreas = getAllRolloutAreas();
+
+    if (!rolloutEnabled) {
+      allAreas.forEach((area) => {
+        safeSetFedState(area.fedNum, {
+          rolloutVisible: false,
+          blinkHidden: false
+        });
+      });
+      return undefined;
+    }
+
+    allAreas.forEach((area) => {
+      safeSetFedState(area.fedNum, {
+        rolloutVisible: true,
+        rolloutColor: getRolloutColor(area.categoryId),
+        blinkHidden: false
+      });
+    });
+
+    const activeAreas = rolloutCategoryId ? getRolloutAreas(rolloutCategoryId) : [];
+
+    if (!activeAreas.length) {
+      return undefined;
+    }
+
+    let isHidden = false;
+    blinkIntervalRef.current = window.setInterval(() => {
+      isHidden = !isHidden;
+      activeAreas.forEach((area) => {
+        safeSetFedState(area.fedNum, {
+          blinkHidden: isHidden
+        });
+      });
+    }, 520);
+
+    return () => {
+      if (blinkIntervalRef.current) {
+        window.clearInterval(blinkIntervalRef.current);
+        blinkIntervalRef.current = null;
+      }
+
+      activeAreas.forEach((area) => {
+        safeSetFedState(area.fedNum, {
+          blinkHidden: false
+        });
+      });
+    };
+  }, [mapReadyTick, rolloutCategoryId, rolloutEnabled]);
 
   useEffect(() => {
     if (!containerRef.current) return undefined;
@@ -245,6 +349,8 @@ export function MapCanvas({
     function clearFedFeatureState(fedId) {
       map.removeFeatureState(fedFeatureTarget(fedId));
     }
+
+    setFedStateRef.current = setFedFeatureState;
 
     function addFedFillLayer(useVectorTiles) {
       const layer = {
@@ -615,6 +721,8 @@ export function MapCanvas({
         onStatusChange?.(
           `Effective Area: Yukon FED (${MVP_FED_NUM}) - ${daCount} DAs`
         );
+        isMapReadyRef.current = true;
+        setMapReadyTick((current) => current + 1);
 
         console.log(
           `[OK] FED base: ${fedMode};`,
@@ -639,6 +747,12 @@ export function MapCanvas({
 
     return () => {
       labelResizeObserver?.disconnect();
+      isMapReadyRef.current = false;
+      if (blinkIntervalRef.current) {
+        window.clearInterval(blinkIntervalRef.current);
+        blinkIntervalRef.current = null;
+      }
+      setFedStateRef.current = null;
       map.off("click", onClick);
       map.off("mousemove", onMouseMove);
       map.off("mouseout", onMouseOut);

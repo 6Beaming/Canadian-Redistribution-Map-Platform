@@ -1,4 +1,5 @@
 import { ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getPasswordRecoveryClient } from "../services/passwordRecoveryClient.js";
@@ -141,8 +142,8 @@ export default function PasswordRecoveryPage() {
               {error ? <p className="form-error">{error}</p> : null}
               {notice ? <p className="form-success">{notice}</p> : null}
 
-              <button
-                className="primary-button"
+              <Button
+                className="mt-3 w-full"
                 disabled={status === "submitting"}
                 type="submit"
               >
@@ -152,15 +153,17 @@ export default function PasswordRecoveryPage() {
                     ? "Updating password"
                     : "Update password"}
                 </span>
-              </button>
+              </Button>
 
-              <button
-                className="text-button"
+              <Button
                 onClick={() => navigate("/sign-in")}
                 type="button"
+                variant="link"
+                size="sm"
+                className="justify-self-center"
               >
                 Back to sign in
-              </button>
+              </Button>
             </form>
           ) : (
             <div className="login-form">
@@ -169,13 +172,15 @@ export default function PasswordRecoveryPage() {
               ) : null}
               {error ? <p className="form-error">{error}</p> : null}
               {notice ? <p className="form-success">{notice}</p> : null}
-              <button
-                className="text-button"
+              <Button
                 onClick={() => navigate("/sign-in")}
                 type="button"
+                variant="link"
+                size="sm"
+                className="justify-self-center"
               >
                 Back to sign in
-              </button>
+              </Button>
             </div>
           )}
         </div>

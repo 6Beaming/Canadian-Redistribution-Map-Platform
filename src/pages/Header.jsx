@@ -1,7 +1,9 @@
-import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { ArrowLeft, UserPlus } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, LogIn, LogOut, UserPlus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ProfileControl } from "@/components/non_prebuilt/ProfileControl.jsx";
+import { ThemeBrandBox } from "@/components/non_prebuilt/ThemeBrandBox.jsx";
 import { useAuth } from "../contexts/AuthContext.jsx";
 
 export default function Header() {
@@ -10,7 +12,7 @@ export default function Header() {
   const pathname = location.pathname;
 
   const isUsersHome = pathname === "/" || pathname === "/users";
-  const isUserSurface =
+  const isUserMapSurface =
     isUsersHome ||
     pathname === "/users/search-da" ||
     pathname === "/users/profile";
@@ -19,11 +21,13 @@ export default function Header() {
   const isSubmissionsPage = pathname === "/submissions";
   const isSubmissionDetailPage = pathname.startsWith("/submissions/");
   const isWorkspacePage = pathname === "/dashboard/workspace";
+  const isUserSubmissionSurface = isSubmissionsPage || isSubmissionDetailPage;
+  const isUserSurface = isUserMapSurface || isUserSubmissionSurface;
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { sessionStatus, signOut } = useAuth();
+  const { sessionStatus, signOut, user } = useAuth();
 
-  async function handleAuthAction() {
+  async function handleSignOut() {
     if (sessionStatus !== "signed-in") {
       navigate("/sign-in");
       return;
@@ -39,127 +43,85 @@ export default function Header() {
     }
   }
 
-  function AuthActionButton() {
-    const isSignedIn = sessionStatus === "signed-in";
-    const Icon = isSignedIn ? LogOut : LogIn;
-    const label = isSubmitting
-      ? "Signing Out"
-      : isSignedIn
-        ? "Sign Out"
-        : "Sign In";
-
-    return (
-      <Button
-        variant="outline"
-        className="min-w-28 border-white bg-transparent text-white hover:bg-gray-700 hover:text-white"
-        disabled={isSubmitting}
-        onClick={handleAuthAction}
-      >
-        <Icon className="h-4 w-4" />
-        {label}
-      </Button>
-    );
-  }
-
   if (isWorkspacePage) {
     return null;
   }
 
-  if (isDashboardPage) {
-    return (
-      <div className="grid h-16 w-full grid-cols-[1fr_auto_1fr] items-center border-b border-gray-700 bg-gray-800 px-6 text-white">
-        <div />
-        <Button
-          variant="outline"
-          className="justify-self-center border-white bg-transparent text-white hover:bg-gray-700 hover:text-white"
-          onClick={() => navigate("/dashboard/submissionsTable")}
-        >
-          All Submissions
-        </Button>
-        <div className="justify-self-end flex items-center gap-2">
-          <Button
-            variant="outline"
-            className="border-white bg-transparent text-white hover:bg-gray-700 hover:text-white"
-            onClick={() => navigate("/dashboard/invite")}
-          >
-            <UserPlus className="h-4 w-4" />
-            Invite a new colleague
-          </Button>
-          <AuthActionButton />
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="relative w-full h-16 bg-gray-800 text-white flex items-center px-6 border-b border-gray-700">
-      <div className="flex-1" />
+    <header
+      className={`header relative h-16 w-full border-b border-[#d7e6fb] bg-[#f6efdf] text-[#17324d]${isUserMapSurface ? " header--user-map-surface" : ""}${isDashboardPage ? " header--dashboard-surface" : ""}`}
+    >
+      <div className={`header__left-slot absolute inset-y-0 left-0 flex items-center gap-3 ${isUserMapSurface || isDashboardPage ? "" : "px-4 md:px-6"}`}>
+        {isDashboardPage ? (
+          <ProfileControl
+            user={user}
+            sessionStatus={sessionStatus}
+            isSubmitting={isSubmitting}
+            onSignIn={() => navigate("/sign-in")}
+            onSignOut={handleSignOut}
+            onPrimaryAction={() => navigate("/dashboard/invite")}
+            primaryActionLabel="Invite A New Colleague"
+            primaryActionIcon={UserPlus}
+            edgeAligned
+          />
+        ) : isUserMapSurface ? (
+          <ProfileControl
+            user={user}
+            sessionStatus={sessionStatus}
+            isSubmitting={isSubmitting}
+            onSignIn={() => navigate("/sign-in")}
+            onSignOut={handleSignOut}
+            onNavigateProfile={() => navigate("/users/profile")}
+            edgeAligned
+          />
+        ) : null}
 
-      {isUsersHome && sessionStatus === "signed-in" && (
-        <Button
-          onClick={() => navigate("/submissions")}
-          className="bg-transparent border border-white text-white hover:bg-gray-700"
-        >
-          My Submissions
-        </Button>
-      )}
-
-      {isUserSurface && (
-        <p className="absolute left-6 text-lg font-semibold">Home</p>
-      )}
-
-      {isUserSurface && (
-        <div className="flex-1 flex justify-end items-center gap-2">
-          <Button
-            variant="outline"
-            className="border-white bg-transparent text-white hover:bg-gray-700 hover:text-white"
-            onClick={() => navigate("/users/profile")}
-          >
-            My Profile
-          </Button>
-          <AuthActionButton />
-        </div>
-      )}
-
-      {isSubmissionsPage && (
-        <>
+        {isSubmissionsPage ? (
           <Button
             variant="outline"
             size="icon"
-            className="rounded-full absolute left-5.5 bg-black"
+            className="rounded-full"
             onClick={() => navigate("/users")}
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="flex-1 flex items-center justify-center">
-            <p className="text-lg font-semibold">My Submissions</p>
-          </div>
-          <div className="flex-1" />
-          <div className="absolute right-6">
-            <AuthActionButton />
-          </div>
-        </>
-      )}
+        ) : null}
 
-      {isSubmissionDetailPage && (
-        <>
+        {isSubmissionDetailPage ? (
           <Button
             variant="outline"
             size="icon"
-            className="rounded-full absolute left-5.5 bg-black"
+            className="rounded-full"
             onClick={() => navigate("/submissions")}
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="flex-1 flex items-center justify-center">
-            <p className="text-lg font-semibold">Submission</p>
-          </div>
-          <div className="flex-1" />
-          <div className="absolute right-6">
-            <AuthActionButton />
-          </div>
-        </>
-      )}
-    </div>
+        ) : null}
+      </div>
+
+      <div className="header__brand-slot pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+        <div className="pointer-events-auto">
+          <ThemeBrandBox />
+        </div>
+      </div>
+
+      <div className="header__right-slot absolute inset-y-0 right-0 flex items-center justify-end gap-3 px-4 md:px-6">
+        {isUserSubmissionSurface ? (
+          <ProfileControl
+            user={user}
+            sessionStatus={sessionStatus}
+            isSubmitting={isSubmitting}
+            onSignIn={() => navigate("/sign-in")}
+            onSignOut={handleSignOut}
+            onNavigateProfile={() => navigate("/users/profile")}
+            align="right"
+          />
+        ) : null}
+
+        {!isDashboardPage && !isUserSurface ? (
+          <div className="h-10 w-10" />
+        ) : null}
+      </div>
+    </header>
   );
 }

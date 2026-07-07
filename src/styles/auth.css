@@ -115,59 +115,6 @@
   gap: 10px;
 }
 
-.primary-button,
-.text-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  min-height: 44px;
-  border-radius: 8px;
-  font-weight: 800;
-}
-
-.primary-button {
-  margin-top: 14px;
-  border: 0;
-  color: #ffffff;
-  background: #111827;
-}
-
-.primary-button,
-.text-button,
-.inline-text-button,
-.icon-button {
-  cursor: pointer;
-}
-
-.primary-button:disabled,
-.text-button:disabled,
-.inline-text-button:disabled,
-.icon-button:disabled {
-  cursor: wait;
-  opacity: 0.7;
-}
-
-.primary-button:hover:not(:disabled) {
-  background: #1f2937;
-}
-
-.icon-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border: 1px solid #d1d5db;
-  border-radius: 50%;
-  color: #111827;
-  background: #ffffff;
-}
-
-.icon-button:hover:not(:disabled) {
-  background: #f3f4f6;
-}
-
 .form-error {
   margin: 6px 0 0;
   border-left: 4px solid #dc2626;
@@ -190,40 +137,6 @@
   margin: 18px 0 -14px;
   color: #4b5563;
   font-weight: 700;
-}
-
-.text-button {
-  min-height: 36px;
-  border: 0;
-  color: #2563eb;
-  background: transparent;
-}
-
-.text-button:hover:not(:disabled) {
-  color: #1d4ed8;
-  text-decoration: underline;
-}
-
-.inline-text-button {
-  display: inline;
-  min-height: auto;
-  border: 0;
-  padding: 0;
-  color: #2563eb;
-  background: transparent;
-  font-weight: 800;
-}
-
-.inline-text-button:hover:not(:disabled) {
-  color: #1d4ed8;
-  text-decoration: underline;
-}
-
-.text-button:focus-visible,
-.inline-text-button:focus-visible {
-  border-radius: 4px;
-  outline: 2px solid #2563eb;
-  outline-offset: 3px;
 }
 
 .forgot-password-button {
