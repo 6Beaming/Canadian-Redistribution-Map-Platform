@@ -3,9 +3,14 @@ import {
   getDaPopulationDisplay
 } from "@/lib/map/profileUtils.js";
 import { MISSING_DA_POPULATION, MVP_FED_NUM } from "@/lib/map/constants.js";
+import {
+  getRolloutAccentColor,
+  getRolloutArea,
+  getRolloutCategory
+} from "@/lib/map/rolloutPlan.js";
 
 const UNORGANIZED_FOOTNOTE =
-  "This dissemination area lies in a census subdivision classified as Unorganized—areas outside incorporated municipalities in Yukon (Statistics Canada geography).";
+  "This dissemination area lies in a census subdivision classified as Unorganized, areas outside incorporated municipalities in Yukon (Statistics Canada geography).";
 
 function formatPopulation(value) {
   if (value === MISSING_DA_POPULATION) return MISSING_DA_POPULATION;
@@ -50,7 +55,7 @@ function DaStatistics({ dguid, profile }) {
   return (
     <>
       <header className="map-info-panel__header">
-        <h2 className="map-info-panel__title">
+        <h2 className="map-info-panel__title map-info-panel__title--centered">
           {panelTitle.text}
           {panelTitle.unorganized ? (
             <sup className="map-info-panel__title-mark" aria-hidden="true">
@@ -64,7 +69,7 @@ function DaStatistics({ dguid, profile }) {
         <dl className="map-info-panel__details">
           <dt>DGUID</dt>
           <dd>
-            <code>{dguid ?? "—"}</code>
+            <code>{dguid ?? "N/A"}</code>
           </dd>
 
           {profile?.da_code != null ? (
@@ -134,13 +139,20 @@ function DaStatistics({ dguid, profile }) {
 }
 
 function FedStatistics({ fedNum, fedName }) {
-  const num = String(fedNum ?? "—");
+  const num = String(fedNum ?? "N/A");
   const name = fedName || `FED ${num}`;
+  const rolloutArea = getRolloutArea(num);
+  const rolloutCategoryId = rolloutArea?.categoryId ?? null;
+  const rolloutCategory = rolloutCategoryId ? getRolloutCategory(rolloutCategoryId) : null;
+  const showRolloutCard =
+    rolloutCategoryId === "data-blocked" ||
+    rolloutCategoryId === "developing" ||
+    rolloutCategoryId === "planned-in-developing";
 
   return (
     <>
       <header className="map-info-panel__header">
-        <h2 className="map-info-panel__title">{name}</h2>
+        <h2 className="map-info-panel__title map-info-panel__title--centered">{name}</h2>
       </header>
       <div className="map-info-panel__body">
         <dl className="map-info-panel__details">
@@ -149,7 +161,23 @@ function FedStatistics({ fedNum, fedName }) {
             <code>{num}</code>
           </dd>
         </dl>
-        <p className="map-info-panel__coming-soon">Coming Soon!</p>
+        {showRolloutCard && rolloutCategory ? (
+          <div
+            className="map-info-panel__rollout-badge"
+            style={{
+              backgroundColor: getRolloutAccentColor(rolloutCategory.id),
+              borderColor: rolloutCategory.color,
+              color:
+                rolloutCategory.id === "planned-in-developing"
+                  ? "#7a6331"
+                  : rolloutCategory.color
+            }}
+          >
+            {rolloutCategory.description}
+          </div>
+        ) : (
+          <p className="map-info-panel__coming-soon">Coming Soon!</p>
+        )}
         <p className="map-info-panel__hint">
           This region is not part of the pilot demo yet. Yukon ({MVP_FED_NUM}) is
           available now.
@@ -164,7 +192,7 @@ export default function UserViewStatistics({ selection, profilesByDguid }) {
     return (
       <>
         <header className="map-info-panel__header">
-          <h2 className="map-info-panel__title">Region details</h2>
+          <h2 className="map-info-panel__title map-info-panel__title--centered">Region details</h2>
         </header>
         <div className="map-info-panel__body">
           <p className="map-info-panel__empty">

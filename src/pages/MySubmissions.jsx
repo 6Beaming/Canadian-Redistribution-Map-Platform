@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -44,10 +44,18 @@ const submissions = [
 ];
 
 const statusStyles = {
-  Approved: "bg-green-100 text-green-700",
-  Rejected: "bg-red-100 text-red-700",
-  "Under Review": "bg-yellow-100 text-yellow-700",
+  Approved: "bg-green-100 px-3 py-1 text-sm text-green-700",
+  Rejected: "bg-red-100 px-3 py-1 text-sm text-red-700",
+  "Under Review": "bg-yellow-100 px-3 py-1 text-sm text-yellow-700",
 };
+
+const statusMessages = {
+  Approved: "The commissioners has approved your submission, we appreciate your contribution!",
+  Rejected: "Sorry, your submission was rejected, click to resubmit.",
+  "Under Review": "We have let the commissioners know, please be patient.",
+};
+
+const clickableStatuses = new Set(["Rejected"]);
 
 const columns = [
   {
@@ -85,9 +93,11 @@ const columns = [
     cell: ({ row }) => {
       const status = row.getValue("status");
       return (
-        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusStyles[status]}`}>
-          {status}
-        </span>
+        <div className="flex justify-start">
+          <span className={`inline-flex w-[132px] items-center justify-center rounded-full whitespace-nowrap text-center font-medium ${statusStyles[status]}`}>
+            {status}
+          </span>
+        </div>
       );
     },
   },
@@ -96,6 +106,7 @@ const columns = [
 export default function MySubmissions() {
   const navigate = useNavigate();
   const [sorting, setSorting] = useState([{ id: "submittedAt", desc: true }]);
+  const [hoveredRowId, setHoveredRowId] = useState(null);
   const { sessionStatus } = useAuth();
 
   useEffect(() => {
@@ -112,7 +123,7 @@ export default function MySubmissions() {
     getPaginationRowModel: getPaginationRowModel(),
     onSortingChange: setSorting,
     state: { sorting },
-    initialState: { pagination: { pageSize: 7 } },
+    initialState: { pagination: { pageSize: 10 } },
   });
 
   if (sessionStatus !== "signed-in") {
@@ -120,70 +131,105 @@ export default function MySubmissions() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto flex flex-col gap-4">
-      <div className="overflow-hidden rounded-lg border border-gray-200 shadow-sm">
-        <Table>
-          <TableHeader className="bg-gray-50">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="font-semibold text-gray-700">
-                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
+    <div className="px-4 py-6 md:px-6">
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 overflow-x-auto">
+        <div className="min-w-[960px]">
+          <div className="overflow-visible rounded-lg border border-gray-200 shadow-sm">
+            <Table>
+              <TableHeader className="bg-gray-50">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id} className="h-12">
+                    {headerGroup.headers.map((header) => (
+                      <TableHead key={header.id} className="h-12 px-3 text-[15px] font-semibold text-gray-700">
+                        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                      </TableHead>
+                    ))}
+                  </TableRow>
                 ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className="hover:bg-gray-50 transition-colors cursor-pointer"
-                  onClick={() => navigate(`/submissions/${row.original.id}`)}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-gray-400">
-                  No submissions yet.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              </TableHeader>
+              <TableBody>
+                {table.getRowModel().rows.length ? (
+                  table.getRowModel().rows.map((row) => {
+                    const isClickable = clickableStatuses.has(row.original.status);
+                    const statusMessage = statusMessages[row.original.status];
 
-      {/* Pagination */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">
-          Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
-        </p>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            Next
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+                    return (
+                      <Fragment key={row.id}>
+                        <TableRow
+                          className={`h-14 transition-colors hover:bg-gray-50 ${
+                            isClickable ? "cursor-pointer" : "cursor-default"
+                          }`}
+                          onMouseEnter={() => setHoveredRowId(row.id)}
+                          onMouseLeave={() => setHoveredRowId((current) => (current === row.id ? null : current))}
+                          onClick={
+                            isClickable
+                              ? () => navigate(`/submissions/${row.original.id}`)
+                              : undefined
+                          }
+                        >
+                          {row.getVisibleCells().map((cell) => (
+                            <TableCell key={cell.id} className="px-3 py-3 text-[15px]">
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                        <TableRow
+                          aria-hidden="true"
+                          className="pointer-events-none border-0 hover:bg-transparent"
+                        >
+                          <TableCell colSpan={columns.length} className="border-0 p-0">
+                            <div className="flex justify-center overflow-hidden">
+                              <div
+                                className={`overflow-hidden rounded-full px-4 text-center text-sm font-medium shadow-[0_10px_24px_rgba(15,23,42,0.08)] transition-all duration-200 ${
+                                  hoveredRowId === row.id
+                                    ? "max-h-10 translate-y-0 py-2 opacity-100"
+                                    : "max-h-0 -translate-y-1 py-0 opacity-0"
+                                } ${statusStyles[row.original.status]}`}
+                              >
+                                {statusMessage}
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      </Fragment>
+                    );
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={columns.length} className="h-24 px-3 py-3 text-center text-[15px] text-gray-400">
+                      No submissions yet.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="flex items-center justify-between py-4">
+            <p className="text-sm text-gray-500">
+              Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.previousPage()}
+                disabled={!table.getCanPreviousPage()}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.nextPage()}
+                disabled={!table.getCanNextPage()}
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

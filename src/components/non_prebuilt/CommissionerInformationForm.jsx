@@ -61,16 +61,16 @@ export function CommissionerInformationForm() {
   }
 
   return (
-    <section className="flex flex-col gap-4 rounded-xl border p-6">
-      <div>
-        <h2 className="text-lg font-semibold">Profile information</h2>
+    <section className="flex flex-col items-center gap-4 rounded-[24px] border border-[#d7e6fb] bg-white/92 p-6 text-center shadow-[0_16px_38px_rgba(26,115,232,0.08)]">
+      <div className="w-full">
+        <h2 className="text-xl font-semibold text-[#17324d]">Profile Information</h2>
         <p className="text-sm text-gray-600">
           Update the information associated with your commissioner account.
         </p>
       </div>
 
       <form
-        className="grid max-w-xl gap-4"
+        className="grid w-full max-w-xl gap-4 text-left"
         onSubmit={handleSubmit}
       >
         <div className="grid gap-2">
@@ -86,7 +86,7 @@ export function CommissionerInformationForm() {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="grid gap-2">
-            <Label htmlFor="commissioner-first-name">First name</Label>
+            <Label htmlFor="commissioner-first-name">First Name</Label>
             <Input
               autoComplete="given-name"
               id="commissioner-first-name"
@@ -99,7 +99,7 @@ export function CommissionerInformationForm() {
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="commissioner-last-name">Last name</Label>
+            <Label htmlFor="commissioner-last-name">Last Name</Label>
             <Input
               autoComplete="family-name"
               id="commissioner-last-name"
@@ -113,7 +113,7 @@ export function CommissionerInformationForm() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="commissioner-province">Province or territory</Label>
+          <Label htmlFor="commissioner-province">Province Or Territory</Label>
           <Input
             className="cursor-not-allowed bg-gray-100 text-gray-600"
             id="commissioner-province"
@@ -134,18 +134,18 @@ export function CommissionerInformationForm() {
         ) : null}
 
         {isEditingName ? (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-center gap-2">
             <Button disabled={isSubmitting} type="submit">
               <Save className="h-4 w-4" />
-              {isSubmitting ? "Saving" : "Save changes"}
+              {isSubmitting ? "Saving" : "Save Changes"}
             </Button>
             <Button
               disabled={isSubmitting}
               onClick={handleCancel}
               type="button"
-              variant="outline"
+              variant="destructive"
             >
-              Cancel changes
+              Cancel Changes
             </Button>
           </div>
         ) : null}

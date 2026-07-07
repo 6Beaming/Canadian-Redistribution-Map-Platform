@@ -1,4 +1,5 @@
 import { ArrowLeft, KeyRound, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const provinces = [
   ["AB", "Alberta"],
@@ -16,7 +17,6 @@ const provinces = [
   ["YT", "Yukon"]
 ];
 
-// shared onboarding screens
 export default function AuthOnboarding({
   error,
   isSubmitting,
@@ -41,15 +41,17 @@ export default function AuthOnboarding({
         <section className="auth-layout" aria-label="Complete profile">
           <div className="login-panel">
             <div className="onboarding-header">
-              <button
+              <Button
                 aria-label="Back to sign in"
-                className="icon-button"
+                className="rounded-full"
                 disabled={isSubmitting}
                 onClick={onLogout}
+                size="icon"
                 type="button"
+                variant="outline"
               >
                 <ArrowLeft aria-hidden="true" size={22} />
-              </button>
+              </Button>
               <div className="brand-lockup">
                 <div>
                   <h1>
@@ -141,8 +143,8 @@ export default function AuthOnboarding({
               {error ? <p className="form-error">{error}</p> : null}
               {notice ? <p className="form-success">{notice}</p> : null}
 
-              <button
-                className="primary-button"
+              <Button
+                className="mt-3 w-full"
                 disabled={isSubmitting}
                 type="submit"
               >
@@ -154,7 +156,7 @@ export default function AuthOnboarding({
                       ? "Save commissioner profile"
                       : "Save profile"}
                 </span>
-              </button>
+              </Button>
             </form>
           </div>
         </section>
@@ -168,15 +170,17 @@ export default function AuthOnboarding({
         <section className="auth-layout" aria-label="Verify phone">
           <div className="login-panel">
             <div className="onboarding-header">
-              <button
+              <Button
                 aria-label="Back to profile"
-                className="icon-button"
+                className="rounded-full"
                 disabled={isSubmitting}
                 onClick={onShowProfileForm}
+                size="icon"
                 type="button"
+                variant="outline"
               >
                 <ArrowLeft aria-hidden="true" size={22} />
-              </button>
+              </Button>
               <div className="brand-lockup">
                 <div>
                   <h1>Verify Phone</h1>
@@ -206,23 +210,25 @@ export default function AuthOnboarding({
               {error ? <p className="form-error">{error}</p> : null}
               {notice ? <p className="form-success">{notice}</p> : null}
 
-              <button
-                className="primary-button"
+              <Button
+                className="mt-3 w-full"
                 disabled={isSubmitting}
                 type="submit"
               >
                 <KeyRound aria-hidden="true" size={19} />
                 <span>{isSubmitting ? "Verifying code" : "Verify code"}</span>
-              </button>
+              </Button>
 
-              <button
-                className="text-button"
+              <Button
+                className="justify-self-center"
                 disabled={isSubmitting}
                 onClick={onLogout}
+                size="sm"
                 type="button"
+                variant="link"
               >
                 Back to sign in
-              </button>
+              </Button>
             </form>
           </div>
         </section>

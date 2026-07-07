@@ -11,7 +11,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 
-export function DatePickerSimple({date, setDate}) {
+export function DatePickerSimple({ date, setDate, className }) {
 
   return (
       <Popover>
@@ -19,7 +19,7 @@ export function DatePickerSimple({date, setDate}) {
           <Button
             variant="outline"
             id="date-picker-simple"
-            className="justify-start font-normal"
+            className={className ?? "justify-start font-normal"}
           >
             {date ? format(date, "PPP") : <span>Pick a date</span>}
           </Button>

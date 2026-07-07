@@ -1,15 +1,12 @@
 import { useState } from "react";
-import { ArrowLeft, Send, UserPlus } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Send, UserPlus } from "lucide-react";
 import { CommissionerInformationForm } from "@/components/non_prebuilt/CommissionerInformationForm.jsx";
-import { ProfileSignOutButton } from "@/components/non_prebuilt/ProfileSignOutButton.jsx";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authApi } from "@/services/authApi.js";
 
 export default function CommissionerProfile() {
-  const navigate = useNavigate();
   const [isInviteFormOpen, setIsInviteFormOpen] = useState(false);
   const [isInviteConfirmationOpen, setIsInviteConfirmationOpen] =
     useState(false);
@@ -51,19 +48,11 @@ export default function CommissionerProfile() {
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-6">
-      <Button
-        variant="outline"
-        className="w-fit"
-        onClick={() => navigate("/dashboard")}
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to dashboard
-      </Button>
-
-      <section className="flex flex-col gap-4 rounded-xl border p-6">
-        <div>
-          <p className="text-sm text-gray-600">
+    <div className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
+      <section className="flex flex-col items-center gap-4 rounded-[24px] border border-[#d7e6fb] bg-white/92 p-6 text-center shadow-[0_16px_38px_rgba(26,115,232,0.08)]">
+        <div className="w-full">
+          <h2 className="text-xl font-semibold text-[#17324d]">Invite A New Colleague</h2>
+          <p className="mt-2 text-sm text-gray-600">
             Invite another commissioner to collaborate with you.
           </p>
         </div>
@@ -78,14 +67,14 @@ export default function CommissionerProfile() {
             }}
           >
             <UserPlus className="h-4 w-4" />
-            Invite a new colleague
+            Invite A New Colleague
           </Button>
         ) : (
           <form
-            className="flex max-w-md flex-col gap-3"
+            className="flex w-full max-w-md flex-col items-center gap-3 text-center"
             onSubmit={handleInviteSubmit}
           >
-            <Label htmlFor="colleague-email">New colleague&apos;s email</Label>
+            <Label htmlFor="colleague-email">New Colleague&apos;s Email</Label>
             <Input
               autoComplete="email"
               id="colleague-email"
@@ -100,21 +89,21 @@ export default function CommissionerProfile() {
               type="email"
               value={inviteEmail}
             />
-            <div className="flex gap-2">
+            <div className="flex flex-wrap justify-center gap-2">
               <Button
                 className="w-fit"
                 disabled={isSendingInvite}
                 type="submit"
               >
                 <Send className="h-4 w-4" />
-                Send invitation
+                Send Invitation
               </Button>
               <Button
                 className="w-fit"
                 disabled={isSendingInvite}
                 onClick={handleInviteCancel}
                 type="button"
-                variant="outline"
+                variant="destructive"
               >
                 Cancel
               </Button>
@@ -136,8 +125,6 @@ export default function CommissionerProfile() {
 
       <CommissionerInformationForm />
 
-      <ProfileSignOutButton />
-
       {isInviteConfirmationOpen ? (
         <div
           aria-labelledby="confirm-invite-title"
@@ -146,12 +133,12 @@ export default function CommissionerProfile() {
           role="dialog"
         >
           <div className="flex w-full max-w-md flex-col gap-4 rounded-xl bg-white p-6 shadow-xl">
-            <div>
+            <div className="text-center">
               <h2
                 className="text-lg font-semibold"
                 id="confirm-invite-title"
               >
-                Confirm commissioner invitation
+                Confirm Commissioner Invitation
               </h2>
               <p className="mt-2 text-sm text-gray-600">
                 Send an invitation to{" "}
@@ -167,7 +154,7 @@ export default function CommissionerProfile() {
               </p>
             ) : null}
 
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-wrap justify-center gap-2">
               <Button
                 disabled={isSendingInvite}
                 onClick={() => {
@@ -175,7 +162,7 @@ export default function CommissionerProfile() {
                   setIsInviteConfirmationOpen(false);
                 }}
                 type="button"
-                variant="outline"
+                variant="destructive"
               >
                 Cancel
               </Button>
@@ -185,7 +172,7 @@ export default function CommissionerProfile() {
                 type="button"
               >
                 <Send className="h-4 w-4" />
-                {isSendingInvite ? "Sending invitation" : "Confirm and send"}
+                {isSendingInvite ? "Sending Invitation" : "Confirm And Send"}
               </Button>
             </div>
           </div>

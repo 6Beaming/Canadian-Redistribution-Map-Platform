@@ -1,4 +1,5 @@
 import { LogIn } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { authApi } from "../services/authApi.js";
@@ -143,31 +144,34 @@ export default function SignInPage() {
           value={form.password}
         />
 
-        <button
-          className="inline-text-button forgot-password-button"
+        <Button
+          className="forgot-password-button justify-self-end"
           onClick={() => navigate("/forgot-password")}
           type="button"
+          variant="link"
+          size="sm"
         >
           Forgot password?
-        </button>
+        </Button>
 
         {error ? <p className="form-error">{error}</p> : null}
         {notice ? <p className="form-success">{notice}</p> : null}
 
-        <button className="primary-button" disabled={isSubmitting} type="submit">
+        <Button className="mt-3 w-full" disabled={isSubmitting} type="submit">
           <LogIn aria-hidden="true" size={19} />
           <span>{isSubmitting ? "Signing in" : "Sign in"}</span>
-        </button>
+        </Button>
 
         <p className="auth-prompt">
           <span>New user?</span>
-          <button
-            className="inline-text-button"
+          <Button
             onClick={() => navigate("/sign-up")}
             type="button"
+            variant="link"
+            size="sm"
           >
             Create an account
-          </button>
+          </Button>
         </p>
       </form>
     </AuthPanel>

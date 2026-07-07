@@ -1,13 +1,12 @@
 "use client"
 
 import * as React from "react"
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
-
-import { Line } from "recharts"
+import { Area, AreaChart, CartesianGrid, Line, XAxis } from "recharts"
 import { Field, FieldLabel } from "@/components/ui/field"
-import { DatePickerSimple} from "../ui/datePicker"
+import { DatePickerSimple } from "../ui/datePicker"
 import {
     Card,
+    CardAccent,
     CardContent,
     CardDescription,
     CardHeader,
@@ -24,7 +23,6 @@ import { subDays } from "date-fns"
 
 export const description = "An interactive area chart"
 
-//test data
 const chartData = [
     { date: "2026-05-01", comment: 260, objection: 160, counterProposal: 88, all: 508 },
     { date: "2026-05-02", comment: 310, objection: 190, counterProposal: 105, all: 605 },
@@ -112,11 +110,8 @@ const chartConfig = {
     },
 }
 
-/*based off shadcn prebuilt example
-https://ui.shadcn.com/charts/area */
 export function SubmissionsGraph() {
     const [dateStart, setDateStart] = React.useState(subDays(new Date(), 30))
-
     const [dateEnd, setDateEnd] = React.useState(new Date())
 
     const filteredData = chartData.filter((item) => {
@@ -125,26 +120,31 @@ export function SubmissionsGraph() {
     })
 
     return (
-        <Card className="pt-0">
-            <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
-                <div className="grid flex-1 gap-1">
-                    <CardTitle>Submission Volume Over Time</CardTitle>
-                    <CardDescription>
-                        Showing total submissions from {dateStart.toLocaleDateString("en-CA", {month: "short",day: "numeric",})} to  
-                        {" "} { subDays(dateEnd,1).toLocaleDateString("en-CA", {month: "short",day: "numeric",})}
-                    </CardDescription>
+        <Card className="max-w-none">
+            <CardHeader className="gap-6">
+                <div className="flex flex-col gap-4">
+                    <CardAccent />
+                    <div className="grid gap-3">
+                        <CardTitle>Submission Volume Over Time</CardTitle>
+                        <CardDescription>
+                            Showing total submissions from {dateStart.toLocaleDateString("en-CA", { month: "short", day: "numeric" })} to
+                            {" "}
+                            {subDays(dateEnd, 1).toLocaleDateString("en-CA", { month: "short", day: "numeric" })}
+                        </CardDescription>
+                    </div>
                 </div>
-                <Field className="mx-auto w-44">
-                    <FieldLabel htmlFor="date-picker-simple">Start Date</FieldLabel>
-                    <DatePickerSimple date = {dateStart} setDate={setDateStart}/> 
-                </Field>
-                <Field className="mx-auto w-44">
-                    <FieldLabel htmlFor="date-picker-simple">End Date (Exclusive)</FieldLabel>
-                    <DatePickerSimple date = {dateEnd} setDate={setDateEnd}/>
-                </Field>
-        
+                <div className="flex flex-col gap-4 md:flex-row md:flex-wrap">
+                    <Field className="w-full max-w-44">
+                        <FieldLabel htmlFor="date-picker-simple">Start Date</FieldLabel>
+                        <DatePickerSimple date={dateStart} setDate={setDateStart} />
+                    </Field>
+                    <Field className="w-full max-w-44">
+                        <FieldLabel htmlFor="date-picker-simple">End Date (Exclusive)</FieldLabel>
+                        <DatePickerSimple date={dateEnd} setDate={setDateEnd} />
+                    </Field>
+                </div>
             </CardHeader>
-            <CardContent className="px-2 pt-6 sm:px-6 sm:pt-6">
+            <CardContent className="pt-2">
                 <ChartContainer
                     config={chartConfig}
                     className="aspect-auto h-[250px] w-full"

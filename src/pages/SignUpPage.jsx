@@ -1,4 +1,5 @@
 import { UserPlus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "../services/authApi.js";
@@ -123,18 +124,20 @@ export default function SignUpPage() {
         {error ? <p className="form-error">{error}</p> : null}
         {notice ? <p className="form-success">{notice}</p> : null}
 
-        <button className="primary-button" disabled={isSubmitting} type="submit">
+        <Button className="mt-3 w-full" disabled={isSubmitting} type="submit">
           <UserPlus aria-hidden="true" size={19} />
           <span>{isSubmitting ? "Creating account" : "Sign up"}</span>
-        </button>
+        </Button>
 
-        <button
-          className="text-button"
+        <Button
+          className="justify-self-center"
           onClick={() => navigate("/sign-in")}
           type="button"
+          variant="link"
+          size="sm"
         >
           Back to sign in
-        </button>
+        </Button>
       </form>
     </AuthPanel>
   );

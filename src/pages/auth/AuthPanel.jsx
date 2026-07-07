@@ -1,4 +1,5 @@
 import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 // shared page frame
 export default function AuthPanel({
@@ -14,15 +15,17 @@ export default function AuthPanel({
         <div className="login-panel">
           <div className="brand-lockup">
             {onBack ? (
-              <button
+              <Button
                 aria-label="Back to public user dashboard"
-                className="icon-button"
+                className="rounded-full"
                 disabled={isBackDisabled}
                 onClick={onBack}
                 type="button"
+                variant="outline"
+                size="icon"
               >
                 <ArrowLeft aria-hidden="true" size={22} />
-              </button>
+              </Button>
             ) : null}
             <div>
               <h1>{title}</h1>
