@@ -9,7 +9,8 @@
     "dev:server": "node --watch server/index.js",
     "dev:client": "vite --host 0.0.0.0",
     "start": "node server/index.js",
-    "test": "node --test tests/auth.api.test.js",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
+    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand --coverage",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "check:server": "node --check server/index.js && node --check server/app.js && node --check server/map-api-service/index.js && node --check server/routes/auth.js && node --check server/middleware/requireAuth.js && node --check server/lib/cookies.js && node --check server/lib/supabase.js"
@@ -47,6 +48,7 @@
     "@vitejs/plugin-react": "^6.0.2",
     "autoprefixer": "^10.5.0",
     "concurrently": "^8.2.2",
+    "jest": "^30.4.2",
     "vite": "^8.0.16"
   }
 }
