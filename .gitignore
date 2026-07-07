@@ -8,6 +8,7 @@ scripts/data/bundle/output/
 scripts/data/external/statcan/*.csv
 scripts/data/external/statcan/*.CSV
 dist/
+coverage/
 
 .env.local
 npm-debug.log*
