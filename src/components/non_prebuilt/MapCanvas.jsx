@@ -527,19 +527,24 @@ export function MapCanvas({
     }
 
     function pickInteractiveFeature(point) {
-      const daFeatures = map.queryRenderedFeatures(point, { layers: ["da-fill"] });
-      if (daFeatures.length) {
-        const feature = daFeatures[0];
-        const id = getFeatureId(feature, "DGUID");
-        if (id) return { type: "da", id };
+      if (map.getLayer("da-fill")) {
+
+        const daFeatures = map.queryRenderedFeatures(point, { layers: ["da-fill"] });
+        if (daFeatures.length) {
+          const feature = daFeatures[0];
+          const id = getFeatureId(feature, "DGUID");
+          if (id) return { type: "da", id };
+        }
       }
 
-      const fedFeatures = map.queryRenderedFeatures(point, { layers: ["fed-fill"] });
-      if (fedFeatures.length) {
-        const feature = fedFeatures[0];
-        if (isMvpFed(feature.properties)) return null;
-        const id = getFeatureId(feature, "fed_num");
-        if (id) return { type: "fed", id };
+      if (map.getLayer("fed-fill")) {
+        const fedFeatures = map.queryRenderedFeatures(point, { layers: ["fed-fill"] });
+        if (fedFeatures.length) {
+          const feature = fedFeatures[0];
+          if (isMvpFed(feature.properties)) return null;
+          const id = getFeatureId(feature, "fed_num");
+          if (id) return { type: "fed", id };
+        }
       }
 
       return null;

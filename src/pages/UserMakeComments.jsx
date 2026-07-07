@@ -1,5 +1,11 @@
-import { FeaturePlaceholder } from "@/components/non_prebuilt/FeaturePlaceholder.jsx";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
 export default function UserMakeComments() {
-  return <FeaturePlaceholder title="Make Comments" />;
+  return (
+    <div className="grid w-full gap-2">
+      <Textarea placeholder="Type your comment here."/>
+      <Button>Submit Comment</Button>
+    </div>
+  )
 }
