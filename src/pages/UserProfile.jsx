@@ -47,27 +47,33 @@ export default function UserProfile() {
   const [form, setForm] = useState(() => profileFormFromUser(user));
   const [otpForm, setOtpForm] = useState({ token: "" });
   const [otpRequired, setOtpRequired] = useState(false);
-  const [pendingPhoneLabel, setPendingPhoneLabel] = useState("");
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
 
   useEffect(() => {
-    setForm(profileFormFromUser(user));
-  }, [user]);
+    if (!otpRequired) {
+      setForm(profileFormFromUser(user));
+    }
+  }, [otpRequired, user]);
 
   function resetOtpState() {
     setOtpRequired(false);
-    setPendingPhoneLabel("");
     setOtpForm({ token: "" });
+  }
+
+  function handleStartEditingProfile() {
+    setIsEditingProfile(true);
+    setError("");
+    setStatus("");
   }
 
   function handleChange(event) {
     const { name, value } = event.target;
+    handleStartEditingProfile();
     setForm((currentForm) => ({ ...currentForm, [name]: value }));
-    setError("");
-    setStatus("");
 
     if (otpRequired) {
       resetOtpState();
@@ -75,19 +81,25 @@ export default function UserProfile() {
   }
 
   function handleProvinceChange(value) {
+    handleStartEditingProfile();
     setForm((currentForm) => ({ ...currentForm, province: value }));
-    setError("");
-    setStatus("");
 
     if (otpRequired) {
       resetOtpState();
     }
   }
 
+  function handleCancelChanges() {
+    setForm(profileFormFromUser(user));
+    setIsEditingProfile(false);
+    resetOtpState();
+    setError("");
+    setStatus("");
+  }
+
   function handleOtpChange(event) {
     setOtpForm({ token: event.target.value.replace(/\D/g, "").slice(0, 6) });
     setError("");
-    setStatus("");
   }
 
   async function handleSubmit(event) {
@@ -100,16 +112,28 @@ export default function UserProfile() {
       const result = await authApi.updatePublicProfile(form);
 
       if (result.otpRequired) {
+        const phoneLabel = result.phoneMasked || "";
+
+        markSignedIn(result.user);
+        setForm((currentForm) => ({
+          ...profileFormFromUser(result.user),
+          phoneNumber: currentForm.phoneNumber
+        }));
         setOtpRequired(true);
-        setPendingPhoneLabel(result.phoneMasked || "");
+        setIsEditingProfile(false);
         setOtpForm({ token: "" });
-        setStatus(result.message);
+        setStatus(
+          phoneLabel
+            ? `${result.message} Code sent to ${phoneLabel}.`
+            : result.message
+        );
         return;
       }
 
       markSignedIn(result.user);
       setForm(profileFormFromUser(result.user));
       resetOtpState();
+      setIsEditingProfile(false);
       setStatus(result.message);
     } catch (updateError) {
       setError(updateError.message);
@@ -130,6 +154,7 @@ export default function UserProfile() {
       markSignedIn(result.user);
       setForm(profileFormFromUser(result.user));
       resetOtpState();
+      setIsEditingProfile(false);
       setStatus(result.message);
     } catch (verifyError) {
       setError(verifyError.message);
@@ -154,7 +179,11 @@ export default function UserProfile() {
           <h1 className="text-xl font-semibold">Profile information</h1>
         </div>
 
-        <form className="grid max-w-2xl gap-4" onSubmit={handleSubmit}>
+        <form
+          className="grid max-w-2xl gap-4"
+          id="public-profile-form"
+          onSubmit={handleSubmit}
+        >
           <div className="grid gap-2">
             <Label htmlFor="public-profile-email">Email</Label>
             <Input
@@ -174,6 +203,7 @@ export default function UserProfile() {
                 id="public-profile-first-name"
                 name="firstName"
                 onChange={handleChange}
+                onFocus={handleStartEditingProfile}
                 required
                 value={form.firstName}
               />
@@ -186,6 +216,7 @@ export default function UserProfile() {
                 id="public-profile-last-name"
                 name="lastName"
                 onChange={handleChange}
+                onFocus={handleStartEditingProfile}
                 required
                 value={form.lastName}
               />
@@ -196,10 +227,19 @@ export default function UserProfile() {
             <Label htmlFor="public-profile-province">Province or territory</Label>
             <Select
               name="province"
+              onOpenChange={(open) => {
+                if (open) {
+                  handleStartEditingProfile();
+                }
+              }}
               onValueChange={handleProvinceChange}
               value={form.province}
             >
-              <SelectTrigger className="w-full" id="public-profile-province">
+              <SelectTrigger
+                className="w-full"
+                id="public-profile-province"
+                onFocus={handleStartEditingProfile}
+              >
                 <SelectValue placeholder="Select province or territory" />
               </SelectTrigger>
               <SelectContent>
@@ -220,6 +260,7 @@ export default function UserProfile() {
                 id="public-profile-postal-code"
                 name="postalCode"
                 onChange={handleChange}
+                onFocus={handleStartEditingProfile}
                 placeholder="A1A 1A1"
                 required
                 value={form.postalCode}
@@ -234,6 +275,7 @@ export default function UserProfile() {
                 inputMode="tel"
                 name="phoneNumber"
                 onChange={handleChange}
+                onFocus={handleStartEditingProfile}
                 placeholder="647-555-0001"
                 required
                 type="tel"
@@ -253,24 +295,13 @@ export default function UserProfile() {
             </p>
           ) : null}
 
-          <div className="flex flex-wrap gap-2">
-            <Button disabled={isSubmitting || isVerifying} type="submit">
-              <Save className="h-4 w-4" />
-              {isSubmitting ? "Saving" : "Save changes"}
-            </Button>
-          </div>
         </form>
 
         {otpRequired ? (
           <form
-            className="grid max-w-sm gap-3 border-t pt-5"
+            className="grid max-w-sm gap-3"
             onSubmit={handleVerifyOtp}
           >
-            {pendingPhoneLabel ? (
-              <p className="text-sm text-gray-600">
-                Code sent to {pendingPhoneLabel}
-              </p>
-            ) : null}
             <div className="grid gap-2">
               <Label htmlFor="public-profile-otp">Verification code</Label>
               <Input
@@ -290,6 +321,27 @@ export default function UserProfile() {
               {isVerifying ? "Verifying" : "Verify phone"}
             </Button>
           </form>
+        ) : null}
+
+        {isEditingProfile ? (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              disabled={isSubmitting || isVerifying}
+              form="public-profile-form"
+              type="submit"
+            >
+              <Save className="h-4 w-4" />
+              {isSubmitting ? "Saving" : "Save changes"}
+            </Button>
+            <Button
+              disabled={isSubmitting || isVerifying}
+              onClick={handleCancelChanges}
+              type="button"
+              variant="outline"
+            >
+              Cancel changes
+            </Button>
+          </div>
         ) : null}
       </section>
 
