@@ -2,18 +2,9 @@ import { createClient } from "@supabase/supabase-js";
 
 let supabaseClient;
 let supabaseAdminClient;
-let supabaseTestDoubles;
 
 const PROFILE_COLUMNS =
   "id,email,first_name,last_name,province,postal_code,phone,role,invited_by,created_at";
-
-export function setSupabaseTestDoubles(doubles = null) {
-  supabaseTestDoubles = doubles;
-}
-
-function getSupabaseTestDouble(name) {
-  return supabaseTestDoubles?.[name];
-}
 
 function getSupabaseConfig() {
   const supabaseUrl = process.env.SUPABASE_URL;
@@ -31,12 +22,6 @@ function getSupabaseConfig() {
 }
 
 export function getSupabaseClient() {
-  const testDouble = getSupabaseTestDouble("getSupabaseClient");
-
-  if (testDouble) {
-    return testDouble();
-  }
-
   if (supabaseClient) {
     return supabaseClient;
   }
@@ -55,12 +40,6 @@ export function getSupabaseClient() {
 }
 
 export async function signUpSupabaseUser({ email, emailRedirectTo, password }) {
-  const testDouble = getSupabaseTestDouble("signUpSupabaseUser");
-
-  if (testDouble) {
-    return testDouble({ email, emailRedirectTo, password });
-  }
-
   const { supabaseKey, supabaseUrl } = getSupabaseConfig();
   const url = new URL(`${supabaseUrl}/auth/v1/signup`);
 
@@ -96,12 +75,6 @@ export async function signUpSupabaseUser({ email, emailRedirectTo, password }) {
 }
 
 export async function resendSupabaseSignupConfirmation({ email, emailRedirectTo }) {
-  const testDouble = getSupabaseTestDouble("resendSupabaseSignupConfirmation");
-
-  if (testDouble) {
-    return testDouble({ email, emailRedirectTo });
-  }
-
   const supabase = getSupabaseClient();
   const { error } = await supabase.auth.resend({
     type: "signup",
@@ -173,22 +146,10 @@ function requireSupabaseAdminClient() {
 }
 
 export function isSupabaseAdminConfigured() {
-  const testDouble = getSupabaseTestDouble("isSupabaseAdminConfigured");
-
-  if (testDouble) {
-    return testDouble();
-  }
-
   return Boolean(getSupabaseAdminClient());
 }
 
 export async function findSupabaseAuthUserByEmail(email) {
-  const testDouble = getSupabaseTestDouble("findSupabaseAuthUserByEmail");
-
-  if (testDouble) {
-    return testDouble(email);
-  }
-
   const supabase = requireSupabaseAdminClient();
 
   const normalizedEmail = email.toLowerCase();
@@ -230,12 +191,6 @@ export async function findSupabaseAuthUserByEmail(email) {
 }
 
 export async function findSupabaseProfileByPhone(phone) {
-  const testDouble = getSupabaseTestDouble("findSupabaseProfileByPhone");
-
-  if (testDouble) {
-    return testDouble(phone);
-  }
-
   const supabase = requireSupabaseAdminClient();
 
   const { data, error } = await supabase
@@ -261,12 +216,6 @@ export async function inviteSupabaseCommissioner({
   invitedBy,
   redirectTo
 }) {
-  const testDouble = getSupabaseTestDouble("inviteSupabaseCommissioner");
-
-  if (testDouble) {
-    return testDouble({ email, invitedBy, redirectTo });
-  }
-
   const supabase = requireSupabaseAdminClient();
   const normalizedEmail = email.toLowerCase();
   const { data: existingPendingInvite, error: pendingLookupError } =
@@ -395,12 +344,6 @@ export async function inviteSupabaseCommissioner({
 }
 
 export async function getPendingCommissionerInvite(email) {
-  const testDouble = getSupabaseTestDouble("getPendingCommissionerInvite");
-
-  if (testDouble) {
-    return testDouble(email);
-  }
-
   const supabase = requireSupabaseAdminClient();
   const { data, error } = await supabase
     .from("pending_invites")
@@ -421,12 +364,6 @@ export async function getPendingCommissionerInvite(email) {
 }
 
 export async function consumePendingCommissionerInvite(email, invitedBy) {
-  const testDouble = getSupabaseTestDouble("consumePendingCommissionerInvite");
-
-  if (testDouble) {
-    return testDouble(email, invitedBy);
-  }
-
   const supabase = requireSupabaseAdminClient();
   const { error } = await supabase
     .from("pending_invites")
@@ -446,12 +383,6 @@ export async function consumePendingCommissionerInvite(email, invitedBy) {
 }
 
 export async function getSupabaseProfileAsAdmin(userId) {
-  const testDouble = getSupabaseTestDouble("getSupabaseProfileAsAdmin");
-
-  if (testDouble) {
-    return testDouble(userId);
-  }
-
   const supabase = requireSupabaseAdminClient();
   const { data, error } = await supabase
     .from("profiles")
@@ -472,12 +403,6 @@ export async function getSupabaseProfileAsAdmin(userId) {
 }
 
 export async function getSupabaseProfile(accessToken, userId) {
-  const testDouble = getSupabaseTestDouble("getSupabaseProfile");
-
-  if (testDouble) {
-    return testDouble(accessToken, userId);
-  }
-
   const supabase = getSupabaseUserClient(accessToken);
   const { data, error } = await supabase
     .from("profiles")
@@ -495,12 +420,6 @@ export async function getSupabaseProfile(accessToken, userId) {
 }
 
 export async function updateSupabaseProfile(accessToken, userId, updates) {
-  const testDouble = getSupabaseTestDouble("updateSupabaseProfile");
-
-  if (testDouble) {
-    return testDouble(accessToken, userId, updates);
-  }
-
   const supabase = getSupabaseUserClient(accessToken);
   const { data, error } = await supabase
     .from("profiles")
@@ -525,12 +444,6 @@ export async function updateSupabaseProfile(accessToken, userId, updates) {
 }
 
 export async function upsertSupabaseProfile(accessToken, profile) {
-  const testDouble = getSupabaseTestDouble("upsertSupabaseProfile");
-
-  if (testDouble) {
-    return testDouble(accessToken, profile);
-  }
-
   const supabase = getSupabaseUserClient(accessToken);
   const { data, error } = await supabase
     .from("profiles")
@@ -555,12 +468,6 @@ export async function upsertSupabaseProfile(accessToken, profile) {
 }
 
 export async function startSupabasePhoneVerification(accessToken, phone) {
-  const testDouble = getSupabaseTestDouble("startSupabasePhoneVerification");
-
-  if (testDouble) {
-    return testDouble(accessToken, phone);
-  }
-
   const { supabaseKey, supabaseUrl } = getSupabaseConfig();
   const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
     method: "PUT",
@@ -590,12 +497,6 @@ export async function startSupabasePhoneVerification(accessToken, phone) {
 }
 
 export async function verifySupabasePhoneChange(accessToken, phone, token) {
-  const testDouble = getSupabaseTestDouble("verifySupabasePhoneChange");
-
-  if (testDouble) {
-    return testDouble(accessToken, phone, token);
-  }
-
   const supabase = getSupabaseUserClient(accessToken);
   const { data, error } = await supabase.auth.verifyOtp({
     phone,
