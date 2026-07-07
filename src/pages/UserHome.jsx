@@ -76,9 +76,6 @@ export default function UserHome() {
             className={`map-dashboard${isFullscreen ? " map-dashboard--fullscreen" : ""}`}
           >
             <section className="map-dashboard__main" aria-label="Map workspace">
-              {!isFullscreen ? (
-                <div className="map-dashboard__spacer" aria-hidden="true" />
-              ) : null}
               <div className="map-dashboard__map-wrap">
                 <div className="map-dashboard__status" aria-live="polite">
                   {status}

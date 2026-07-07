@@ -32,6 +32,8 @@ import SignUpPage from "./pages/SignUpPage.jsx";
 
 import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
 
+import AuditLogPage from "./pages/AuditLogTable/AuditLogPage.jsx";
+
 
 
 function RequireCommissioner() {
@@ -133,6 +135,8 @@ function App() {
           <Route path="/dashboard" element={<DashboardHome />} />
 
           <Route path="/dashboard/graphs" element={<DashboardGraphs />} />
+
+          <Route path="/dashboard/auditlog" element={<AuditLogPage />} />
 
           <Route
 
