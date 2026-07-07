@@ -194,6 +194,26 @@ function buildHandleFeatureCollection(handles, selectedHandleId) {
   };
 }
 
+function updateBoundaryFeatureCollection(boundaryGeoJson, fromCoordinate, toCoordinate) {
+  const fromKey = coordinateKey(fromCoordinate);
+
+  return {
+    type: "FeatureCollection",
+    features: boundaryGeoJson.features.map((feature) => ({
+      ...feature,
+      geometry:
+        feature.geometry?.type === "LineString"
+          ? {
+              ...feature.geometry,
+              coordinates: feature.geometry.coordinates.map((coordinate) =>
+                coordinateKey(coordinate) === fromKey ? [...toCoordinate] : [...coordinate],
+              ),
+            }
+          : feature.geometry,
+    })),
+  };
+}
+
 function projectLngLatToMeters(coordinate) {
   const lng = coordinate[0] * (Math.PI / 180);
   const lat = Math.max(Math.min(coordinate[1], 89.9), -89.9) * (Math.PI / 180);
@@ -571,7 +591,15 @@ export function selectCounterProposalHandle(cache, handleId) {
     return cache;
   }
 
-  return rebuildCounterProposalCache(cache, cache.currentFeatures, handleId);
+  if (cache.selectedHandleId === handleId) {
+    return cache;
+  }
+
+  return {
+    ...cache,
+    selectedHandleId: handleId,
+    handleFeatureCollection: buildHandleFeatureCollection(cache.handles, handleId),
+  };
 }
 
 export function previewCounterProposalHandleMove(cache, handleId, nextCoordinate) {
@@ -617,7 +645,35 @@ export function previewCounterProposalHandleMove(cache, handleId, nextCoordinate
     );
   });
 
-  return rebuildCounterProposalCache(cache, nextCurrentFeatures, handleId);
+  const nextHandles = cache.handles.map((entry) =>
+    entry.id === handleId
+      ? {
+          ...entry,
+          coordinate: [...nextCoordinate],
+        }
+      : entry,
+  );
+
+  return {
+    ...cache,
+    currentFeatures: nextCurrentFeatures,
+    currentFeatureCollection: createFeatureCollection(nextCurrentFeatures),
+    sharedBoundaryGeoJson: updateBoundaryFeatureCollection(
+      cache.sharedBoundaryGeoJson,
+      handle.coordinate,
+      nextCoordinate,
+    ),
+    handles: nextHandles,
+    handleFeatureCollection: buildHandleFeatureCollection(nextHandles, handleId),
+    selectedHandleId: handleId,
+    impacts: buildImpactSummary(
+      cache.originalFeatures,
+      nextCurrentFeatures,
+      cache.populationByDguid,
+      cache.firstDguid,
+      cache.secondDguid,
+    ),
+  };
 }
 
 export function commitCounterProposalCacheHistory(cache, baselineSnapshot = null) {

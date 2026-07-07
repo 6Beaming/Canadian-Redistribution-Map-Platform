@@ -1023,17 +1023,20 @@ export function MapCanvas({
       onFedSelect?.(hit.id, fedName);
     };
 
+    const pushCounterProposalDragMove = (nextCoordinate) => {
+      counterProposalDragRef.current = {
+        ...counterProposalDragRef.current,
+        moved: true,
+      };
+      map.getCanvas().style.cursor = "grabbing";
+      onCounterProposalDragMoveRef.current?.(
+        counterProposalDragRef.current.id,
+        nextCoordinate,
+      );
+    };
+
     const onMouseMove = (event) => {
       if (counterProposalDragRef.current) {
-        counterProposalDragRef.current = {
-          ...counterProposalDragRef.current,
-          moved: true,
-        };
-        map.getCanvas().style.cursor = "grabbing";
-        onCounterProposalDragMoveRef.current?.(counterProposalDragRef.current.id, [
-          event.lngLat.lng,
-          event.lngLat.lat,
-        ]);
         return;
       }
 
@@ -1080,6 +1083,21 @@ export function MapCanvas({
       onCounterProposalHandleSelectRef.current?.(hit.id);
     };
 
+    const onWindowMouseMove = (event) => {
+      if (!counterProposalDragRef.current) {
+        return;
+      }
+
+      const canvasRect = map.getCanvas().getBoundingClientRect();
+      const projectedPoint = [
+        event.clientX - canvasRect.left,
+        event.clientY - canvasRect.top,
+      ];
+      const lngLat = map.unproject(projectedPoint);
+
+      pushCounterProposalDragMove([lngLat.lng, lngLat.lat]);
+    };
+
     const onMouseUp = () => {
       if (!counterProposalDragRef.current) {
         return;
@@ -1104,6 +1122,8 @@ export function MapCanvas({
     map.on("mousemove", onMouseMove);
     map.on("mouseout", onMouseOut);
     map.on("zoom", onZoom);
+    window.addEventListener("mousemove", onWindowMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
 
     map.on("load", async () => {
       try {
@@ -1194,6 +1214,8 @@ export function MapCanvas({
       map.off("mousemove", onMouseMove);
       map.off("mouseout", onMouseOut);
       map.off("zoom", onZoom);
+      window.removeEventListener("mousemove", onWindowMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
       map.remove();
       mapRef.current = null;
       maplibregl.removeProtocol("pmtiles");
