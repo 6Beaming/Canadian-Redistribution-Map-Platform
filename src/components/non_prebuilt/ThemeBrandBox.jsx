@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 const EXPANSION_DURATION_MS = 3000;
 
-export function ThemeBrandBox({ className }) {
+export function ThemeBrandBox({ className, disableMobileExpansion = false }) {
   const containerRef = useRef(null);
   const titleRef = useRef(null);
   const cooldownRef = useRef(null);
@@ -58,7 +58,7 @@ export function ThemeBrandBox({ className }) {
   }, []);
 
   useEffect(() => {
-    if (!isMobile) {
+    if (!isMobile || disableMobileExpansion) {
       setIsExpanded(false);
       setIsCoolingDown(false);
       setIsTruncated(false);
@@ -104,10 +104,10 @@ export function ThemeBrandBox({ className }) {
       resizeObserver?.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [isMobile]);
+  }, [disableMobileExpansion, isMobile]);
 
   function handleExpand() {
-    if (!isMobile || !isTruncated || isCoolingDown) {
+    if (!isMobile || disableMobileExpansion || !isTruncated || isCoolingDown) {
       return;
     }
 
@@ -128,7 +128,7 @@ export function ThemeBrandBox({ className }) {
   }
 
   function handleKeyDown(event) {
-    if (!isMobile || !isTruncated || isCoolingDown) {
+    if (!isMobile || disableMobileExpansion || !isTruncated || isCoolingDown) {
       return;
     }
 
@@ -138,7 +138,7 @@ export function ThemeBrandBox({ className }) {
     }
   }
 
-  const isInteractive = isMobile && isTruncated;
+  const isInteractive = isMobile && isTruncated && !disableMobileExpansion;
 
   return (
     <div

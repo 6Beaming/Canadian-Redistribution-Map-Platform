@@ -2,8 +2,8 @@ export const MVP_FED_NUM = "60001";
 export const FED_COUNT = 343;
 export const FED_SOURCE_LAYER = "fed2023_districts";
 
-export const SELECTED_COLOR = "#006064";
-export const HOVER_COLOR = "#00e5ff";
+export const SELECTED_COLOR = "#e8a0a0";
+export const HOVER_COLOR = "#f4d03f";
 
 export const OUTLINE_ZOOM = {
   DA_MIN: 9

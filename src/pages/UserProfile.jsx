@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, KeyRound, Save } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { KeyRound, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +10,6 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
-import { ProfileSignOutButton } from "@/components/non_prebuilt/ProfileSignOutButton.jsx";
 import { useAuth } from "@/contexts/AuthContext.jsx";
 import { authApi } from "@/services/authApi.js";
 
@@ -42,7 +40,6 @@ function profileFormFromUser(user) {
 }
 
 export default function UserProfile() {
-  const navigate = useNavigate();
   const { markSignedIn, user } = useAuth();
   const [form, setForm] = useState(() => profileFormFromUser(user));
   const [otpForm, setOtpForm] = useState({ token: "" });
@@ -164,23 +161,16 @@ export default function UserProfile() {
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto flex flex-col gap-6">
-      <Button
-        variant="outline"
-        className="w-fit"
-        onClick={() => navigate("/users")}
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to map
-      </Button>
-
-      <section className="flex flex-col gap-5 rounded-xl border p-6">
-        <div>
-          <h1 className="text-xl font-semibold">Profile information</h1>
+    <div className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
+      <section className="flex flex-col items-center gap-5 rounded-[24px] border border-[#d7e6fb] bg-white/92 p-6 text-center shadow-[0_16px_38px_rgba(26,115,232,0.08)]">
+        <div className="w-full">
+          <h2 className="text-xl font-semibold text-[#17324d]">
+            Profile Information
+          </h2>
         </div>
 
         <form
-          className="grid max-w-2xl gap-4"
+          className="grid w-full max-w-2xl gap-4 text-left"
           id="public-profile-form"
           onSubmit={handleSubmit}
         >
@@ -197,7 +187,7 @@ export default function UserProfile() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="public-profile-first-name">First name</Label>
+              <Label htmlFor="public-profile-first-name">First Name</Label>
               <Input
                 autoComplete="given-name"
                 id="public-profile-first-name"
@@ -210,7 +200,7 @@ export default function UserProfile() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="public-profile-last-name">Last name</Label>
+              <Label htmlFor="public-profile-last-name">Last Name</Label>
               <Input
                 autoComplete="family-name"
                 id="public-profile-last-name"
@@ -224,7 +214,7 @@ export default function UserProfile() {
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="public-profile-province">Province or territory</Label>
+            <Label htmlFor="public-profile-province">Province Or Territory</Label>
             <Select
               name="province"
               onOpenChange={(open) => {
@@ -254,7 +244,7 @@ export default function UserProfile() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="public-profile-postal-code">Postal code</Label>
+              <Label htmlFor="public-profile-postal-code">Postal Code</Label>
               <Input
                 autoComplete="postal-code"
                 id="public-profile-postal-code"
@@ -268,7 +258,7 @@ export default function UserProfile() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="public-profile-phone">Phone</Label>
+              <Label htmlFor="public-profile-phone">Phone Number</Label>
               <Input
                 autoComplete="tel"
                 id="public-profile-phone"
@@ -299,11 +289,11 @@ export default function UserProfile() {
 
         {otpRequired ? (
           <form
-            className="grid max-w-sm gap-3"
+            className="grid w-full max-w-sm gap-3 text-left"
             onSubmit={handleVerifyOtp}
           >
             <div className="grid gap-2">
-              <Label htmlFor="public-profile-otp">Verification code</Label>
+              <Label htmlFor="public-profile-otp">Verification Code</Label>
               <Input
                 autoComplete="one-time-code"
                 id="public-profile-otp"
@@ -318,34 +308,32 @@ export default function UserProfile() {
             </div>
             <Button disabled={isSubmitting || isVerifying} type="submit">
               <KeyRound className="h-4 w-4" />
-              {isVerifying ? "Verifying" : "Verify phone"}
+              {isVerifying ? "Verifying" : "Verify Phone"}
             </Button>
           </form>
         ) : null}
 
         {isEditingProfile ? (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap justify-center gap-2">
             <Button
               disabled={isSubmitting || isVerifying}
               form="public-profile-form"
               type="submit"
             >
               <Save className="h-4 w-4" />
-              {isSubmitting ? "Saving" : "Save changes"}
+              {isSubmitting ? "Saving" : "Save Changes"}
             </Button>
             <Button
               disabled={isSubmitting || isVerifying}
               onClick={handleCancelChanges}
               type="button"
-              variant="outline"
+              variant="destructive"
             >
-              Cancel changes
+              Cancel Changes
             </Button>
           </div>
         ) : null}
       </section>
-
-      <ProfileSignOutButton />
     </div>
   );
 }

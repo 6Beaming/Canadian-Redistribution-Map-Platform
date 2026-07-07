@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
 import { HorizontalTabs } from "@/components/ui/horizontal-tabs";
 import iconSrc from "@/assets/icon.svg";
 import { DEFAULT_ROLLOUT_CATEGORY_ID, ROLLOUT_CATEGORIES } from "@/lib/map/rolloutPlan.js";
@@ -12,11 +11,26 @@ export function MapRegionSelector({
 }) {
   const containerRef = useRef(null);
   const measureRef = useRef(null);
-  const [openWidth, setOpenWidth] = useState(344);
-  const [openHeight, setOpenHeight] = useState(118);
+  const [openWidth, setOpenWidth] = useState(520);
+  const [openHeight, setOpenHeight] = useState(58);
   const activeCategory =
     ROLLOUT_CATEGORIES.find((category) => category.id === value) ??
     ROLLOUT_CATEGORIES[0];
+
+  function getTargetWidth() {
+    if (typeof window === "undefined") {
+      return 420;
+    }
+
+    const mapCanvas =
+      containerRef.current?.parentElement?.querySelector(".map-canvas");
+    const baseWidth =
+      mapCanvas?.clientWidth ??
+      containerRef.current?.parentElement?.clientWidth ??
+      window.innerWidth;
+
+    return Math.max(50, Math.floor(baseWidth * 0.8));
+  }
 
   const tabItems = useMemo(
     () =>
@@ -33,11 +47,13 @@ export function MapRegionSelector({
         return;
       }
 
-      const measuredWidth = measureRef.current.scrollWidth;
+      const nextWidth = getTargetWidth();
+      measureRef.current.style.width = `${nextWidth}px`;
+
       const measuredHeight = measureRef.current.scrollHeight;
 
-      setOpenWidth(Math.max(300, Math.min(window.innerWidth - 32, measuredWidth + 20)));
-      setOpenHeight(Math.max(108, measuredHeight + 18));
+      setOpenWidth(nextWidth);
+      setOpenHeight(Math.max(50, measuredHeight + 8));
     }
 
     updateMeasurements();
@@ -46,33 +62,7 @@ export function MapRegionSelector({
     return () => {
       window.removeEventListener("resize", updateMeasurements);
     };
-  }, [value]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return undefined;
-    }
-
-    function handlePointerDown(event) {
-      if (!containerRef.current?.contains(event.target)) {
-        onOpenChange?.(false);
-      }
-    }
-
-    function handleKeyDown(event) {
-      if (event.key === "Escape") {
-        onOpenChange?.(false);
-      }
-    }
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen, onOpenChange]);
+  }, [isOpen, value]);
 
   function handleToggle() {
     const nextOpen = !isOpen;
@@ -84,6 +74,10 @@ export function MapRegionSelector({
     onOpenChange?.(nextOpen);
   }
 
+  function stopMapEvent(event) {
+    event.stopPropagation();
+  }
+
   return (
     <div
       ref={containerRef}
@@ -92,6 +86,9 @@ export function MapRegionSelector({
         "--map-region-selector-open-width": `${openWidth}px`,
         "--map-region-selector-open-height": `${openHeight}px`,
       }}
+      onPointerDown={stopMapEvent}
+      onClick={stopMapEvent}
+      onDoubleClick={stopMapEvent}
     >
       <button
         type="button"
@@ -104,10 +101,6 @@ export function MapRegionSelector({
         <span className="map-region-selector__icon-shell">
           <img src={iconSrc} alt="" className="map-region-selector__icon" />
         </span>
-        <span className="map-region-selector__label">
-          {activeCategory?.label ?? "Effected"}
-        </span>
-        <ChevronDown className="map-region-selector__chevron" aria-hidden="true" />
       </button>
 
       <div className="map-region-selector__tabs">
@@ -127,10 +120,6 @@ export function MapRegionSelector({
             <span className="map-region-selector__icon-shell">
               <img src={iconSrc} alt="" className="map-region-selector__icon" />
             </span>
-            <span className="map-region-selector__label map-region-selector__label--visible">
-              {activeCategory?.label ?? "Effected"}
-            </span>
-            <ChevronDown className="map-region-selector__chevron map-region-selector__chevron--visible" />
           </div>
           <div className="map-region-selector__measure-tabs">
             {ROLLOUT_CATEGORIES.map((category) => (

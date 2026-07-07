@@ -13,15 +13,15 @@ export const ROLLOUT_CATEGORIES = [
   {
     id: "data-blocked",
     label: "Data Blocked",
-    color: "#8b5cf6",
-    accentColor: "#f1e8ff",
+    color: "#b39af4",
+    accentColor: "#f5f0ff",
     description: "FED geometry exists, but required DA inputs are blocked by missing bundle assets.",
   },
   {
     id: "developing",
     label: "Developing",
-    color: "#4caf68",
-    accentColor: "#e8f8ec",
+    color: "#2f8f4d",
+    accentColor: "#e2f4e8",
     description: "Secondary FEDs selected for the next buildout wave.",
   },
   {

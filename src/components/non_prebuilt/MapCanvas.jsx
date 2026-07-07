@@ -42,6 +42,8 @@ const EXPAND_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
 
 const EXIT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4H4v5"/><path d="M15 4h5v5"/><path d="M9 20H4v-5"/><path d="M15 20h5v-5"/></svg>`;
 
+const MAP_BOUNDARY_COLOR = "#000000";
+
 function createFullscreenControl(buttonRef, getIsFullscreen, onToggle) {
   return {
     onAdd() {
@@ -120,11 +122,15 @@ function fedFillPaint() {
     ],
     "fill-outline-color": [
       "case",
+      ["boolean", ["feature-state", "selected"], false],
+      MAP_BOUNDARY_COLOR,
+      ["boolean", ["feature-state", "hover"], false],
+      MAP_BOUNDARY_COLOR,
       ["boolean", ["feature-state", "rolloutVisible"], false],
-      ["coalesce", ["feature-state", "rolloutColor"], "#2a2a2a"],
+      MAP_BOUNDARY_COLOR,
       fedNumMatch(),
-      "#0d2137",
-      "#2a2a2a"
+      MAP_BOUNDARY_COLOR,
+      MAP_BOUNDARY_COLOR
     ],
     "fill-opacity": [
       "case",
@@ -145,10 +151,10 @@ function fedOutlinePaint() {
     "line-color": [
       "case",
       ["boolean", ["feature-state", "rolloutVisible"], false],
-      ["coalesce", ["feature-state", "rolloutColor"], "#2a2a2a"],
+      MAP_BOUNDARY_COLOR,
       fedNumMatch(),
-      "#0d2137",
-      "#2a2a2a"
+      MAP_BOUNDARY_COLOR,
+      MAP_BOUNDARY_COLOR
     ],
     "line-width": [
       "interpolate",
@@ -161,12 +167,7 @@ function fedOutlinePaint() {
       10,
       ["case", fedNumMatch(), 3.5, 2.4]
     ],
-    "line-opacity": [
-      "case",
-      ["boolean", ["feature-state", "rolloutVisible"], false],
-      ["case", ["boolean", ["feature-state", "blinkHidden"], false], 0.35, 1],
-      1
-    ]
+    "line-opacity": 1
   };
 }
 
@@ -186,6 +187,8 @@ function isMvpFed(properties) {
 
 export function MapCanvas({
   isFullscreen = false,
+  selection = null,
+  externalHoverSelection = null,
   onDaSelect,
   onFedSelect,
   onStatusChange,
@@ -201,8 +204,11 @@ export function MapCanvas({
   const fedNameLookupRef = useRef(new Map());
   const selectionRef = useRef({ da: null, fed: null });
   const hoverRef = useRef({ da: null, fed: null });
+  const externalHoverRef = useRef({ da: null, fed: null });
   const fedSourceModeRef = useRef("pmtiles");
   const setFedStateRef = useRef(null);
+  const applySelectionRef = useRef(null);
+  const applyExternalHoverRef = useRef(null);
   const blinkIntervalRef = useRef(null);
   const isMapReadyRef = useRef(false);
   const [mapReadyTick, setMapReadyTick] = useState(0);
@@ -236,6 +242,22 @@ export function MapCanvas({
   }, [isFullscreen]);
 
   useEffect(() => {
+    if (!isMapReadyRef.current || !applySelectionRef.current) {
+      return;
+    }
+
+    applySelectionRef.current(selection);
+  }, [selection, mapReadyTick]);
+
+  useEffect(() => {
+    if (!isMapReadyRef.current || !applyExternalHoverRef.current) {
+      return;
+    }
+
+    applyExternalHoverRef.current(externalHoverSelection);
+  }, [externalHoverSelection, mapReadyTick]);
+
+  useEffect(() => {
     const setFedState = setFedStateRef.current;
 
     if (!setFedState || !isMapReadyRef.current) {
@@ -257,16 +279,6 @@ export function MapCanvas({
 
     const allAreas = getAllRolloutAreas();
 
-    if (!rolloutEnabled) {
-      allAreas.forEach((area) => {
-        safeSetFedState(area.fedNum, {
-          rolloutVisible: false,
-          blinkHidden: false
-        });
-      });
-      return undefined;
-    }
-
     allAreas.forEach((area) => {
       safeSetFedState(area.fedNum, {
         rolloutVisible: true,
@@ -274,6 +286,10 @@ export function MapCanvas({
         blinkHidden: false
       });
     });
+
+    if (!rolloutEnabled) {
+      return undefined;
+    }
 
     const activeAreas = rolloutCategoryId ? getRolloutAreas(rolloutCategoryId) : [];
 
@@ -351,6 +367,23 @@ export function MapCanvas({
     }
 
     setFedStateRef.current = setFedFeatureState;
+
+    function normalizeDaId(target) {
+      if (!target) {
+        return null;
+      }
+
+      return target.type === "da" ? target.dguid ?? target.id ?? null : null;
+    }
+
+    function normalizeFedId(target) {
+      if (!target || target.type !== "fed") {
+        return null;
+      }
+
+      const fedNum = target.fedNum ?? target.id ?? null;
+      return fedNum != null ? String(fedNum) : null;
+    }
 
     function addFedFillLayer(useVectorTiles) {
       const layer = {
@@ -451,8 +484,10 @@ export function MapCanvas({
           "line-color": [
             "case",
             ["boolean", ["feature-state", "selected"], false],
-            "#b7950b",
-            "#3d5a73"
+            MAP_BOUNDARY_COLOR,
+            ["boolean", ["feature-state", "hover"], false],
+            MAP_BOUNDARY_COLOR,
+            MAP_BOUNDARY_COLOR
           ],
           "line-width": [
             "interpolate",
@@ -461,7 +496,7 @@ export function MapCanvas({
             OUTLINE_ZOOM.DA_MIN,
             0,
             OUTLINE_ZOOM.DA_MIN + 2,
-            ["case", ["boolean", ["feature-state", "selected"], false], 1.4, 0.6]
+            ["case", ["boolean", ["feature-state", "selected"], false], 1.6, 0.9]
           ],
           "line-opacity": [
             "interpolate",
@@ -470,7 +505,7 @@ export function MapCanvas({
             OUTLINE_ZOOM.DA_MIN,
             0,
             OUTLINE_ZOOM.DA_MIN + 1,
-            0.9
+            1
           ]
         }
       });
@@ -586,62 +621,100 @@ export function MapCanvas({
       clearFedSelection();
     }
 
-    function applySelection(hit) {
-      clearAllSelection();
-      if (hit.type === "da") {
-        selectionRef.current.da = hit.id;
-        map.setFeatureState({ source: "das", id: hit.id }, { selected: true });
+    function refreshDaHover(daId) {
+      if (daId === null || daId === undefined) {
         return;
       }
-      selectionRef.current.fed = hit.id;
-      setFedFeatureState(hit.id, { selected: true });
+
+      const shouldHover =
+        hoverRef.current.da === daId || externalHoverRef.current.da === daId;
+      map.setFeatureState({ source: "das", id: daId }, { hover: shouldHover });
     }
 
-    function clearHover() {
-      const { da, fed } = hoverRef.current;
-      if (da !== null && da !== undefined) {
-        map.setFeatureState({ source: "das", id: da }, { hover: false });
+    function refreshFedHover(fedId) {
+      if (fedId === null || fedId === undefined) {
+        return;
       }
-      if (fed !== null && fed !== undefined) {
-        setFedFeatureState(fed, { hover: false });
-      }
-      hoverRef.current = { da: null, fed: null };
+
+      const shouldHover =
+        hoverRef.current.fed === fedId || externalHoverRef.current.fed === fedId;
+      setFedFeatureState(fedId, { hover: shouldHover });
     }
 
-    function updateHover(hit) {
-      const nextDaId = hit?.type === "da" ? hit.id : null;
-      const nextFedId = hit?.type === "fed" ? hit.id : null;
-      const { da: hoveredDaId, fed: hoveredFedNum } = hoverRef.current;
-
-      if (hoveredDaId === nextDaId && hoveredFedNum === nextFedId) return;
-
-      if (hoveredDaId !== null && hoveredDaId !== undefined && hoveredDaId !== nextDaId) {
-        map.setFeatureState({ source: "das", id: hoveredDaId }, { hover: false });
-      }
-      if (
-        hoveredFedNum !== null &&
-        hoveredFedNum !== undefined &&
-        hoveredFedNum !== nextFedId
-      ) {
-        setFedFeatureState(hoveredFedNum, { hover: false });
-      }
+    function setInternalHover(hit) {
+      const nextDaId = normalizeDaId(hit);
+      const nextFedId = normalizeFedId(hit);
+      const previousDaId = hoverRef.current.da;
+      const previousFedId = hoverRef.current.fed;
 
       hoverRef.current = { da: nextDaId, fed: nextFedId };
 
-      if (nextDaId !== null && nextDaId !== undefined) {
-        map.setFeatureState({ source: "das", id: nextDaId }, { hover: true });
+      if (previousDaId !== nextDaId) {
+        refreshDaHover(previousDaId);
       }
-      if (nextFedId !== null && nextFedId !== undefined) {
-        setFedFeatureState(nextFedId, { hover: true });
+      if (previousFedId !== nextFedId) {
+        refreshFedHover(previousFedId);
+      }
+      if (nextDaId !== previousDaId) {
+        refreshDaHover(nextDaId);
+      }
+      if (nextFedId !== previousFedId) {
+        refreshFedHover(nextFedId);
       }
     }
+
+    function setExternalHover(hit) {
+      const nextDaId = normalizeDaId(hit);
+      const nextFedId = normalizeFedId(hit);
+      const previousDaId = externalHoverRef.current.da;
+      const previousFedId = externalHoverRef.current.fed;
+
+      externalHoverRef.current = { da: nextDaId, fed: nextFedId };
+
+      if (previousDaId !== nextDaId) {
+        refreshDaHover(previousDaId);
+      }
+      if (previousFedId !== nextFedId) {
+        refreshFedHover(previousFedId);
+      }
+      if (nextDaId !== previousDaId) {
+        refreshDaHover(nextDaId);
+      }
+      if (nextFedId !== previousFedId) {
+        refreshFedHover(nextFedId);
+      }
+    }
+
+    function applySelectionTarget(target) {
+      clearAllSelection();
+
+      const nextDaId = normalizeDaId(target);
+      if (nextDaId !== null && nextDaId !== undefined) {
+        selectionRef.current.da = nextDaId;
+        map.setFeatureState({ source: "das", id: nextDaId }, { selected: true });
+        return;
+      }
+
+      const nextFedId = normalizeFedId(target);
+      if (nextFedId !== null && nextFedId !== undefined) {
+        selectionRef.current.fed = nextFedId;
+        setFedFeatureState(nextFedId, { selected: true });
+      }
+    }
+
+    applySelectionRef.current = applySelectionTarget;
+    applyExternalHoverRef.current = setExternalHover;
 
     const onClick = (event) => {
       const hit = pickInteractiveFeature(event.point);
       if (!hit) return;
 
-      clearHover();
-      applySelection(hit);
+      setInternalHover(null);
+      applySelectionTarget(
+        hit.type === "da"
+          ? { type: "da", dguid: hit.id }
+          : { type: "fed", fedNum: hit.id },
+      );
 
       if (hit.type === "da") {
         onDaSelect?.(hit.id);
@@ -656,16 +729,16 @@ export function MapCanvas({
     const onMouseMove = (event) => {
       const hit = pickInteractiveFeature(event.point);
       if (!hit) {
-        clearHover();
+        setInternalHover(null);
         map.getCanvas().style.cursor = "";
         return;
       }
       map.getCanvas().style.cursor = "pointer";
-      updateHover(hit);
+      setInternalHover(hit);
     };
 
     const onMouseOut = () => {
-      clearHover();
+      setInternalHover(null);
       map.getCanvas().style.cursor = "";
     };
 
@@ -753,6 +826,8 @@ export function MapCanvas({
         blinkIntervalRef.current = null;
       }
       setFedStateRef.current = null;
+      applySelectionRef.current = null;
+      applyExternalHoverRef.current = null;
       map.off("click", onClick);
       map.off("mousemove", onMouseMove);
       map.off("mouseout", onMouseOut);

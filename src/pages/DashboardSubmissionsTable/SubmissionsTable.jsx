@@ -41,6 +41,9 @@ export default function SubmissionsTable({ columns, data, onRowClick }) {
     const table = useReactTable({
         data,
         columns,
+        meta: {
+            onReviewInWorkspace: onRowClick,
+        },
         getCoreRowModel: getCoreRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
         onSortingChange: setSorting,
@@ -68,7 +71,7 @@ export default function SubmissionsTable({ columns, data, onRowClick }) {
 
     return (
         <div>
-            <div className="flex items-center py-4">
+            <div className="flex items-center gap-[10px] py-4">
                 <Input
                     placeholder="Filter ridings..."
                     value={(table.getColumn("riding")?.getFilterValue()) ?? ""}
@@ -77,10 +80,18 @@ export default function SubmissionsTable({ columns, data, onRowClick }) {
                     }
                     className="max-w-sm"
                 />
-                <DatePickerSimple date = {dateStart} setDate={setDateStart}/>
-                <DatePickerSimple date = {dateEnd} setDate={setDateEnd}/>
+                <DatePickerSimple
+                    date={dateStart}
+                    setDate={setDateStart}
+                    className="h-10 min-w-[160px] justify-start px-5 py-2 text-sm font-normal"
+                />
+                <DatePickerSimple
+                    date={dateEnd}
+                    setDate={setDateEnd}
+                    className="h-10 min-w-[160px] justify-start px-5 py-2 text-sm font-normal"
+                />
                 <DropdownMenu>
-                    <DropdownMenuTrigger className="ml-auto">
+                    <DropdownMenuTrigger className="h-10 min-w-[160px] px-5 py-2 text-sm">
                         Submission Type
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
@@ -159,12 +170,6 @@ export default function SubmissionsTable({ columns, data, onRowClick }) {
                                 <TableRow
                                     key={row.id}
                                     data-state={row.getIsSelected() && "selected"}
-                                    className={onRowClick ? "cursor-pointer" : undefined}
-                                    onClick={
-                                        onRowClick
-                                            ? () => onRowClick(row.original)
-                                            : undefined
-                                    }
                                 >
                                     {row.getVisibleCells().map((cell) => (
                                         <TableCell key={cell.id}>
@@ -183,23 +188,28 @@ export default function SubmissionsTable({ columns, data, onRowClick }) {
                     </TableBody>
                 </Table>
             </div>
-            <div className="flex items-center justify-end space-x-2 py-4">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => table.previousPage()}
-                    disabled={!table.getCanPreviousPage()}
-                >
-                    Previous
-                </Button>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => table.nextPage()}
-                    disabled={!table.getCanNextPage()}
-                >
-                    Next
-                </Button>
+            <div className="flex items-center justify-between py-4">
+                <p className="text-sm text-gray-500">
+                    Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+                </p>
+                <div className="flex items-center space-x-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => table.previousPage()}
+                        disabled={!table.getCanPreviousPage()}
+                    >
+                        Previous
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => table.nextPage()}
+                        disabled={!table.getCanNextPage()}
+                    >
+                        Next
+                    </Button>
+                </div>
             </div>
         </div>
     )

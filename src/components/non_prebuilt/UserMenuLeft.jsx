@@ -3,7 +3,7 @@ import { ChevronRight, Menu } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const MENU_ITEMS = [
-  { id: "search-da", label: "Search For My DA", path: "/users/search-da" },
+  { id: "search-da", label: "Search For My Area", path: "/users/search-da" },
   { id: "submissions", label: "View My Submissions", path: "/submissions" },
 ];
 

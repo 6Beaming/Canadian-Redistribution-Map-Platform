@@ -27,7 +27,7 @@ import { ArrowUpDown } from "lucide-react"
 const columns = [
     {
         id: "actions",
-        cell: ({ row }) => {
+        cell: ({ row, table }) => {
             const submission = row.original
 
             return (
@@ -41,6 +41,11 @@ const columns = [
                             onClick={() => navigator.clipboard.writeText(submission.id)}
                         >
                             Copy submission ID
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onSelect={() => table.options.meta?.onReviewInWorkspace?.(submission)}
+                        >
+                            Review this in the workspace
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem>View author of submission</DropdownMenuItem>

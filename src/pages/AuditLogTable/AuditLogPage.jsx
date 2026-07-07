@@ -1,6 +1,3 @@
-/* source from https://ui.shadcn.com/docs/components/radix/data-table#basic-table */
-
-import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
 import columns from "./AuditLogColumns"
@@ -256,22 +253,20 @@ const auditLogs = [
 export default function AuditLogPage() {
     const navigate = useNavigate();
     return (
-
-        <div >
-            <div className="w-full flex justify-center bg-white py-10 ">
+        <div className="px-4 py-6 md:px-6">
+            <div className="mx-auto flex max-w-6xl flex-col gap-6">
+            <div className="w-full flex justify-center rounded-[28px] border border-[#d7e6fb] bg-white/92 py-10 shadow-[0_18px_42px_rgba(26,115,232,0.08)]">
                 <h1 className="text-5xl font-bold text-primary">
                     Audit Log
                 </h1>
             </div>
-            <div className="px-15">
-                <Button onClick={() => navigate(-1)}>
-                    Back
-                </Button>
+            <div>
                 <AuditLogTable
                     columns={columns}
                     data={auditLogs}
                     onRowClick={() => navigate("/dashboard/workspace")}
                 />
+            </div>
             </div>
         </div>
     )

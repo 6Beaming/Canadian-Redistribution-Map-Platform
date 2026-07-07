@@ -1,4 +1,4 @@
-import { ArrowLeft, BarChart3, Files, UserCheck } from "lucide-react";
+import { BarChart3, Files, UserCheck } from "lucide-react";
 import { SubmissionsGraph } from "@/components/non_prebuilt/submissionsGraph";
 import { Button } from "@/components/ui/button";
 import { Card, CardAccent, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,13 +27,6 @@ export default function DashboardGraphs() {
               </div>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button
-                variant="outline"
-                onClick={() => navigate("/dashboard")}
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back To Map
-              </Button>
               <Button onClick={() => navigate("/dashboard/submissionsTable")}>
                 <Files className="h-4 w-4" />
                 All Submission

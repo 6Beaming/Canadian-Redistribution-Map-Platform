@@ -12,6 +12,7 @@ import "@/styles/map.css";
 export default function UserHome() {
   const [status, setStatus] = useState("Loading map...");
   const [selection, setSelection] = useState(null);
+  const [rolloutHoverSelection, setRolloutHoverSelection] = useState(null);
   const [profilesByDguid, setProfilesByDguid] = useState(new Map());
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [panelView, setPanelView] = useState(getDefaultPanelView("user"));
@@ -85,12 +86,22 @@ export default function UserHome() {
     };
   }, [isFullscreen]);
 
+  useEffect(() => {
+    if (!isRolloutOpen) {
+      setRolloutHoverSelection(null);
+    }
+  }, [isRolloutOpen]);
+
   const handleDaSelect = useCallback((dguid) => {
     setSelection({ type: "da", dguid });
+    setRolloutHoverSelection(null);
+    setIsRolloutOpen(false);
   }, []);
 
   const handleFedSelect = useCallback((fedNum, fedName) => {
     setSelection({ type: "fed", fedNum, fedName });
+    setRolloutHoverSelection(null);
+    setIsRolloutOpen(false);
   }, []);
 
   const handleStatusChange = useCallback((message) => {
@@ -99,6 +110,16 @@ export default function UserHome() {
 
   const handleToggleFullscreen = useCallback(() => {
     setIsFullscreen((current) => !current);
+  }, []);
+
+  const handleRolloutHoverChange = useCallback((nextHoverSelection) => {
+    setRolloutHoverSelection(nextHoverSelection);
+  }, []);
+
+  const handleRolloutSelect = useCallback((nextSelection) => {
+    setSelection(nextSelection);
+    setRolloutHoverSelection(null);
+    setIsRolloutOpen(false);
   }, []);
 
   return (
@@ -135,6 +156,8 @@ export default function UserHome() {
               />
               <MapCanvas
                 isFullscreen={isFullscreen}
+                selection={selection}
+                externalHoverSelection={rolloutHoverSelection}
                 onDaSelect={handleDaSelect}
                 onFedSelect={handleFedSelect}
                 onStatusChange={handleStatusChange}
@@ -152,6 +175,8 @@ export default function UserHome() {
             panelView={panelView}
             rolloutEnabled={isRolloutOpen}
             rolloutCategoryId={rolloutCategoryId}
+            onRolloutHoverChange={handleRolloutHoverChange}
+            onRolloutSelect={handleRolloutSelect}
           />
         </div>
       </div>

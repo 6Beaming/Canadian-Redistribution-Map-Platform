@@ -1,4 +1,14 @@
-import { Card, CardAccent, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAccent,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { MISSING_DA_POPULATION, MVP_FED_NUM } from "@/lib/map/constants.js";
 import { getDaPanelTitle, getDaPopulationDisplay } from "@/lib/map/profileUtils.js";
 
@@ -109,6 +119,36 @@ function FedSummary({ fedNum, fedName }) {
   );
 }
 
+function WorkspaceCardButton() {
+  const navigate = useNavigate();
+
+  return (
+    <Button
+      className="min-w-0 px-4 py-2 text-[13px]"
+      size="sm"
+      variant="outline"
+      onClick={() => navigate("/dashboard/workspace")}
+    >
+      <svg
+        aria-hidden="true"
+        className="h-4 w-4"
+        viewBox="0 0 20 20"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M6 14L14 6M8 6H14V12"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      Workspace
+    </Button>
+  );
+}
+
 export function CommissionerSubmissionCollections({
   panelView,
   selection,
@@ -168,7 +208,12 @@ export function CommissionerSubmissionCollections({
           {collection.cards.map((card, index) => (
             <Card key={`${collection.title}-${index}`} size="sm" className="max-w-none">
               <CardHeader>
-                <CardAccent />
+                <div className="flex items-start justify-between gap-3">
+                  <CardAccent className="mt-2 shrink-0" />
+                  <CardAction className="shrink-0">
+                    <WorkspaceCardButton />
+                  </CardAction>
+                </div>
                 <div className="space-y-1">
                   <CardTitle>{card.title}</CardTitle>
                   <CardDescription>{card.subtitle}</CardDescription>
