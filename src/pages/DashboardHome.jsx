@@ -7,6 +7,7 @@ import { buildProfileIndex } from "@/lib/map/profileUtils.js";
 import "@/styles/map.css";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { FeaturePlaceholder } from "@/components/non_prebuilt/FeaturePlaceholder.jsx";
 
 export default function DashboardHome() {
   const navigate = useNavigate();
@@ -120,9 +121,6 @@ export default function DashboardHome() {
             className={`map-dashboard${isFullscreen ? " map-dashboard--fullscreen" : ""}`}
           >
             <section className="map-dashboard__main" aria-label="Map workspace">
-              {!isFullscreen ? (
-                <div className="map-dashboard__spacer" aria-hidden="true" />
-              ) : null}
               <div className="map-dashboard__map-wrap">
                 <div className="map-dashboard__status" aria-live="polite">
                   {status}
@@ -134,6 +132,9 @@ export default function DashboardHome() {
                   onStatusChange={handleStatusChange}
                   onToggleFullscreen={handleToggleFullscreen}
                 />
+              </div>
+              <div className="map-dashboard__panel map-dashboard__placeholder">
+                <FeaturePlaceholder title="Comissioner Map Widget" />
               </div>
             </section>
 
