@@ -136,6 +136,26 @@ function validateCommissionerProfile(body) {
   };
 }
 
+function validateCommissionerOnboardingProfile(body) {
+  const validation = validateCommissionerProfile(body);
+  const province = requiredString(body?.province).toUpperCase();
+
+  if (validation.error) {
+    return validation;
+  }
+
+  if (!VALID_PROVINCES.has(province)) {
+    return { error: "Select a valid province or territory." };
+  }
+
+  return {
+    profile: {
+      ...validation.profile,
+      province
+    }
+  };
+}
+
 function validateCommissionerInvite(body) {
   if (
     !body ||
@@ -203,12 +223,23 @@ function pendingOtpState(pendingProfile) {
   };
 }
 
-function pendingProfileResponse(user, profile = null, pendingProfile = null) {
-  const otpState = pendingOtpState(pendingProfile);
+function pendingProfileResponse(
+  user,
+  profile = null,
+  pendingProfile = null,
+  pendingInvite = null
+) {
+  const otpState = pendingInvite ? null : pendingOtpState(pendingProfile);
+  const pendingUser = publicUser(user, profile);
+
+  if (pendingInvite) {
+    pendingUser.role = "commissioner";
+    pendingUser.profileComplete = false;
+  }
 
   return {
     profileRequired: true,
-    user: publicUser(user, profile),
+    user: pendingUser,
     ...(otpState || {})
   };
 }
@@ -286,9 +317,11 @@ async function applySessionCookiesForUser(res, session, user) {
   const publicUserData = publicUser(user, profile);
 
   if (!publicUserData.profileComplete) {
+    const pendingInvite = await getPendingCommissionerInvite(user.email);
+
     clearAuthenticatedSessionCookies(res);
     setPendingSessionCookies(res, session);
-    return pendingProfileResponse(user, profile);
+    return pendingProfileResponse(user, profile, null, pendingInvite);
   }
 
   clearPendingSessionCookies(res);
@@ -460,21 +493,77 @@ router.get("/profile-session", requirePendingProfileAuth, async (req, res, next)
       return;
     }
 
-    res.json(pendingProfileResponse(req.user, profile, pendingProfile));
+    const pendingInvite = await getPendingCommissionerInvite(req.user.email);
+
+    res.json(
+      pendingProfileResponse(req.user, profile, pendingProfile, pendingInvite)
+    );
   } catch (error) {
     next(error);
   }
 });
 
 router.post("/profile", requirePendingProfileAuth, async (req, res, next) => {
-  const validation = validatePublicProfile(req.body);
-
-  if (validation.error) {
-    res.status(400).json({ error: validation.error });
-    return;
-  }
-
   try {
+    const pendingInvite = await getPendingCommissionerInvite(req.user.email);
+
+    if (pendingInvite) {
+      const validation = validateCommissionerOnboardingProfile(req.body);
+
+      if (validation.error) {
+        res.status(400).json({ error: validation.error });
+        return;
+      }
+
+      const inviterProfile = await getSupabaseProfileAsAdmin(
+        pendingInvite.invited_by
+      );
+
+      if (!inviterProfile || inviterProfile.role !== "commissioner") {
+        res.status(403).json({
+          error: "The commissioner invitation is no longer valid."
+        });
+        return;
+      }
+
+      const completedProfile = await upsertSupabaseProfile(req.accessToken, {
+        email: req.user.email,
+        first_name: validation.profile.firstName,
+        id: req.user.id,
+        invited_by: pendingInvite.invited_by,
+        last_name: validation.profile.lastName,
+        profile_completed: true,
+        province: validation.profile.province,
+        role: "commissioner"
+      });
+
+      await consumePendingCommissionerInvite(
+        req.user.email,
+        pendingInvite.invited_by
+      );
+
+      const user = publicUser(req.user, completedProfile);
+
+      clearPendingSessionCookies(res);
+      setSessionCookies(res, {
+        access_token: req.accessToken,
+        expires_in: 3600,
+        refresh_token: req.refreshToken
+      });
+      res.status(200).json({
+        message: "Commissioner profile completed.",
+        user
+      });
+      return;
+    }
+
+    const validation = validatePublicProfile(req.body);
+
+    if (validation.error) {
+      res.status(400).json({ error: validation.error });
+      return;
+    }
+
     const {
       firstName,
       lastName,
@@ -544,9 +633,17 @@ router.post(
 
       const existingProfile = await getSupabaseProfile(req.accessToken, req.user.id);
       const pendingInvite = await getPendingCommissionerInvite(req.user.email);
+      const invitedAsCommissioner = pendingProfile.invitedAsCommissioner === true;
       const inviterProfile = pendingInvite
         ? await getSupabaseProfileAsAdmin(pendingInvite.invited_by)
         : null;
+
+      if (invitedAsCommissioner && !pendingInvite) {
+        res.status(403).json({
+          error: "The commissioner invitation is no longer valid."
+        });
+        return;
+      }
 
       if (
         pendingInvite &&

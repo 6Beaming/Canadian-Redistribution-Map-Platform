@@ -112,6 +112,16 @@ export default function useAuthOnboarding() {
 
     try {
       const result = await authApi.completeProfile(profileForm);
+
+      if (result.user) {
+        clearPendingProfile();
+        setProfileForm(initialProfileForm);
+        setOtpForm(initialOtpForm);
+        markSignedIn(result.user);
+        navigateToRoleHome(result.user);
+        return;
+      }
+
       setPendingPhoneLabel(result.phoneMasked || profileForm.phoneNumber);
       setOtpForm(initialOtpForm);
       setNotice(result.message || "Verification code sent.");

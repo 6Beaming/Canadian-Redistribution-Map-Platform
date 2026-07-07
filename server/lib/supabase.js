@@ -248,13 +248,8 @@ export async function inviteSupabaseCommissioner({
 
     if (existingUser) {
       const existingProfile = await getSupabaseProfileAsAdmin(existingUser.id);
-      const hasAcceptedInvite = Boolean(
-        existingProfile ||
-          existingUser.email_confirmed_at ||
-          existingUser.confirmed_at
-      );
 
-      if (hasAcceptedInvite) {
+      if (existingProfile) {
         const inviteError = new Error(
           "This invitation has already been accepted. The colleague can sign in to continue."
         );
@@ -263,6 +258,9 @@ export async function inviteSupabaseCommissioner({
         throw inviteError;
       }
 
+      // A clicked invite can leave behind a confirmed auth user before the
+      // password/profile flow finishes. The pending invite is still the source
+      // of truth, so remove that stale auth row before resending.
       const { error: deleteError } =
         await supabase.auth.admin.deleteUser(existingUser.id);
 
