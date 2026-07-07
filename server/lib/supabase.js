@@ -4,7 +4,7 @@ let supabaseClient;
 let supabaseAdminClient;
 
 const PROFILE_COLUMNS =
-  "id,email,first_name,last_name,province,postal_code,phone,role,profile_completed,invited_by,created_at";
+  "id,email,first_name,last_name,province,postal_code,phone,role,invited_by,created_at";
 
 function getSupabaseConfig() {
   const supabaseUrl = process.env.SUPABASE_URL;

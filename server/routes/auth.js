@@ -184,8 +184,7 @@ function validateCommissionerInvite(body) {
 
 function isPublicProfileComplete(profile) {
   return Boolean(
-    profile?.profile_completed &&
-      profile.first_name &&
+    profile?.first_name &&
       profile.last_name &&
       profile.province &&
       profile.postal_code &&
@@ -223,7 +222,6 @@ function publicProfileUpdates(user, profile) {
     last_name: profile.lastName,
     phone: profile.phoneNational,
     postal_code: profile.postalCode,
-    profile_completed: true,
     province: profile.province,
     role: "public_user"
   };
@@ -549,7 +547,6 @@ router.post("/profile", requirePendingProfileAuth, async (req, res, next) => {
         id: req.user.id,
         invited_by: pendingInvite.invited_by,
         last_name: validation.profile.lastName,
-        profile_completed: true,
         province: validation.profile.province,
         role: "commissioner"
       });
@@ -680,7 +677,6 @@ router.post(
         last_name: pendingProfile.lastName,
         phone: pendingProfile.phoneNational,
         postal_code: pendingProfile.postalCode,
-        profile_completed: true,
         province: inviterProfile?.province || pendingProfile.province,
         role: pendingInvite
           ? "commissioner"
