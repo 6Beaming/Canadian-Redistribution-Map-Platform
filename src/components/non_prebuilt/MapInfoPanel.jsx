@@ -409,6 +409,18 @@ export function MapInfoPanel({
   variant = "user",
   rolloutEnabled = false,
   rolloutCategoryId,
+  objectionGeometryIndex,
+  objectionWorkflow,
+  onObjectionBackStep,
+  onObjectionConfirmReview,
+  counterProposalWorkflow,
+  onCounterProposalBackStep,
+  onCounterProposalConfirmCache,
+  onCounterProposalConfirmEdit,
+  onCounterProposalConfirmPreview,
+  onCounterProposalPreviewModeChange,
+  onCounterProposalRedo,
+  onCounterProposalUndo,
   onRolloutHoverChange,
   onRolloutSelect,
 }) {
@@ -675,7 +687,7 @@ export function MapInfoPanel({
     }
 
     if (variant === "user") {
-      if (!hasSelection) {
+      if (!hasSelection && panelView === "statistics") {
         return (
           <UserViewStatistics
             selection={selection}
@@ -694,13 +706,30 @@ export function MapInfoPanel({
         case "objection":
           return (
             <div className="map-info-panel__embedded">
-              <UserMakeObjection />
+              <UserMakeObjection
+                geometryIndex={objectionGeometryIndex}
+                onBackStep={onObjectionBackStep}
+                onConfirmReview={onObjectionConfirmReview}
+                profilesByDguid={profilesByDguid}
+                workflow={objectionWorkflow}
+              />
             </div>
           );
         case "counter-proposal":
           return (
             <div className="map-info-panel__embedded">
-              <UserMakeCounterProposal />
+              <UserMakeCounterProposal
+                geometryIndex={objectionGeometryIndex}
+                onBackStep={onCounterProposalBackStep}
+                onConfirmCache={onCounterProposalConfirmCache}
+                onConfirmEdit={onCounterProposalConfirmEdit}
+                onConfirmPreview={onCounterProposalConfirmPreview}
+                onPreviewModeChange={onCounterProposalPreviewModeChange}
+                onRedo={onCounterProposalRedo}
+                onUndo={onCounterProposalUndo}
+                profilesByDguid={profilesByDguid}
+                workflow={counterProposalWorkflow}
+              />
             </div>
           );
         case "statistics":

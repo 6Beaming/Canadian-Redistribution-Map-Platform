@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,13 +51,13 @@ function FieldHoverHint({ message }) {
 
 function ProfileField({ id, label, value, disabled, message, type = "text" }) {
   return (
-    <div className="group/comment-control grid gap-2">
+    <div className="group/comment-control grid min-w-0 gap-2">
       <Label htmlFor={id}>{label}</Label>
       <Input
         className={
           disabled
-            ? "cursor-not-allowed bg-gray-100 text-gray-500"
-            : "cursor-default bg-[#f8fbff] text-[#3c4043]"
+            ? "min-w-0 cursor-not-allowed bg-gray-100 text-gray-500"
+            : "min-w-0 cursor-default bg-[#f8fbff] text-[#3c4043]"
         }
         disabled={disabled}
         id={id}
@@ -75,36 +75,9 @@ export default function UserMakeComments() {
   const isSignedIn = sessionStatus === "signed-in";
   const profile = useMemo(() => getProfileSnapshot(user), [user]);
   const [comment, setComment] = useState("");
-  const [error, setError] = useState("");
-  const [status, setStatus] = useState("");
-
-  useEffect(() => {
-    setError("");
-    setStatus("");
-  }, [isSignedIn, user]);
 
   function handleCommentChange(event) {
     setComment(event.target.value);
-    setError("");
-    setStatus("");
-  }
-
-  function handleSubmit(event) {
-    event.preventDefault();
-
-    if (!isSignedIn) {
-      return;
-    }
-
-    if (!comment.trim()) {
-      setError("Please enter a comment before submitting.");
-      setStatus("");
-      return;
-    }
-
-    setComment("");
-    setError("");
-    setStatus("Comment saved locally in the current demo.");
   }
 
   const profileFieldMessage = isSignedIn ? PROFILE_SYNC_NOTICE : SIGN_IN_NOTICE;
@@ -112,15 +85,15 @@ export default function UserMakeComments() {
   const emailFieldMessage = isSignedIn ? "" : SIGN_IN_NOTICE;
 
   return (
-    <section className="grid gap-5">
+    <section className="grid min-w-0 gap-5 overflow-x-hidden">
       <div className="grid gap-1">
         <h2 className="text-[18px] font-semibold text-[#17324d]">Make Comments</h2>
         <p className="text-sm text-[#5f6368]">
-          Review the synchronized profile information below and add your comment for the selected area.
+          Review the synchronized profile information below and draft your comment for the current area. This view is front-end only and does not submit or store data.
         </p>
       </div>
 
-      <form className="grid gap-4" onSubmit={handleSubmit}>
+      <form className="grid min-w-0 gap-4 overflow-x-hidden">
         <ProfileField
           disabled
           id="comment-profile-email"
@@ -172,13 +145,13 @@ export default function UserMakeComments() {
           />
         </div>
 
-        <div className="group/comment-control grid gap-2">
+        <div className="group/comment-control grid min-w-0 gap-2">
           <Label htmlFor="comment-content">Comment Input</Label>
           <Textarea
             className={
               isSignedIn
-                ? "min-h-32 bg-white text-[#3c4043]"
-                : "min-h-32 cursor-not-allowed bg-gray-100 text-gray-500"
+                ? "min-h-32 w-full bg-white text-[#3c4043]"
+                : "min-h-32 w-full cursor-not-allowed bg-gray-100 text-gray-500"
             }
             disabled={!isSignedIn}
             id="comment-content"
@@ -189,20 +162,9 @@ export default function UserMakeComments() {
           <FieldHoverHint message={commentFieldMessage} />
         </div>
 
-        {error ? (
-          <p className="form-error" role="alert">
-            {error}
-          </p>
-        ) : null}
-        {status ? (
-          <p className="form-success" role="status">
-            {status}
-          </p>
-        ) : null}
-
         <div className="group/comment-control grid gap-2">
-          <div className="flex flex-wrap gap-3">
-            <Button disabled={!isSignedIn} type="submit">
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <Button disabled={!isSignedIn} type="button">
               Submit Comment
             </Button>
           </div>

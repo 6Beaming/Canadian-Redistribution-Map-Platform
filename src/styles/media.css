@@ -298,6 +298,7 @@
     min-height: 0;
     max-height: none;
     width: 80dvw;
+    overflow: hidden;
     z-index: 53;
     opacity: 1;
     visibility: visible;
@@ -441,6 +442,13 @@
     height: 6px;
     border-radius: 999px;
     background: #c7dafb;
+  }
+
+  .map-info-panel--floating .map-info-panel__content,
+  .map-info-panel--floating .map-info-panel__body,
+  .map-info-panel--floating .map-info-panel__embedded,
+  .map-info-panel--floating .map-info-panel__view {
+    overflow-x: hidden;
   }
 
   .map-info-panel__content,
