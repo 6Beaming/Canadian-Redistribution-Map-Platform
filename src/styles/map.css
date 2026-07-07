@@ -1,3 +1,8 @@
+/*chat gpt design for heatmap button*/
+.heatmap-button.active {
+  outline: 2px solid #006064;
+}
+
 .map-dashboard {
   display: grid;
   grid-template-columns: 3fr 1fr;
@@ -72,6 +77,11 @@
   overflow: hidden;
 }
 
+.map-dashboard--fullscreen .map-dashboard__placeholder {
+  flex: 0 0 80px;
+  min-height: 20%;
+}
+
 .map-dashboard__main {
   display: flex;
   flex-direction: column;
@@ -88,7 +98,7 @@
 
 .map-dashboard__map-wrap {
   position: relative;
-  flex: 0 0 66.666vh;
+  flex: 3;
   width: 100%;
   padding: 12px 14px 12px 14px;
   box-sizing: border-box;
