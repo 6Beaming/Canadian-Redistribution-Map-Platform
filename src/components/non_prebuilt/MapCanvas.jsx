@@ -17,6 +17,8 @@ import {
   buildFedNameLookup,
   buildProfileIndex
 } from "@/lib/map/profileUtils.js";
+import { emptyBoundaryFeatureCollection } from "@/lib/map/objectionWorkflow.js";
+import { emptyCounterProposalFeatureCollection } from "@/lib/map/counterProposalWorkflow.js";
 import {
   applyLabelScale,
   DA_LABEL_ZOOM,
@@ -43,6 +45,8 @@ const EXPAND_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
 const EXIT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4H4v5"/><path d="M15 4h5v5"/><path d="M9 20H4v-5"/><path d="M15 20h5v-5"/></svg>`;
 
 const MAP_BOUNDARY_COLOR = "#000000";
+const EMPTY_OBJECTION_BOUNDARY = emptyBoundaryFeatureCollection();
+const EMPTY_COUNTER_PROPOSAL_FEATURES = emptyCounterProposalFeatureCollection();
 
 function createFullscreenControl(buttonRef, getIsFullscreen, onToggle) {
   return {
@@ -189,6 +193,12 @@ export function MapCanvas({
   isFullscreen = false,
   selection = null,
   externalHoverSelection = null,
+  objectionPreview = null,
+  counterProposalPreview = null,
+  onCounterProposalDragEnd,
+  onCounterProposalDragMove,
+  onCounterProposalDragStart,
+  onCounterProposalHandleSelect,
   onDaSelect,
   onFedSelect,
   onStatusChange,
@@ -202,6 +212,7 @@ export function MapCanvas({
   const onToggleFullscreenRef = useRef(onToggleFullscreen);
   const isFullscreenRef = useRef(isFullscreen);
   const fedNameLookupRef = useRef(new Map());
+  const latestSelectionPropRef = useRef(selection);
   const selectionRef = useRef({ da: null, fed: null });
   const hoverRef = useRef({ da: null, fed: null });
   const externalHoverRef = useRef({ da: null, fed: null });
@@ -209,12 +220,27 @@ export function MapCanvas({
   const setFedStateRef = useRef(null);
   const applySelectionRef = useRef(null);
   const applyExternalHoverRef = useRef(null);
+  const applyObjectionPreviewRef = useRef(null);
+  const applyCounterProposalPreviewRef = useRef(null);
   const blinkIntervalRef = useRef(null);
+  const counterProposalPreviewRef = useRef(counterProposalPreview);
+  const onCounterProposalHandleSelectRef = useRef(onCounterProposalHandleSelect);
+  const onCounterProposalDragStartRef = useRef(onCounterProposalDragStart);
+  const onCounterProposalDragMoveRef = useRef(onCounterProposalDragMove);
+  const onCounterProposalDragEndRef = useRef(onCounterProposalDragEnd);
+  const counterProposalDragRef = useRef(null);
+  const skipNextClickRef = useRef(false);
   const isMapReadyRef = useRef(false);
   const [mapReadyTick, setMapReadyTick] = useState(0);
 
   onToggleFullscreenRef.current = onToggleFullscreen;
   isFullscreenRef.current = isFullscreen;
+  latestSelectionPropRef.current = selection;
+  counterProposalPreviewRef.current = counterProposalPreview;
+  onCounterProposalHandleSelectRef.current = onCounterProposalHandleSelect;
+  onCounterProposalDragStartRef.current = onCounterProposalDragStart;
+  onCounterProposalDragMoveRef.current = onCounterProposalDragMove;
+  onCounterProposalDragEndRef.current = onCounterProposalDragEnd;
 
   useEffect(() => {
     const button = fullscreenBtnRef.current;
@@ -256,6 +282,22 @@ export function MapCanvas({
 
     applyExternalHoverRef.current(externalHoverSelection);
   }, [externalHoverSelection, mapReadyTick]);
+
+  useEffect(() => {
+    if (!isMapReadyRef.current || !applyObjectionPreviewRef.current) {
+      return;
+    }
+
+    applyObjectionPreviewRef.current(objectionPreview);
+  }, [mapReadyTick, objectionPreview]);
+
+  useEffect(() => {
+    if (!isMapReadyRef.current || !applyCounterProposalPreviewRef.current) {
+      return;
+    }
+
+    applyCounterProposalPreviewRef.current(counterProposalPreview);
+  }, [counterProposalPreview, mapReadyTick]);
 
   useEffect(() => {
     const setFedState = setFedStateRef.current;
@@ -511,6 +553,189 @@ export function MapCanvas({
       });
     }
 
+    function addObjectionBoundaryLayers() {
+      map.addSource("objection-boundary", {
+        type: "geojson",
+        data: EMPTY_OBJECTION_BOUNDARY
+      });
+
+      map.addLayer({
+        id: "objection-boundary-glow",
+        type: "line",
+        source: "objection-boundary",
+        layout: {
+          "line-join": "round",
+          "line-cap": "round"
+        },
+        paint: {
+          "line-color": "#ff4b4b",
+          "line-width": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            4,
+            6,
+            8,
+            12
+          ],
+          "line-opacity": 0.32,
+          "line-blur": 1.2
+        }
+      });
+
+      map.addLayer({
+        id: "objection-boundary-line",
+        type: "line",
+        source: "objection-boundary",
+        layout: {
+          "line-join": "round",
+          "line-cap": "round"
+        },
+        paint: {
+          "line-color": "#d93025",
+          "line-width": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            4,
+            2.4,
+            8,
+            4.4
+          ],
+          "line-opacity": 1
+        }
+      });
+    }
+
+    function addCounterProposalLayers() {
+      map.addSource("counter-proposal", {
+        type: "geojson",
+        data: EMPTY_COUNTER_PROPOSAL_FEATURES,
+        promoteId: "DGUID",
+      });
+
+      map.addLayer({
+        id: "counter-proposal-fill",
+        type: "fill",
+        source: "counter-proposal",
+        paint: {
+          "fill-color": "#7aa8f8",
+          "fill-opacity": 0.58,
+          "fill-outline-color": MAP_BOUNDARY_COLOR,
+        },
+      });
+
+      map.addLayer({
+        id: "counter-proposal-outline",
+        type: "line",
+        source: "counter-proposal",
+        layout: {
+          "line-join": "round",
+          "line-cap": "round",
+        },
+        paint: {
+          "line-color": MAP_BOUNDARY_COLOR,
+          "line-width": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            4,
+            1.2,
+            8,
+            2.2,
+            11,
+            3.2,
+          ],
+          "line-opacity": 1,
+        },
+      });
+
+      map.addSource("counter-proposal-boundary", {
+        type: "geojson",
+        data: EMPTY_OBJECTION_BOUNDARY,
+      });
+
+      map.addLayer({
+        id: "counter-proposal-boundary-glow",
+        type: "line",
+        source: "counter-proposal-boundary",
+        layout: {
+          "line-join": "round",
+          "line-cap": "round",
+        },
+        paint: {
+          "line-color": "#ff4b4b",
+          "line-width": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            4,
+            8,
+            8,
+            14,
+          ],
+          "line-opacity": 0.26,
+          "line-blur": 1.1,
+        },
+      });
+
+      map.addLayer({
+        id: "counter-proposal-boundary-line",
+        type: "line",
+        source: "counter-proposal-boundary",
+        layout: {
+          "line-join": "round",
+          "line-cap": "round",
+        },
+        paint: {
+          "line-color": "#d93025",
+          "line-width": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            4,
+            2.8,
+            8,
+            5,
+          ],
+          "line-opacity": 1,
+        },
+      });
+
+      map.addSource("counter-proposal-handles", {
+        type: "geojson",
+        data: EMPTY_COUNTER_PROPOSAL_FEATURES,
+      });
+
+      map.addLayer({
+        id: "counter-proposal-handles",
+        type: "circle",
+        source: "counter-proposal-handles",
+        paint: {
+          "circle-radius": [
+            "case",
+            ["boolean", ["get", "selected"], false],
+            8,
+            6,
+          ],
+          "circle-color": [
+            "case",
+            ["boolean", ["get", "selected"], false],
+            "#1a73e8",
+            "#ffffff",
+          ],
+          "circle-stroke-width": [
+            "case",
+            ["boolean", ["get", "selected"], false],
+            3,
+            2,
+          ],
+          "circle-stroke-color": "#1a73e8",
+          "circle-opacity": 0.98,
+        },
+      });
+    }
+
     function syncDaOutlineVisibility() {
       if (!map.getLayer("da-outline")) return;
       const visible = map.getZoom() >= OUTLINE_ZOOM.DA_MIN ? "visible" : "none";
@@ -584,6 +809,20 @@ export function MapCanvas({
     }
 
     function pickInteractiveFeature(point) {
+      if (counterProposalPreviewRef.current?.editable) {
+        const handleFeatures = map.queryRenderedFeatures(point, {
+          layers: ["counter-proposal-handles"],
+        });
+        const handleId = handleFeatures[0]?.properties?.id;
+
+        if (handleId) {
+          return {
+            type: "counter-proposal-handle",
+            id: String(handleId),
+          };
+        }
+      }
+
       const daFeatures = map.queryRenderedFeatures(point, { layers: ["da-fill"] });
       if (daFeatures.length) {
         const feature = daFeatures[0];
@@ -702,11 +941,69 @@ export function MapCanvas({
       }
     }
 
+    function applyObjectionPreview(nextPreview) {
+      const source = map.getSource("objection-boundary");
+
+      if (!source || typeof source.setData !== "function") {
+        return;
+      }
+
+      source.setData(nextPreview?.boundaryGeoJson ?? EMPTY_OBJECTION_BOUNDARY);
+    }
+
+    function applyCounterProposalPreview(nextPreview) {
+      const proposalSource = map.getSource("counter-proposal");
+      const boundarySource = map.getSource("counter-proposal-boundary");
+      const handleSource = map.getSource("counter-proposal-handles");
+
+      if (proposalSource && typeof proposalSource.setData === "function") {
+        proposalSource.setData(
+          nextPreview?.featureCollection ?? EMPTY_COUNTER_PROPOSAL_FEATURES,
+        );
+      }
+
+      if (boundarySource && typeof boundarySource.setData === "function") {
+        boundarySource.setData(
+          nextPreview?.boundaryGeoJson ?? EMPTY_OBJECTION_BOUNDARY,
+        );
+      }
+
+      if (handleSource && typeof handleSource.setData === "function") {
+        handleSource.setData(
+          nextPreview?.handleFeatureCollection ?? EMPTY_COUNTER_PROPOSAL_FEATURES,
+        );
+      }
+
+      if (nextPreview) {
+        clearAllSelection();
+        return;
+      }
+
+      applySelectionTarget(latestSelectionPropRef.current);
+    }
+
     applySelectionRef.current = applySelectionTarget;
     applyExternalHoverRef.current = setExternalHover;
+    applyObjectionPreviewRef.current = applyObjectionPreview;
+    applyCounterProposalPreviewRef.current = applyCounterProposalPreview;
 
     const onClick = (event) => {
+      if (skipNextClickRef.current) {
+        skipNextClickRef.current = false;
+        return;
+      }
+
       const hit = pickInteractiveFeature(event.point);
+
+      if (hit?.type === "counter-proposal-handle") {
+        onCounterProposalHandleSelectRef.current?.(hit.id);
+        return;
+      }
+
+      if (counterProposalPreviewRef.current) {
+        return;
+      }
+
       if (!hit) return;
 
       setInternalHover(null);
@@ -727,7 +1024,27 @@ export function MapCanvas({
     };
 
     const onMouseMove = (event) => {
+      if (counterProposalDragRef.current) {
+        counterProposalDragRef.current = {
+          ...counterProposalDragRef.current,
+          moved: true,
+        };
+        map.getCanvas().style.cursor = "grabbing";
+        onCounterProposalDragMoveRef.current?.(counterProposalDragRef.current.id, [
+          event.lngLat.lng,
+          event.lngLat.lat,
+        ]);
+        return;
+      }
+
       const hit = pickInteractiveFeature(event.point);
+
+      if (hit?.type === "counter-proposal-handle") {
+        map.getCanvas().style.cursor = "grab";
+        setInternalHover(null);
+        return;
+      }
+
       if (!hit) {
         setInternalHover(null);
         map.getCanvas().style.cursor = "";
@@ -738,13 +1055,52 @@ export function MapCanvas({
     };
 
     const onMouseOut = () => {
+      if (counterProposalDragRef.current) {
+        return;
+      }
+
       setInternalHover(null);
       map.getCanvas().style.cursor = "";
+    };
+
+    const onMouseDown = (event) => {
+      const hit = pickInteractiveFeature(event.point);
+
+      if (hit?.type !== "counter-proposal-handle") {
+        return;
+      }
+
+      counterProposalDragRef.current = {
+        id: hit.id,
+        moved: false,
+      };
+      map.dragPan.disable();
+      map.getCanvas().style.cursor = "grabbing";
+      onCounterProposalDragStartRef.current?.(hit.id);
+      onCounterProposalHandleSelectRef.current?.(hit.id);
+    };
+
+    const onMouseUp = () => {
+      if (!counterProposalDragRef.current) {
+        return;
+      }
+
+      const { moved } = counterProposalDragRef.current;
+      counterProposalDragRef.current = null;
+      map.dragPan.enable();
+      map.getCanvas().style.cursor = "";
+      onCounterProposalDragEndRef.current?.();
+
+      if (moved) {
+        skipNextClickRef.current = true;
+      }
     };
 
     const onZoom = () => syncDaOutlineVisibility();
 
     map.on("click", onClick);
+    map.on("mousedown", onMouseDown);
+    map.on("mouseup", onMouseUp);
     map.on("mousemove", onMouseMove);
     map.on("mouseout", onMouseOut);
     map.on("zoom", onZoom);
@@ -765,6 +1121,8 @@ export function MapCanvas({
 
         const fedMode = await addFedBaseLayers();
         addDaLayers(daGeojson);
+        addObjectionBoundaryLayers();
+        addCounterProposalLayers();
         const initialLabelScale = labelScreenScale(containerRef.current?.clientWidth ?? 0);
 
         addFedLabelLayers(fedLabels, initialLabelScale);
@@ -828,7 +1186,11 @@ export function MapCanvas({
       setFedStateRef.current = null;
       applySelectionRef.current = null;
       applyExternalHoverRef.current = null;
+      applyObjectionPreviewRef.current = null;
+      applyCounterProposalPreviewRef.current = null;
       map.off("click", onClick);
+      map.off("mousedown", onMouseDown);
+      map.off("mouseup", onMouseUp);
       map.off("mousemove", onMouseMove);
       map.off("mouseout", onMouseOut);
       map.off("zoom", onZoom);
