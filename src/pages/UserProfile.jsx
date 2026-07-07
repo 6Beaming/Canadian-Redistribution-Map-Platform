@@ -1,7 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { FeaturePlaceholder } from "@/components/non_prebuilt/FeaturePlaceholder.jsx";
+import { ProfileSignOutButton } from "@/components/non_prebuilt/ProfileSignOutButton.jsx";
 
 export default function UserProfile() {
   const navigate = useNavigate();
@@ -16,7 +16,7 @@ export default function UserProfile() {
         <ArrowLeft className="h-4 w-4" />
         Back to map
       </Button>
-      <FeaturePlaceholder title="My Profile" />
+      <ProfileSignOutButton />
     </div>
   );
 }
