@@ -1,10 +1,13 @@
 import { Router } from "express";
 import {
   clearAuthenticatedSessionCookies,
+  clearPendingProfileUpdateCookie,
   clearPendingSessionCookies,
   clearSessionCookies,
   getPendingProfileCookie,
+  getPendingProfileUpdateCookie,
   setPendingProfileCookie,
+  setPendingProfileUpdateCookie,
   setPendingSessionCookies,
   setSessionCookies
 } from "../lib/cookies.js";
@@ -205,10 +208,24 @@ function publicUser(user, profile = null) {
     lastName: profile?.last_name || null,
     name: fullName || null,
     phoneNumber: profile?.phone || null,
+    postalCode: profile?.postal_code || null,
     profileComplete:
       role === "public_user" ? isPublicProfileComplete(profile) : true,
     province: profile?.province || null,
     role
+  };
+}
+
+function publicProfileUpdates(user, profile) {
+  return {
+    email: user.email,
+    first_name: profile.firstName,
+    last_name: profile.lastName,
+    phone: profile.phoneNational,
+    postal_code: profile.postalCode,
+    profile_completed: true,
+    province: profile.province,
+    role: "public_user"
   };
 }
 
@@ -727,30 +744,140 @@ router.get("/me", requireAuth, (req, res) => {
 });
 
 router.patch("/me", requireAuth, async (req, res, next) => {
-  if (req.profile?.role !== "commissioner") {
+  try {
+    const profileRole = req.profile?.role || "public_user";
+
+    if (profileRole === "commissioner") {
+      const validation = validateCommissionerProfile(req.body);
+
+      if (validation.error) {
+        res.status(400).json({ error: validation.error });
+        return;
+      }
+
+      const updatedProfile = await updateSupabaseProfile(
+        req.accessToken,
+        req.user.id,
+        {
+          first_name: validation.profile.firstName,
+          last_name: validation.profile.lastName
+        }
+      );
+
+      res.json({
+        message: "Profile information updated.",
+        user: publicUser(req.user, updatedProfile)
+      });
+      return;
+    }
+
+    if (!["public_user", "user"].includes(profileRole)) {
+      res.status(403).json({
+        error: "Only public users can update a public profile."
+      });
+      return;
+    }
+
+    const validation = validatePublicProfile(req.body);
+
+    if (validation.error) {
+      res.status(400).json({ error: validation.error });
+      return;
+    }
+
+    const { phoneNational, phoneNumber } = validation.profile;
+
+    if (await phoneBelongsToAnotherUser(phoneNational, req.user.id)) {
+      res.status(409).json({
+        error: "This phone number is already linked to another account."
+      });
+      return;
+    }
+
+    const phoneChanged = requiredString(req.profile?.phone) !== phoneNational;
+
+    if (phoneChanged) {
+      await startSupabasePhoneVerification(
+        req.accessToken,
+        validation.profile.phoneAuth
+      );
+      setPendingProfileUpdateCookie(res, validation.profile);
+
+      res.status(202).json({
+        message: "Verification code sent.",
+        otpRequired: true,
+        phoneMasked: maskPhoneNumber(phoneNumber)
+      });
+      return;
+    }
+
+    const updatedProfile = await updateSupabaseProfile(
+      req.accessToken,
+      req.user.id,
+      publicProfileUpdates(req.user, validation.profile)
+    );
+
+    clearPendingProfileUpdateCookie(res);
+    res.json({
+      message: "Profile information updated.",
+      user: publicUser(req.user, updatedProfile)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/me/phone-otp", requireAuth, async (req, res, next) => {
+  const profileRole = req.profile?.role || "public_user";
+
+  if (!["public_user", "user"].includes(profileRole)) {
     res.status(403).json({
-      error: "Only commissioners can update a commissioner profile."
+      error: "Only public users can verify a public profile phone change."
     });
     return;
   }
 
-  const validation = validateCommissionerProfile(req.body);
+  const token = requiredString(req.body?.token).replace(/\s+/g, "");
 
-  if (validation.error) {
-    res.status(400).json({ error: validation.error });
+  if (!/^\d{6}$/.test(token)) {
+    res.status(400).json({ error: "Enter the 6-digit verification code." });
+    return;
+  }
+
+  const pendingProfile = getPendingProfileUpdateCookie(req);
+  const validation = validatePublicProfile(pendingProfile);
+
+  if (!pendingProfile || validation.error) {
+    res.status(409).json({ error: "Save your profile before entering a code." });
     return;
   }
 
   try {
+    if (
+      await phoneBelongsToAnotherUser(
+        validation.profile.phoneNational,
+        req.user.id
+      )
+    ) {
+      res.status(409).json({
+        error: "This phone number is already linked to another account."
+      });
+      return;
+    }
+
+    await verifySupabasePhoneChange(
+      req.accessToken,
+      validation.profile.phoneAuth,
+      token
+    );
+
     const updatedProfile = await updateSupabaseProfile(
       req.accessToken,
       req.user.id,
-      {
-        first_name: validation.profile.firstName,
-        last_name: validation.profile.lastName
-      }
+      publicProfileUpdates(req.user, validation.profile)
     );
 
+    clearPendingProfileUpdateCookie(res);
     res.json({
       message: "Profile information updated.",
       user: publicUser(req.user, updatedProfile)

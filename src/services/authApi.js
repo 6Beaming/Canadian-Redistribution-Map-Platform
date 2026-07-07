@@ -70,6 +70,12 @@ export const authApi = {
       body: JSON.stringify(profile)
     });
   },
+  updatePublicProfile(profile) {
+    return request("/api/auth/me", {
+      method: "PATCH",
+      body: JSON.stringify(profile)
+    });
+  },
   inviteCommissioner(email) {
     return request("/api/auth/commissioner-invites", {
       method: "POST",
@@ -99,6 +105,12 @@ export const authApi = {
   },
   verifyProfileOtp({ token }) {
     return request("/api/auth/profile/phone-otp", {
+      method: "POST",
+      body: JSON.stringify({ token })
+    });
+  },
+  verifyPublicProfilePhoneOtp({ token }) {
+    return request("/api/auth/me/phone-otp", {
       method: "POST",
       body: JSON.stringify({ token })
     });

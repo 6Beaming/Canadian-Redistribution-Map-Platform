@@ -13,6 +13,10 @@ export const PENDING_REFRESH_COOKIE =
 export const PENDING_PROFILE_COOKIE =
   process.env.PENDING_PROFILE_COOKIE_NAME || "crmp_pending_profile";
 
+export const PENDING_PROFILE_UPDATE_COOKIE =
+  process.env.PENDING_PROFILE_UPDATE_COOKIE_NAME ||
+  "crmp_pending_profile_update";
+
 const REFRESH_TOKEN_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const PENDING_PROFILE_MAX_AGE_MS = 10 * 60 * 1000;
 
@@ -63,6 +67,20 @@ export function getPendingProfileCookie(req) {
   }
 }
 
+export function getPendingProfileUpdateCookie(req) {
+  const value = getCookie(req, PENDING_PROFILE_UPDATE_COOKIE);
+
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
 function setCookiePair(res, session, accessCookieName, refreshCookieName) {
   const accessTokenMaxAgeMs =
     Math.max(Number(session.expires_in || 3600) - 30, 60) * 1000;
@@ -95,6 +113,13 @@ export function setPendingProfileCookie(res, profile) {
   });
 }
 
+export function setPendingProfileUpdateCookie(res, profile) {
+  res.cookie(PENDING_PROFILE_UPDATE_COOKIE, JSON.stringify(profile), {
+    ...baseCookieOptions(),
+    maxAge: PENDING_PROFILE_MAX_AGE_MS
+  });
+}
+
 function clearCookiePair(res, accessCookieName, refreshCookieName) {
   res.clearCookie(accessCookieName, baseCookieOptions());
   res.clearCookie(refreshCookieName, baseCookieOptions());
@@ -109,7 +134,12 @@ export function clearPendingSessionCookies(res) {
   res.clearCookie(PENDING_PROFILE_COOKIE, baseCookieOptions());
 }
 
+export function clearPendingProfileUpdateCookie(res) {
+  res.clearCookie(PENDING_PROFILE_UPDATE_COOKIE, baseCookieOptions());
+}
+
 export function clearSessionCookies(res) {
   clearAuthenticatedSessionCookies(res);
   clearPendingSessionCookies(res);
+  clearPendingProfileUpdateCookie(res);
 }
