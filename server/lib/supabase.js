@@ -4,7 +4,7 @@ let supabaseClient;
 let supabaseAdminClient;
 
 const PROFILE_COLUMNS =
-  "id,email,first_name,last_name,province,postal_code,phone,role,profile_completed,invited_by,created_at";
+  "id,email,first_name,last_name,province,postal_code,phone,role,invited_by,created_at";
 
 function getSupabaseConfig() {
   const supabaseUrl = process.env.SUPABASE_URL;
@@ -211,65 +211,195 @@ export async function findSupabaseProfileByPhone(phone) {
   return data?.[0] || null;
 }
 
-export async function createSupabaseCommissionerUser({
+export async function inviteSupabaseCommissioner({
   email,
-  emailRedirectTo,
-  firstName,
-  invitedBy = null,
-  lastName,
-  password,
-  province
+  invitedBy,
+  redirectTo
 }) {
   const supabase = requireSupabaseAdminClient();
-  const signupData = await signUpSupabaseUser({
-    email,
-    emailRedirectTo,
-    password
-  });
-  const user = signupData.user || signupData;
+  const normalizedEmail = email.toLowerCase();
+  const { data: existingPendingInvite, error: pendingLookupError } =
+    await supabase
+      .from("pending_invites")
+      .select("email,invited_by")
+      .eq("email", normalizedEmail)
+      .maybeSingle();
 
-  if (!user?.id) {
-    const authError = new Error("Unable to create commissioner account.");
-    authError.statusCode = 400;
-    authError.publicMessage = authError.message;
-    throw authError;
+  if (pendingLookupError) {
+    const inviteError = new Error(
+      pendingLookupError.message || "Unable to check pending invitation."
+    );
+    inviteError.statusCode = 500;
+    inviteError.publicMessage = "Unable to check pending invitation.";
+    throw inviteError;
   }
 
-  const profile = {
-    email,
-    first_name: firstName,
-    id: user.id,
-    invited_by: invitedBy,
-    last_name: lastName,
-    profile_completed: true,
-    province,
-    role: "commissioner"
-  };
+  const existingUser = await findSupabaseAuthUserByEmail(normalizedEmail);
 
-  const { data: profileData, error: profileError } = await supabase
-    .from("profiles")
-    .upsert(profile, { onConflict: "id" })
-    .select(PROFILE_COLUMNS)
-    .single();
+  if (existingPendingInvite) {
+    if (existingPendingInvite.invited_by !== invitedBy) {
+      const inviteError = new Error(
+        "This email already has an invitation from another commissioner."
+      );
+      inviteError.statusCode = 409;
+      inviteError.publicMessage = inviteError.message;
+      throw inviteError;
+    }
 
-  if (profileError) {
-    await supabase.auth.admin.deleteUser(user.id);
+    if (existingUser) {
+      const existingProfile = await getSupabaseProfileAsAdmin(existingUser.id);
 
-    const saveError = new Error(
-      profileError.message || "Unable to save commissioner profile."
+      if (existingProfile) {
+        const inviteError = new Error(
+          "This invitation has already been accepted. The colleague can sign in to continue."
+        );
+        inviteError.statusCode = 409;
+        inviteError.publicMessage = inviteError.message;
+        throw inviteError;
+      }
+
+      // A clicked invite can leave behind a confirmed auth user before the
+      // password/profile flow finishes. The pending invite is still the source
+      // of truth, so remove that stale auth row before resending.
+      const { error: deleteError } =
+        await supabase.auth.admin.deleteUser(existingUser.id);
+
+      if (deleteError) {
+        const inviteError = new Error(
+          deleteError.message || "Unable to refresh expired invitation."
+        );
+        inviteError.statusCode = 500;
+        inviteError.publicMessage = "Unable to refresh expired invitation.";
+        throw inviteError;
+      }
+    }
+  } else if (existingUser) {
+    const inviteError = new Error("An account with this email already exists.");
+    inviteError.statusCode = 409;
+    inviteError.publicMessage = inviteError.message;
+    throw inviteError;
+  }
+
+  let createdPendingInvite = false;
+
+  if (!existingPendingInvite) {
+    const { error: insertError } = await supabase
+      .from("pending_invites")
+      .insert({
+        email: normalizedEmail,
+        invited_by: invitedBy
+      });
+
+    if (insertError) {
+      const inviteError = new Error(
+        insertError.message || "Unable to record commissioner invitation."
+      );
+      inviteError.statusCode = insertError.code === "23505" ? 409 : 400;
+      inviteError.publicMessage =
+        insertError.code === "23505"
+          ? "An invitation was created by another request. Please try again."
+          : "Unable to record commissioner invitation.";
+      throw inviteError;
+    }
+
+    createdPendingInvite = true;
+  }
+
+  const { data, error: emailError } =
+    await supabase.auth.admin.inviteUserByEmail(normalizedEmail, {
+      redirectTo
+    });
+
+  if (emailError && createdPendingInvite) {
+    const { error: cleanupError } = await supabase
+      .from("pending_invites")
+      .delete()
+      .eq("email", normalizedEmail)
+      .eq("invited_by", invitedBy);
+
+    if (cleanupError) {
+      console.error(
+        `Unable to roll back pending invite for ${normalizedEmail}:`,
+        cleanupError.message
+      );
+    }
+  }
+
+  if (emailError) {
+    const inviteError = new Error(
+      emailError.message || "Unable to send commissioner invitation."
     );
-    saveError.statusCode = profileError.code === "23505" ? 409 : 500;
-    saveError.publicMessage =
-      profileError.code === "23505"
-        ? "A profile already exists for this account."
-        : "Unable to save commissioner profile.";
-    throw saveError;
+    inviteError.statusCode = emailError.status || 400;
+    inviteError.publicMessage =
+      emailError.message?.toLowerCase().includes("already")
+        ? "An account with this email already exists."
+        : "Unable to send commissioner invitation.";
+    throw inviteError;
   }
 
   return {
-    profile: profileData,
-    user
+    data,
+    resent: Boolean(existingPendingInvite)
   };
+}
+
+export async function getPendingCommissionerInvite(email) {
+  const supabase = requireSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("pending_invites")
+    .select("email,invited_by")
+    .eq("email", email.toLowerCase())
+    .maybeSingle();
+
+  if (error) {
+    const inviteError = new Error(
+      error.message || "Unable to verify commissioner invitation."
+    );
+    inviteError.statusCode = 500;
+    inviteError.publicMessage = "Unable to verify commissioner invitation.";
+    throw inviteError;
+  }
+
+  return data;
+}
+
+export async function consumePendingCommissionerInvite(email, invitedBy) {
+  const supabase = requireSupabaseAdminClient();
+  const { error } = await supabase
+    .from("pending_invites")
+    .delete()
+    .eq("email", email.toLowerCase())
+    .eq("invited_by", invitedBy);
+
+  if (error) {
+    console.error(
+      `Unable to consume pending invite for ${email}:`,
+      error.message
+    );
+    return false;
+  }
+
+  return true;
+}
+
+export async function getSupabaseProfileAsAdmin(userId) {
+  const supabase = requireSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(PROFILE_COLUMNS)
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    const profileError = new Error(
+      error.message || "Unable to load commissioner profile."
+    );
+    profileError.statusCode = 500;
+    profileError.publicMessage = "Unable to verify commissioner team.";
+    throw profileError;
+  }
+
+  return data;
 }
 
 export async function getSupabaseProfile(accessToken, userId) {
@@ -283,6 +413,30 @@ export async function getSupabaseProfile(accessToken, userId) {
   if (error) {
     const profileError = new Error(error.message || "Unable to load user profile.");
     profileError.statusCode = error.code === "42501" ? 403 : 500;
+    throw profileError;
+  }
+
+  return data;
+}
+
+export async function updateSupabaseProfile(accessToken, userId, updates) {
+  const supabase = getSupabaseUserClient(accessToken);
+  const { data, error } = await supabase
+    .from("profiles")
+    .update(updates)
+    .eq("id", userId)
+    .select(PROFILE_COLUMNS)
+    .single();
+
+  if (error) {
+    const profileError = new Error(
+      error.message || "Unable to update user profile."
+    );
+    profileError.statusCode = error.code === "42501" ? 403 : 500;
+    profileError.publicMessage =
+      error.code === "42501"
+        ? "Profiles table permissions need to allow users to update their own profile."
+        : "Unable to update user profile.";
     throw profileError;
   }
 

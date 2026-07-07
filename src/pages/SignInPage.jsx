@@ -106,6 +106,7 @@ export default function SignInPage() {
         onVerifyOtp={onboarding.handleVerifyOtp}
         otpForm={onboarding.otpForm}
         pendingPhoneLabel={onboarding.pendingPhoneLabel}
+        pendingUser={onboarding.pendingProfileUser}
         profileForm={onboarding.profileForm}
         sessionStatus={onboarding.sessionStatus}
       />

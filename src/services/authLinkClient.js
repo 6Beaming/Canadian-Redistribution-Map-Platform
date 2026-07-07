@@ -1,10 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 
-let passwordRecoveryClient;
+let authLinkClient;
 
-export function getPasswordRecoveryClient() {
-  if (passwordRecoveryClient) {
-    return passwordRecoveryClient;
+export function getAuthLinkClient() {
+  if (authLinkClient) {
+    return authLinkClient;
   }
 
   const url = import.meta.env.VITE_SUPABASE_URL;
@@ -13,10 +13,10 @@ export function getPasswordRecoveryClient() {
     import.meta.env.VITE_SUPABASE_ANON_KEY;
 
   if (!url || !publishableKey) {
-    throw new Error("Password reset is not configured for this environment.");
+    throw new Error("Email-link authentication is not configured.");
   }
 
-  passwordRecoveryClient = createClient(url, publishableKey, {
+  authLinkClient = createClient(url, publishableKey, {
     auth: {
       autoRefreshToken: false,
       detectSessionInUrl: true,
@@ -24,5 +24,5 @@ export function getPasswordRecoveryClient() {
     }
   });
 
-  return passwordRecoveryClient;
+  return authLinkClient;
 }

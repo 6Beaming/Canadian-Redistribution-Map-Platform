@@ -64,6 +64,24 @@ export const authApi = {
   getCurrentUser() {
     return request("/api/auth/me");
   },
+  updateCommissionerProfile(profile) {
+    return request("/api/auth/me", {
+      method: "PATCH",
+      body: JSON.stringify(profile)
+    });
+  },
+  updatePublicProfile(profile) {
+    return request("/api/auth/me", {
+      method: "PATCH",
+      body: JSON.stringify(profile)
+    });
+  },
+  inviteCommissioner(email) {
+    return request("/api/auth/commissioner-invites", {
+      method: "POST",
+      body: JSON.stringify({ email })
+    });
+  },
   getPendingProfileSession() {
     return request("/api/auth/profile-session");
   },
@@ -79,12 +97,6 @@ export const authApi = {
       body: JSON.stringify({ email, password })
     });
   },
-  commissionerSignup(account) {
-    return request("/api/auth/commissioner-signup", {
-      method: "POST",
-      body: JSON.stringify(account)
-    });
-  },
   completeProfile(profile) {
     return request("/api/auth/profile", {
       method: "POST",
@@ -93,6 +105,12 @@ export const authApi = {
   },
   verifyProfileOtp({ token }) {
     return request("/api/auth/profile/phone-otp", {
+      method: "POST",
+      body: JSON.stringify({ token })
+    });
+  },
+  verifyPublicProfilePhoneOtp({ token }) {
+    return request("/api/auth/me/phone-otp", {
       method: "POST",
       body: JSON.stringify({ token })
     });
