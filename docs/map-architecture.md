@@ -37,10 +37,6 @@ the PMTiles render bundle.
 - These files are the local editable source used when the app needs exact DA
   geometry by `DGUID`.
 
-This directory replaces the older `authority/` naming. The contents are now
-more than geometry: they are geometry plus the DA-level metadata required for
-panel rendering and future persistence workflows.
-
 ### `src/data/map/render/`
 
 - `da_boundaries_available.pmtiles`
