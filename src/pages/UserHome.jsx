@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HorizontalTabs } from "@/components/ui/horizontal-tabs";
 import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
 import { MapInfoPanel, getDefaultPanelView, getPanelViews } from "@/components/non_prebuilt/MapInfoPanel.jsx";
@@ -22,6 +22,11 @@ import {
   undoCounterProposalCache,
   writeCounterProposalStorage,
 } from "@/lib/map/counterProposalWorkflow.js";
+import {
+  getMetadataGeojsonPathsForFed,
+  getFallbackDaAssetManifest,
+  normalizeDaAssetManifest,
+} from "@/lib/map/daAssetManifest.js";
 import { DEFAULT_ROLLOUT_CATEGORY_ID } from "@/lib/map/rolloutPlan.js";
 import { mapApi } from "@/services/mapApi.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
@@ -42,8 +47,10 @@ export default function UserHome() {
   const [status, setStatus] = useState("Loading map...");
   const [selection, setSelection] = useState(null);
   const [rolloutHoverSelection, setRolloutHoverSelection] = useState(null);
+  const [assetManifest, setAssetManifest] = useState(() => getFallbackDaAssetManifest());
   const [profilesByDguid, setProfilesByDguid] = useState(new Map());
   const [objectionGeometryIndex, setObjectionGeometryIndex] = useState(null);
+  const [objectionGeometryFedNum, setObjectionGeometryFedNum] = useState("");
   const [objectionWorkflow, setObjectionWorkflow] = useState(() =>
     createInitialObjectionWorkflow(),
   );
@@ -54,6 +61,7 @@ export default function UserHome() {
   const [panelView, setPanelView] = useState(getDefaultPanelView("user"));
   const [isRolloutOpen, setIsRolloutOpen] = useState(false);
   const [rolloutCategoryId, setRolloutCategoryId] = useState(DEFAULT_ROLLOUT_CATEGORY_ID);
+  const metadataIndexCacheRef = useRef(new Map());
   const counterProposalDragFrameRef = useRef(0);
   const pendingCounterProposalDragRef = useRef(null);
   const views = useMemo(() => getPanelViews("user"), []);
@@ -76,16 +84,17 @@ export default function UserHome() {
 
     Promise.all([
       mapApi.getDaProfiles(),
-      mapApi.fetchAssetJson("single_fed_das.geojson"),
+      mapApi.getDaAssetManifest().catch(() => getFallbackDaAssetManifest()),
     ])
-      .then(([payload, daGeojson]) => {
+      .then(([payload, assetManifestPayload]) => {
         if (!isMounted) {
           return;
         }
 
+        const normalizedManifest = normalizeDaAssetManifest(assetManifestPayload);
         const { index } = buildProfileIndex(payload);
+        setAssetManifest(normalizedManifest);
         setProfilesByDguid(index);
-        setObjectionGeometryIndex(buildDaObjectionIndex(daGeojson));
       })
       .catch((error) => {
         if (isMounted) {
@@ -169,12 +178,105 @@ export default function UserHome() {
     }
   }, [isRolloutOpen]);
 
+  const getFedNumForDguid = useCallback(
+    (dguid) => String(profilesByDguid.get(String(dguid))?.fed_num ?? "").trim(),
+    [profilesByDguid],
+  );
+
+  const ensureMetadataIndexForFed = useCallback(
+    async (fedNum) => {
+      const normalizedFedNum = String(fedNum ?? "").trim();
+
+      if (!normalizedFedNum) {
+        return null;
+      }
+
+      if (metadataIndexCacheRef.current.has(normalizedFedNum)) {
+        return metadataIndexCacheRef.current.get(normalizedFedNum);
+      }
+
+      const metadataGeojsonPaths = getMetadataGeojsonPathsForFed(
+        assetManifest,
+        normalizedFedNum,
+      );
+
+      if (!metadataGeojsonPaths.length) {
+        throw new Error(`No metadata GeoJSON is available for FED ${normalizedFedNum}.`);
+      }
+
+      const metadataGeojsons = await Promise.all(
+        metadataGeojsonPaths.map((path) => mapApi.fetchAssetJson(path)),
+      );
+      const mergedMetadataGeojson = {
+        type: "FeatureCollection",
+        features: metadataGeojsons.flatMap((payload) => payload?.features ?? []),
+      };
+      const nextIndex = buildDaObjectionIndex(mergedMetadataGeojson);
+      metadataIndexCacheRef.current.set(normalizedFedNum, nextIndex);
+      return nextIndex;
+    },
+    [assetManifest],
+  );
+
+  useEffect(() => {
+    if (panelView !== "objection" && panelView !== "counter-proposal") {
+      setObjectionGeometryIndex(null);
+      setObjectionGeometryFedNum("");
+      return;
+    }
+
+    const activeFirstDguid =
+      panelView === "objection"
+        ? objectionWorkflow.firstDguid
+        : counterProposalWorkflow.firstDguid;
+    const activeFedNum = getFedNumForDguid(activeFirstDguid);
+
+    if (!activeFirstDguid || !activeFedNum) {
+      setObjectionGeometryIndex(null);
+      setObjectionGeometryFedNum("");
+      return;
+    }
+
+    let isCancelled = false;
+    setObjectionGeometryIndex(null);
+    setObjectionGeometryFedNum(activeFedNum);
+
+    ensureMetadataIndexForFed(activeFedNum)
+      .then((nextIndex) => {
+        if (isCancelled) {
+          return;
+        }
+
+        setObjectionGeometryIndex(nextIndex);
+        setObjectionGeometryFedNum(activeFedNum);
+      })
+      .catch((error) => {
+        if (isCancelled) {
+          return;
+        }
+
+        setObjectionGeometryIndex(null);
+        setStatus(`Error: ${error.message}`);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    counterProposalWorkflow.firstDguid,
+    ensureMetadataIndexForFed,
+    getFedNumForDguid,
+    objectionWorkflow.firstDguid,
+    panelView,
+  ]);
+
   const handleDaSelect = useCallback((dguid) => {
     setRolloutHoverSelection(null);
     setIsRolloutOpen(false);
 
     if (panelView === "objection") {
       let nextSelection = null;
+      const currentFedNum = getFedNumForDguid(dguid);
 
       setObjectionWorkflow((current) => {
         if (current.step === 1 || !current.firstDguid) {
@@ -182,14 +284,26 @@ export default function UserHome() {
           return createInitialObjectionWorkflow({
             step: 2,
             firstDguid: dguid,
+            error: currentFedNum
+              ? ""
+              : "No FED assignment is available for the selected DA.",
           });
         }
 
         if (current.step === 2) {
           nextSelection = { type: "da", dguid };
+          const firstFedNum = getFedNumForDguid(current.firstDguid);
+
+          if (!objectionGeometryIndex || !firstFedNum || objectionGeometryFedNum !== firstFedNum) {
+            return createInitialObjectionWorkflow({
+              step: 2,
+              firstDguid: current.firstDguid,
+              error:
+                "The selected FED geometry is still loading. Please wait a moment and pick the neighbouring DA again.",
+            });
+          }
 
           if (
-            !objectionGeometryIndex ||
             current.firstDguid === dguid ||
             !areDaNeighbours(objectionGeometryIndex, current.firstDguid, dguid)
           ) {
@@ -222,6 +336,7 @@ export default function UserHome() {
 
     if (panelView === "counter-proposal") {
       let nextSelection = null;
+      const currentFedNum = getFedNumForDguid(dguid);
 
       setCounterProposalWorkflow((current) => {
         if (current.step === 1 || !current.firstDguid) {
@@ -230,14 +345,27 @@ export default function UserHome() {
             step: 2,
             firstDguid: dguid,
             previewMode: "proposal",
+            error: currentFedNum
+              ? ""
+              : "No FED assignment is available for the selected DA.",
           });
         }
 
         if (current.step === 2) {
           nextSelection = { type: "da", dguid };
+          const firstFedNum = getFedNumForDguid(current.firstDguid);
+
+          if (!objectionGeometryIndex || !firstFedNum || objectionGeometryFedNum !== firstFedNum) {
+            return createInitialCounterProposalWorkflow({
+              step: 2,
+              firstDguid: current.firstDguid,
+              previewMode: "proposal",
+              error:
+                "The selected FED geometry is still loading. Please wait a moment and pick the neighbouring DA again.",
+            });
+          }
 
           if (
-            !objectionGeometryIndex ||
             current.firstDguid === dguid ||
             !areDaNeighbours(objectionGeometryIndex, current.firstDguid, dguid)
           ) {
@@ -273,7 +401,13 @@ export default function UserHome() {
     }
 
     setSelection({ type: "da", dguid });
-  }, [objectionGeometryIndex, panelView, profilesByDguid]);
+  }, [
+    getFedNumForDguid,
+    objectionGeometryFedNum,
+    objectionGeometryIndex,
+    panelView,
+    profilesByDguid,
+  ]);
 
   const handleFedSelect = useCallback((fedNum, fedName) => {
     setSelection({ type: "fed", fedNum, fedName });
@@ -467,55 +601,59 @@ export default function UserHome() {
         return;
       }
 
-      setCounterProposalWorkflow((current) => {
-        if (!current.cache) {
-          return current;
-        }
+      startTransition(() => {
+        setCounterProposalWorkflow((current) => {
+          if (!current.cache) {
+            return current;
+          }
 
-        return {
-          ...current,
-          cache: previewCounterProposalHandleMove(
-            current.cache,
-            pending.handleId,
-            pending.nextCoordinate,
-          ),
-        };
+          return {
+            ...current,
+            cache: previewCounterProposalHandleMove(
+              current.cache,
+              pending.handleId,
+              pending.nextCoordinate,
+            ),
+          };
+        });
       });
     });
   }, []);
 
   const handleCounterProposalDragEnd = useCallback(() => {
-    setCounterProposalWorkflow((current) => {
-      if (!current.cache) {
-        return current;
-      }
+    startTransition(() => {
+      setCounterProposalWorkflow((current) => {
+        if (!current.cache) {
+          return current;
+        }
 
-      let nextCache = current.cache;
-      const pending = pendingCounterProposalDragRef.current;
+        let nextCache = current.cache;
+        const pending = pendingCounterProposalDragRef.current;
 
-      if (counterProposalDragFrameRef.current) {
-        window.cancelAnimationFrame(counterProposalDragFrameRef.current);
-        counterProposalDragFrameRef.current = 0;
-      }
+        if (counterProposalDragFrameRef.current) {
+          window.cancelAnimationFrame(counterProposalDragFrameRef.current);
+          counterProposalDragFrameRef.current = 0;
+        }
 
-      pendingCounterProposalDragRef.current = null;
+        pendingCounterProposalDragRef.current = null;
 
-      if (pending) {
-        nextCache = previewCounterProposalHandleMove(
-          nextCache,
-          pending.handleId,
-          pending.nextCoordinate,
-        );
-      }
+        if (pending) {
+          nextCache = previewCounterProposalHandleMove(
+            nextCache,
+            pending.handleId,
+            pending.nextCoordinate,
+          );
+        }
 
-      return {
-        ...current,
-        cache: commitCounterProposalCacheHistory(
-          nextCache,
-          current.dragBaselineSnapshot,
-        ),
-        dragBaselineSnapshot: null,
-      };
+        return {
+          ...current,
+          cache: commitCounterProposalCacheHistory(
+            nextCache,
+            current.dragBaselineSnapshot,
+          ),
+          dragBaselineSnapshot: null,
+        };
+      });
     });
   }, []);
 

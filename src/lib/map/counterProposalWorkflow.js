@@ -100,19 +100,35 @@ function setCoordinateReference(
   coordinateIndex,
   nextCoordinate,
 ) {
-  const target = getCoordinateReference(
+  const ring = getRingReference(
     geometry,
     polygonIndex,
     ringIndex,
-    coordinateIndex,
   );
 
-  if (!target) {
+  if (!ring?.[coordinateIndex]) {
     return;
   }
 
-  target[0] = nextCoordinate[0];
-  target[1] = nextCoordinate[1];
+  ring[coordinateIndex][0] = nextCoordinate[0];
+  ring[coordinateIndex][1] = nextCoordinate[1];
+
+  const lastIndex = ring.length - 1;
+
+  if (lastIndex < 1) {
+    return;
+  }
+
+  if (coordinateIndex === 0) {
+    ring[lastIndex][0] = nextCoordinate[0];
+    ring[lastIndex][1] = nextCoordinate[1];
+    return;
+  }
+
+  if (coordinateIndex === lastIndex) {
+    ring[0][0] = nextCoordinate[0];
+    ring[0][1] = nextCoordinate[1];
+  }
 }
 
 function buildSharedBoundaryHandles(features, boundaryGeoJson) {
@@ -359,6 +375,427 @@ function isPointInGeometry(point, geometry) {
 
 function isPointWithinFeatureSet(features, point) {
   return features.some((feature) => isPointInGeometry(point, feature.geometry));
+}
+
+function getRingReference(geometry, polygonIndex, ringIndex) {
+  if (!geometry) {
+    return null;
+  }
+
+  if (geometry.type === "Polygon") {
+    return geometry.coordinates?.[ringIndex] ?? null;
+  }
+
+  if (geometry.type === "MultiPolygon") {
+    return geometry.coordinates?.[polygonIndex]?.[ringIndex] ?? null;
+  }
+
+  return null;
+}
+
+function coordinatesEqual(left, right, epsilon = 1e-9) {
+  if (!Array.isArray(left) || !Array.isArray(right)) {
+    return false;
+  }
+
+  return (
+    Math.abs(Number(left[0]) - Number(right[0])) <= epsilon &&
+    Math.abs(Number(left[1]) - Number(right[1])) <= epsilon
+  );
+}
+
+function segmentLengthMeters(start, end) {
+  const [x0, y0] = projectLngLatToMeters(start);
+  const [x1, y1] = projectLngLatToMeters(end);
+  return Math.hypot(x1 - x0, y1 - y0);
+}
+
+function getSegmentSampleCount(start, end) {
+  return Math.min(240, Math.max(24, Math.ceil(segmentLengthMeters(start, end) / 1500)));
+}
+
+function visitGeometrySegments(featureDguid, geometry, callback) {
+  if (!geometry) {
+    return;
+  }
+
+  const visitRingSegments = (ring, polygonIndex, ringIndex) => {
+    if (!Array.isArray(ring) || ring.length < 2) {
+      return;
+    }
+
+    const segmentCount = ring.length - 1;
+
+    for (let segmentIndex = 0; segmentIndex < segmentCount; segmentIndex += 1) {
+      callback({
+        featureDguid,
+        polygonIndex,
+        ringIndex,
+        ringLength: ring.length,
+        segmentCount,
+        segmentIndex,
+        startIndex: segmentIndex,
+        endIndex: segmentIndex + 1,
+        start: ring[segmentIndex],
+        end: ring[segmentIndex + 1],
+      });
+    }
+  };
+
+  if (geometry.type === "Polygon") {
+    geometry.coordinates.forEach((ring, ringIndex) => {
+      visitRingSegments(ring, 0, ringIndex);
+    });
+    return;
+  }
+
+  if (geometry.type === "MultiPolygon") {
+    geometry.coordinates.forEach((polygon, polygonIndex) => {
+      polygon.forEach((ring, ringIndex) => {
+        visitRingSegments(ring, polygonIndex, ringIndex);
+      });
+    });
+  }
+}
+
+function interpolateCoordinate(start, end, weight) {
+  return [
+    start[0] + (end[0] - start[0]) * weight,
+    start[1] + (end[1] - start[1]) * weight,
+  ];
+}
+
+function isSegmentWithinFeatureSet(features, start, end, sampleCount = 18) {
+  for (let step = 0; step <= sampleCount; step += 1) {
+    const weight = step / sampleCount;
+    const point = interpolateCoordinate(start, end, weight);
+
+    if (!isPointWithinFeatureSet(features, point)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function getRingMoveIndex(ring, coordinateIndex) {
+  if (!Array.isArray(ring) || ring.length < 2) {
+    return -1;
+  }
+
+  const lastIndex = ring.length - 1;
+  return coordinateIndex === lastIndex ? 0 : coordinateIndex;
+}
+
+function buildChangedSegmentEntries(feature, occurrence) {
+  const ring = getRingReference(
+    feature?.geometry,
+    occurrence.polygonIndex,
+    occurrence.ringIndex,
+  );
+
+  if (!Array.isArray(ring) || ring.length < 4) {
+    return [];
+  }
+
+  const moveIndex = getRingMoveIndex(ring, occurrence.coordinateIndex);
+
+  if (moveIndex < 0 || moveIndex >= ring.length - 1) {
+    return [];
+  }
+
+  const lastIndex = ring.length - 1;
+  const previousStartIndex = moveIndex === 0 ? lastIndex - 1 : moveIndex - 1;
+  const previousEndIndex = moveIndex === 0 ? lastIndex : moveIndex;
+  const nextStartIndex = moveIndex;
+  const nextEndIndex = moveIndex + 1;
+
+  return [
+    {
+      featureDguid: occurrence.featureDguid,
+      polygonIndex: occurrence.polygonIndex,
+      ringIndex: occurrence.ringIndex,
+      ringLength: ring.length,
+      segmentCount: ring.length - 1,
+      segmentIndex: previousStartIndex,
+      startIndex: previousStartIndex,
+      endIndex: previousEndIndex,
+      start: ring[previousStartIndex],
+      end: ring[previousEndIndex],
+    },
+    {
+      featureDguid: occurrence.featureDguid,
+      polygonIndex: occurrence.polygonIndex,
+      ringIndex: occurrence.ringIndex,
+      ringLength: ring.length,
+      segmentCount: ring.length - 1,
+      segmentIndex: nextStartIndex,
+      startIndex: nextStartIndex,
+      endIndex: nextEndIndex,
+      start: ring[nextStartIndex],
+      end: ring[nextEndIndex],
+    },
+  ].filter((entry) => !coordinatesEqual(entry.start, entry.end));
+}
+
+function buildMovedCurrentFeatures(currentFeatures, handle, nextCoordinate) {
+  const nextCurrentFeatures = cloneValue(currentFeatures);
+  const featureLookup = new Map(
+    nextCurrentFeatures.map((feature) => [getFeatureDguid(feature), feature]),
+  );
+
+  handle.occurrences.forEach((occurrence) => {
+    const feature = featureLookup.get(occurrence.featureDguid);
+
+    if (!feature) {
+      return;
+    }
+
+    setCoordinateReference(
+      feature.geometry,
+      occurrence.polygonIndex,
+      occurrence.ringIndex,
+      occurrence.coordinateIndex,
+      nextCoordinate,
+    );
+  });
+
+  return nextCurrentFeatures;
+}
+
+function segmentsAreEquivalent(left, right) {
+  return (
+    (coordinatesEqual(left.start, right.start) && coordinatesEqual(left.end, right.end)) ||
+    (coordinatesEqual(left.start, right.end) && coordinatesEqual(left.end, right.start))
+  );
+}
+
+function segmentsAreAdjacent(left, right) {
+  if (
+    left.featureDguid !== right.featureDguid ||
+    left.polygonIndex !== right.polygonIndex ||
+    left.ringIndex !== right.ringIndex
+  ) {
+    return false;
+  }
+
+  if (left.segmentIndex === right.segmentIndex) {
+    return true;
+  }
+
+  if (Math.abs(left.segmentIndex - right.segmentIndex) === 1) {
+    return true;
+  }
+
+  return (
+    (left.segmentIndex === 0 && right.segmentIndex === left.segmentCount - 1) ||
+    (right.segmentIndex === 0 && left.segmentIndex === right.segmentCount - 1)
+  );
+}
+
+function segmentsShareEndpoint(left, right) {
+  return (
+    coordinatesEqual(left.start, right.start) ||
+    coordinatesEqual(left.start, right.end) ||
+    coordinatesEqual(left.end, right.start) ||
+    coordinatesEqual(left.end, right.end)
+  );
+}
+
+function orientation(start, middle, end, epsilon = 1e-12) {
+  const value =
+    (middle[1] - start[1]) * (end[0] - middle[0]) -
+    (middle[0] - start[0]) * (end[1] - middle[1]);
+
+  if (Math.abs(value) <= epsilon) {
+    return 0;
+  }
+
+  return value > 0 ? 1 : -1;
+}
+
+function segmentsConflict(left, right) {
+  if (segmentsAreEquivalent(left, right)) {
+    return false;
+  }
+
+  const endpointTouch = segmentsShareEndpoint(left, right);
+
+  const o1 = orientation(left.start, left.end, right.start);
+  const o2 = orientation(left.start, left.end, right.end);
+  const o3 = orientation(right.start, right.end, left.start);
+  const o4 = orientation(right.start, right.end, left.end);
+
+  if (o1 !== o2 && o3 !== o4) {
+    return !endpointTouch;
+  }
+
+  if (o1 === 0 && isPointOnSegment(right.start, left.start, left.end)) {
+    return !endpointTouch;
+  }
+
+  if (o2 === 0 && isPointOnSegment(right.end, left.start, left.end)) {
+    return !endpointTouch;
+  }
+
+  if (o3 === 0 && isPointOnSegment(left.start, right.start, right.end)) {
+    return !endpointTouch;
+  }
+
+  if (o4 === 0 && isPointOnSegment(left.end, right.start, right.end)) {
+    return !endpointTouch;
+  }
+
+  return false;
+}
+
+function isValidRing(ring) {
+  return Array.isArray(ring) && ring.length >= 4 && coordinatesEqual(ring[0], ring[ring.length - 1]);
+}
+
+function isFeatureGeometryWithinAllowedRegion(allowedFeatures, feature) {
+  let isValid = true;
+
+  visitGeometryCoordinates(feature.geometry, ({ coordinate }) => {
+    if (!isValid || isPointWithinFeatureSet(allowedFeatures, coordinate)) {
+      return;
+    }
+
+    isValid = false;
+  });
+
+  if (!isValid) {
+    return false;
+  }
+
+  visitGeometrySegments(getFeatureDguid(feature), feature.geometry, (segment) => {
+    if (
+      !isValid ||
+      isSegmentWithinFeatureSet(
+        allowedFeatures,
+        segment.start,
+        segment.end,
+        getSegmentSampleCount(segment.start, segment.end),
+      )
+    ) {
+      return;
+    }
+
+    isValid = false;
+  });
+
+  return isValid;
+}
+
+function isHandleMoveWithinAllowedRegion(cache, handle, nextCoordinate) {
+  if (!cache || !handle || !Array.isArray(nextCoordinate)) {
+    return false;
+  }
+
+  if (!isPointWithinFeatureSet(cache.originalFeatures, nextCoordinate)) {
+    return false;
+  }
+
+  const nextCurrentFeatures = buildMovedCurrentFeatures(
+    cache.currentFeatures,
+    handle,
+    nextCoordinate,
+  );
+  const featureLookup = new Map(
+    nextCurrentFeatures.map((feature) => [getFeatureDguid(feature), feature]),
+  );
+  const changedSegments = [];
+
+  for (const occurrence of handle.occurrences) {
+    const feature = featureLookup.get(occurrence.featureDguid);
+
+    if (!feature) {
+      continue;
+    }
+
+    const ring = getRingReference(
+      feature.geometry,
+      occurrence.polygonIndex,
+      occurrence.ringIndex,
+    );
+
+    if (!isValidRing(ring)) {
+      return false;
+    }
+
+    changedSegments.push(...buildChangedSegmentEntries(feature, occurrence));
+  }
+
+  if (!changedSegments.length) {
+    return false;
+  }
+
+  const allSegments = [];
+
+  for (const feature of nextCurrentFeatures) {
+    if (!isFeatureGeometryWithinAllowedRegion(cache.originalFeatures, feature)) {
+      return false;
+    }
+
+    visitGeometrySegments(getFeatureDguid(feature), feature.geometry, (segment) => {
+      allSegments.push(segment);
+    });
+  }
+
+  if (allSegments.length === 0) {
+    return false;
+  }
+
+  for (const changedSegment of changedSegments) {
+    if (
+      !isSegmentWithinFeatureSet(
+        cache.originalFeatures,
+        changedSegment.start,
+        changedSegment.end,
+        getSegmentSampleCount(changedSegment.start, changedSegment.end),
+      )
+    ) {
+      return false;
+    }
+
+    for (const candidateSegment of allSegments) {
+      if (
+        segmentsAreAdjacent(changedSegment, candidateSegment) ||
+        segmentsAreEquivalent(changedSegment, candidateSegment)
+      ) {
+        continue;
+      }
+
+      if (segmentsConflict(changedSegment, candidateSegment)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+function constrainHandleMoveCoordinate(cache, handle, nextCoordinate) {
+  if (isHandleMoveWithinAllowedRegion(cache, handle, nextCoordinate)) {
+    return [...nextCoordinate];
+  }
+
+  let lowerBound = [...handle.coordinate];
+  let upperBound = [...nextCoordinate];
+  let best = [...handle.coordinate];
+
+  for (let index = 0; index < 16; index += 1) {
+    const candidate = interpolateCoordinate(lowerBound, upperBound, 0.5);
+
+    if (isHandleMoveWithinAllowedRegion(cache, handle, candidate)) {
+      best = candidate;
+      lowerBound = candidate;
+    } else {
+      upperBound = candidate;
+    }
+  }
+
+  return best;
 }
 
 function buildImpactSummary(
@@ -613,43 +1050,26 @@ export function previewCounterProposalHandleMove(cache, handleId, nextCoordinate
     return cache;
   }
 
-  if (!isPointWithinFeatureSet(cache.originalFeatures, nextCoordinate)) {
-    return cache;
-  }
+  const constrainedCoordinate = constrainHandleMoveCoordinate(cache, handle, nextCoordinate);
 
   const currentKey = coordinateKey(handle.coordinate);
-  const nextKey = coordinateKey(nextCoordinate);
+  const nextKey = coordinateKey(constrainedCoordinate);
 
   if (currentKey === nextKey) {
     return cache;
   }
 
-  const nextCurrentFeatures = cloneValue(cache.currentFeatures);
-  const featureLookup = new Map(
-    nextCurrentFeatures.map((feature) => [getFeatureDguid(feature), feature]),
+  const nextCurrentFeatures = buildMovedCurrentFeatures(
+    cache.currentFeatures,
+    handle,
+    constrainedCoordinate,
   );
-
-  handle.occurrences.forEach((occurrence) => {
-    const feature = featureLookup.get(occurrence.featureDguid);
-
-    if (!feature) {
-      return;
-    }
-
-    setCoordinateReference(
-      feature.geometry,
-      occurrence.polygonIndex,
-      occurrence.ringIndex,
-      occurrence.coordinateIndex,
-      nextCoordinate,
-    );
-  });
 
   const nextHandles = cache.handles.map((entry) =>
     entry.id === handleId
       ? {
           ...entry,
-          coordinate: [...nextCoordinate],
+          coordinate: [...constrainedCoordinate],
         }
       : entry,
   );
@@ -661,7 +1081,7 @@ export function previewCounterProposalHandleMove(cache, handleId, nextCoordinate
     sharedBoundaryGeoJson: updateBoundaryFeatureCollection(
       cache.sharedBoundaryGeoJson,
       handle.coordinate,
-      nextCoordinate,
+      constrainedCoordinate,
     ),
     handles: nextHandles,
     handleFeatureCollection: buildHandleFeatureCollection(nextHandles, handleId),

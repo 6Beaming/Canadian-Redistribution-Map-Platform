@@ -11,9 +11,8 @@ export function getAssignmentsStorePath() {
   return path.join(__dirname, "store", "assignments.json");
 }
 
-export const ALLOWED_ASSET_FILES = new Set([
-  "single_fed_das.geojson",
-  "fed_boundaries_2023.geojson",
-  "fed_boundaries_2023.pmtiles",
-  "fed_labels.geojson"
+export const ALLOWED_ASSET_EXTENSIONS = new Set([
+  ".geojson",
+  ".json",
+  ".pmtiles"
 ]);

@@ -115,7 +115,7 @@ function PairSummaryCard({ firstDguid, secondDguid, profilesByDguid, geometryInd
         <div className="grid min-w-0 gap-1">
           <CardTitle>Extracted Boundary Pair</CardTitle>
           <CardDescription>
-            The selected Yukon DA pair is held only in temporary page memory. Refreshing the page clears the preview.
+            The selected DA pair is held only in temporary page memory. Refreshing the page clears the preview.
           </CardDescription>
         </div>
       </CardHeader>
@@ -204,7 +204,7 @@ export default function UserMakeObjection({
       <section className="grid min-w-0 gap-4 overflow-x-hidden">
         <div className="grid gap-1">
           <h2 className="text-[18px] font-semibold text-[#17324d]">Make An Objection To Boundaries</h2>
-          <p className="text-sm text-[#5f6368]">Loading Yukon DA geometry for the objection workflow.</p>
+          <p className="text-sm text-[#5f6368]">Loading the selected FED DA geometry for the objection workflow.</p>
         </div>
       </section>
     );
@@ -217,7 +217,7 @@ export default function UserMakeObjection({
         <div className="grid gap-1">
           <h2 className="text-[18px] font-semibold text-[#17324d]">Make An Objection To Boundaries</h2>
           <p className="text-sm text-[#5f6368]">
-            This front-end prototype currently works only for the effected Yukon DA set and does not write to storage or submit data.
+            This front-end prototype works for enabled DA areas, keeps everything in the current browser session, and does not write to storage or submit data.
           </p>
         </div>
       </div>
@@ -233,7 +233,7 @@ export default function UserMakeObjection({
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#607086]">Step 1</p>
           <h3 className="text-[17px] font-semibold text-[#17324d]">Select The First DA</h3>
           <p className="text-[14px] leading-6 text-[#5f6368]">
-            Click one Yukon dissemination area on the map to begin the objection workflow.
+            Click one enabled dissemination area on the map to begin the objection workflow.
           </p>
         </div>
       ) : null}
@@ -244,7 +244,7 @@ export default function UserMakeObjection({
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#607086]">Step 2</p>
             <h3 className="text-[17px] font-semibold text-[#17324d]">Select A Neighbouring DA</h3>
             <p className="text-[14px] leading-6 text-[#5f6368]">
-              The first DA has been captured. Click a neighbouring Yukon DA on the map. If the second pick does not share a boundary, the workflow returns to Step 1.
+              The first DA has been captured. Click a neighbouring DA from the same FED on the map. If the second pick does not share a boundary, the workflow returns to Step 1.
             </p>
             <div className="grid min-w-0 gap-2 rounded-[14px] border border-[#d7e6fb] bg-white p-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#607086]">Current First DA</p>

@@ -1,0 +1,1338 @@
+{
+  "version": 1,
+  "generatedAt": "2026-07-08T11:59:33.185361+00:00",
+  "combined": {
+    "renderPmtiles": "render/da_boundaries_available.pmtiles",
+    "renderGeojsonFallback": "",
+    "labelGeojson": "render/da_labels_available.geojson",
+    "sourceLayer": "da_boundaries_available",
+    "minZoom": 5,
+    "maxZoom": 12
+  },
+  "profiles": {
+    "json": "indexes/da_profile_index.json"
+  },
+  "assets": [
+    {
+      "fedNum": "10001",
+      "fedName": "Avalon",
+      "provinceCode": "nl",
+      "metadataGeojsons": [
+        "metadata/fed_10001.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 158
+    },
+    {
+      "fedNum": "10002",
+      "fedName": "Cape Spear",
+      "provinceCode": "nl",
+      "metadataGeojsons": [
+        "metadata/fed_10002.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 140
+    },
+    {
+      "fedNum": "10003",
+      "fedName": "Central Newfoundland",
+      "provinceCode": "nl",
+      "metadataGeojsons": [
+        "metadata/fed_10003.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 183
+    },
+    {
+      "fedNum": "10004",
+      "fedName": "Labrador",
+      "provinceCode": "nl",
+      "metadataGeojsons": [
+        "metadata/fed_10004.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 63
+    },
+    {
+      "fedNum": "10005",
+      "fedName": "Long Range Mountains",
+      "provinceCode": "nl",
+      "metadataGeojsons": [
+        "metadata/fed_10005.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 195
+    },
+    {
+      "fedNum": "10006",
+      "fedName": "St. John's East",
+      "provinceCode": "nl",
+      "metadataGeojsons": [
+        "metadata/fed_10006.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 140
+    },
+    {
+      "fedNum": "10007",
+      "fedName": "Terra Nova—The Peninsulas",
+      "provinceCode": "nl",
+      "metadataGeojsons": [
+        "metadata/fed_10007.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 203
+    },
+    {
+      "fedNum": "11001",
+      "fedName": "Cardigan",
+      "provinceCode": "pe",
+      "metadataGeojsons": [
+        "metadata/fed_11001.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 77
+    },
+    {
+      "fedNum": "11002",
+      "fedName": "Charlottetown",
+      "provinceCode": "pe",
+      "metadataGeojsons": [
+        "metadata/fed_11002.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 65
+    },
+    {
+      "fedNum": "11003",
+      "fedName": "Egmont",
+      "provinceCode": "pe",
+      "metadataGeojsons": [
+        "metadata/fed_11003.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 85
+    },
+    {
+      "fedNum": "11004",
+      "fedName": "Malpeque",
+      "provinceCode": "pe",
+      "metadataGeojsons": [
+        "metadata/fed_11004.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 92
+    },
+    {
+      "fedNum": "46001",
+      "fedName": "Brandon—Souris",
+      "provinceCode": "mb",
+      "metadataGeojsons": [
+        "metadata/fed_46001.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 163
+    },
+    {
+      "fedNum": "46002",
+      "fedName": "Churchill—Keewatinook Aski",
+      "provinceCode": "mb",
+      "metadataGeojsons": [
+        "metadata/fed_46002.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 218
+    },
+    {
+      "fedNum": "46003",
+      "fedName": "Elmwood—Transcona",
+      "provinceCode": "mb",
+      "metadataGeojsons": [
+        "metadata/fed_46003.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 144
+    },
+    {
+      "fedNum": "46004",
+      "fedName": "Kildonan—St. Paul",
+      "provinceCode": "mb",
+      "metadataGeojsons": [
+        "metadata/fed_46004.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 136
+    },
+    {
+      "fedNum": "46005",
+      "fedName": "Portage—Lisgar",
+      "provinceCode": "mb",
+      "metadataGeojsons": [
+        "metadata/fed_46005.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 148
+    },
+    {
+      "fedNum": "46006",
+      "fedName": "Provencher",
+      "provinceCode": "mb",
+      "metadataGeojsons": [
+        "metadata/fed_46006.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 141
+    },
+    {
+      "fedNum": "46007",
+      "fedName": "Riding Mountain",
+      "provinceCode": "mb",
+      "metadataGeojsons": [
+        "metadata/fed_46007.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 209
+    },
+    {
+      "fedNum": "46008",
+      "fedName": "St. Boniface—St. Vital",
+      "provinceCode": "mb",
+      "metadataGeojsons": [
+        "metadata/fed_46008.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 148
+    },
+    {
+      "fedNum": "46009",
+      "fedName": "Selkirk—Interlake—Eastman",
+      "provinceCode": "mb",
+      "metadataGeojsons": [
+        "metadata/fed_46009.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 179
+    },
+    {
+      "fedNum": "46010",
+      "fedName": "Winnipeg Centre",
+      "provinceCode": "mb",
+      "metadataGeojsons": [
+        "metadata/fed_46010.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 164
+    },
+    {
+      "fedNum": "46011",
+      "fedName": "Winnipeg North",
+      "provinceCode": "mb",
+      "metadataGeojsons": [
+        "metadata/fed_46011.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 134
+    },
+    {
+      "fedNum": "46012",
+      "fedName": "Winnipeg South",
+      "provinceCode": "mb",
+      "metadataGeojsons": [
+        "metadata/fed_46012.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 113
+    },
+    {
+      "fedNum": "46013",
+      "fedName": "Winnipeg South Centre",
+      "provinceCode": "mb",
+      "metadataGeojsons": [
+        "metadata/fed_46013.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 158
+    },
+    {
+      "fedNum": "46014",
+      "fedName": "Winnipeg West",
+      "provinceCode": "mb",
+      "metadataGeojsons": [
+        "metadata/fed_46014.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 168
+    },
+    {
+      "fedNum": "47001",
+      "fedName": "Battlefords—Lloydminster—Meadow Lake",
+      "provinceCode": "sk",
+      "metadataGeojsons": [
+        "metadata/fed_47001.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 248
+    },
+    {
+      "fedNum": "47002",
+      "fedName": "Carlton Trail—Eagle Creek",
+      "provinceCode": "sk",
+      "metadataGeojsons": [
+        "metadata/fed_47002.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 196
+    },
+    {
+      "fedNum": "47003",
+      "fedName": "Desnethé—Missinippi—Churchill River",
+      "provinceCode": "sk",
+      "metadataGeojsons": [
+        "metadata/fed_47003.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 166
+    },
+    {
+      "fedNum": "47004",
+      "fedName": "Moose Jaw—Lake Centre—Lanigan",
+      "provinceCode": "sk",
+      "metadataGeojsons": [
+        "metadata/fed_47004.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 226
+    },
+    {
+      "fedNum": "47005",
+      "fedName": "Prince Albert",
+      "provinceCode": "sk",
+      "metadataGeojsons": [
+        "metadata/fed_47005.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 182
+    },
+    {
+      "fedNum": "47006",
+      "fedName": "Regina—Lewvan",
+      "provinceCode": "sk",
+      "metadataGeojsons": [
+        "metadata/fed_47006.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 140
+    },
+    {
+      "fedNum": "47007",
+      "fedName": "Regina—Qu'Appelle",
+      "provinceCode": "sk",
+      "metadataGeojsons": [
+        "metadata/fed_47007.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 251
+    },
+    {
+      "fedNum": "47008",
+      "fedName": "Regina—Wascana",
+      "provinceCode": "sk",
+      "metadataGeojsons": [
+        "metadata/fed_47008.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 147
+    },
+    {
+      "fedNum": "47009",
+      "fedName": "Saskatoon South",
+      "provinceCode": "sk",
+      "metadataGeojsons": [
+        "metadata/fed_47009.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 108
+    },
+    {
+      "fedNum": "47010",
+      "fedName": "Saskatoon—University",
+      "provinceCode": "sk",
+      "metadataGeojsons": [
+        "metadata/fed_47010.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 120
+    },
+    {
+      "fedNum": "47011",
+      "fedName": "Saskatoon West",
+      "provinceCode": "sk",
+      "metadataGeojsons": [
+        "metadata/fed_47011.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 143
+    },
+    {
+      "fedNum": "47012",
+      "fedName": "Souris—Moose Mountain",
+      "provinceCode": "sk",
+      "metadataGeojsons": [
+        "metadata/fed_47012.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 227
+    },
+    {
+      "fedNum": "47013",
+      "fedName": "Swift Current—Grasslands—Kindersley",
+      "provinceCode": "sk",
+      "metadataGeojsons": [
+        "metadata/fed_47013.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 233
+    },
+    {
+      "fedNum": "47014",
+      "fedName": "Yorkton—Melville",
+      "provinceCode": "sk",
+      "metadataGeojsons": [
+        "metadata/fed_47014.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 238
+    },
+    {
+      "fedNum": "48001",
+      "fedName": "Airdrie—Cochrane",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48001.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 140
+    },
+    {
+      "fedNum": "48002",
+      "fedName": "Battle River—Crowfoot",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48002.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 235
+    },
+    {
+      "fedNum": "48003",
+      "fedName": "Bow River",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48003.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 162
+    },
+    {
+      "fedNum": "48004",
+      "fedName": "Calgary Centre",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48004.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 168
+    },
+    {
+      "fedNum": "48005",
+      "fedName": "Calgary Confederation",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48005.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 196
+    },
+    {
+      "fedNum": "48006",
+      "fedName": "Calgary Crowfoot",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48006.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 132
+    },
+    {
+      "fedNum": "48007",
+      "fedName": "Calgary East",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48007.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 206
+    },
+    {
+      "fedNum": "48008",
+      "fedName": "Calgary Heritage",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48008.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 191
+    },
+    {
+      "fedNum": "48009",
+      "fedName": "Calgary McKnight",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48009.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 168
+    },
+    {
+      "fedNum": "48010",
+      "fedName": "Calgary Midnapore",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48010.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 153
+    },
+    {
+      "fedNum": "48011",
+      "fedName": "Calgary Nose Hill",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48011.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 192
+    },
+    {
+      "fedNum": "48012",
+      "fedName": "Calgary Shepard",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48012.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 72
+    },
+    {
+      "fedNum": "48013",
+      "fedName": "Calgary Signal Hill",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48013.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 145
+    },
+    {
+      "fedNum": "48014",
+      "fedName": "Calgary Skyview",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48014.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 51
+    },
+    {
+      "fedNum": "48015",
+      "fedName": "Edmonton Centre",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48015.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 198
+    },
+    {
+      "fedNum": "48016",
+      "fedName": "Edmonton Gateway",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48016.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 106
+    },
+    {
+      "fedNum": "48017",
+      "fedName": "Edmonton Griesbach",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48017.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 200
+    },
+    {
+      "fedNum": "48018",
+      "fedName": "Edmonton Manning",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48018.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 135
+    },
+    {
+      "fedNum": "48019",
+      "fedName": "Edmonton Northwest",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48019.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 123
+    },
+    {
+      "fedNum": "48020",
+      "fedName": "Edmonton Riverbend",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48020.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 119
+    },
+    {
+      "fedNum": "48021",
+      "fedName": "Edmonton Southeast",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48021.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 132
+    },
+    {
+      "fedNum": "48022",
+      "fedName": "Edmonton Strathcona",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48022.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 201
+    },
+    {
+      "fedNum": "48023",
+      "fedName": "Edmonton West",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48023.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 138
+    },
+    {
+      "fedNum": "48024",
+      "fedName": "Foothills",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48024.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 202
+    },
+    {
+      "fedNum": "48025",
+      "fedName": "Fort McMurray—Cold Lake",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48025.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 222
+    },
+    {
+      "fedNum": "48026",
+      "fedName": "Grande Prairie",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48026.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 177
+    },
+    {
+      "fedNum": "48027",
+      "fedName": "Lakeland",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48027.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 211
+    },
+    {
+      "fedNum": "48028",
+      "fedName": "Leduc—Wetaskiwin",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48028.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 155
+    },
+    {
+      "fedNum": "48029",
+      "fedName": "Lethbridge",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48029.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 182
+    },
+    {
+      "fedNum": "48030",
+      "fedName": "Medicine Hat—Cardston—Warner",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48030.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 169
+    },
+    {
+      "fedNum": "48031",
+      "fedName": "Parkland",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48031.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 153
+    },
+    {
+      "fedNum": "48032",
+      "fedName": "Peace River—Westlock",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48032.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 247
+    },
+    {
+      "fedNum": "48033",
+      "fedName": "Ponoka—Didsbury",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48033.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 188
+    },
+    {
+      "fedNum": "48034",
+      "fedName": "Red Deer",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48034.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 177
+    },
+    {
+      "fedNum": "48035",
+      "fedName": "Sherwood Park—Fort Saskatchewan",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48035.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 162
+    },
+    {
+      "fedNum": "48036",
+      "fedName": "St. Albert—Sturgeon River",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48036.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 189
+    },
+    {
+      "fedNum": "48037",
+      "fedName": "Yellowhead",
+      "provinceCode": "ab",
+      "metadataGeojsons": [
+        "metadata/fed_48037.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 206
+    },
+    {
+      "fedNum": "59001",
+      "fedName": "Abbotsford—South Langley",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59001.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 181
+    },
+    {
+      "fedNum": "59002",
+      "fedName": "Burnaby Central",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59002.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 143
+    },
+    {
+      "fedNum": "59003",
+      "fedName": "Burnaby North—Seymour",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59003.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 172
+    },
+    {
+      "fedNum": "59004",
+      "fedName": "Cariboo—Prince George",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59004.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 284
+    },
+    {
+      "fedNum": "59005",
+      "fedName": "Chilliwack—Hope",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59005.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 216
+    },
+    {
+      "fedNum": "59006",
+      "fedName": "Cloverdale—Langley City",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59006.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 143
+    },
+    {
+      "fedNum": "59007",
+      "fedName": "Columbia—Kootenay—Southern Rockies",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59007.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 215
+    },
+    {
+      "fedNum": "59008",
+      "fedName": "Coquitlam—Port Coquitlam",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59008.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 135
+    },
+    {
+      "fedNum": "59009",
+      "fedName": "Courtenay—Alberni",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59009.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 216
+    },
+    {
+      "fedNum": "59010",
+      "fedName": "Cowichan—Malahat—Langford",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59010.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 173
+    },
+    {
+      "fedNum": "59011",
+      "fedName": "Delta",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59011.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 181
+    },
+    {
+      "fedNum": "59012",
+      "fedName": "Esquimalt—Saanich—Sooke",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59012.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 174
+    },
+    {
+      "fedNum": "59013",
+      "fedName": "Fleetwood—Port Kells",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59013.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 130
+    },
+    {
+      "fedNum": "59014",
+      "fedName": "Kamloops—Shuswap—Central Rockies",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59014.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 187
+    },
+    {
+      "fedNum": "59015",
+      "fedName": "Kamloops—Thompson—Nicola",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59015.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 290
+    },
+    {
+      "fedNum": "59016",
+      "fedName": "Kelowna",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59016.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 119
+    },
+    {
+      "fedNum": "59017",
+      "fedName": "Langley Township—Fraser Heights",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59017.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 128
+    },
+    {
+      "fedNum": "59018",
+      "fedName": "Mission—Matsqui—Abbotsford",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59018.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 197
+    },
+    {
+      "fedNum": "59019",
+      "fedName": "Nanaimo—Ladysmith",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59019.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 193
+    },
+    {
+      "fedNum": "59020",
+      "fedName": "New Westminster—Burnaby—Maillardville",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59020.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 141
+    },
+    {
+      "fedNum": "59021",
+      "fedName": "North Island—Powell River",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59021.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 270
+    },
+    {
+      "fedNum": "59022",
+      "fedName": "North Vancouver—Capilano",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59022.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 175
+    },
+    {
+      "fedNum": "59023",
+      "fedName": "Okanagan Lake West—South Kelowna",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59023.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 156
+    },
+    {
+      "fedNum": "59024",
+      "fedName": "Pitt Meadows—Maple Ridge",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59024.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 161
+    },
+    {
+      "fedNum": "59025",
+      "fedName": "Port Moody—Coquitlam",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59025.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 169
+    },
+    {
+      "fedNum": "59026",
+      "fedName": "Prince George—Peace River—Northern Rockies",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59026.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 237
+    },
+    {
+      "fedNum": "59027",
+      "fedName": "Richmond Centre—Marpole",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59027.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 146
+    },
+    {
+      "fedNum": "59028",
+      "fedName": "Richmond East—Steveston",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59028.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 150
+    },
+    {
+      "fedNum": "59029",
+      "fedName": "Saanich—Gulf Islands",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59029.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 188
+    },
+    {
+      "fedNum": "59030",
+      "fedName": "Similkameen—South Okanagan—West Kootenay",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59030.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 200
+    },
+    {
+      "fedNum": "59031",
+      "fedName": "Skeena—Bulkley Valley",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59031_part01.geojson",
+        "metadata/fed_59031_part02.geojson"
+      ],
+      "shardCount": 2,
+      "renderIncluded": true,
+      "featureCount": 281
+    },
+    {
+      "fedNum": "59032",
+      "fedName": "South Surrey—White Rock",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59032.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 156
+    },
+    {
+      "fedNum": "59033",
+      "fedName": "Surrey Centre",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59033.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 148
+    },
+    {
+      "fedNum": "59034",
+      "fedName": "Surrey Newton",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59034.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 132
+    },
+    {
+      "fedNum": "59035",
+      "fedName": "Vancouver Centre",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59035.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 126
+    },
+    {
+      "fedNum": "59036",
+      "fedName": "Vancouver East",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59036.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 200
+    },
+    {
+      "fedNum": "59037",
+      "fedName": "Vancouver Fraserview—South Burnaby",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59037.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 166
+    },
+    {
+      "fedNum": "59038",
+      "fedName": "Vancouver Granville",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59038.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 180
+    },
+    {
+      "fedNum": "59039",
+      "fedName": "Vancouver Kingsway",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59039.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 183
+    },
+    {
+      "fedNum": "59040",
+      "fedName": "Vancouver Quadra",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59040.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 211
+    },
+    {
+      "fedNum": "59041",
+      "fedName": "Vernon—Lake Country—Monashee",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59041.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 170
+    },
+    {
+      "fedNum": "59042",
+      "fedName": "Victoria",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59042.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 204
+    },
+    {
+      "fedNum": "59043",
+      "fedName": "West Vancouver—Sunshine Coast—Sea to Sky Country",
+      "provinceCode": "bc",
+      "metadataGeojsons": [
+        "metadata/fed_59043.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 221
+    },
+    {
+      "fedNum": "60001",
+      "fedName": "Yukon",
+      "provinceCode": "yt",
+      "metadataGeojsons": [
+        "metadata/fed_60001.geojson"
+      ],
+      "shardCount": 1,
+      "renderIncluded": true,
+      "featureCount": 74
+    }
+  ]
+}

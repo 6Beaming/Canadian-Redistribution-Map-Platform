@@ -8,8 +8,8 @@ export const FED_LABEL_ZOOM = {
 };
 
 export const DA_LABEL_ZOOM = {
-  COMMUNITY_MIN: 6,
-  CODE_MIN: 10,
+  COMMUNITY_MIN: 5,
+  CODE_MIN: 9,
   MAX: 16
 };
 
@@ -32,6 +32,7 @@ const FED_LOCAL_SIZE_PAIRS = [
 ];
 
 const DA_COMMUNITY_SIZE_PAIRS = [
+  [5, 9],
   [6, 10],
   [7, 11],
   [8, 13],
@@ -44,6 +45,7 @@ const DA_COMMUNITY_SIZE_PAIRS = [
 ];
 
 const DA_CODE_SIZE_PAIRS = [
+  [9, 8],
   [10, 9],
   [11, 10],
   [12, 11],
@@ -148,7 +150,7 @@ export function daCommunityLabelPaint() {
     "text-halo-color": "#ffffff",
     "text-halo-width": 2,
     "text-halo-blur": 0.25,
-    "text-opacity": ["interpolate", ["linear"], ["zoom"], 6, 0.5, 7.5, 0.8, 8.5, 1, 14, 1]
+    "text-opacity": ["interpolate", ["linear"], ["zoom"], 5, 0.42, 6.5, 0.72, 8, 1, 14, 1]
   };
 }
 
@@ -158,7 +160,7 @@ export function daCodeLabelPaint() {
     "text-halo-color": "#ffffff",
     "text-halo-width": 1.5,
     "text-halo-blur": 0.2,
-    "text-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0.65, 11, 0.9, 14, 0.9]
+    "text-opacity": ["interpolate", ["linear"], ["zoom"], 9, 0.58, 10, 0.8, 12, 0.92, 14, 0.92]
   };
 }
 

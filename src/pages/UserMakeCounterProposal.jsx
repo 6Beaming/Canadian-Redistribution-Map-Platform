@@ -178,7 +178,7 @@ function SelectionPairCard({ cache, profilesByDguid }) {
         <div className="grid min-w-0 gap-1">
           <CardTitle>Counter-Proposal Cache</CardTitle>
           <CardDescription>
-            The selected Yukon DA pair has been extracted into the browser-side <code>counter-proposal-cache</code>. Refreshing the page clears it.
+            The selected DA pair has been extracted into the temporary browser-side <code>counter-proposal-cache</code>. Refreshing the page clears it.
           </CardDescription>
         </div>
       </CardHeader>
@@ -263,7 +263,7 @@ function EditorWorkspaceCard({
         <div className="grid min-w-0 gap-1">
           <CardTitle>Counter-Proposal Editing Area</CardTitle>
           <CardDescription>
-            Use the live map on the left to click a shared boundary point, drag it inside the combined DA area, then compare the original and proposal views here.
+            Use the live map on the left to click a shared boundary point, drag it inside the original combined DA envelope, then compare the original and proposal views here.
           </CardDescription>
         </div>
       </CardHeader>
@@ -369,7 +369,7 @@ export default function UserMakeCounterProposal({
         <div className="grid gap-1">
           <h2 className="text-[18px] font-semibold text-[#17324d]">Make a Counter-Proposal</h2>
           <p className="text-sm text-[#5f6368]">
-            This front-end prototype extracts a temporary browser cache for one neighbouring Yukon DA pair, lets you edit the shared boundary live on the map, and clears everything after refresh.
+            This front-end prototype extracts a temporary browser cache for one neighbouring enabled DA pair, lets you edit the shared boundary live on the map, and clears everything after refresh.
           </p>
         </div>
       </div>
@@ -385,7 +385,7 @@ export default function UserMakeCounterProposal({
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#607086]">Step 1</p>
           <h3 className="text-[17px] font-semibold text-[#17324d]">Select The First DA</h3>
           <p className="text-[14px] leading-6 text-[#5f6368]">
-            Click one Yukon dissemination area on the map to begin your counter-proposal.
+            Click one enabled dissemination area on the map to begin your counter-proposal.
           </p>
         </div>
       ) : null}
@@ -396,7 +396,7 @@ export default function UserMakeCounterProposal({
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#607086]">Step 2</p>
             <h3 className="text-[17px] font-semibold text-[#17324d]">Select A Neighbouring DA</h3>
             <p className="text-[14px] leading-6 text-[#5f6368]">
-              The first DA has been captured. Click a neighbouring Yukon DA on the map. If the second pick is not adjacent, the workflow returns to Step 1.
+              The first DA has been captured. Click a neighbouring DA from the same FED on the map. If the second pick is not adjacent, the workflow returns to Step 1.
             </p>
             <div className="grid min-w-0 gap-2 rounded-[14px] border border-[#d7e6fb] bg-white p-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#607086]">Current First DA</p>

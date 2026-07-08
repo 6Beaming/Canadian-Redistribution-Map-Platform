@@ -35,6 +35,10 @@ export const mapApi = {
     return request("/da-profiles");
   },
 
+  getDaAssetManifest() {
+    return this.fetchAssetJson("manifests/da_asset_manifest.json");
+  },
+
   getAssignments() {
     return request("/assignments");
   },
@@ -52,6 +56,17 @@ export const mapApi = {
       throw new Error(`Failed to load ${filename} (${response.status}).`);
     }
     return response.json();
+  },
+
+  async assetExists(filename) {
+    try {
+      const response = await fetch(this.assetUrl(filename), {
+        method: "HEAD"
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
   },
 
   async supportsByteServing(filename) {

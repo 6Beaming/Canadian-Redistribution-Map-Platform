@@ -4,16 +4,30 @@ import { Protocol } from "pmtiles";
 import { mapApi } from "@/services/mapApi.js";
 import {
   CANADA_BOUNDS,
+  DATA_BLOCKED_FILL_COLOR,
+  DEFAULT_DA_RENDER_MAX_ZOOM,
+  DEFAULT_DA_RENDER_MIN_ZOOM,
+  DEFAULT_DA_SOURCE_LAYER,
+  ENABLED_FILL_COLOR,
   FED_COUNT,
   FED_SOURCE_LAYER,
   HOVER_COLOR,
+  MAP_ZOOM,
   MVP_FED_NUM,
-  OUTLINE_ZOOM,
   SELECTED_COLOR,
+  TRANSPARENT_INTERACTION_OPACITY,
   WHITE_BASEMAP_STYLE
 } from "@/lib/map/constants.js";
 import {
-  buildDaLabelGeoJSON,
+  getDaLabelGeojsonPath,
+  getDaRenderMaxZoom,
+  getDaRenderMinZoom,
+  getDaRenderPmtilesPath,
+  getDaRenderSourceLayer,
+  getFallbackDaAssetManifest,
+  normalizeDaAssetManifest,
+} from "@/lib/map/daAssetManifest.js";
+import {
   buildFedNameLookup,
   buildProfileIndex
 } from "@/lib/map/profileUtils.js";
@@ -38,13 +52,23 @@ import {
   getRolloutAreas,
   getRolloutColor,
 } from "@/lib/map/rolloutPlan.js";
+import {
+  buildGoogleRoadmapTileUrl,
+  getGoogleRoadmapSession,
+  hasGoogleMapTilesApiKey,
+} from "@/services/googleMapTilesApi.js";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 const EXPAND_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5"/><path d="M20 9V4h-5"/><path d="M4 15v5h5"/><path d="M20 15v5h-5"/></svg>`;
 
 const EXIT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4H4v5"/><path d="M15 4h5v5"/><path d="M9 20H4v-5"/><path d="M15 20h5v-5"/></svg>`;
 
+const BOUNDARY_ON_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M12 4v16"/><path d="M4 12h16"/></svg>`;
+
+const BOUNDARY_OFF_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m6 6 12 12"/></svg>`;
+
 const MAP_BOUNDARY_COLOR = "#000000";
+const TRANSPARENT_BOUNDARY_COLOR = "rgba(0, 0, 0, 0)";
 const EMPTY_OBJECTION_BOUNDARY = emptyBoundaryFeatureCollection();
 const EMPTY_COUNTER_PROPOSAL_FEATURES = emptyCounterProposalFeatureCollection();
 
@@ -75,103 +99,288 @@ function createFullscreenControl(buttonRef, getIsFullscreen, onToggle) {
   };
 }
 
-function forEachCoordinate(coords, geometryType, callback) {
-  if (geometryType === "Polygon") {
-    coords.forEach((ring) => ring.forEach(callback));
-    return;
-  }
-  if (geometryType === "MultiPolygon") {
-    coords.forEach((polygon) =>
-      polygon.forEach((ring) => ring.forEach(callback))
-    );
-  }
-}
-
-function extendBoundsFromGeoJSON(bounds, geojson) {
-  geojson.features.forEach((feature) => {
-    const { type, coordinates } = feature.geometry;
-    forEachCoordinate(coordinates, type, ([lng, lat]) => {
-      bounds.extend([lng, lat]);
-    });
-  });
-  return bounds;
-}
-
 function paddedMaxBounds(bounds, factor = 0.35) {
   const sw = bounds.getSouthWest();
   const ne = bounds.getNorthEast();
   const padLng = (ne.lng - sw.lng) * factor;
   const padLat = (ne.lat - sw.lat) * factor;
+  const clampLatitude = (value) => Math.max(-89.75, Math.min(89.75, value));
   return new maplibregl.LngLatBounds(
-    [sw.lng - padLng, sw.lat - padLat],
-    [ne.lng + padLng, ne.lat + padLat]
+    [sw.lng - padLng, clampLatitude(sw.lat - padLat)],
+    [ne.lng + padLng, clampLatitude(ne.lat + padLat)]
   );
+}
+
+function createBoundaryControl(buttonRef, getBoundariesVisible, onToggle) {
+  return {
+    onAdd() {
+      const container = document.createElement("div");
+      container.className = "maplibregl-ctrl maplibregl-ctrl-group";
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "maplibregl-ctrl-icon map-boundary-btn";
+      button.innerHTML = getBoundariesVisible() ? BOUNDARY_ON_ICON : BOUNDARY_OFF_ICON;
+      button.setAttribute(
+        "aria-label",
+        getBoundariesVisible() ? "Hide FED and DA boundaries" : "Show FED and DA boundaries",
+      );
+      button.setAttribute("aria-pressed", String(getBoundariesVisible()));
+      button.title = getBoundariesVisible() ? "Hide boundaries" : "Show boundaries";
+      button.addEventListener("click", onToggle);
+
+      buttonRef.current = button;
+      container.appendChild(button);
+      return container;
+    },
+    onRemove() {
+      buttonRef.current = null;
+    }
+  };
+}
+
+function buildRolloutFedMembershipExpression(fedNums, truthyValue, fallbackValue) {
+  const expression = [
+    "match",
+    ["to-string", ["coalesce", ["get", "fed_num"], ["get", "FED_NUM"], MVP_FED_NUM]],
+  ];
+
+  fedNums.forEach((fedNum) => {
+    expression.push(fedNum, truthyValue);
+  });
+
+  expression.push(fallbackValue);
+  return expression;
+}
+
+function buildInitialMapBounds() {
+  const sourceBounds = new maplibregl.LngLatBounds(CANADA_BOUNDS.sw, CANADA_BOUNDS.ne);
+  const sw = sourceBounds.getSouthWest();
+  const ne = sourceBounds.getNorthEast();
+  const lngPad = (ne.lng - sw.lng) * 0.058;
+  const southPad = (ne.lat - sw.lat) * 0.08;
+  const northPad = (ne.lat - sw.lat) * 0.16;
+
+  return new maplibregl.LngLatBounds(
+    [sw.lng - lngPad, Math.max(-84.5, sw.lat - southPad)],
+    [ne.lng + lngPad, Math.min(85.25, ne.lat + northPad)],
+  );
+}
+
+function boundaryHighlightStateExpression() {
+  return [
+    "any",
+    ["boolean", ["feature-state", "selected"], false],
+    ["boolean", ["feature-state", "hover"], false],
+  ];
+}
+
+function boundaryFillOutlineColor(showBoundaries) {
+  if (showBoundaries) {
+    return MAP_BOUNDARY_COLOR;
+  }
+
+  return [
+    "case",
+    boundaryHighlightStateExpression(),
+    MAP_BOUNDARY_COLOR,
+    TRANSPARENT_BOUNDARY_COLOR,
+  ];
+}
+
+function boundaryLineOpacity(showBoundaries) {
+  if (showBoundaries) {
+    return 1;
+  }
+
+  return [
+    "case",
+    boundaryHighlightStateExpression(),
+    1,
+    0,
+  ];
 }
 
 function fedNumMatch() {
   return ["==", ["to-string", ["get", "fed_num"]], MVP_FED_NUM];
 }
 
-function fedFillPaint() {
+const ENABLED_FED_NUMS = getRolloutAreas("enabled").map((area) => String(area.fedNum));
+const BLOCKED_FED_NUMS = getRolloutAreas("data-blocked").map((area) =>
+  String(area.fedNum),
+);
+const FED_ROLLOUT_FILL_EXPRESSION = buildRolloutFedMembershipExpression(
+  ENABLED_FED_NUMS,
+  ENABLED_FILL_COLOR,
+  buildRolloutFedMembershipExpression(BLOCKED_FED_NUMS, DATA_BLOCKED_FILL_COLOR, "#ffffff"),
+);
+
+function buildBlockedDaFillExpression() {
+  return buildRolloutFedMembershipExpression(
+    BLOCKED_FED_NUMS,
+    DATA_BLOCKED_FILL_COLOR,
+    ENABLED_FILL_COLOR,
+  );
+}
+
+const BLOCKED_DA_FILL_EXPRESSION = buildBlockedDaFillExpression();
+
+function buildBlinkCategoryDaExpression(categoryId, hiddenValue, visibleValue) {
+  if (categoryId === "enabled") {
+    return buildRolloutFedMembershipExpression(
+      ENABLED_FED_NUMS,
+      hiddenValue,
+      visibleValue,
+    );
+  }
+
+  if (categoryId === "data-blocked") {
+    return buildRolloutFedMembershipExpression(
+      BLOCKED_FED_NUMS,
+      hiddenValue,
+      visibleValue,
+    );
+  }
+
+  return visibleValue;
+}
+
+function fedFillPaint(showRollout, showBoundaries = true) {
+  const fillColor = showRollout
+    ? [
+        "case",
+        ["boolean", ["feature-state", "selected"], false],
+        SELECTED_COLOR,
+        ["boolean", ["feature-state", "hover"], false],
+        HOVER_COLOR,
+        FED_ROLLOUT_FILL_EXPRESSION,
+      ]
+    : [
+        "case",
+        ["boolean", ["feature-state", "selected"], false],
+        SELECTED_COLOR,
+        ["boolean", ["feature-state", "hover"], false],
+        HOVER_COLOR,
+        "#ffffff",
+      ];
+
+  const fillOpacity = showRollout
+    ? [
+        "case",
+        ["boolean", ["feature-state", "selected"], false],
+        0.85,
+        ["boolean", ["feature-state", "hover"], false],
+        0.75,
+        ["boolean", ["feature-state", "blinkHidden"], false],
+        0.22,
+        0.68,
+      ]
+    : [
+        "case",
+        ["boolean", ["feature-state", "selected"], false],
+        0.85,
+        ["boolean", ["feature-state", "hover"], false],
+        0.75,
+        TRANSPARENT_INTERACTION_OPACITY,
+      ];
+
   return {
-    "fill-color": [
-      "case",
-      ["boolean", ["feature-state", "selected"], false],
-      SELECTED_COLOR,
-      ["boolean", ["feature-state", "hover"], false],
-      HOVER_COLOR,
-      ["boolean", ["feature-state", "rolloutVisible"], false],
-      ["coalesce", ["feature-state", "rolloutColor"], "#ffffff"],
-      "#ffffff"
-    ],
-    "fill-outline-color": [
-      "case",
-      ["boolean", ["feature-state", "selected"], false],
-      MAP_BOUNDARY_COLOR,
-      ["boolean", ["feature-state", "hover"], false],
-      MAP_BOUNDARY_COLOR,
-      ["boolean", ["feature-state", "rolloutVisible"], false],
-      MAP_BOUNDARY_COLOR,
-      fedNumMatch(),
-      MAP_BOUNDARY_COLOR,
-      MAP_BOUNDARY_COLOR
-    ],
-    "fill-opacity": [
-      "case",
-      ["boolean", ["feature-state", "selected"], false],
-      0.85,
-      ["boolean", ["feature-state", "hover"], false],
-      0.75,
-      ["boolean", ["feature-state", "rolloutVisible"], false],
-      ["case", ["boolean", ["feature-state", "blinkHidden"], false], 0.24, 0.82],
-      1
-    ],
+    "fill-color": fillColor,
+    "fill-outline-color": boundaryFillOutlineColor(showBoundaries),
+    "fill-opacity": fillOpacity,
     "fill-antialias": true
   };
 }
 
-function fedOutlinePaint() {
+function fedOutlinePaint(showBoundaries = true) {
   return {
-    "line-color": [
-      "case",
-      ["boolean", ["feature-state", "rolloutVisible"], false],
-      MAP_BOUNDARY_COLOR,
-      fedNumMatch(),
-      MAP_BOUNDARY_COLOR,
-      MAP_BOUNDARY_COLOR
-    ],
+    "line-color": MAP_BOUNDARY_COLOR,
     "line-width": [
       "interpolate",
       ["linear"],
       ["zoom"],
-      3,
-      ["case", fedNumMatch(), 2.4, 1.6],
-      6,
-      ["case", fedNumMatch(), 3, 2],
-      10,
-      ["case", fedNumMatch(), 3.5, 2.4]
+      0,
+      ["case", fedNumMatch(), 1.1, 0.7],
+      4,
+      ["case", fedNumMatch(), 1.8, 1.1],
+      8,
+      ["case", fedNumMatch(), 2.5, 1.6],
+      12,
+      ["case", fedNumMatch(), 3.2, 2.1]
     ],
-    "line-opacity": 1
+    "line-opacity": boundaryLineOpacity(showBoundaries)
+  };
+}
+
+function daFillPaint(
+  showRollout,
+  rolloutCategoryId = null,
+  blinkHidden = false,
+  showBoundaries = true,
+) {
+  const fillColor = showRollout
+    ? [
+        "case",
+        ["boolean", ["feature-state", "selected"], false],
+        SELECTED_COLOR,
+        ["boolean", ["feature-state", "hover"], false],
+        HOVER_COLOR,
+        BLOCKED_DA_FILL_EXPRESSION,
+      ]
+    : [
+        "case",
+        ["boolean", ["feature-state", "selected"], false],
+        SELECTED_COLOR,
+        ["boolean", ["feature-state", "hover"], false],
+        HOVER_COLOR,
+        "#ffffff",
+      ];
+
+  const fillOpacity = showRollout
+    ? [
+        "case",
+        ["boolean", ["feature-state", "selected"], false],
+        0.85,
+        ["boolean", ["feature-state", "hover"], false],
+        0.72,
+        buildBlinkCategoryDaExpression(
+          rolloutCategoryId,
+          blinkHidden ? 0.18 : 0.58,
+          0.58,
+        ),
+      ]
+    : [
+        "case",
+        ["boolean", ["feature-state", "selected"], false],
+        0.85,
+        ["boolean", ["feature-state", "hover"], false],
+        0.72,
+        TRANSPARENT_INTERACTION_OPACITY,
+      ];
+
+  return {
+    "fill-color": fillColor,
+    "fill-opacity": fillOpacity,
+    "fill-outline-color": boundaryFillOutlineColor(showBoundaries),
+    "fill-antialias": true,
+  };
+}
+
+function daOutlinePaint(minZoom = DEFAULT_DA_RENDER_MIN_ZOOM, showBoundaries = true) {
+  return {
+    "line-color": MAP_BOUNDARY_COLOR,
+    "line-width": [
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      minZoom,
+      0.7,
+      minZoom + 5,
+      1.05,
+      minZoom + 10,
+      1.45,
+    ],
+    "line-opacity": boundaryLineOpacity(showBoundaries),
   };
 }
 
@@ -209,15 +418,24 @@ export function MapCanvas({
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const fullscreenBtnRef = useRef(null);
+  const boundaryBtnRef = useRef(null);
   const onToggleFullscreenRef = useRef(onToggleFullscreen);
+  const onDaSelectRef = useRef(onDaSelect);
+  const onFedSelectRef = useRef(onFedSelect);
+  const onStatusChangeRef = useRef(onStatusChange);
   const isFullscreenRef = useRef(isFullscreen);
+  const boundariesVisibleRef = useRef(true);
   const fedNameLookupRef = useRef(new Map());
   const latestSelectionPropRef = useRef(selection);
   const selectionRef = useRef({ da: null, fed: null });
   const hoverRef = useRef({ da: null, fed: null });
   const externalHoverRef = useRef({ da: null, fed: null });
   const fedSourceModeRef = useRef("pmtiles");
+  const daSourceModeRef = useRef("geojson");
+  const daSourceLayerRef = useRef(DEFAULT_DA_SOURCE_LAYER);
   const setFedStateRef = useRef(null);
+  const applyPresentationModeRef = useRef(null);
+  const applyBoundaryVisibilityRef = useRef(null);
   const applySelectionRef = useRef(null);
   const applyExternalHoverRef = useRef(null);
   const applyObjectionPreviewRef = useRef(null);
@@ -232,6 +450,7 @@ export function MapCanvas({
   const skipNextClickRef = useRef(false);
   const isMapReadyRef = useRef(false);
   const [mapReadyTick, setMapReadyTick] = useState(0);
+  const [boundariesVisible, setBoundariesVisible] = useState(true);
 
   onToggleFullscreenRef.current = onToggleFullscreen;
   isFullscreenRef.current = isFullscreen;
@@ -241,6 +460,10 @@ export function MapCanvas({
   onCounterProposalDragStartRef.current = onCounterProposalDragStart;
   onCounterProposalDragMoveRef.current = onCounterProposalDragMove;
   onCounterProposalDragEndRef.current = onCounterProposalDragEnd;
+  onDaSelectRef.current = onDaSelect;
+  onFedSelectRef.current = onFedSelect;
+  onStatusChangeRef.current = onStatusChange;
+  boundariesVisibleRef.current = boundariesVisible;
 
   useEffect(() => {
     const button = fullscreenBtnRef.current;
@@ -253,6 +476,19 @@ export function MapCanvas({
       isFullscreen ? "Exit fullscreen map" : "Expand map to fullscreen"
     );
   }, [isFullscreen]);
+
+  useEffect(() => {
+    const button = boundaryBtnRef.current;
+    if (!button) return;
+
+    button.innerHTML = boundariesVisible ? BOUNDARY_ON_ICON : BOUNDARY_OFF_ICON;
+    button.title = boundariesVisible ? "Hide boundaries" : "Show boundaries";
+    button.setAttribute(
+      "aria-label",
+      boundariesVisible ? "Hide FED and DA boundaries" : "Show FED and DA boundaries",
+    );
+    button.setAttribute("aria-pressed", String(boundariesVisible));
+  }, [boundariesVisible]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -300,6 +536,22 @@ export function MapCanvas({
   }, [counterProposalPreview, mapReadyTick]);
 
   useEffect(() => {
+    if (!isMapReadyRef.current || !applyPresentationModeRef.current) {
+      return;
+    }
+
+    applyPresentationModeRef.current(rolloutEnabled);
+  }, [mapReadyTick, rolloutEnabled]);
+
+  useEffect(() => {
+    if (!isMapReadyRef.current || !applyBoundaryVisibilityRef.current) {
+      return;
+    }
+
+    applyBoundaryVisibilityRef.current(boundariesVisible);
+  }, [boundariesVisible, mapReadyTick]);
+
+  useEffect(() => {
     const setFedState = setFedStateRef.current;
 
     if (!setFedState || !isMapReadyRef.current) {
@@ -330,12 +582,26 @@ export function MapCanvas({
     });
 
     if (!rolloutEnabled) {
+      if (mapRef.current?.getLayer("da-fill")) {
+        mapRef.current.setPaintProperty(
+          "da-fill",
+          "fill-opacity",
+          daFillPaint(false, rolloutCategoryId, false)["fill-opacity"],
+        );
+      }
       return undefined;
     }
 
     const activeAreas = rolloutCategoryId ? getRolloutAreas(rolloutCategoryId) : [];
 
     if (!activeAreas.length) {
+      if (mapRef.current?.getLayer("da-fill")) {
+        mapRef.current.setPaintProperty(
+          "da-fill",
+          "fill-opacity",
+          daFillPaint(true, rolloutCategoryId, false)["fill-opacity"],
+        );
+      }
       return undefined;
     }
 
@@ -347,6 +613,14 @@ export function MapCanvas({
           blinkHidden: isHidden
         });
       });
+
+      if (mapRef.current?.getLayer("da-fill")) {
+        mapRef.current.setPaintProperty(
+          "da-fill",
+          "fill-opacity",
+          daFillPaint(true, rolloutCategoryId, isHidden)["fill-opacity"],
+        );
+      }
     }, 520);
 
     return () => {
@@ -360,6 +634,14 @@ export function MapCanvas({
           blinkHidden: false
         });
       });
+
+      if (mapRef.current?.getLayer("da-fill")) {
+        mapRef.current.setPaintProperty(
+          "da-fill",
+          "fill-opacity",
+          daFillPaint(rolloutEnabled, rolloutCategoryId, false)["fill-opacity"],
+        );
+      }
     };
   }, [mapReadyTick, rolloutCategoryId, rolloutEnabled]);
 
@@ -373,20 +655,30 @@ export function MapCanvas({
       container: containerRef.current,
       style: WHITE_BASEMAP_STYLE,
       center: [-135, 63.5],
-      zoom: 5,
-      minZoom: 1,
-      maxZoom: 14,
+      zoom: MAP_ZOOM.INITIAL,
+      minZoom: MAP_ZOOM.MIN,
+      maxZoom: MAP_ZOOM.MAX,
       renderWorldCopies: false,
-      maxPitch: 0
+      maxPitch: 0,
+      attributionControl: false,
     });
 
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl(), "top-right");
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
     map.addControl(
       createFullscreenControl(
         fullscreenBtnRef,
         () => isFullscreenRef.current,
         () => onToggleFullscreenRef.current?.()
+      ),
+      "top-right"
+    );
+    map.addControl(
+      createBoundaryControl(
+        boundaryBtnRef,
+        () => boundariesVisibleRef.current,
+        () => setBoundariesVisible((current) => !current),
       ),
       "top-right"
     );
@@ -400,12 +692,20 @@ export function MapCanvas({
       return target;
     }
 
+    function daFeatureTarget(daId) {
+      const target = { source: "das", id: daId };
+      if (daSourceModeRef.current === "pmtiles") {
+        target.sourceLayer = daSourceLayerRef.current;
+      }
+      return target;
+    }
+
     function setFedFeatureState(fedId, state) {
       map.setFeatureState(fedFeatureTarget(fedId), state);
     }
 
-    function clearFedFeatureState(fedId) {
-      map.removeFeatureState(fedFeatureTarget(fedId));
+    function setDaFeatureState(daId, state) {
+      map.setFeatureState(daFeatureTarget(daId), state);
     }
 
     setFedStateRef.current = setFedFeatureState;
@@ -432,7 +732,7 @@ export function MapCanvas({
         id: "fed-fill",
         type: "fill",
         source: "fed-2023",
-        paint: fedFillPaint()
+        paint: fedFillPaint(rolloutEnabled, boundariesVisibleRef.current)
       };
       if (useVectorTiles) {
         layer["source-layer"] = FED_SOURCE_LAYER;
@@ -441,8 +741,7 @@ export function MapCanvas({
     }
 
     function addFedOutlineLayer(useVectorTiles) {
-      if (!useVectorTiles) return;
-      map.addLayer({
+      const layer = {
         id: "fed-outline",
         type: "line",
         source: "fed-2023",
@@ -450,17 +749,121 @@ export function MapCanvas({
           "line-join": "round",
           "line-cap": "round"
         },
-        paint: fedOutlinePaint(),
-        "source-layer": FED_SOURCE_LAYER
+        paint: fedOutlinePaint(boundariesVisibleRef.current),
+      };
+
+      if (useVectorTiles) {
+        layer["source-layer"] = FED_SOURCE_LAYER;
+      }
+
+      map.addLayer(layer);
+    }
+
+    function addDaFillLayer(useVectorTiles, sourceLayer, minZoom) {
+      const layer = {
+        id: "da-fill",
+        type: "fill",
+        source: "das",
+        paint: daFillPaint(
+          rolloutEnabled,
+          rolloutCategoryId,
+          false,
+          boundariesVisibleRef.current,
+        ),
+        minzoom: minZoom,
+      };
+
+      if (useVectorTiles) {
+        layer["source-layer"] = sourceLayer;
+      }
+
+      map.addLayer(layer);
+    }
+
+    function addDaOutlineLayer(useVectorTiles, sourceLayer, minZoom) {
+      const layer = {
+        id: "da-outline",
+        type: "line",
+        source: "das",
+        minzoom: minZoom,
+        layout: {
+          "line-join": "round",
+          "line-cap": "round",
+        },
+        paint: daOutlinePaint(minZoom, boundariesVisibleRef.current),
+      };
+
+      if (useVectorTiles) {
+        layer["source-layer"] = sourceLayer;
+      }
+
+      map.addLayer(layer);
+    }
+
+    async function addGoogleBasemapLayers() {
+      if (!hasGoogleMapTilesApiKey()) {
+        return false;
+      }
+
+      const [labelSession, mutedSession] = await Promise.all([
+        getGoogleRoadmapSession({ labelsVisible: true }),
+        getGoogleRoadmapSession({ labelsVisible: false }),
+      ]);
+      const attribution = "Map data (c) Google";
+
+      map.addSource("google-roadmap-labels", {
+        type: "raster",
+        tiles: [buildGoogleRoadmapTileUrl(labelSession.session)],
+        tileSize: Number(labelSession.tileWidth ?? 256),
+        attribution,
+        scheme: "xyz",
       });
+      map.addLayer(
+        {
+          id: "google-roadmap-labels",
+          type: "raster",
+          source: "google-roadmap-labels",
+          layout: {
+            visibility: rolloutEnabled ? "none" : "visible",
+          },
+          paint: {
+            "raster-opacity": 1,
+          },
+        },
+        "fed-fill",
+      );
+
+      map.addSource("google-roadmap-muted", {
+        type: "raster",
+        tiles: [buildGoogleRoadmapTileUrl(mutedSession.session)],
+        tileSize: Number(mutedSession.tileWidth ?? 256),
+        attribution,
+        scheme: "xyz",
+      });
+      map.addLayer(
+        {
+          id: "google-roadmap-muted",
+          type: "raster",
+          source: "google-roadmap-muted",
+          layout: {
+            visibility: rolloutEnabled ? "visible" : "none",
+          },
+          paint: {
+            "raster-opacity": 1,
+          },
+        },
+        "fed-fill",
+      );
+
+      return true;
     }
 
     async function addFedBaseLayers() {
-      const usePmtiles = await mapApi.supportsByteServing("fed_boundaries_2023.pmtiles");
+      const usePmtiles = await mapApi.supportsByteServing("reference/fed_boundaries_2023.pmtiles");
       fedSourceModeRef.current = usePmtiles ? "pmtiles" : "geojson";
 
       if (usePmtiles) {
-        const pmtilesHttpUrl = mapApi.absoluteAssetUrl("fed_boundaries_2023.pmtiles");
+        const pmtilesHttpUrl = mapApi.absoluteAssetUrl("reference/fed_boundaries_2023.pmtiles");
         map.addSource("fed-2023", {
           type: "vector",
           url: `pmtiles://${pmtilesHttpUrl}`,
@@ -471,86 +874,167 @@ export function MapCanvas({
         return "pmtiles";
       }
 
-      const fedGeojson = await mapApi.fetchAssetJson("fed_boundaries_2023.geojson");
+      const fedGeojson = await mapApi.fetchAssetJson("reference/fed_boundaries_2023.geojson");
       map.addSource("fed-2023", {
         type: "geojson",
         data: fedGeojson,
         promoteId: "fed_num"
       });
       addFedFillLayer(false);
+      addFedOutlineLayer(false);
       return "geojson";
     }
 
-    function addDaLayers(daGeojson) {
+    async function addDaLayers(assetManifest) {
+      const normalizedManifest = normalizeDaAssetManifest(assetManifest);
+      const pmtilesPath = getDaRenderPmtilesPath(normalizedManifest);
+      const sourceLayer =
+        getDaRenderSourceLayer(normalizedManifest) || DEFAULT_DA_SOURCE_LAYER;
+      const minZoom = Math.max(
+        Number(getDaRenderMinZoom(normalizedManifest)) || DEFAULT_DA_RENDER_MIN_ZOOM,
+        MAP_ZOOM.MIN,
+      );
+      const maxZoom = Math.min(
+        Number(getDaRenderMaxZoom(normalizedManifest)) || DEFAULT_DA_RENDER_MAX_ZOOM,
+        MAP_ZOOM.MAX + 1,
+      );
+
+      daSourceLayerRef.current = sourceLayer;
+
+      if (!pmtilesPath) {
+        throw new Error(
+          "The DA asset manifest does not declare a PMTiles render bundle. Rebuild the local DA render assets first.",
+        );
+      }
+
+      if (!(await mapApi.supportsByteServing(pmtilesPath))) {
+        throw new Error(
+          "The DA PMTiles bundle is unavailable or byte-range serving is disabled. Verify /api/map/assets supports Range requests.",
+        );
+      }
+
+      daSourceModeRef.current = "pmtiles";
       map.addSource("das", {
-        type: "geojson",
-        data: daGeojson,
-        promoteId: "DGUID"
+        type: "vector",
+        url: `pmtiles://${mapApi.absoluteAssetUrl(pmtilesPath)}`,
+        promoteId: { [sourceLayer]: "DGUID" },
       });
+      addDaFillLayer(true, sourceLayer, minZoom);
+      addDaOutlineLayer(true, sourceLayer, minZoom);
 
-      map.addLayer({
-        id: "da-fill",
-        type: "fill",
-        source: "das",
-        paint: {
-          "fill-color": [
-            "case",
-            ["boolean", ["feature-state", "selected"], false],
-            SELECTED_COLOR,
-            ["boolean", ["feature-state", "hover"], false],
-            HOVER_COLOR,
-            "#4e79a7"
-          ],
-          "fill-opacity": [
-            "case",
-            ["boolean", ["feature-state", "selected"], false],
-            0.85,
-            ["boolean", ["feature-state", "hover"], false],
-            0.72,
-            0.55
-          ],
-          "fill-antialias": true
+      return {
+        mode: "pmtiles",
+        featureCount: normalizedManifest.assets.reduce(
+          (count, asset) => count + Math.max(0, Number(asset.featureCount ?? 0)),
+          0,
+        ),
+        minZoom,
+        maxZoom,
+        sourceLayer,
+      };
+    }
+
+    function setPresentationMode(showRollout) {
+      if (map.getLayer("fed-fill")) {
+        map.setPaintProperty(
+          "fed-fill",
+          "fill-color",
+          fedFillPaint(showRollout, boundariesVisibleRef.current)["fill-color"],
+        );
+        map.setPaintProperty(
+          "fed-fill",
+          "fill-outline-color",
+          fedFillPaint(showRollout, boundariesVisibleRef.current)["fill-outline-color"],
+        );
+        map.setPaintProperty(
+          "fed-fill",
+          "fill-opacity",
+          fedFillPaint(showRollout, boundariesVisibleRef.current)["fill-opacity"],
+        );
+      }
+
+      if (map.getLayer("da-fill")) {
+        map.setPaintProperty(
+          "da-fill",
+          "fill-color",
+          daFillPaint(
+            showRollout,
+            rolloutCategoryId,
+            false,
+            boundariesVisibleRef.current,
+          )["fill-color"],
+        );
+        map.setPaintProperty(
+          "da-fill",
+          "fill-opacity",
+          daFillPaint(showRollout, rolloutCategoryId, false)["fill-opacity"],
+        );
+        map.setPaintProperty(
+          "da-fill",
+          "fill-outline-color",
+          daFillPaint(
+            showRollout,
+            rolloutCategoryId,
+            false,
+            boundariesVisibleRef.current,
+          )["fill-outline-color"],
+        );
+      }
+
+      [
+        "fed-labels-national",
+        "fed-labels-local",
+        "da-labels-community",
+        "da-labels-code",
+      ].forEach((layerId) => {
+        if (map.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, "visibility", showRollout ? "visible" : "none");
         }
       });
 
-      map.addLayer({
-        id: "da-outline",
-        type: "line",
-        source: "das",
-        layout: {
-          visibility: "none",
-          "line-join": "round",
-          "line-cap": "round"
-        },
-        paint: {
-          "line-color": [
-            "case",
-            ["boolean", ["feature-state", "selected"], false],
-            MAP_BOUNDARY_COLOR,
-            ["boolean", ["feature-state", "hover"], false],
-            MAP_BOUNDARY_COLOR,
-            MAP_BOUNDARY_COLOR
-          ],
-          "line-width": [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            OUTLINE_ZOOM.DA_MIN,
-            0,
-            OUTLINE_ZOOM.DA_MIN + 2,
-            ["case", ["boolean", ["feature-state", "selected"], false], 1.6, 0.9]
-          ],
-          "line-opacity": [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            OUTLINE_ZOOM.DA_MIN,
-            0,
-            OUTLINE_ZOOM.DA_MIN + 1,
-            1
-          ]
-        }
-      });
+      if (map.getLayer("google-roadmap-labels")) {
+        map.setLayoutProperty(
+          "google-roadmap-labels",
+          "visibility",
+          showRollout ? "none" : "visible",
+        );
+      }
+
+      if (map.getLayer("google-roadmap-muted")) {
+        map.setLayoutProperty(
+          "google-roadmap-muted",
+          "visibility",
+          showRollout ? "visible" : "none",
+        );
+      }
+    }
+
+    function applyBoundaryVisibility(showBoundaries) {
+      if (map.getLayer("fed-fill")) {
+        map.setPaintProperty(
+          "fed-fill",
+          "fill-outline-color",
+          boundaryFillOutlineColor(showBoundaries),
+        );
+      }
+
+      if (map.getLayer("da-fill")) {
+        map.setPaintProperty(
+          "da-fill",
+          "fill-outline-color",
+          boundaryFillOutlineColor(showBoundaries),
+        );
+      }
+
+      if (map.getLayer("fed-outline")) {
+        map.setLayoutProperty("fed-outline", "visibility", "visible");
+        map.setPaintProperty("fed-outline", "line-opacity", boundaryLineOpacity(showBoundaries));
+      }
+
+      if (map.getLayer("da-outline")) {
+        map.setLayoutProperty("da-outline", "visibility", "visible");
+        map.setPaintProperty("da-outline", "line-opacity", boundaryLineOpacity(showBoundaries));
+      }
     }
 
     function addObjectionBoundaryLayers() {
@@ -738,8 +1222,7 @@ export function MapCanvas({
 
     function syncDaOutlineVisibility() {
       if (!map.getLayer("da-outline")) return;
-      const visible = map.getZoom() >= OUTLINE_ZOOM.DA_MIN ? "visible" : "none";
-      map.setLayoutProperty("da-outline", "visibility", visible);
+      map.setLayoutProperty("da-outline", "visibility", "visible");
     }
 
     function addFedLabelLayers(geojson, scale) {
@@ -767,7 +1250,7 @@ export function MapCanvas({
     }
 
     function addDaLabelLayers(geojson, scale) {
-      if (!geojson.features.length) return { community: 0, code: 0 };
+      if (!geojson?.features?.length) return { community: 0, code: 0 };
 
       map.addSource("da-labels-yt", { type: "geojson", data: geojson });
 
@@ -809,7 +1292,7 @@ export function MapCanvas({
     }
 
     function pickInteractiveFeature(point) {
-      if (counterProposalPreviewRef.current?.editable) {
+      if (counterProposalPreviewRef.current?.editable && map.getLayer("counter-proposal-handles")) {
         const handleFeatures = map.queryRenderedFeatures(point, {
           layers: ["counter-proposal-handles"],
         });
@@ -823,14 +1306,18 @@ export function MapCanvas({
         }
       }
 
-      const daFeatures = map.queryRenderedFeatures(point, { layers: ["da-fill"] });
+      const daFeatures = map.getLayer("da-fill")
+        ? map.queryRenderedFeatures(point, { layers: ["da-fill"] })
+        : [];
       if (daFeatures.length) {
         const feature = daFeatures[0];
         const id = getFeatureId(feature, "DGUID");
         if (id) return { type: "da", id };
       }
 
-      const fedFeatures = map.queryRenderedFeatures(point, { layers: ["fed-fill"] });
+      const fedFeatures = map.getLayer("fed-fill")
+        ? map.queryRenderedFeatures(point, { layers: ["fed-fill"] })
+        : [];
       if (fedFeatures.length) {
         const feature = fedFeatures[0];
         if (isMvpFed(feature.properties)) return null;
@@ -844,7 +1331,7 @@ export function MapCanvas({
     function clearDaSelection() {
       const selected = selectionRef.current.da;
       if (selected === null || selected === undefined) return;
-      map.setFeatureState({ source: "das", id: selected }, { selected: false });
+      setDaFeatureState(selected, { selected: false });
       selectionRef.current.da = null;
     }
 
@@ -867,7 +1354,7 @@ export function MapCanvas({
 
       const shouldHover =
         hoverRef.current.da === daId || externalHoverRef.current.da === daId;
-      map.setFeatureState({ source: "das", id: daId }, { hover: shouldHover });
+      setDaFeatureState(daId, { hover: shouldHover });
     }
 
     function refreshFedHover(fedId) {
@@ -930,7 +1417,7 @@ export function MapCanvas({
       const nextDaId = normalizeDaId(target);
       if (nextDaId !== null && nextDaId !== undefined) {
         selectionRef.current.da = nextDaId;
-        map.setFeatureState({ source: "das", id: nextDaId }, { selected: true });
+        setDaFeatureState(nextDaId, { selected: true });
         return;
       }
 
@@ -986,6 +1473,8 @@ export function MapCanvas({
     applyExternalHoverRef.current = setExternalHover;
     applyObjectionPreviewRef.current = applyObjectionPreview;
     applyCounterProposalPreviewRef.current = applyCounterProposalPreview;
+    applyPresentationModeRef.current = setPresentationMode;
+    applyBoundaryVisibilityRef.current = applyBoundaryVisibility;
 
     const onClick = (event) => {
       if (skipNextClickRef.current) {
@@ -1014,13 +1503,13 @@ export function MapCanvas({
       );
 
       if (hit.type === "da") {
-        onDaSelect?.(hit.id);
+        onDaSelectRef.current?.(hit.id);
         return;
       }
 
       const fedName =
         fedNameLookupRef.current.get(String(hit.id)) || `FED ${hit.id}`;
-      onFedSelect?.(hit.id, fedName);
+      onFedSelectRef.current?.(hit.id, fedName);
     };
 
     const pushCounterProposalDragMove = (nextCoordinate) => {
@@ -1127,27 +1616,36 @@ export function MapCanvas({
 
     map.on("load", async () => {
       try {
-        const [daGeojson, fedLabels, profilePayload] = await Promise.all([
-          mapApi.fetchAssetJson("single_fed_das.geojson"),
-          mapApi.fetchAssetJson("fed_labels.geojson"),
+        const [assetManifestPayload, fedLabels, profilePayload] = await Promise.all([
+          mapApi.getDaAssetManifest().catch(() => getFallbackDaAssetManifest()),
+          mapApi.fetchAssetJson("reference/fed_labels.geojson"),
           mapApi.getDaProfiles()
         ]);
 
-        const daCount = daGeojson.features?.length ?? 0;
-        if (daCount === 0) throw new Error("DA GeoJSON contains no features");
-
+        const assetManifest = normalizeDaAssetManifest(assetManifestPayload);
         const { index: profileIndex } = buildProfileIndex(profilePayload);
         fedNameLookupRef.current = buildFedNameLookup(fedLabels);
 
         const fedMode = await addFedBaseLayers();
-        addDaLayers(daGeojson);
+        const googleBasemapEnabled = await addGoogleBasemapLayers().catch((error) => {
+          console.warn("[MapCanvas] Google Map Tiles basemap unavailable:", error);
+          onStatusChangeRef.current?.(`Google basemap unavailable: ${error.message}`);
+          return false;
+        });
+        const daBundle = await addDaLayers(assetManifest);
         addObjectionBoundaryLayers();
         addCounterProposalLayers();
         const initialLabelScale = labelScreenScale(containerRef.current?.clientWidth ?? 0);
 
         addFedLabelLayers(fedLabels, initialLabelScale);
 
-        const daLabels = buildDaLabelGeoJSON(daGeojson, profileIndex);
+        let daLabels = null;
+        const labelGeojsonPath = getDaLabelGeojsonPath(assetManifest);
+
+        if (labelGeojsonPath && (await mapApi.assetExists(labelGeojsonPath))) {
+          daLabels = await mapApi.fetchAssetJson(labelGeojsonPath);
+        }
+
         const daLabelCounts = addDaLabelLayers(daLabels, initialLabelScale);
 
         if (typeof ResizeObserver !== "undefined" && containerRef.current) {
@@ -1156,27 +1654,42 @@ export function MapCanvas({
         }
 
         syncDaOutlineVisibility();
+        setPresentationMode(rolloutEnabled);
+        applyBoundaryVisibility(boundariesVisibleRef.current);
 
-        const daBounds = extendBoundsFromGeoJSON(
-          new maplibregl.LngLatBounds(),
-          daGeojson
-        );
-        map.fitBounds(daBounds, { padding: 48, duration: 0 });
+        const initialBounds = buildInitialMapBounds();
+        map.fitBounds(initialBounds, {
+          padding: { top: 92, right: 64, bottom: 72, left: 64 },
+          duration: 0,
+        });
+
         map.setMaxBounds(
           paddedMaxBounds(
-            new maplibregl.LngLatBounds(CANADA_BOUNDS.sw, CANADA_BOUNDS.ne),
-            0.08
+            initialBounds,
+            0.24
           )
         );
 
-        onStatusChange?.(
-          `Effective Area: Yukon FED (${MVP_FED_NUM}) - ${daCount} DAs`
+        const daCount =
+          daBundle.featureCount ||
+          assetManifest.assets.reduce(
+            (count, asset) => count + Math.max(0, Number(asset.featureCount ?? 0)),
+            0,
+          ) ||
+          profileIndex.size ||
+          0;
+
+        onStatusChangeRef.current?.(
+          `Map ready: ${daCount} DA features across ${assetManifest.assets.length} metadata group(s).`
         );
         isMapReadyRef.current = true;
         setMapReadyTick((current) => current + 1);
 
         console.log(
           `[OK] FED base: ${fedMode};`,
+          googleBasemapEnabled ? "Google roadmap basemap enabled;" : "Google roadmap basemap disabled;",
+          daBundle.mode,
+          "DA render mode;",
           daCount,
           "DA polygons on",
           FED_COUNT,
@@ -1185,6 +1698,12 @@ export function MapCanvas({
           "FED labels;",
           profileIndex.size,
           "DA profiles;",
+          assetManifest.assets.length,
+          "metadata groups;",
+          "render minzoom",
+          daBundle.minZoom,
+          "render maxzoom",
+          daBundle.maxZoom,
           daLabelCounts.community,
           "community labels;",
           daLabelCounts.code,
@@ -1192,7 +1711,7 @@ export function MapCanvas({
         );
       } catch (error) {
         console.error("[MapCanvas]", error);
-        onStatusChange?.(`Error: ${error.message}`);
+        onStatusChangeRef.current?.(`Error: ${error.message}`);
       }
     });
 
@@ -1204,6 +1723,8 @@ export function MapCanvas({
         blinkIntervalRef.current = null;
       }
       setFedStateRef.current = null;
+      applyPresentationModeRef.current = null;
+      applyBoundaryVisibilityRef.current = null;
       applySelectionRef.current = null;
       applyExternalHoverRef.current = null;
       applyObjectionPreviewRef.current = null;
@@ -1220,7 +1741,7 @@ export function MapCanvas({
       mapRef.current = null;
       maplibregl.removeProtocol("pmtiles");
     };
-  }, [onDaSelect, onFedSelect, onStatusChange]);
+  }, []);
 
   return (
     <div className="map-canvas">

@@ -2,11 +2,12 @@ local/
 node_modules/
 __pycache__/
 *.py[cod]
-scripts/data/bundle/census_boundaries/
-scripts/data/bundle/elections_canada/
-scripts/data/bundle/output/
-scripts/data/external/statcan/*.csv
-scripts/data/external/statcan/*.CSV
+data/external/statcan/*.csv
+data/external/statcan/*.CSV
+data/external/statcan/csd_cache/
+data/external/statcan/colab_outputs/
+.tmp/
+src/data/map/render/da_boundaries_available.geojson
 dist/
 coverage/
 

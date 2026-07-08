@@ -167,7 +167,8 @@
   cursor: pointer;
 }
 
-.maplibregl-ctrl-group button.map-fullscreen-btn svg {
+.maplibregl-ctrl-group button.map-fullscreen-btn svg,
+.maplibregl-ctrl-group button.map-boundary-btn svg {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -175,6 +176,18 @@
   height: 17px;
   transform: translate(-50%, -50%);
   pointer-events: none;
+}
+
+.maplibregl-ctrl-group button.map-boundary-btn {
+  overflow: hidden;
+  line-height: 0;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.maplibregl-ctrl-group button.map-boundary-btn[aria-pressed="false"] {
+  color: #6f7f95;
+  background: #f6f9ff;
 }
 
 .map-region-selector {
@@ -778,9 +791,12 @@
   display: flex;
   width: 100%;
   min-width: 220px;
+  max-height: min(360px, calc(100dvh - 240px));
   flex-direction: column;
   gap: 6px;
-  overflow: visible;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border: 1px solid #d7e6fb;
   border-radius: 18px;
   background: #ffffff;
@@ -822,14 +838,16 @@
 .map-info-panel__area-submenu {
   position: absolute;
   top: 0;
-  right: calc(100% + 12px);
+  right: calc(100% + 6px);
   z-index: 65;
   display: flex;
-  max-height: 260px;
+  max-height: min(320px, calc(100dvh - 260px));
   min-width: 240px;
   flex-direction: column;
   gap: 6px;
+  overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
   border: 1px solid #d7e6fb;
   border-radius: 18px;
   background: #ffffff;
@@ -837,12 +855,20 @@
   box-shadow: 0 16px 36px rgba(26, 115, 232, 0.14);
 }
 
+.map-info-panel__area-submenu--floating {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: auto;
+  z-index: 80;
+}
+
 .map-info-panel__area-submenu::before {
   content: "";
   position: absolute;
   top: 0;
-  right: -16px;
-  width: 16px;
+  right: -8px;
+  width: 8px;
   height: 100%;
   background: transparent;
 }

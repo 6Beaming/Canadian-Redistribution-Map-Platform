@@ -116,16 +116,31 @@ function getDefaultToggleState(floatingState = getDefaultFloatingState()) {
   });
 }
 
-function buildEffectedDaItems(profilesByDguid) {
-  return Array.from(profilesByDguid.entries())
-    .map(([dguid, profile]) => ({
+function buildEnabledDaItemsByFed(profilesByDguid) {
+  const itemsByFed = new Map();
+
+  Array.from(profilesByDguid.entries()).forEach(([dguid, profile]) => {
+    const fedNum = String(profile?.fed_num || MVP_FED_NUM);
+    const items = itemsByFed.get(fedNum) ?? [];
+    const panelTitle = getDaPanelTitle(profile);
+    const daCode = String(profile?.da_code || "").trim();
+    const menuLabel = panelTitle.text.startsWith("Unnamed DA: DA ")
+      ? `DA ${daCode || dguid}`
+      : panelTitle.text;
+    items.push({
       dguid,
-      fedNum: MVP_FED_NUM,
-      label: getDaPanelTitle(profile).text,
-      sortLabel: String(profile?.panel_title || profile?.community_display || profile?.da_code || dguid),
-      daCode: String(profile?.da_code || ""),
-    }))
-    .sort((left, right) => {
+      fedNum,
+      label: menuLabel,
+      sortLabel: String(
+        profile?.panel_title || profile?.community_display || profile?.geo_name || profile?.da_code || dguid,
+      ),
+      daCode,
+    });
+    itemsByFed.set(fedNum, items);
+  });
+
+  itemsByFed.forEach((items, fedNum) => {
+    items.sort((left, right) => {
       const labelCompare = left.sortLabel.localeCompare(right.sortLabel, undefined, {
         numeric: true,
         sensitivity: "base",
@@ -140,6 +155,11 @@ function buildEffectedDaItems(profilesByDguid) {
         sensitivity: "base",
       });
     });
+
+    itemsByFed.set(fedNum, items);
+  });
+
+  return itemsByFed;
 }
 
 function RolloutCategoryPanel({
@@ -150,24 +170,22 @@ function RolloutCategoryPanel({
 }) {
   const category = getRolloutCategory(categoryId);
   const areas = useMemo(() => getRolloutAreas(categoryId), [categoryId]);
-  const effectedDaItems = useMemo(
-    () => (categoryId === "effected" ? buildEffectedDaItems(profilesByDguid) : []),
+  const enabledDaItemsByFed = useMemo(
+    () => (categoryId === "enabled" ? buildEnabledDaItemsByFed(profilesByDguid) : new Map()),
     [categoryId, profilesByDguid],
   );
   const areaItems = useMemo(
     () =>
       areas.map((area) => ({
         ...area,
-        daItems:
-          categoryId === "effected" && area.fedNum === MVP_FED_NUM
-            ? effectedDaItems
-            : [],
+        daItems: categoryId === "enabled" ? enabledDaItemsByFed.get(String(area.fedNum)) ?? [] : [],
       })),
-    [areas, categoryId, effectedDaItems],
+    [areas, categoryId, enabledDaItemsByFed],
   );
   const [selectedFedNum, setSelectedFedNum] = useState(areaItems[0]?.fedNum ?? "");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [submenuFedNum, setSubmenuFedNum] = useState("");
+  const [submenuAnchor, setSubmenuAnchor] = useState(null);
   const pickerRef = useRef(null);
   const submenuModeRef = useRef("none");
 
@@ -178,6 +196,7 @@ function RolloutCategoryPanel({
   useEffect(() => {
     if (!isMenuOpen) {
       setSubmenuFedNum("");
+      setSubmenuAnchor(null);
       submenuModeRef.current = "none";
       onHoverTargetChange?.(null);
       return undefined;
@@ -187,6 +206,7 @@ function RolloutCategoryPanel({
       if (!pickerRef.current?.contains(event.target)) {
         setIsMenuOpen(false);
         setSubmenuFedNum("");
+        setSubmenuAnchor(null);
         submenuModeRef.current = "none";
         onHoverTargetChange?.(null);
       }
@@ -196,6 +216,7 @@ function RolloutCategoryPanel({
       if (event.key === "Escape") {
         setIsMenuOpen(false);
         setSubmenuFedNum("");
+        setSubmenuAnchor(null);
         submenuModeRef.current = "none";
         onHoverTargetChange?.(null);
       }
@@ -221,10 +242,35 @@ function RolloutCategoryPanel({
     areaItems[0] ??
     null;
 
-  function handleFedHover(area) {
+  const submenuArea =
+    areaItems.find((area) => area.fedNum === submenuFedNum && area.daItems.length) ?? null;
+
+  function updateSubmenuAnchor(anchorNode) {
+    if (typeof window === "undefined" || !anchorNode) {
+      setSubmenuAnchor(null);
+      return;
+    }
+
+    const rect = anchorNode.getBoundingClientRect();
+    const width = 240;
+    const gap = 10;
+    const maxHeight = Math.min(320, Math.max(160, window.innerHeight - rect.top - 20));
+    const top = Math.min(rect.top, Math.max(8, window.innerHeight - maxHeight - 8));
+    const left = Math.max(8, rect.left - width - gap);
+
+    setSubmenuAnchor({
+      top,
+      left,
+      width,
+      maxHeight,
+    });
+  }
+
+  function handleFedHover(area, anchorNode) {
     setSelectedFedNum(area.fedNum);
     submenuModeRef.current = area.daItems.length ? "hover" : "none";
     setSubmenuFedNum(area.daItems.length ? area.fedNum : "");
+    updateSubmenuAnchor(area.daItems.length ? anchorNode : null);
     onHoverTargetChange?.({
       type: "fed",
       fedNum: area.fedNum,
@@ -232,10 +278,31 @@ function RolloutCategoryPanel({
     });
   }
 
+  function handleFedItemLeave(area, event) {
+    const relatedTarget = event.relatedTarget;
+
+    if (
+      submenuModeRef.current === "locked" &&
+      submenuFedNum === area.fedNum
+    ) {
+      return;
+    }
+
+    if (relatedTarget && pickerRef.current?.contains(relatedTarget)) {
+      return;
+    }
+
+    submenuModeRef.current = "none";
+    setSubmenuFedNum("");
+    setSubmenuAnchor(null);
+    onHoverTargetChange?.(null);
+  }
+
   function handleFedSelect(area) {
     setSelectedFedNum(area.fedNum);
     setIsMenuOpen(false);
     setSubmenuFedNum("");
+    setSubmenuAnchor(null);
     submenuModeRef.current = "none";
     onHoverTargetChange?.(null);
     onSelectTarget?.({
@@ -245,10 +312,12 @@ function RolloutCategoryPanel({
     });
   }
 
-  function handleFedItemClick(area) {
+  function handleFedItemClick(area, anchorNode) {
     setSelectedFedNum(area.fedNum);
 
     if (area.daItems.length) {
+      updateSubmenuAnchor(anchorNode);
+
       if (submenuFedNum !== area.fedNum) {
         submenuModeRef.current = "locked";
         setSubmenuFedNum(area.fedNum);
@@ -283,6 +352,7 @@ function RolloutCategoryPanel({
   function handleDaSelect(dguid) {
     setIsMenuOpen(false);
     setSubmenuFedNum("");
+    setSubmenuAnchor(null);
     submenuModeRef.current = "none";
     onHoverTargetChange?.(null);
     onSelectTarget?.({
@@ -304,7 +374,7 @@ function RolloutCategoryPanel({
           style={{
             backgroundColor: getRolloutAccentColor(categoryId),
             borderColor: category.color,
-            color: category.id === "planned-in-developing" ? "#7a6331" : category.color,
+            color: category.id === "data-blocked" ? "#7a6331" : category.color,
           }}
         >
           {category.description}
@@ -328,50 +398,58 @@ function RolloutCategoryPanel({
                   <div
                     key={area.fedNum}
                     className="map-info-panel__area-item-wrap"
-                    onMouseEnter={() => handleFedHover(area)}
-                    onMouseLeave={() => {
-                      submenuModeRef.current = "none";
-                      setSubmenuFedNum("");
-                      onHoverTargetChange?.(null);
-                    }}
+                    onMouseEnter={(event) => handleFedHover(area, event.currentTarget)}
+                    onMouseLeave={(event) => handleFedItemLeave(area, event)}
                   >
                     <button
                       type="button"
                       className={`map-info-panel__area-item${selectedFedNum === area.fedNum ? " map-info-panel__area-item--active" : ""}`}
-                      onClick={() => handleFedItemClick(area)}
+                      onClick={(event) => handleFedItemClick(area, event.currentTarget)}
                     >
                       <span>{area.name}</span>
                       {area.daItems.length ? <ChevronLeft className="h-4 w-4" /> : null}
                     </button>
-
-                    {area.daItems.length && submenuFedNum === area.fedNum ? (
-                      <div className="map-info-panel__area-submenu">
-                        {area.daItems.map((da) => (
-                          <button
-                            key={da.dguid}
-                            type="button"
-                            className="map-info-panel__area-subitem"
-                            onMouseEnter={() =>
-                              onHoverTargetChange?.({
-                                type: "da",
-                                dguid: da.dguid,
-                              })
-                            }
-                            onMouseLeave={() =>
-                              onHoverTargetChange?.({
-                                type: "fed",
-                                fedNum: area.fedNum,
-                                fedName: area.name,
-                              })
-                            }
-                            onClick={() => handleDaSelect(da.dguid)}
-                          >
-                            {da.label}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
                   </div>
+                ))}
+              </div>
+            ) : null}
+
+            {isMenuOpen && submenuArea && submenuAnchor ? (
+              <div
+                className="map-info-panel__area-submenu map-info-panel__area-submenu--floating"
+                style={{
+                  top: `${submenuAnchor.top}px`,
+                  left: `${submenuAnchor.left}px`,
+                  width: `${submenuAnchor.width}px`,
+                  maxHeight: `${submenuAnchor.maxHeight}px`,
+                }}
+                onMouseEnter={() => {
+                  submenuModeRef.current = "locked";
+                  setSubmenuFedNum(submenuArea.fedNum);
+                }}
+              >
+                {submenuArea.daItems.map((da) => (
+                  <button
+                    key={da.dguid}
+                    type="button"
+                    className="map-info-panel__area-subitem"
+                    onMouseEnter={() =>
+                      onHoverTargetChange?.({
+                        type: "da",
+                        dguid: da.dguid,
+                      })
+                    }
+                    onMouseLeave={() =>
+                      onHoverTargetChange?.({
+                        type: "fed",
+                        fedNum: submenuArea.fedNum,
+                        fedName: submenuArea.name,
+                      })
+                    }
+                    onClick={() => handleDaSelect(da.dguid)}
+                  >
+                    {da.label}
+                  </button>
                 ))}
               </div>
             ) : null}

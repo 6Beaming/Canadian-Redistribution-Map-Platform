@@ -49,6 +49,7 @@ function SourceLink({ source }) {
 function DaStatistics({ dguid, profile }) {
   const population = getDaPopulationDisplay(profile);
   const panelTitle = getDaPanelTitle(profile);
+  const fedNum = String(profile?.fed_num || MVP_FED_NUM);
   const showPending =
     !profile || profile.status !== "ok" || population === MISSING_DA_POPULATION;
 
@@ -95,7 +96,7 @@ function DaStatistics({ dguid, profile }) {
 
           <dt>FED</dt>
           <dd>
-            <code>{MVP_FED_NUM}</code>
+            <code>{fedNum}</code>
           </dd>
 
           {profile?.source ? (
@@ -120,8 +121,8 @@ function DaStatistics({ dguid, profile }) {
         {showPending ? (
           <p className="map-info-panel__pending">
             Census name and population are collected externally. Run{" "}
-            <code>scripts/collect_yt_da_profiles.py</code> to refresh{" "}
-            <code>src/data/map/yt_da_profiles.json</code>.
+            <code>scripts/reusable/collect_da_profiles.py</code> to refresh{" "}
+            <code>src/data/map/indexes/da_profile_index.json</code>.
           </p>
         ) : null}
 
@@ -144,10 +145,7 @@ function FedStatistics({ fedNum, fedName }) {
   const rolloutArea = getRolloutArea(num);
   const rolloutCategoryId = rolloutArea?.categoryId ?? null;
   const rolloutCategory = rolloutCategoryId ? getRolloutCategory(rolloutCategoryId) : null;
-  const showRolloutCard =
-    rolloutCategoryId === "data-blocked" ||
-    rolloutCategoryId === "developing" ||
-    rolloutCategoryId === "planned-in-developing";
+  const showRolloutCard = rolloutCategoryId === "enabled" || rolloutCategoryId === "data-blocked";
 
   return (
     <>
@@ -167,10 +165,7 @@ function FedStatistics({ fedNum, fedName }) {
             style={{
               backgroundColor: getRolloutAccentColor(rolloutCategory.id),
               borderColor: rolloutCategory.color,
-              color:
-                rolloutCategory.id === "planned-in-developing"
-                  ? "#7a6331"
-                  : rolloutCategory.color
+              color: rolloutCategory.id === "data-blocked" ? "#7a6331" : rolloutCategory.color
             }}
           >
             {rolloutCategory.description}
@@ -179,8 +174,9 @@ function FedStatistics({ fedNum, fedName }) {
           <p className="map-info-panel__coming-soon">Coming Soon!</p>
         )}
         <p className="map-info-panel__hint">
-          This region is not part of the pilot demo yet. Yukon ({MVP_FED_NUM}) is
-          available now.
+          {rolloutCategoryId === "enabled"
+            ? "Zoom in and select a DA to inspect the local DA boundary and profile data."
+            : "Local DA metadata is not ready for this FED yet."}
         </p>
       </div>
     </>
