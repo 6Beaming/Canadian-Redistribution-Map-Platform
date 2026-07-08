@@ -1,3 +1,10 @@
+.heatmap-button.active {
+  outline: 2px solid #006064;
+  background: #e6fffb;
+  color: #0f766e;
+}
+
+
 .map-page {
   box-sizing: border-box;
   height: calc(100dvh - 64px);

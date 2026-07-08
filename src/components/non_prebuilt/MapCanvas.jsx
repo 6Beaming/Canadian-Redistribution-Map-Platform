@@ -67,6 +67,8 @@ const BOUNDARY_ON_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2
 
 const BOUNDARY_OFF_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m6 6 12 12"/></svg>`;
 
+const HEATMAP_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c1.4 2.1 3.2 3.7 3.2 6a3.2 3.2 0 1 1-6.4 0c0-1.2.5-2.3 1.4-3.5"/><path d="M8 14a4 4 0 0 0 8 0c0-1.4-.7-2.6-1.7-3.6"/><path d="M12 12c.8 1 1.8 1.8 1.8 3.2a1.8 1.8 0 1 1-3.6 0c0-.7.3-1.3.8-2"/></svg>`;
+
 const MAP_BOUNDARY_COLOR = "#000000";
 const TRANSPARENT_BOUNDARY_COLOR = "rgba(0, 0, 0, 0)";
 const EMPTY_OBJECTION_BOUNDARY = emptyBoundaryFeatureCollection();
@@ -137,6 +139,43 @@ function createBoundaryControl(buttonRef, getBoundariesVisible, onToggle) {
       buttonRef.current = null;
     }
   };
+}
+
+function createHeatmapControl(buttonRef, getHeatmapState, onToggle) {
+  return {
+    onAdd() {
+      const container = document.createElement("div");
+      container.className = "maplibregl-ctrl maplibregl-ctrl-group";
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "maplibregl-ctrl-icon heatmap-button";
+      button.innerHTML = HEATMAP_ICON;
+      button.title = "Toggle submission heatmap";
+      button.setAttribute("aria-label", "Toggle submission heatmap");
+      button.setAttribute("aria-pressed", String(getHeatmapState()));
+      button.classList.toggle("active", getHeatmapState());
+      button.addEventListener("click", onToggle);
+
+      buttonRef.current = button;
+      container.appendChild(button);
+      return container;
+    },
+    onRemove() {
+      buttonRef.current = null;
+    }
+  };
+}
+
+function buildSubmissionCountExpression(submissionsByDguid) {
+  const expression = ["match", ["to-string", ["get", "DGUID"]]];
+
+  Object.entries(submissionsByDguid).forEach(([dguid, count]) => {
+    expression.push(String(dguid), Number(count) || 0);
+  });
+
+  expression.push(0);
+  return expression;
 }
 
 function buildRolloutFedMembershipExpression(fedNums, truthyValue, fallbackValue) {
@@ -224,6 +263,21 @@ function buildBlockedDaFillExpression() {
 }
 
 const BLOCKED_DA_FILL_EXPRESSION = buildBlockedDaFillExpression();
+const DA_SUBMISSION_COUNT_EXPRESSION = buildSubmissionCountExpression(daSubmissions);
+const HEATMAP_DA_FILL_EXPRESSION = [
+  "interpolate",
+  ["linear"],
+  DA_SUBMISSION_COUNT_EXPRESSION,
+  0, "#fff7bc",
+  10, "#fee391",
+  25, "#fec44f",
+  50, "#fe9929",
+  75, "#ec7014",
+  100, "#f03b20",
+  150, "#de2d26",
+  200, "#bd0026",
+  220, "#800026",
+];
 
 function buildBlinkCategoryDaExpression(categoryId, hiddenValue, visibleValue) {
   if (categoryId === "enabled") {
@@ -317,6 +371,7 @@ function daFillPaint(
   rolloutCategoryId = null,
   blinkHidden = false,
   showBoundaries = true,
+  heatmapEnabled = false,
 ) {
   const fillColor = showRollout
     ? [
@@ -327,6 +382,15 @@ function daFillPaint(
         HOVER_COLOR,
         BLOCKED_DA_FILL_EXPRESSION,
       ]
+    : heatmapEnabled
+      ? [
+          "case",
+          ["boolean", ["feature-state", "selected"], false],
+          SELECTED_COLOR,
+          ["boolean", ["feature-state", "hover"], false],
+          HOVER_COLOR,
+          HEATMAP_DA_FILL_EXPRESSION,
+        ]
     : [
         "case",
         ["boolean", ["feature-state", "selected"], false],
@@ -349,6 +413,15 @@ function daFillPaint(
           0.58,
         ),
       ]
+    : heatmapEnabled
+      ? [
+          "case",
+          ["boolean", ["feature-state", "selected"], false],
+          0.88,
+          ["boolean", ["feature-state", "hover"], false],
+          0.82,
+          0.74,
+        ]
     : [
         "case",
         ["boolean", ["feature-state", "selected"], false],
@@ -415,6 +488,9 @@ export function MapCanvas({
   rolloutEnabled = false,
   rolloutCategoryId = null
 }) {
+  const [heatmapEnabled, setHeatmapEnabled] = useState(false);
+  const heatmapEnabledRef = useRef(false);
+  const heatmapButtonRef = useRef(null);
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const fullscreenBtnRef = useRef(null);
@@ -436,6 +512,7 @@ export function MapCanvas({
   const setFedStateRef = useRef(null);
   const applyPresentationModeRef = useRef(null);
   const applyBoundaryVisibilityRef = useRef(null);
+  const applyHeatmapModeRef = useRef(null);
   const applySelectionRef = useRef(null);
   const applyExternalHoverRef = useRef(null);
   const applyObjectionPreviewRef = useRef(null);
@@ -464,6 +541,7 @@ export function MapCanvas({
   onFedSelectRef.current = onFedSelect;
   onStatusChangeRef.current = onStatusChange;
   boundariesVisibleRef.current = boundariesVisible;
+  heatmapEnabledRef.current = heatmapEnabled;
 
   useEffect(() => {
     const button = fullscreenBtnRef.current;
@@ -489,6 +567,14 @@ export function MapCanvas({
     );
     button.setAttribute("aria-pressed", String(boundariesVisible));
   }, [boundariesVisible]);
+
+  useEffect(() => {
+    const button = heatmapButtonRef.current;
+    if (!button) return;
+
+    button.classList.toggle("active", heatmapEnabled);
+    button.setAttribute("aria-pressed", String(heatmapEnabled));
+  }, [heatmapEnabled]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -552,6 +638,14 @@ export function MapCanvas({
   }, [boundariesVisible, mapReadyTick]);
 
   useEffect(() => {
+    if (!isMapReadyRef.current || !applyHeatmapModeRef.current) {
+      return;
+    }
+
+    applyHeatmapModeRef.current(heatmapEnabled);
+  }, [heatmapEnabled, mapReadyTick]);
+
+  useEffect(() => {
     const setFedState = setFedStateRef.current;
 
     if (!setFedState || !isMapReadyRef.current) {
@@ -586,7 +680,13 @@ export function MapCanvas({
         mapRef.current.setPaintProperty(
           "da-fill",
           "fill-opacity",
-          daFillPaint(false, rolloutCategoryId, false)["fill-opacity"],
+          daFillPaint(
+            false,
+            rolloutCategoryId,
+            false,
+            boundariesVisibleRef.current,
+            heatmapEnabledRef.current,
+          )["fill-opacity"],
         );
       }
       return undefined;
@@ -599,7 +699,13 @@ export function MapCanvas({
         mapRef.current.setPaintProperty(
           "da-fill",
           "fill-opacity",
-          daFillPaint(true, rolloutCategoryId, false)["fill-opacity"],
+          daFillPaint(
+            true,
+            rolloutCategoryId,
+            false,
+            boundariesVisibleRef.current,
+            heatmapEnabledRef.current,
+          )["fill-opacity"],
         );
       }
       return undefined;
@@ -618,7 +724,13 @@ export function MapCanvas({
         mapRef.current.setPaintProperty(
           "da-fill",
           "fill-opacity",
-          daFillPaint(true, rolloutCategoryId, isHidden)["fill-opacity"],
+          daFillPaint(
+            true,
+            rolloutCategoryId,
+            isHidden,
+            boundariesVisibleRef.current,
+            heatmapEnabledRef.current,
+          )["fill-opacity"],
         );
       }
     }, 520);
@@ -639,7 +751,13 @@ export function MapCanvas({
         mapRef.current.setPaintProperty(
           "da-fill",
           "fill-opacity",
-          daFillPaint(rolloutEnabled, rolloutCategoryId, false)["fill-opacity"],
+          daFillPaint(
+            rolloutEnabled,
+            rolloutCategoryId,
+            false,
+            boundariesVisibleRef.current,
+            heatmapEnabledRef.current,
+          )["fill-opacity"],
         );
       }
     };
@@ -679,6 +797,14 @@ export function MapCanvas({
         boundaryBtnRef,
         () => boundariesVisibleRef.current,
         () => setBoundariesVisible((current) => !current),
+      ),
+      "top-right"
+    );
+    map.addControl(
+      createHeatmapControl(
+        heatmapButtonRef,
+        () => heatmapEnabledRef.current,
+        () => setHeatmapEnabled((current) => !current),
       ),
       "top-right"
     );
@@ -769,6 +895,7 @@ export function MapCanvas({
           rolloutCategoryId,
           false,
           boundariesVisibleRef.current,
+          heatmapEnabledRef.current,
         ),
         minzoom: minZoom,
       };
@@ -962,12 +1089,19 @@ export function MapCanvas({
             rolloutCategoryId,
             false,
             boundariesVisibleRef.current,
+            heatmapEnabledRef.current,
           )["fill-color"],
         );
         map.setPaintProperty(
           "da-fill",
           "fill-opacity",
-          daFillPaint(showRollout, rolloutCategoryId, false)["fill-opacity"],
+          daFillPaint(
+            showRollout,
+            rolloutCategoryId,
+            false,
+            boundariesVisibleRef.current,
+            heatmapEnabledRef.current,
+          )["fill-opacity"],
         );
         map.setPaintProperty(
           "da-fill",
@@ -977,6 +1111,7 @@ export function MapCanvas({
             rolloutCategoryId,
             false,
             boundariesVisibleRef.current,
+            heatmapEnabledRef.current,
           )["fill-outline-color"],
         );
       }
@@ -1007,6 +1142,28 @@ export function MapCanvas({
           showRollout ? "visible" : "none",
         );
       }
+    }
+
+    function setHeatmapMode(enabled) {
+      if (!map.getLayer("da-fill")) {
+        return;
+      }
+
+      const nextPaint = daFillPaint(
+        rolloutEnabled,
+        rolloutCategoryId,
+        false,
+        boundariesVisibleRef.current,
+        enabled,
+      );
+
+      map.setPaintProperty("da-fill", "fill-color", nextPaint["fill-color"]);
+      map.setPaintProperty("da-fill", "fill-opacity", nextPaint["fill-opacity"]);
+      map.setPaintProperty(
+        "da-fill",
+        "fill-outline-color",
+        nextPaint["fill-outline-color"],
+      );
     }
 
     function applyBoundaryVisibility(showBoundaries) {
@@ -1475,6 +1632,7 @@ export function MapCanvas({
     applyCounterProposalPreviewRef.current = applyCounterProposalPreview;
     applyPresentationModeRef.current = setPresentationMode;
     applyBoundaryVisibilityRef.current = applyBoundaryVisibility;
+    applyHeatmapModeRef.current = setHeatmapMode;
 
     const onClick = (event) => {
       if (skipNextClickRef.current) {
@@ -1725,6 +1883,7 @@ export function MapCanvas({
       setFedStateRef.current = null;
       applyPresentationModeRef.current = null;
       applyBoundaryVisibilityRef.current = null;
+      applyHeatmapModeRef.current = null;
       applySelectionRef.current = null;
       applyExternalHoverRef.current = null;
       applyObjectionPreviewRef.current = null;
