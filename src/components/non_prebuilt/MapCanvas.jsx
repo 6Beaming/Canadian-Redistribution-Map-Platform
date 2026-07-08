@@ -58,6 +58,7 @@ import {
   hasGoogleMapTilesApiKey,
 } from "@/services/googleMapTilesApi.js";
 import "maplibre-gl/dist/maplibre-gl.css";
+import daSubmissions from "../../data/map/indexes/da_submissions.json";
 
 const EXPAND_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5"/><path d="M20 9V4h-5"/><path d="M4 15v5h5"/><path d="M20 15v5h-5"/></svg>`;
 
