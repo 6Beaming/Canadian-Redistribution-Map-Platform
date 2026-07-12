@@ -3,15 +3,15 @@ import { getSupabaseClient } from "../lib/supabase.js";
 
 const router = Router();
 
-// Get all tags for a comment
-router.get("/:commentId", async (req, res) => {
+// Get all tags for a comment 
+router.get("/:submissionId", async (req, res) => {
   const supabase = getSupabaseClient();
-  const { commentId } = req.params;
+  const { submissionId } = req.params;
 
   const { data, error } = await supabase
     .from("comment_tags")
     .select("*")
-    .eq("comment_id", commentId)
+    .eq("comment_id", submissionId)
     .order("created_at", { ascending: false });
 
   if (error) return res.status(500).json({ error: error.message });
@@ -24,14 +24,14 @@ router.post("/", async (req, res) => {
   const { comment_id, tag } = req.body;
 
   // Verify comment exists
-  const { data: comment, error: commentError } = await supabase
-    .from("comments")
+  const { data: submission, error: submissionError } = await supabase
+    .from("submissions")
     .select("id")
     .eq("id", comment_id)
     .single();
 
-  if (commentError || !comment) {
-    return res.status(404).json({ error: "Comment not found." });
+  if (submissionError || !submission) {
+    return res.status(404).json({ error: "Submission not found." });
   }
 
   const { data, error } = await supabase
@@ -58,3 +58,4 @@ router.delete("/:tagId", async (req, res) => {
 });
 
 export default router;
+
