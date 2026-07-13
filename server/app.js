@@ -5,7 +5,8 @@ import authRouter from "./routes/auth.js";
 import commentsRouter from "./routes/comments.js";
 import commentTagsRouter from "./routes/commentTags.js";
 import auditLogRouter from "./routes/auditLog.js";
-
+import objectionsRouter from "./routes/objections.js";
+import counterProposalsRouter from "./routes/counterProposals.js";
 
 const app = express();
 
@@ -38,6 +39,8 @@ app.use("/api/auth", authRouter);
 app.use("/api/comments", commentsRouter);
 app.use("/api/comment-tags", commentTagsRouter);
 app.use("/api/audit-log", auditLogRouter);
+app.use("/api/objections", objectionsRouter);
+app.use("/api/counter-proposals", counterProposalsRouter);
 
 mountMapApiService(app);
 
