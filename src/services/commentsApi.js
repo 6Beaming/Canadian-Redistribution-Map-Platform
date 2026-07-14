@@ -26,7 +26,7 @@ function handleResponse(res){
 // Get all comments for a Yukon proposal
 export async function getCommentsForDA(proposalId){
     const res = await fetch(
-        `/api/comments/${proposalId}`, 
+        `/api/comments/proposal/${proposalId}`, 
         {
             method:"GET",
         }
@@ -34,6 +34,34 @@ export async function getCommentsForDA(proposalId){
 
     return handleResponse(res);
 }
+
+
+
+// Get all comments 
+export async function getAllComments(){
+    const res = await fetch(
+        `/api/comments/`, 
+        {
+            method:"GET",
+        }
+    );
+
+    return handleResponse(res);
+}
+
+
+// Get all comments for a user_id
+export async function getCommentsUser(user_id){
+    const res = await fetch(
+        `/api/comments/${user_id}`, 
+        {
+            method:"GET",
+        }
+    );
+
+    return handleResponse(res);
+}
+
 
 // Add a comment to a Yukon proposal
 export async function addComment(proposal_id, user_id, comment, fed_num, dguid, title, neighboring_dguid, type){
