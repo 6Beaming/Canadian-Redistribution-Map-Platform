@@ -15,11 +15,14 @@ Arvindh:
 
 4. Comments - yukon only
 5. Tag comments
-6. Audit log
+6. Backend API
 
 Alex:
 
 7. Real time commissioner updates for coworking
+8. Heatmap for comissioners
+9. Audit log frontend
+10. Frontend API
 
 Eric:
 
