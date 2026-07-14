@@ -21,7 +21,10 @@
   * Integrate Audit Logs
   * Adding Tags to Commissioner Workspace
 * Fronted APIs
+  * Make submissions submit to backend database.
   * Make submissions and audit table get info from the backend.
+  * Create backend APIs as necessary
+
 
 **Erfang:**
 * Frontend Refactoring
