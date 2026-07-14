@@ -17,6 +17,7 @@ import UserHome from "./pages/UserHome.jsx";
 import UserProfile from "./pages/UserProfile.jsx";
 import UserResumeSubmission from "./pages/UserResumeSubmission.jsx";
 import UserSearchDA from "./pages/UserSearchDA.jsx";
+import { Toaster } from "@/components/ui/sonner";
 
 function RequireCommissioner() {
   const { sessionStatus, user } = useAuth();
@@ -69,6 +70,7 @@ function App() {
           <Route path="/dashboard/workspace" element={<CommissionerWorkspace />} />
         </Route>
       </Routes>
+      <Toaster position="top-center" offset="80px" closeButton/>
     </AuthProvider>
   );
 }

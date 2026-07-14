@@ -33,17 +33,19 @@ router.get("/:proposalId", async (req, res) => {
 // Add comment to boundary proposal (only for Yukon proposals)
 router.post("/", async (req, res) => {
   const supabase = getSupabaseClient();
-  const { proposal_id, user_id, comment, fed_num, dguid, title } = req.body;
+  const { proposal_id, user_id, comment, fed_num, dguid, title, neighboring_dguid, type} = req.body;
 
   // Verify proposal exists
-  const { data: proposal, error: proposalError } = await supabase
-    .from("map_proposals")
-    .select("id, province_code")
-    .eq("id", proposal_id)
-    .single();
+  if (proposal_id) {
+    const { data: proposal, error: proposalError } = await supabase
+      .from("map_proposals")
+      .select("id, province_code")
+      .eq("id", proposal_id)
+      .single();
 
-  if (proposalError || !proposal) {
-    return res.status(404).json({ error: "Proposal not found." });
+    if (proposalError || !proposal) {
+      return res.status(404).json({ error: "Proposal not found." });
+    }
   }
 
   const { data, error } = await supabase
@@ -54,8 +56,9 @@ router.post("/", async (req, res) => {
       comment,
       fed_num,
       dguid,
+      neighboring_dguid,
       title: title || "Feedback",
-      type: "feedback",
+      type,
       status: "pending"
     }])
     .select();
