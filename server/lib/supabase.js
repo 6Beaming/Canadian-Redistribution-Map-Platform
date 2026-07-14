@@ -41,9 +41,9 @@ export function getSupabaseClient() {
     return supabaseClient;
   }
 
-  const { supabaseKey, supabaseUrl } = getSupabaseConfig();
+  const { supabaseKey, supabaseUrl, supabaseServiceRoleKey} = getSupabaseConfig();
 
-  supabaseClient = createClient(supabaseUrl, supabaseKey, {
+  supabaseClient = createClient(supabaseUrl, supabaseKey, supabaseServiceRoleKey, {
     auth: {
       autoRefreshToken: false,
       detectSessionInUrl: false,

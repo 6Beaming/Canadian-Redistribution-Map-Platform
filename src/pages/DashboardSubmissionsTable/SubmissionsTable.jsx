@@ -73,10 +73,10 @@ export default function SubmissionsTable({ columns, data, onRowClick }) {
         <div>
             <div className="flex items-center gap-[10px] py-4">
                 <Input
-                    placeholder="Filter ridings..."
-                    value={(table.getColumn("riding")?.getFilterValue()) ?? ""}
+                    placeholder="Filter Community Name..."
+                    value={(table.getColumn("community_name")?.getFilterValue()) ?? ""}
                     onChange={(event) =>
-                        table.getColumn("riding")?.setFilterValue(event.target.value)
+                        table.getColumn("community_name")?.setFilterValue(event.target.value)
                     }
                     className="max-w-sm"
                 />

@@ -68,22 +68,6 @@ const columns = [
         header: "ID",
     },
     {
-        accessorKey: "referenceNumber",
-        header: "Reference #",
-    },
-    {
-        accessorKey: "type",
-        header: "Type",
-    },
-    {
-        accessorKey: "riding",
-        header: "Riding",
-    },
-    {
-        accessorKey: "submittedBy",
-        header: "Submitted By",
-    },
-    {
         accessorKey: "date",
         header: ({ column }) => {
             return (
@@ -98,20 +82,24 @@ const columns = [
         },
     },
     {
+        accessorKey: "submittedBy",
+        header: "Submitted By",
+    },
+    {
+        accessorKey: "type",
+        header: "Type",
+    },
+    {
+        accessorKey: "community_name",
+        header: "Community Name",
+    },
+    {
+        accessorKey: "title",
+        header: "Title",
+    },
+    {
         accessorKey: "status",
         header: "Status",
-    },
-    {
-        accessorKey: "sentiment",
-        header: "Sentiment",
-    },
-    {
-        accessorKey: "summary",
-        header: "Summary",
-    },
-    {
-        accessorKey: "body",
-        header: "Body",
     },
 ]
 

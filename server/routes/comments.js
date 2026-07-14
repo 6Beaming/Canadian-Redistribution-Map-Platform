@@ -4,7 +4,7 @@ import { getSupabaseClient } from "../lib/supabase.js";
 const router = Router();
 
 // Get all comments for Yukon boundary proposals
-router.get("/:proposalId", async (req, res) => {
+router.get("/proposal/:proposalId", async (req, res) => {
   const supabase = getSupabaseClient();
   const { proposalId } = req.params;
 
@@ -30,10 +30,71 @@ router.get("/:proposalId", async (req, res) => {
   res.json(data);
 });
 
+
+
+// Get all comments
+router.get("/", async (req, res) => {
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await supabase
+    .from("submissions")
+    .select("*, dissemination_areas!submissions_dguid_fkey(community_name)")
+    .order("created_at", { ascending: false });
+
+  if (error) return res.status(500).json({ error: error.message });
+
+
+  //AI generated code to merge and get profiles as well
+  //Right now used as a stop gap since problem with schema
+  // Get all unique user ids
+  const userIds = [...new Set(data.map(s => s.user_id).filter(Boolean))];
+
+  let profiles = [];
+
+  if (userIds.length > 0) {
+    const { data: profileData, error: profileError } = await supabase
+      .from("profiles")
+      .select("id, first_name, last_name")
+      .in("id", userIds);
+
+
+    if (profileError) {
+      return res.status(500).json({ error: profileError.message });
+    }
+
+    profiles = profileData;
+  }
+
+  // Merge profiles into submissions
+  const result = data.map(submission => ({
+    ...submission,
+    profile: profiles.find(
+      profile => profile.id === submission.user_id
+    ) || null
+  }));
+
+  res.json(result);
+});
+
+// Get all comments for a userId
+router.get("/:user_id", async (req, res) => {
+  const supabase = getSupabaseClient();
+  const { user_id } = req.params;
+
+  const { data, error } = await supabase
+    .from("submissions")
+    .select("*, dissemination_areas!submissions_dguid_fkey(community_name)")
+    .eq("user_id", user_id)
+    .order("created_at", { ascending: false });
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
 // Add comment to boundary proposal (only for Yukon proposals)
 router.post("/", async (req, res) => {
   const supabase = getSupabaseClient();
-  const { proposal_id, user_id, comment, fed_num, dguid, title, neighboring_dguid, type} = req.body;
+  const { proposal_id, user_id, comment, fed_num, dguid, title, neighboring_dguid, type } = req.body;
 
   // Verify proposal exists
   if (proposal_id) {
