@@ -14,6 +14,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext.jsx";
 import { getDaGeometrySummary } from "@/lib/map/objectionWorkflow.js";
 import { getDaPanelTitle } from "@/lib/map/profileUtils.js";
+import { toast } from "sonner";
+import { addComment } from "@/services/commentsApi";
 
 const PROFILE_SYNC_NOTICE =
   "Attention: Your submitted information will be synchronized with your Profile information.";
@@ -49,9 +51,8 @@ function getProfileSnapshot(user) {
 function FieldHoverHint({ message }) {
   return (
     <p
-      className={`min-h-[18px] text-[12px] leading-[1.35] text-[#d93025] transition-opacity duration-200 ${
-        message ? "opacity-0 group-hover/comment-control:opacity-100" : "opacity-0"
-      }`}
+      className={`min-h-[18px] text-[12px] leading-[1.35] text-[#d93025] transition-opacity duration-200 ${message ? "opacity-0 group-hover/comment-control:opacity-100" : "opacity-0"
+        }`}
       role={message ? "note" : undefined}
     >
       {message || "\u00a0"}
@@ -182,6 +183,10 @@ function WizardActions({
 }
 
 export default function UserMakeObjection({
+  proposalId,
+  fedNum,
+  dguid,
+  neighboring_dguid,
   workflow,
   profilesByDguid,
   geometryIndex,
@@ -192,12 +197,58 @@ export default function UserMakeObjection({
   const isSignedIn = sessionStatus === "signed-in";
   const profile = useMemo(() => getProfileSnapshot(user), [user]);
   const [objectionText, setObjectionText] = useState("");
+  const [title, setTitle] = useState("");
   const step = workflow?.step ?? 1;
   const first = getDaDisplay(profilesByDguid, workflow?.firstDguid);
   const second = getDaDisplay(profilesByDguid, workflow?.secondDguid);
   const profileFieldMessage = isSignedIn ? PROFILE_SYNC_NOTICE : SIGN_IN_NOTICE;
   const textFieldMessage = isSignedIn ? "" : SIGN_IN_NOTICE;
   const emailFieldMessage = isSignedIn ? "" : SIGN_IN_NOTICE;
+
+  function handleTitleChange(event) {
+    setTitle(event.target.value);
+  }
+
+  async function handleSubmitObjection() {
+    if (!isSignedIn) return;
+
+    if (title == "") {
+      toast.error("Objection title cannot be empty.", {
+        duration: 1000,
+      });
+      return;
+    }
+    if (objectionText == "") {
+      toast.error("Objection text cannot be empty", {
+        duration: 1000,
+      });
+      return;
+    }
+
+    try {
+      await addComment(
+        proposalId,
+        user.id,
+        objectionText,
+        fedNum,
+        dguid,
+        title,
+        neighboring_dguid,
+        "objection"
+      );
+
+      setTitle("");
+      setObjectionText("");
+      toast.success("Objection submitted successfully.", {
+        duration: 1000,
+      });
+    } catch (error) {
+      console.error("Failed to submit objection:", error);
+      toast.error("Failed to submit objection.", {
+        duration: 1000,
+      });
+    }
+  }
 
   if (!geometryIndex) {
     return (
@@ -258,7 +309,7 @@ export default function UserMakeObjection({
             confirmDisabled
             confirmLabel="Await Map Pick"
             onBack={onBackStep}
-            onConfirm={() => {}}
+            onConfirm={() => { }}
           />
         </div>
       ) : null}
@@ -350,6 +401,23 @@ export default function UserMakeObjection({
               </div>
 
               <div className="group/comment-control grid min-w-0 gap-2">
+                <Label htmlFor="objection-title">Objection Title</Label>
+                <Input
+                  className={
+                    isSignedIn
+                      ? "min-w-0 bg-white text-[#3c4043]"
+                      : "min-w-0 cursor-not-allowed bg-gray-100 text-gray-500"
+                  }
+                  disabled={!isSignedIn}
+                  id="objection-title"
+                  onChange={handleTitleChange}
+                  placeholder="Enter a title for your objection."
+                  value={title}
+                />
+                <FieldHoverHint message={textFieldMessage} />
+              </div>
+
+              <div className="group/comment-control grid min-w-0 gap-2">
                 <Label htmlFor="objection-content">Objection Input</Label>
                 <Textarea
                   className={
@@ -377,7 +445,7 @@ export default function UserMakeObjection({
                 </Button>
 
                 <div className="group/comment-control grid gap-2">
-                  <Button className="w-full justify-center" disabled={!isSignedIn} type="button">
+                  <Button className="w-full justify-center" disabled={!isSignedIn} type="button" onClick={handleSubmitObjection}>
                     Submit Objection
                   </Button>
                   <FieldHoverHint message={textFieldMessage} />

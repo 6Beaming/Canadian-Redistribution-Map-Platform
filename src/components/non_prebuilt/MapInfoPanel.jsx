@@ -753,6 +753,12 @@ export function MapInfoPanel({
   }
 
   function renderPanelContent() {
+
+    const profile = profilesByDguid.get(selection?.dguid);
+
+    const dguid = selection?.dguid;
+    const fedNum = profile?.fed_num;
+
     if (rolloutEnabled && rolloutCategoryId) {
       return (
         <RolloutCategoryPanel
@@ -778,13 +784,21 @@ export function MapInfoPanel({
         case "comments":
           return (
             <div className="map-info-panel__embedded">
-              <UserMakeComments />
+              <UserMakeComments
+                proposalId={null}
+                fedNum={fedNum}
+                dguid={dguid}
+              />
             </div>
           );
         case "objection":
           return (
             <div className="map-info-panel__embedded">
               <UserMakeObjection
+              proposalId={null}
+                fedNum={fedNum}
+                dguid={objectionWorkflow?.firstDguid ?? dguid}
+                neighboring_dguid={objectionWorkflow?.secondDguid ?? null}
                 geometryIndex={objectionGeometryIndex}
                 onBackStep={onObjectionBackStep}
                 onConfirmReview={onObjectionConfirmReview}
@@ -857,10 +871,10 @@ export function MapInfoPanel({
         style={
           isMobile
             ? {
-                left: `${floatingState.x}px`,
-                top: `${floatingState.y}px`,
-                width: `${floatingState.width}px`,
-              }
+              left: `${floatingState.x}px`,
+              top: `${floatingState.y}px`,
+              width: `${floatingState.width}px`,
+            }
             : undefined
         }
         onPointerDown={(event) => event.stopPropagation()}

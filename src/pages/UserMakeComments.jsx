@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext.jsx";
+import { addComment } from "@/services/commentsApi";
+import { toast } from "sonner";
 
 const PROFILE_SYNC_NOTICE =
   "Attention: Your submitted information will be synchronized with your Profile information.";
@@ -39,9 +41,8 @@ function getProfileSnapshot(user) {
 function FieldHoverHint({ message }) {
   return (
     <p
-      className={`min-h-[18px] text-[12px] leading-[1.35] text-[#d93025] transition-opacity duration-200 ${
-        message ? "opacity-0 group-hover/comment-control:opacity-100" : "opacity-0"
-      }`}
+      className={`min-h-[18px] text-[12px] leading-[1.35] text-[#d93025] transition-opacity duration-200 ${message ? "opacity-0 group-hover/comment-control:opacity-100" : "opacity-0"
+        }`}
       role={message ? "note" : undefined}
     >
       {message || "\u00a0"}
@@ -70,14 +71,60 @@ function ProfileField({ id, label, value, disabled, message, type = "text" }) {
   );
 }
 
-export default function UserMakeComments() {
+export default function UserMakeComments({ proposalId, fedNum, dguid }) {
   const { sessionStatus, user } = useAuth();
   const isSignedIn = sessionStatus === "signed-in";
   const profile = useMemo(() => getProfileSnapshot(user), [user]);
   const [comment, setComment] = useState("");
+  const [title, setTitle] = useState("");
 
   function handleCommentChange(event) {
     setComment(event.target.value);
+  }
+
+  function handleTitleChange(event) {
+    setTitle(event.target.value);
+  }
+
+  async function handleSubmitComment() {
+    if (!isSignedIn) return;
+
+    if (title == "") {
+      toast.error("Comment Title cannot be empty.", {
+        duration: 1000,
+      });
+      return;
+    }
+    if (comment == "") {
+      toast.error("Comment cannot be empty", {
+        duration: 1000,
+      });
+      return;
+    }
+
+    try {
+      await addComment(
+        proposalId,
+        user.id,
+        comment,
+        fedNum,
+        dguid,
+        title,
+        null,
+        "feedback"
+      );
+
+      setTitle("");
+      setComment("");
+      toast.success("Comment submitted successfully.", {
+        duration: 1000,
+      });
+    } catch (error) {
+      console.error("Failed to submit comment:", error);
+      toast.error("Failed to submit comment.", {
+        duration: 1000,
+      });
+    }
   }
 
   const profileFieldMessage = isSignedIn ? PROFILE_SYNC_NOTICE : SIGN_IN_NOTICE;
@@ -146,6 +193,23 @@ export default function UserMakeComments() {
         </div>
 
         <div className="group/comment-control grid min-w-0 gap-2">
+          <Label htmlFor="comment-title">Comment Title</Label>
+          <Input
+            className={
+              isSignedIn
+                ? "min-w-0 bg-white text-[#3c4043]"
+                : "min-w-0 cursor-not-allowed bg-gray-100 text-gray-500"
+            }
+            disabled={!isSignedIn}
+            id="comment-title"
+            onChange={handleTitleChange}
+            placeholder="Enter a title for your comment."
+            value={title}
+          />
+          <FieldHoverHint message={commentFieldMessage} />
+        </div>
+
+        <div className="group/comment-control grid min-w-0 gap-2">
           <Label htmlFor="comment-content">Comment Input</Label>
           <Textarea
             className={
@@ -164,7 +228,7 @@ export default function UserMakeComments() {
 
         <div className="group/comment-control grid gap-2">
           <div className="flex flex-wrap items-center justify-end gap-3">
-            <Button disabled={!isSignedIn} type="button">
+            <Button disabled={!isSignedIn} type="button" onClick={handleSubmitComment}>
               Submit Comment
             </Button>
           </div>

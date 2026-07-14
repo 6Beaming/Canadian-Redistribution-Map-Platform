@@ -16,6 +16,7 @@
 ****************************** */
  
 
+
 function handleResponse(res){
 	if (!res.ok) { return res.text().then(text => { throw new Error(`${text} (status: ${res.status})`)}); }
 	return res.json();
@@ -35,13 +36,13 @@ export async function getCommentsForDA(proposalId){
 }
 
 // Add a comment to a Yukon proposal
-export async function addComment(proposal_id, user_id, content){
+export async function addComment(proposal_id, user_id, comment, fed_num, dguid, title, neighboring_dguid, type){
     const res = await fetch(
         `/api/comments/`, 
         {
-            method:"GET",
+            method:"POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({proposal_id, user_id, content })
+            body: JSON.stringify({proposal_id, user_id, comment, fed_num, dguid, title, neighboring_dguid, type})
         }
     );
 
