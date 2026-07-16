@@ -1,12 +1,11 @@
 ### July 7 4-5pm Division of labour
-* Refactor frontend for everyone’s individual work from last demo, including:
-* Buttons
-* Making side panel simpler
-
 **Eric:**
 * Pre-centred map
   * convert postal code
   * searching based on province, riding 
+* Refactor UI:
+  * Buttons
+  * Making side panel simpler
 
 **Arvindh:**
 * Integrate backend into the frontend
