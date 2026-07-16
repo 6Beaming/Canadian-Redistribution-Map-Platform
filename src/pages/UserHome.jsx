@@ -1,7 +1,6 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { HorizontalTabs } from "@/components/ui/horizontal-tabs";
 import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
-import { MapInfoPanel, getDefaultPanelView, getPanelViews } from "@/components/non_prebuilt/MapInfoPanel.jsx";
+import { MapInfoPanel, getDefaultPanelView } from "@/components/non_prebuilt/MapInfoPanel.jsx";
 import { MapRegionSelector } from "@/components/non_prebuilt/MapRegionSelector.jsx";
 import UserMenuLeft from "@/components/non_prebuilt/UserMenuLeft.jsx";
 import {
@@ -64,21 +63,6 @@ export default function UserHome() {
   const metadataIndexCacheRef = useRef(new Map());
   const counterProposalDragFrameRef = useRef(0);
   const pendingCounterProposalDragRef = useRef(null);
-  const views = useMemo(() => getPanelViews("user"), []);
-  const tabItems = useMemo(
-    () =>
-      views.map((item) => ({
-        ...item,
-        disabled:
-          !selection &&
-          item.id !== "statistics" &&
-          item.id !== "comments" &&
-          item.id !== "objection" &&
-          item.id !== "counter-proposal",
-      })),
-    [selection, views],
-  );
-
   useEffect(() => {
     let isMounted = true;
 
@@ -419,6 +403,11 @@ export default function UserHome() {
     setStatus(message);
   }, []);
 
+  const handlePanelViewChange = useCallback((nextView) => {
+    setPanelView(nextView);
+    setIsRolloutOpen(false);
+  }, []);
+
   const handleToggleFullscreen = useCallback(() => {
     setIsFullscreen((current) => !current);
   }, []);
@@ -734,22 +723,12 @@ export default function UserHome() {
       <div className="map-workspace">
         <UserMenuLeft />
         <div
-          className={`map-dashboard${isFullscreen ? " map-dashboard--fullscreen" : ""}`}
+          className={`map-dashboard map-dashboard--user${isFullscreen ? " map-dashboard--fullscreen" : ""}`}
         >
           <section className="map-dashboard__main" aria-label="Map workspace">
             {!isFullscreen ? (
               <div className="map-dashboard__spacer" aria-hidden="true" />
             ) : null}
-
-            <div className="map-dashboard__tabs-wrap">
-              <HorizontalTabs
-                items={tabItems}
-                value={panelView}
-                onValueChange={setPanelView}
-                className="map-dashboard__tabs"
-                listClassName="map-dashboard__tabs-list"
-              />
-            </div>
 
             <div className="map-dashboard__map-wrap">
               <div className="sr-only" aria-live="polite">
@@ -786,6 +765,7 @@ export default function UserHome() {
             selection={selection}
             profilesByDguid={profilesByDguid}
             panelView={panelView}
+            onPanelViewChange={handlePanelViewChange}
             rolloutEnabled={isRolloutOpen}
             rolloutCategoryId={rolloutCategoryId}
             objectionGeometryIndex={objectionGeometryIndex}

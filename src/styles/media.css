@@ -305,6 +305,25 @@
     padding: 10px 12px 2px;
   }
 
+  .map-info-panel__action-menu {
+    padding: 12px;
+  }
+
+  .map-info-panel__action-heading {
+    margin-bottom: 7px;
+  }
+
+  .map-info-panel__action-list {
+    gap: 6px;
+  }
+
+  .map-info-panel__action-button {
+    min-height: 40px;
+    gap: 9px;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
   .map-info-panel__collapse-toggle {
     display: inline-flex;
     flex: 0 0 54px;

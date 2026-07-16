@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  BarChart3,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  GitCompareArrows,
+  MapPinned,
+  MessageSquareText,
+} from "lucide-react";
 import UserViewStatistics from "@/pages/UserViewStatistics.jsx";
 import UserMakeComments from "@/pages/UserMakeComments.jsx";
 import UserMakeObjection from "@/pages/UserMakeObjection.jsx";
@@ -35,6 +43,47 @@ export function getPanelViews(variant) {
 
 export function getDefaultPanelView(variant) {
   return variant === "commissioner" ? "comments" : "statistics";
+}
+
+const USER_PANEL_VIEW_ICONS = {
+  statistics: BarChart3,
+  comments: MessageSquareText,
+  objection: MapPinned,
+  "counter-proposal": GitCompareArrows,
+};
+
+function UserPanelActionMenu({ activeView, onViewChange }) {
+  return (
+    <nav className="map-info-panel__action-menu" aria-label="User actions">
+      <p className="map-info-panel__action-heading">Actions</p>
+      <div
+        className="map-info-panel__action-list"
+        role="tablist"
+        aria-label="Map actions"
+        aria-orientation="vertical"
+      >
+        {USER_PANEL_VIEWS.map((view) => {
+          const Icon = USER_PANEL_VIEW_ICONS[view.id];
+          const isActive = view.id === activeView;
+
+          return (
+            <button
+              key={view.id}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              data-state={isActive ? "active" : "inactive"}
+              className="map-info-panel__action-button"
+              onClick={() => onViewChange?.(view.id)}
+            >
+              <Icon className="map-info-panel__action-icon" aria-hidden="true" />
+              <span>{view.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
 }
 
 function clamp(value, min, max) {
@@ -484,6 +533,7 @@ export function MapInfoPanel({
   selection,
   profilesByDguid,
   panelView,
+  onPanelViewChange,
   variant = "user",
   rolloutEnabled = false,
   rolloutCategoryId,
@@ -899,6 +949,13 @@ export function MapInfoPanel({
               <span className="map-info-panel__drag-pill" />
             </button>
           </div>
+        ) : null}
+
+        {variant === "user" ? (
+          <UserPanelActionMenu
+            activeView={panelView}
+            onViewChange={onPanelViewChange}
+          />
         ) : null}
 
         <div className="map-info-panel__content">{renderPanelContent()}</div>

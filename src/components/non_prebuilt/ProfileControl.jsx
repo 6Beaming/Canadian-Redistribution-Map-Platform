@@ -186,7 +186,7 @@ export function ProfileControl({
           id={menuId}
           role="dialog"
           aria-label="Profile menu"
-          className="profile-control__popover absolute right-0 top-[calc(100%+0.5rem)] z-[60] w-[min(20rem,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-[#d8e0ea] bg-white text-[#24292f] shadow-[0_12px_36px_rgba(31,35,40,0.18)]"
+          className="profile-control__popover absolute right-0 top-[calc(100%+0.5rem)] z-[60] w-[min(16rem,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-[#d8e0ea] bg-white text-[#24292f] shadow-[0_12px_36px_rgba(31,35,40,0.18)]"
         >
           <div className="flex flex-col items-center px-6 pb-5 pt-6 text-center">
             <button
@@ -214,7 +214,7 @@ export function ProfileControl({
               onChange={handleAvatarChange}
             />
 
-            <p className="mt-12 max-w-full break-all text-sm text-[#57606a]">
+            <p className="mt-6 max-w-full break-all text-sm text-[#57606a]">
               {email}
             </p>
 

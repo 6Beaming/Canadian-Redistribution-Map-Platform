@@ -139,6 +139,14 @@
   background: transparent;
 }
 
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
 .header__search-slot {
   position: absolute;
   inset-block: 0;
