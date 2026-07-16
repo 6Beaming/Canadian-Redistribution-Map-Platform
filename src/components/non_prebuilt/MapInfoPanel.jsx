@@ -26,9 +26,9 @@ const TOGGLE_DRAG_THRESHOLD = 2;
 
 export const USER_PANEL_VIEWS = [
   { id: "statistics", label: "View Statistics" },
-  { id: "comments", label: "Make Comments" },
-  { id: "objection", label: "Make an Objection to Boundaries" },
-  { id: "counter-proposal", label: "Make a Counter-Proposal" },
+  { id: "comments", label: "Write a Comment" },
+  { id: "objection", label: "File Boundary Objection" },
+  { id: "counter-proposal", label: "Draw Counter-Proposal" },
 ];
 
 export const COMMISSIONER_PANEL_VIEWS = [
@@ -52,37 +52,90 @@ const USER_PANEL_VIEW_ICONS = {
   "counter-proposal": GitCompareArrows,
 };
 
-function UserPanelActionMenu({ activeView, onViewChange }) {
-  return (
-    <nav className="map-info-panel__action-menu" aria-label="User actions">
-      <p className="map-info-panel__action-heading">Actions</p>
-      <div
-        className="map-info-panel__action-list"
-        role="tablist"
-        aria-label="Map actions"
-        aria-orientation="vertical"
-      >
-        {USER_PANEL_VIEWS.map((view) => {
-          const Icon = USER_PANEL_VIEW_ICONS[view.id];
-          const isActive = view.id === activeView;
+function UserPanelModeSelector({ activeView, onViewChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectorRef = useRef(null);
+  const activeOption =
+    USER_PANEL_VIEWS.find((view) => view.id === activeView) ?? USER_PANEL_VIEWS[0];
+  const ActiveIcon = USER_PANEL_VIEW_ICONS[activeOption.id];
 
-          return (
-            <button
-              key={view.id}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              data-state={isActive ? "active" : "inactive"}
-              className="map-info-panel__action-button"
-              onClick={() => onViewChange?.(view.id)}
-            >
-              <Icon className="map-info-panel__action-icon" aria-hidden="true" />
-              <span>{view.label}</span>
-            </button>
-          );
-        })}
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined;
+    }
+
+    function handlePointerDown(event) {
+      if (!selectorRef.current?.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown, true);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown, true);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
+  function handleSelect(nextView) {
+    setIsOpen(false);
+    onViewChange?.(nextView);
+  }
+
+  return (
+    <div className="map-info-panel__mode-selector">
+      <div ref={selectorRef} className="map-info-panel__mode-control relative">
+        <button
+          type="button"
+          className="map-info-panel__mode-trigger"
+          aria-haspopup="menu"
+          aria-expanded={isOpen}
+          onClick={() => setIsOpen((current) => !current)}
+        >
+          <ActiveIcon className="map-info-panel__mode-icon" aria-hidden="true" />
+          <span>{activeOption.label}</span>
+          <ChevronDown
+            className={`map-info-panel__mode-chevron${isOpen ? " map-info-panel__mode-chevron--open" : ""}`}
+            aria-hidden="true"
+          />
+        </button>
+
+        {isOpen ? (
+          <div
+            className="map-info-panel__mode-menu absolute left-0 top-full z-20 w-full"
+            role="menu"
+            aria-label="Choose workflow mode"
+          >
+            {USER_PANEL_VIEWS.filter((view) => view.id !== activeOption.id).map(
+              (view) => {
+                const Icon = USER_PANEL_VIEW_ICONS[view.id];
+
+                return (
+                  <button
+                    key={view.id}
+                    type="button"
+                    role="menuitem"
+                    className="map-info-panel__mode-option"
+                    onClick={() => handleSelect(view.id)}
+                  >
+                    <Icon className="map-info-panel__mode-icon" aria-hidden="true" />
+                    <span>{view.label}</span>
+                  </button>
+                );
+              },
+            )}
+          </div>
+        ) : null}
       </div>
-    </nav>
+    </div>
   );
 }
 
@@ -952,7 +1005,7 @@ export function MapInfoPanel({
         ) : null}
 
         {variant === "user" ? (
-          <UserPanelActionMenu
+          <UserPanelModeSelector
             activeView={panelView}
             onViewChange={onPanelViewChange}
           />

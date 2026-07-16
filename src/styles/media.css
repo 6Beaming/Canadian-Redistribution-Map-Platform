@@ -305,19 +305,12 @@
     padding: 10px 12px 2px;
   }
 
-  .map-info-panel__action-menu {
+  .map-info-panel__mode-selector {
     padding: 12px;
   }
 
-  .map-info-panel__action-heading {
-    margin-bottom: 7px;
-  }
-
-  .map-info-panel__action-list {
-    gap: 6px;
-  }
-
-  .map-info-panel__action-button {
+  .map-info-panel__mode-trigger,
+  .map-info-panel__mode-option {
     min-height: 40px;
     gap: 9px;
     padding: 8px 10px;
