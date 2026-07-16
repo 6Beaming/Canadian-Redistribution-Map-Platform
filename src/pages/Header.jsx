@@ -1,10 +1,17 @@
-import { useEffect, useState } from "react";
-import { ArrowLeft, UserRound } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, Search, UserRound } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ProfileControl } from "@/components/non_prebuilt/ProfileControl.jsx";
-import { ThemeBrandBox } from "@/components/non_prebuilt/ThemeBrandBox.jsx";
 import { useAuth } from "../contexts/AuthContext.jsx";
+
+const AUTH_PATHS = new Set([
+  "/accept-invite",
+  "/forgot-password",
+  "/reset-password",
+  "/sign-in",
+  "/sign-up"
+]);
 
 function getBackRoute(pathname) {
   if (
@@ -29,49 +36,16 @@ export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
   const pathname = location.pathname;
-
-  const isUsersHome = pathname === "/" || pathname === "/users";
-  const isDashboardHome = pathname === "/dashboard";
-  const backRoute = getBackRoute(pathname);
-  const isBackHeaderSurface = Boolean(backRoute);
-  const isUserBackSurface =
-    pathname === "/users/search-da" ||
-    pathname === "/submissions" ||
-    pathname.startsWith("/submissions/");
-  const isCommissionerBackSurface = pathname.startsWith("/dashboard/");
-  const [isMobile, setIsMobile] = useState(
-    () => typeof window !== "undefined" && window.innerWidth <= 576
-  );
-
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { sessionStatus, signOut, user } = useAuth();
 
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return undefined;
-    }
+  if (AUTH_PATHS.has(pathname)) {
+    return null;
+  }
 
-    const mediaQuery = window.matchMedia("(max-width: 576px)");
-    const handleChange = (event) => {
-      setIsMobile(event.matches);
-    };
-
-    setIsMobile(mediaQuery.matches);
-
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener("change", handleChange);
-    } else {
-      mediaQuery.addListener(handleChange);
-    }
-
-    return () => {
-      if (mediaQuery.removeEventListener) {
-        mediaQuery.removeEventListener("change", handleChange);
-      } else {
-        mediaQuery.removeListener(handleChange);
-      }
-    };
-  }, []);
+  const backRoute = getBackRoute(pathname);
+  const isCommissionerSurface =
+    pathname === "/dashboard" || pathname.startsWith("/dashboard/");
 
   async function handleSignOut() {
     if (sessionStatus !== "signed-in") {
@@ -89,47 +63,15 @@ export default function Header() {
     }
   }
 
-  const usesEdgeBrandLayout = isMobile && (isUsersHome || isDashboardHome);
-
   return (
-    <header
-      className={`header relative h-16 w-full border-b border-[#d7e6fb] bg-[#f6efdf] text-[#17324d]${isUsersHome ? " header--user-map-surface" : ""}${isDashboardHome ? " header--dashboard-surface" : ""}${isBackHeaderSurface ? " header--back-surface" : ""}`}
-    >
-      <div
-        className={`header__left-slot absolute inset-y-0 left-0 flex items-center gap-3 ${isUsersHome || isDashboardHome ? "" : "px-4 md:px-6"}`}
-      >
-        {isDashboardHome ? (
-          <ProfileControl
-            user={user}
-            sessionStatus={sessionStatus}
-            isSubmitting={isSubmitting}
-            onSignIn={() => navigate("/sign-in")}
-            onSignOut={handleSignOut}
-            onPrimaryAction={() => navigate("/dashboard/profile")}
-            primaryActionLabel="My Profile"
-            primaryActionIcon={UserRound}
-            edgeAligned
-          />
-        ) : null}
-
-        {isUsersHome ? (
-          <ProfileControl
-            user={user}
-            sessionStatus={sessionStatus}
-            isSubmitting={isSubmitting}
-            onSignIn={() => navigate("/sign-in")}
-            onSignOut={handleSignOut}
-            onNavigateProfile={() => navigate("/users/profile")}
-            edgeAligned
-          />
-        ) : null}
-
-        {isBackHeaderSurface ? (
+    <header className="header relative z-50 h-14 w-full border-b border-[#d7e6fb] bg-background text-[#17324d]">
+      <div className="header__left-slot absolute inset-y-0 left-0 z-10 flex items-center px-3 md:px-4">
+        {backRoute ? (
           <Button
             type="button"
             variant="outline"
             size="icon"
-            className="rounded-full"
+            className="h-10 w-10 rounded-full bg-white"
             aria-label="Go back"
             onClick={() => navigate(backRoute)}
           >
@@ -138,70 +80,32 @@ export default function Header() {
         ) : null}
       </div>
 
-      <div
-        className={`header__brand-slot pointer-events-none absolute ${usesEdgeBrandLayout ? "inset-y-0 right-0 flex items-stretch justify-end" : "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"}`}
-        style={
-          usesEdgeBrandLayout
-            ? {
-                width: "50dvw",
-                maxWidth: "50dvw",
-                minWidth: 0,
-                transform: "none"
-              }
-            : undefined
-        }
-      >
-        <div
-          className="pointer-events-auto"
-          style={
-            usesEdgeBrandLayout
-              ? {
-                  display: "flex",
-                  width: "100%",
-                  minWidth: 0,
-                  alignItems: "stretch",
-                  justifyContent: "flex-end",
-                  overflow: "visible"
-                }
-              : undefined
-          }
-        >
-          <ThemeBrandBox disableMobileExpansion={isBackHeaderSurface && isMobile} />
-        </div>
+      <div className="header__search-slot">
+        <Search
+          aria-hidden="true"
+          className="pointer-events-none absolute left-4 h-4 w-4 text-[#607086]"
+        />
+        <input
+          type="search"
+          aria-label="Search by address or postal code"
+          className="h-10 w-full rounded-full border border-[#c9d8eb] bg-white py-2 pl-11 pr-4 text-sm text-[#17324d] shadow-[0_2px_8px_rgba(23,50,77,0.06)] outline-none transition-[border-color,box-shadow] placeholder:text-[#7a8797] focus:border-[#1a73e8] focus:shadow-[0_0_0_3px_rgba(26,115,232,0.14)]"
+          placeholder="Search by address or postal code..."
+        />
       </div>
 
-      <div className="header__right-slot absolute inset-y-0 right-0 flex items-center justify-end gap-3 px-4 md:px-6">
-        {isUserBackSurface ? (
-          <ProfileControl
-            user={user}
-            sessionStatus={sessionStatus}
-            isSubmitting={isSubmitting}
-            onSignIn={() => navigate("/sign-in")}
-            onSignOut={handleSignOut}
-            onNavigateProfile={() => navigate("/users/profile")}
-            align="right"
-          />
-        ) : null}
-
-        {isCommissionerBackSurface ? (
-          <ProfileControl
-            user={user}
-            sessionStatus={sessionStatus}
-            isSubmitting={isSubmitting}
-            onSignIn={() => navigate("/sign-in")}
-            onSignOut={handleSignOut}
-            onPrimaryAction={() => navigate("/dashboard/profile")}
-            primaryActionLabel="My Profile"
-            primaryActionIcon={UserRound}
-            align="right"
-          />
-        ) : null}
-
-        {!isUsersHome &&
-        !isDashboardHome &&
-        !isBackHeaderSurface ? (
-          <div className="h-10 w-10" />
-        ) : null}
+      <div className="header__right-slot absolute inset-y-0 right-0 z-10 flex items-center justify-end px-3 md:px-4">
+        <ProfileControl
+          user={user}
+          sessionStatus={sessionStatus}
+          isSubmitting={isSubmitting}
+          onSignIn={() => navigate("/sign-in")}
+          onSignOut={handleSignOut}
+          onPrimaryAction={() =>
+            navigate(isCommissionerSurface ? "/dashboard/profile" : "/users/profile")
+          }
+          primaryActionLabel="My profile"
+          primaryActionIcon={UserRound}
+        />
       </div>
     </header>
   );

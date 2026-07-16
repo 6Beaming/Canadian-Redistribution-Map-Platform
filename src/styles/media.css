@@ -40,7 +40,7 @@
   }
 
   .map-page {
-    height: calc(100dvh - 64px);
+    height: calc(100dvh - 56px);
     padding: 10px 0 20px;
   }
 
@@ -158,69 +158,10 @@
     min-width: 0;
   }
 
-  .profile-control {
-    max-width: 50dvw;
-  }
-
-  .header--back-surface .profile-control,
-  .header--back-surface .profile-control__button {
-    width: 100%;
-    max-width: 33.333dvw;
-  }
-
-  .header--back-surface .profile-control__button {
-    gap: 6px;
-    padding-right: 7px;
-    padding-left: 9px;
-  }
-
-  .header--back-surface .profile-control__avatar-shell,
-  .header--back-surface .profile-control__avatar--compact {
-    width: 36px;
-    height: 36px;
-  }
-
   .header--back-surface .header__left-slot > button {
     width: 42px;
     height: 42px;
     min-width: 42px;
-  }
-
-  .profile-control__button {
-    width: 100%;
-    min-width: 0;
-    max-width: 50dvw;
-    gap: 8px;
-    padding-right: 8px;
-    padding-left: 10px;
-    transform-origin: left center;
-  }
-
-  .profile-control__avatar-shell,
-  .profile-control__avatar--compact {
-    width: 40px;
-    height: 40px;
-  }
-
-  .profile-control__meta {
-    max-width: 100%;
-    overflow: hidden;
-  }
-
-  .profile-control__eyebrow {
-    font-size: 10px;
-  }
-
-  .profile-control__value {
-    display: block;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .profile-control__value svg {
-    flex-shrink: 0;
   }
 
   .side-menu {

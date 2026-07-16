@@ -8,7 +8,7 @@ export default function DashboardGraphs() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-[calc(100dvh-4rem)] overflow-y-auto bg-[linear-gradient(180deg,#f8fbff_0%,#eef5ff_100%)] px-4 py-6 md:px-6">
+    <div className="min-h-[calc(100dvh-3.5rem)] overflow-y-auto bg-[linear-gradient(180deg,#f8fbff_0%,#eef5ff_100%)] px-4 py-6 md:px-6">
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
         <section className="rounded-[28px] border border-[#d7e6fb] bg-white/92 p-6 shadow-[0_18px_42px_rgba(26,115,232,0.08)] backdrop-blur">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">

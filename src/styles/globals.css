@@ -138,3 +138,13 @@
   height: 0;
   background: transparent;
 }
+
+.header__search-slot {
+  position: absolute;
+  inset-block: 0;
+  left: 50%;
+  display: flex;
+  width: min(42rem, calc(100% - 9rem));
+  align-items: center;
+  transform: translateX(-50%);
+}
