@@ -2,7 +2,6 @@ import { startTransition, useCallback, useEffect, useMemo, useRef, useState } fr
 import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
 import { MapInfoPanel, getDefaultPanelView } from "@/components/non_prebuilt/MapInfoPanel.jsx";
 import { MapRegionSelector } from "@/components/non_prebuilt/MapRegionSelector.jsx";
-import UserMenuLeft from "@/components/non_prebuilt/UserMenuLeft.jsx";
 import {
   areDaNeighbours,
   buildDaObjectionIndex,
@@ -720,8 +719,7 @@ export default function UserHome() {
 
   return (
     <div className="map-page">
-      <div className="map-workspace">
-        <UserMenuLeft />
+      <div className="map-workspace map-workspace--single-column">
         <div
           className={`map-dashboard map-dashboard--user${isFullscreen ? " map-dashboard--fullscreen" : ""}`}
         >

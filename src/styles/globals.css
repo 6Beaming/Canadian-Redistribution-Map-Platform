@@ -152,7 +152,13 @@ button:disabled {
   inset-block: 0;
   left: 50%;
   display: flex;
-  width: min(42rem, calc(100% - 9rem));
+  width: min(42rem, calc(100% - 24rem));
   align-items: center;
   transform: translateX(-50%);
+}
+
+@media (max-width: 576px) {
+  .header__search-slot {
+    width: calc(100% - 14rem);
+  }
 }

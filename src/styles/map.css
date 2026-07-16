@@ -21,6 +21,11 @@
   height: 100%;
 }
 
+.map-workspace--single-column {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
 .map-dashboard {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(340px, 1fr);

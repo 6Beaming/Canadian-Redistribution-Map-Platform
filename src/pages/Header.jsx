@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, Search, UserRound } from "lucide-react";
+import { ArrowLeft, ClipboardList, Search, UserRound } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ProfileControl } from "@/components/non_prebuilt/ProfileControl.jsx";
@@ -64,7 +64,7 @@ export default function Header() {
   }
 
   return (
-    <header className="header relative z-50 h-14 w-full border-b border-[#d7e6fb] bg-background text-[#17324d]">
+    <header className="header relative z-50 flex h-14 w-full items-center justify-center border-b border-[#d7e6fb] bg-background text-[#17324d]">
       <div className="header__left-slot absolute inset-y-0 left-0 z-10 flex items-center px-3 md:px-4">
         {backRoute ? (
           <Button
@@ -93,7 +93,22 @@ export default function Header() {
         />
       </div>
 
-      <div className="header__right-slot absolute inset-y-0 right-0 z-10 flex items-center justify-end px-3 md:px-4">
+      <div className="header__right-slot absolute inset-y-0 right-0 z-10 flex items-center justify-end gap-2 px-3 md:gap-4 md:px-4">
+        {!isCommissionerSurface ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-current={pathname.startsWith("/submissions") ? "page" : undefined}
+            aria-label="My submissions"
+            className="header__submissions-link h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:px-4"
+            onClick={() => navigate("/submissions")}
+          >
+            <ClipboardList className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden md:inline">My submissions</span>
+          </Button>
+        ) : null}
+
         <ProfileControl
           user={user}
           sessionStatus={sessionStatus}
