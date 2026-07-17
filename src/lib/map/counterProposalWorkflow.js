@@ -131,8 +131,43 @@ function setCoordinateReference(
   }
 }
 
+function getSharedBoundaryEndpointKeys(boundaryGeoJson) {
+  const degreeByVertexKey = new Map();
+
+  const incrementDegree = (key) => {
+    degreeByVertexKey.set(key, (degreeByVertexKey.get(key) ?? 0) + 1);
+  };
+
+  boundaryGeoJson.features.forEach((feature) => {
+    if (feature.geometry?.type !== "LineString") {
+      return;
+    }
+
+    const coordinates = feature.geometry.coordinates;
+
+    for (let index = 0; index < coordinates.length - 1; index += 1) {
+      const startKey = coordinateKey(coordinates[index]);
+      const endKey = coordinateKey(coordinates[index + 1]);
+
+      if (startKey === endKey) {
+        continue;
+      }
+
+      incrementDegree(startKey);
+      incrementDegree(endKey);
+    }
+  });
+
+  return new Set(
+    Array.from(degreeByVertexKey.entries())
+      .filter(([, degree]) => degree === 1)
+      .map(([key]) => key),
+  );
+}
+
 function buildSharedBoundaryHandles(features, boundaryGeoJson) {
   const sharedVertexKeys = new Set();
+  const endpointKeys = getSharedBoundaryEndpointKeys(boundaryGeoJson);
 
   boundaryGeoJson.features.forEach((feature) => {
     if (feature.geometry?.type !== "LineString") {
@@ -152,7 +187,7 @@ function buildSharedBoundaryHandles(features, boundaryGeoJson) {
     visitGeometryCoordinates(feature.geometry, (entry) => {
       const key = coordinateKey(entry.coordinate);
 
-      if (!sharedVertexKeys.has(key)) {
+      if (!sharedVertexKeys.has(key) || endpointKeys.has(key)) {
         return;
       }
 
@@ -313,9 +348,9 @@ function isPointOnSegment(point, start, end, epsilon = 1e-9) {
   return dot <= squaredLength + epsilon;
 }
 
-function isPointInRing(point, ring) {
+function classifyPointInRing(point, ring) {
   if (!Array.isArray(ring) || ring.length < 3) {
-    return false;
+    return "outside";
   }
 
   let inside = false;
@@ -325,7 +360,7 @@ function isPointInRing(point, ring) {
     const previousPoint = ring[previous];
 
     if (isPointOnSegment(point, previousPoint, currentPoint)) {
-      return true;
+      return "boundary";
     }
 
     const intersects =
@@ -340,7 +375,37 @@ function isPointInRing(point, ring) {
     }
   }
 
-  return inside;
+  return inside ? "inside" : "outside";
+}
+
+function isPointCoveredByPolygon(point, polygon) {
+  if (!Array.isArray(polygon) || !polygon.length) {
+    return false;
+  }
+
+  const outerRingPosition = classifyPointInRing(point, polygon[0]);
+
+  if (outerRingPosition === "outside") {
+    return false;
+  }
+
+  if (outerRingPosition === "boundary") {
+    return true;
+  }
+
+  for (const hole of polygon.slice(1)) {
+    const holePosition = classifyPointInRing(point, hole);
+
+    if (holePosition === "boundary") {
+      return true;
+    }
+
+    if (holePosition === "inside") {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function isPointInGeometry(point, geometry) {
@@ -349,25 +414,11 @@ function isPointInGeometry(point, geometry) {
   }
 
   if (geometry.type === "Polygon") {
-    if (!isPointInRing(point, geometry.coordinates[0])) {
-      return false;
-    }
-
-    return !geometry.coordinates.slice(1).some((ring) => isPointInRing(point, ring));
+    return isPointCoveredByPolygon(point, geometry.coordinates);
   }
 
   if (geometry.type === "MultiPolygon") {
-    return geometry.coordinates.some((polygon) => {
-      if (!polygon.length) {
-        return false;
-      }
-
-      if (!isPointInRing(point, polygon[0])) {
-        return false;
-      }
-
-      return !polygon.slice(1).some((ring) => isPointInRing(point, ring));
-    });
+    return geometry.coordinates.some((polygon) => isPointCoveredByPolygon(point, polygon));
   }
 
   return false;

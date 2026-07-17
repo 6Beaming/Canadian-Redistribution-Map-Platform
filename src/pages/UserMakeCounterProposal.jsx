@@ -249,14 +249,26 @@ function ComparisonCard({ first, second, firstImpact, secondImpact }) {
   );
 }
 
-function EditorWorkspaceCard({
-  cache,
-  profilesByDguid,
-}) {
+function CounterProposalComparison({ cache, profilesByDguid }) {
   const first = getDaDisplay(profilesByDguid, cache?.firstDguid);
   const second = getDaDisplay(profilesByDguid, cache?.secondDguid);
   const firstImpact = cache?.impacts?.byDguid?.[cache?.firstDguid] ?? null;
   const secondImpact = cache?.impacts?.byDguid?.[cache?.secondDguid] ?? null;
+
+  return (
+    <ComparisonCard
+      first={first}
+      firstImpact={firstImpact}
+      second={second}
+      secondImpact={secondImpact}
+    />
+  );
+}
+
+function EditorWorkspaceCard({
+  cache,
+  profilesByDguid,
+}) {
   const transfer = cache?.impacts?.transfer ?? null;
 
   return (
@@ -267,11 +279,9 @@ function EditorWorkspaceCard({
             Drag a boundary point to adjust your proposal
           </p>
 
-          <ComparisonCard
-            first={first}
-            firstImpact={firstImpact}
-            second={second}
-            secondImpact={secondImpact}
+          <CounterProposalComparison
+            cache={cache}
+            profilesByDguid={profilesByDguid}
           />
 
           <div className="grid gap-1.5 rounded-[14px] border border-[#d7e6fb] bg-white p-3 text-[13px] leading-5 text-[#5f6368]">
@@ -369,8 +379,13 @@ export default function UserMakeCounterProposal({
       ) : null}
 
       {step === 4 ? (
-        <div className="grid min-w-0 gap-1">
-          <div className="group/comment-control mt-3 grid min-w-0 gap-2">
+        <div className="grid min-w-0 gap-3">
+          <CounterProposalComparison
+            cache={cache}
+            profilesByDguid={profilesByDguid}
+          />
+
+          <div className="group/comment-control grid min-w-0 gap-2">
             <Label htmlFor="counter-proposal-content">Description for the new boundary</Label>
             <Textarea
               className={

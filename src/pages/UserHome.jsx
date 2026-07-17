@@ -259,12 +259,14 @@ export default function UserHome() {
     setIsRolloutOpen(false);
 
     if (panelView === "objection") {
-      let nextSelection = null;
       const currentFedNum = getFedNumForDguid(dguid);
+
+      if (objectionWorkflow.step <= 2 || !objectionWorkflow.firstDguid) {
+        setSelection({ type: "da", dguid });
+      }
 
       setObjectionWorkflow((current) => {
         if (current.step === 1 || !current.firstDguid) {
-          nextSelection = { type: "da", dguid };
           return createInitialObjectionWorkflow({
             step: 2,
             firstDguid: dguid,
@@ -275,7 +277,6 @@ export default function UserHome() {
         }
 
         if (current.step === 2) {
-          nextSelection = { type: "da", dguid };
           const firstFedNum = getFedNumForDguid(current.firstDguid);
 
           if (!objectionGeometryIndex || !firstFedNum || objectionGeometryFedNum !== firstFedNum) {
@@ -311,20 +312,18 @@ export default function UserHome() {
 
         return current;
       });
-
-      if (nextSelection) {
-        setSelection(nextSelection);
-      }
       return;
     }
 
     if (panelView === "counter-proposal") {
-      let nextSelection = null;
       const currentFedNum = getFedNumForDguid(dguid);
+
+      if (counterProposalWorkflow.step <= 2 || !counterProposalWorkflow.firstDguid) {
+        setSelection({ type: "da", dguid });
+      }
 
       setCounterProposalWorkflow((current) => {
         if (current.step === 1 || !current.firstDguid) {
-          nextSelection = { type: "da", dguid };
           return createInitialCounterProposalWorkflow({
             step: 2,
             firstDguid: dguid,
@@ -336,7 +335,6 @@ export default function UserHome() {
         }
 
         if (current.step === 2) {
-          nextSelection = { type: "da", dguid };
           const firstFedNum = getFedNumForDguid(current.firstDguid);
 
           if (!objectionGeometryIndex || !firstFedNum || objectionGeometryFedNum !== firstFedNum) {
@@ -377,18 +375,18 @@ export default function UserHome() {
 
         return current;
       });
-
-      if (nextSelection) {
-        setSelection(nextSelection);
-      }
       return;
     }
 
     setSelection({ type: "da", dguid });
   }, [
+    counterProposalWorkflow.firstDguid,
+    counterProposalWorkflow.step,
     getFedNumForDguid,
     objectionGeometryFedNum,
     objectionGeometryIndex,
+    objectionWorkflow.firstDguid,
+    objectionWorkflow.step,
     panelView,
     profilesByDguid,
   ]);
@@ -457,6 +455,10 @@ export default function UserHome() {
   }, []);
 
   const handleObjectionBackStep = useCallback(() => {
+    if (objectionWorkflow.step === 2) {
+      setSelection(null);
+    }
+
     setObjectionWorkflow((current) => {
       if (current.step <= 1) {
         return createInitialObjectionWorkflow();
@@ -480,7 +482,7 @@ export default function UserHome() {
         boundaryGeoJson: current.boundaryGeoJson,
       });
     });
-  }, []);
+  }, [objectionWorkflow.step]);
 
   const handleObjectionConfirmReview = useCallback(() => {
     setObjectionWorkflow((current) => {
@@ -496,6 +498,10 @@ export default function UserHome() {
   }, []);
 
   const handleCounterProposalBackStep = useCallback(() => {
+    if (counterProposalWorkflow.step === 2) {
+      setSelection(null);
+    }
+
     setCounterProposalWorkflow((current) => {
       if (current.step <= 1) {
         return createInitialCounterProposalWorkflow();
@@ -523,7 +529,7 @@ export default function UserHome() {
 
       return current;
     });
-  }, []);
+  }, [counterProposalWorkflow.step]);
 
   const handleCounterProposalConfirmEdit = useCallback(() => {
     setCounterProposalWorkflow((current) => {
@@ -743,20 +749,21 @@ export default function UserHome() {
     }
 
     const showProposal = counterProposalWorkflow.previewMode === "proposal";
-    const showEditor = showProposal && counterProposalWorkflow.step >= 3;
+    const showBoundary = showProposal && counterProposalWorkflow.step >= 3;
+    const showHandles = showProposal && counterProposalWorkflow.step === 3;
 
     return {
       featureCollection: showProposal
         ? counterProposalWorkflow.cache.currentFeatureCollection
         : emptyCounterProposalFeatureCollection(),
-      boundaryGeoJson: showEditor
+      boundaryGeoJson: showBoundary
         ? counterProposalWorkflow.cache.sharedBoundaryGeoJson
         : emptyBoundaryFeatureCollection(),
-      handleFeatureCollection: showEditor
+      handleFeatureCollection: showHandles
         ? counterProposalWorkflow.cache.handleFeatureCollection
         : emptyCounterProposalFeatureCollection(),
       selectedHandleId: counterProposalWorkflow.cache.selectedHandleId,
-      editable: showEditor,
+      editable: showHandles,
     };
   }, [counterProposalWorkflow, panelView]);
 
