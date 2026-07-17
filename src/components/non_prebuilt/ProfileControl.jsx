@@ -52,12 +52,13 @@ export function ProfileControl({
   user,
   sessionStatus,
   isSubmitting = false,
+  menuActions = [],
   onSignIn,
   onSignOut,
   onNavigateProfile,
   onPrimaryAction,
   primaryActionLabel = "My profile",
-  primaryActionIcon: PrimaryActionIcon = UserRound
+  primaryActionIcon: PrimaryActionIcon = UserRound,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [avatarSrc, setAvatarSrc] = useState(null);
@@ -162,6 +163,11 @@ export function ProfileControl({
     (onPrimaryAction ?? onNavigateProfile)?.();
   }
 
+  function handleMenuActionClick(onSelect) {
+    setIsOpen(false);
+    onSelect?.();
+  }
+
   return (
     <div ref={containerRef} className="profile-control relative z-[60]">
       <button
@@ -227,6 +233,22 @@ export function ProfileControl({
               </p>
             ) : null}
           </div>
+
+          {menuActions.length > 0 ? (
+            <div className="border-t border-[#d8e0ea] p-2 md:hidden">
+              {menuActions.map(({ icon: ActionIcon, label, onSelect }) => (
+                <button
+                  key={label}
+                  type="button"
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors hover:bg-[#f3f4f6] focus-visible:bg-[#f3f4f6] focus-visible:outline-none"
+                  onClick={() => handleMenuActionClick(onSelect)}
+                >
+                  <ActionIcon className="h-4 w-4 text-[#57606a]" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           {(onPrimaryAction ?? onNavigateProfile) ? (
             <div className="border-t border-[#d8e0ea] p-2">

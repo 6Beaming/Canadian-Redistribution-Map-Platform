@@ -53,6 +53,33 @@ export default function Header() {
     (!isCommissionerSurface || pathname === "/dashboard") &&
     !isPublicProfilePage &&
     !isPublicSubmissionsPage;
+  const mobileProfileActions = isCommissionerSurface
+    ? [
+        {
+          icon: BarChart3,
+          label: "Analytics",
+          onSelect: () => navigate("/dashboard/graphs"),
+        },
+        {
+          icon: ScrollText,
+          label: "Audit Logs",
+          onSelect: () => navigate("/dashboard/auditlog"),
+        },
+        {
+          icon: ClipboardList,
+          label: "User Submissions",
+          onSelect: () => navigate("/dashboard/submissionsTable"),
+        },
+      ]
+    : !isPublicProfilePage && sessionStatus === "signed-in"
+      ? [
+          {
+            icon: ClipboardList,
+            label: "My submissions",
+            onSelect: () => navigate("/submissions"),
+          },
+        ]
+      : [];
 
   async function handleSignOut() {
     if (sessionStatus !== "signed-in") {
@@ -132,7 +159,7 @@ export default function Header() {
               variant="outline"
               size="sm"
               aria-label="Analytics"
-              className="header__submissions-link h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:px-4"
+              className="header__submissions-link hidden h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:inline-flex md:px-4"
               onClick={() => navigate("/dashboard/graphs")}
             >
               <BarChart3 className="h-4 w-4" aria-hidden="true" />
@@ -143,7 +170,7 @@ export default function Header() {
               variant="outline"
               size="sm"
               aria-label="Audit logs"
-              className="header__submissions-link h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:px-4"
+              className="header__submissions-link hidden h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:inline-flex md:px-4"
               onClick={() => navigate("/dashboard/auditlog")}
             >
               <ScrollText className="h-4 w-4" aria-hidden="true" />
@@ -159,7 +186,7 @@ export default function Header() {
             size="sm"
             aria-current={pathname === "/dashboard/submissionsTable" ? "page" : undefined}
             aria-label="User submissions"
-            className="header__submissions-link h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:px-4"
+            className="header__submissions-link hidden h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:inline-flex md:px-4"
             onClick={() => navigate("/dashboard/submissionsTable")}
           >
             <ClipboardList className="h-4 w-4" aria-hidden="true" />
@@ -172,7 +199,7 @@ export default function Header() {
             size="sm"
             aria-current={pathname.startsWith("/submissions") ? "page" : undefined}
             aria-label="My submissions"
-            className="header__submissions-link h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:px-4"
+            className="header__submissions-link hidden h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:inline-flex md:px-4"
             onClick={() => navigate("/submissions")}
           >
             <ClipboardList className="h-4 w-4" aria-hidden="true" />
@@ -184,6 +211,7 @@ export default function Header() {
           user={user}
           sessionStatus={sessionStatus}
           isSubmitting={isSubmitting}
+          menuActions={mobileProfileActions}
           onSignIn={() => navigate("/sign-in")}
           onSignOut={handleSignOut}
           onPrimaryAction={() =>
