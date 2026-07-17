@@ -45,19 +45,21 @@ export function getDefaultPanelView(variant) {
   return variant === "commissioner" ? "comments" : "statistics";
 }
 
-const USER_PANEL_VIEW_ICONS = {
+const PANEL_VIEW_ICONS = {
   statistics: BarChart3,
   comments: MessageSquareText,
   objection: Flag,
+  "boundaries-objections": Flag,
   "counter-proposal": GitCompareArrows,
 };
 
-function UserPanelModeSelector({ activeView, onViewChange }) {
+function PanelModeSelector({ activeView, onViewChange, variant }) {
   const [isOpen, setIsOpen] = useState(false);
   const selectorRef = useRef(null);
+  const views = getPanelViews(variant);
   const activeOption =
-    USER_PANEL_VIEWS.find((view) => view.id === activeView) ?? USER_PANEL_VIEWS[0];
-  const ActiveIcon = USER_PANEL_VIEW_ICONS[activeOption.id];
+    views.find((view) => view.id === activeView) ?? views[0];
+  const ActiveIcon = PANEL_VIEW_ICONS[activeOption.id];
 
   useEffect(() => {
     if (!isOpen) {
@@ -114,9 +116,9 @@ function UserPanelModeSelector({ activeView, onViewChange }) {
             role="menu"
             aria-label="Choose workflow mode"
           >
-            {USER_PANEL_VIEWS.filter((view) => view.id !== activeOption.id).map(
+            {views.filter((view) => view.id !== activeOption.id).map(
               (view) => {
-                const Icon = USER_PANEL_VIEW_ICONS[view.id];
+                const Icon = PANEL_VIEW_ICONS[view.id];
 
                 return (
                   <button
@@ -995,12 +997,11 @@ export function MapInfoPanel({
           </div>
         ) : null}
 
-        {variant === "user" ? (
-          <UserPanelModeSelector
-            activeView={panelView}
-            onViewChange={onPanelViewChange}
-          />
-        ) : null}
+        <PanelModeSelector
+          activeView={panelView}
+          onViewChange={onPanelViewChange}
+          variant={variant}
+        />
 
         <div className="map-info-panel__content">{renderPanelContent()}</div>
       </aside>

@@ -157,6 +157,10 @@ button:disabled {
   transform: translateX(-50%);
 }
 
+.header__search-slot--commissioner {
+  left: calc(50% - 8rem);
+}
+
 @media (max-width: 576px) {
   .header__search-slot {
     width: calc(100% - 14rem);
