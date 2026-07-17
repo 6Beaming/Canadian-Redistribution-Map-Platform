@@ -1,14 +1,21 @@
-import { useEffect, useState } from "react";
-import { ArrowLeft, UserRound } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, BarChart3, ClipboardList, Map, ScrollText, Search, UserRound } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ProfileControl } from "@/components/non_prebuilt/ProfileControl.jsx";
-import { ThemeBrandBox } from "@/components/non_prebuilt/ThemeBrandBox.jsx";
 import { useAuth } from "../contexts/AuthContext.jsx";
+
+const AUTH_PATHS = new Set([
+  "/accept-invite",
+  "/forgot-password",
+  "/reset-password",
+  "/sign-in",
+  "/sign-up"
+]);
 
 function getBackRoute(pathname) {
   if (
-    pathname === "/users/search-da" ||
+    pathname === "/users/profile" ||
     pathname === "/submissions"
   ) {
     return "/users";
@@ -29,49 +36,50 @@ export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
   const pathname = location.pathname;
-
-  const isUsersHome = pathname === "/" || pathname === "/users";
-  const isDashboardHome = pathname === "/dashboard";
-  const backRoute = getBackRoute(pathname);
-  const isBackHeaderSurface = Boolean(backRoute);
-  const isUserBackSurface =
-    pathname === "/users/search-da" ||
-    pathname === "/submissions" ||
-    pathname.startsWith("/submissions/");
-  const isCommissionerBackSurface = pathname.startsWith("/dashboard/");
-  const [isMobile, setIsMobile] = useState(
-    () => typeof window !== "undefined" && window.innerWidth <= 576
-  );
-
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { sessionStatus, signOut, user } = useAuth();
 
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return undefined;
-    }
+  if (AUTH_PATHS.has(pathname)) {
+    return null;
+  }
 
-    const mediaQuery = window.matchMedia("(max-width: 576px)");
-    const handleChange = (event) => {
-      setIsMobile(event.matches);
-    };
-
-    setIsMobile(mediaQuery.matches);
-
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener("change", handleChange);
-    } else {
-      mediaQuery.addListener(handleChange);
-    }
-
-    return () => {
-      if (mediaQuery.removeEventListener) {
-        mediaQuery.removeEventListener("change", handleChange);
-      } else {
-        mediaQuery.removeListener(handleChange);
-      }
-    };
-  }, []);
+  const backRoute = getBackRoute(pathname);
+  const isCommissionerSurface =
+    pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+  const isPublicProfilePage = pathname === "/users/profile";
+  const isPublicSubmissionsPage =
+    pathname === "/submissions" || pathname.startsWith("/submissions/");
+  const showSearch =
+    (!isCommissionerSurface || pathname === "/dashboard") &&
+    !isPublicProfilePage &&
+    !isPublicSubmissionsPage;
+  const mobileProfileActions = isCommissionerSurface
+    ? [
+        {
+          icon: BarChart3,
+          label: "Analytics",
+          onSelect: () => navigate("/dashboard/graphs"),
+        },
+        {
+          icon: ScrollText,
+          label: "Audit Logs",
+          onSelect: () => navigate("/dashboard/auditlog"),
+        },
+        {
+          icon: ClipboardList,
+          label: "User Submissions",
+          onSelect: () => navigate("/dashboard/submissionsTable"),
+        },
+      ]
+    : !isPublicProfilePage && sessionStatus === "signed-in"
+      ? [
+          {
+            icon: ClipboardList,
+            label: "My submissions",
+            onSelect: () => navigate("/submissions"),
+          },
+        ]
+      : [];
 
   async function handleSignOut() {
     if (sessionStatus !== "signed-in") {
@@ -89,47 +97,37 @@ export default function Header() {
     }
   }
 
-  const usesEdgeBrandLayout = isMobile && (isUsersHome || isDashboardHome);
-
   return (
-    <header
-      className={`header relative h-16 w-full border-b border-[#d7e6fb] bg-[#f6efdf] text-[#17324d]${isUsersHome ? " header--user-map-surface" : ""}${isDashboardHome ? " header--dashboard-surface" : ""}${isBackHeaderSurface ? " header--back-surface" : ""}`}
-    >
-      <div
-        className={`header__left-slot absolute inset-y-0 left-0 flex items-center gap-3 ${isUsersHome || isDashboardHome ? "" : "px-4 md:px-6"}`}
-      >
-        {isDashboardHome ? (
-          <ProfileControl
-            user={user}
-            sessionStatus={sessionStatus}
-            isSubmitting={isSubmitting}
-            onSignIn={() => navigate("/sign-in")}
-            onSignOut={handleSignOut}
-            onPrimaryAction={() => navigate("/dashboard/profile")}
-            primaryActionLabel="My Profile"
-            primaryActionIcon={UserRound}
-            edgeAligned
-          />
-        ) : null}
-
-        {isUsersHome ? (
-          <ProfileControl
-            user={user}
-            sessionStatus={sessionStatus}
-            isSubmitting={isSubmitting}
-            onSignIn={() => navigate("/sign-in")}
-            onSignOut={handleSignOut}
-            onNavigateProfile={() => navigate("/users/profile")}
-            edgeAligned
-          />
-        ) : null}
-
-        {isBackHeaderSurface ? (
+    <header className="header relative z-50 flex h-14 w-full items-center justify-center border-b border-[#d7e6fb] bg-background text-[#17324d]">
+      <div className="header__left-slot absolute inset-y-0 left-0 z-10 flex items-center px-3 md:px-4">
+        {backRoute && isCommissionerSurface ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="header__submissions-link h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:px-4"
+            onClick={() => navigate("/dashboard")}
+          >
+            <Map className="h-4 w-4" aria-hidden="true" />
+            <span>Map View</span>
+          </Button>
+        ) : backRoute && (isPublicProfilePage || pathname === "/submissions") ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="header__submissions-link h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:px-4"
+            onClick={() => navigate(backRoute)}
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            <span>Back to Map</span>
+          </Button>
+        ) : backRoute ? (
           <Button
             type="button"
             variant="outline"
             size="icon"
-            className="rounded-full"
+            className="h-10 w-10 rounded-full bg-white"
             aria-label="Go back"
             onClick={() => navigate(backRoute)}
           >
@@ -138,70 +136,90 @@ export default function Header() {
         ) : null}
       </div>
 
-      <div
-        className={`header__brand-slot pointer-events-none absolute ${usesEdgeBrandLayout ? "inset-y-0 right-0 flex items-stretch justify-end" : "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"}`}
-        style={
-          usesEdgeBrandLayout
-            ? {
-                width: "50dvw",
-                maxWidth: "50dvw",
-                minWidth: 0,
-                transform: "none"
-              }
-            : undefined
-        }
-      >
-        <div
-          className="pointer-events-auto"
-          style={
-            usesEdgeBrandLayout
-              ? {
-                  display: "flex",
-                  width: "100%",
-                  minWidth: 0,
-                  alignItems: "stretch",
-                  justifyContent: "flex-end",
-                  overflow: "visible"
-                }
-              : undefined
-          }
-        >
-          <ThemeBrandBox disableMobileExpansion={isBackHeaderSurface && isMobile} />
+      {showSearch ? (
+        <div className={`header__search-slot${isCommissionerSurface ? " header__search-slot--commissioner" : ""}`}>
+          <Search
+            aria-hidden="true"
+            className="pointer-events-none absolute left-4 h-4 w-4 text-[#607086]"
+          />
+          <input
+            type="search"
+            aria-label="Search by address or postal code"
+            className="h-10 w-full rounded-full border border-[#c9d8eb] bg-white py-2 pl-11 pr-4 text-sm text-[#17324d] shadow-[0_2px_8px_rgba(23,50,77,0.06)] outline-none transition-[border-color,box-shadow] placeholder:text-[#7a8797] focus:border-[#1a73e8] focus:shadow-[0_0_0_3px_rgba(26,115,232,0.14)]"
+            placeholder="Search by address or postal code..."
+          />
         </div>
-      </div>
+      ) : null}
 
-      <div className="header__right-slot absolute inset-y-0 right-0 flex items-center justify-end gap-3 px-4 md:px-6">
-        {isUserBackSurface ? (
-          <ProfileControl
-            user={user}
-            sessionStatus={sessionStatus}
-            isSubmitting={isSubmitting}
-            onSignIn={() => navigate("/sign-in")}
-            onSignOut={handleSignOut}
-            onNavigateProfile={() => navigate("/users/profile")}
-            align="right"
-          />
+      <div className="header__right-slot absolute inset-y-0 right-0 z-10 flex items-center justify-end gap-2 px-3 md:gap-4 md:px-4">
+        {isCommissionerSurface ? (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-label="Analytics"
+              className="header__submissions-link hidden h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:inline-flex md:px-4"
+              onClick={() => navigate("/dashboard/graphs")}
+            >
+              <BarChart3 className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden md:inline">Analytics</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-label="Audit logs"
+              className="header__submissions-link hidden h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:inline-flex md:px-4"
+              onClick={() => navigate("/dashboard/auditlog")}
+            >
+              <ScrollText className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden md:inline">Audit Logs</span>
+            </Button>
+          </>
         ) : null}
 
-        {isCommissionerBackSurface ? (
-          <ProfileControl
-            user={user}
-            sessionStatus={sessionStatus}
-            isSubmitting={isSubmitting}
-            onSignIn={() => navigate("/sign-in")}
-            onSignOut={handleSignOut}
-            onPrimaryAction={() => navigate("/dashboard/profile")}
-            primaryActionLabel="My Profile"
-            primaryActionIcon={UserRound}
-            align="right"
-          />
+        {isCommissionerSurface ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-current={pathname === "/dashboard/submissionsTable" ? "page" : undefined}
+            aria-label="User submissions"
+            className="header__submissions-link hidden h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:inline-flex md:px-4"
+            onClick={() => navigate("/dashboard/submissionsTable")}
+          >
+            <ClipboardList className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden md:inline">User Submissions</span>
+          </Button>
+        ) : !isPublicProfilePage && sessionStatus === "signed-in" ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-current={pathname.startsWith("/submissions") ? "page" : undefined}
+            aria-label="My submissions"
+            className="header__submissions-link hidden h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:inline-flex md:px-4"
+            onClick={() => navigate("/submissions")}
+          >
+            <ClipboardList className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden md:inline">My submissions</span>
+          </Button>
         ) : null}
 
-        {!isUsersHome &&
-        !isDashboardHome &&
-        !isBackHeaderSurface ? (
-          <div className="h-10 w-10" />
-        ) : null}
+        <ProfileControl
+          user={user}
+          sessionStatus={sessionStatus}
+          isSubmitting={isSubmitting}
+          menuActions={mobileProfileActions}
+          onSignIn={() => navigate("/sign-in")}
+          onSignOut={handleSignOut}
+          onPrimaryAction={() =>
+            navigate(isCommissionerSurface ? "/dashboard/profile" : "/users/profile")
+          }
+          primaryActionLabel="My profile"
+          primaryActionIcon={UserRound}
+        />
       </div>
     </header>
   );

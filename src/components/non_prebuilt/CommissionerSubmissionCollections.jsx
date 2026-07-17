@@ -112,7 +112,7 @@ function FedSummary({ fedNum, fedName }) {
           </dd>
         </dl>
         <p className="map-info-panel__hint">
-          Yukon DA collections appear when a Yukon dissemination area is selected on the map.
+          Yukon DA collections appear when a dissemination area is selected on the map.
         </p>
       </div>
     </>
@@ -158,18 +158,11 @@ export function CommissionerSubmissionCollections({
 
   if (!selection?.type) {
     return (
-      <>
-        <header className="map-info-panel__header">
-          <h2 className="map-info-panel__title map-info-panel__title--centered">
-            {collection.title}
-          </h2>
-        </header>
-        <div className="map-info-panel__body">
-          <p className="map-info-panel__empty">
-            Select a Yukon dissemination area to inspect placeholder commissioner cards.
-          </p>
-        </div>
-      </>
+      <div className="map-info-panel__body">
+        <p className="map-info-panel__empty">
+          Select a dissemination area to review submissions for this location.
+        </p>
+      </div>
     );
   }
 

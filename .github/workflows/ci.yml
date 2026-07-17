@@ -1,9 +1,7 @@
 name: CI
-# It runs automatically on pushes to the 'main' branch or when a pull request is opened
+# It runs automatically on every push or when a pull request is opened
 on:
   push:
-    branches:
-      - main
   pull_request:
 
 jobs:

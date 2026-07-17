@@ -1,15 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ImagePlus, LogIn, LogOut, UserRound } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useEffect, useId, useRef, useState } from "react";
+import { LogOut, UserRound } from "lucide-react";
 import { profileAvatarStorage } from "@/services/profileAvatarStorage.js";
 
 function SignedOutAvatar() {
   return (
-    <span className="profile-control__avatar-shell flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#1a73e8] shadow-[inset_0_0_0_1px_rgba(26,115,232,0.12)]">
+    <span className="profile-control__avatar-shell flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#1a73e8]">
       <svg
         viewBox="0 0 24 24"
         aria-hidden="true"
-        className="h-6 w-6"
+        className="h-5 w-5"
         fill="none"
         stroke="currentColor"
         strokeWidth="1.8"
@@ -27,22 +26,22 @@ function ProfileAvatar({ email, avatarSrc, size = "compact" }) {
   const initial = profileAvatarStorage.getFallbackInitial(email);
   const baseClassName =
     size === "large"
-      ? "h-24 w-24 text-4xl"
-      : "h-11 w-11 text-lg";
+      ? "h-20 w-20 text-3xl"
+      : "h-9 w-9 text-sm";
 
   if (avatarSrc) {
     return (
       <img
         src={avatarSrc}
         alt=""
-        className={`profile-control__avatar profile-control__avatar--${size} ${baseClassName} rounded-full object-cover shadow-[0_10px_20px_rgba(26,115,232,0.2)]`}
+        className={`profile-control__avatar profile-control__avatar--${size} ${baseClassName} rounded-full object-cover`}
       />
     );
   }
 
   return (
     <span
-      className={`profile-control__avatar profile-control__avatar--${size} ${baseClassName} flex items-center justify-center rounded-full bg-[#7c4dff] font-semibold text-white shadow-[0_10px_20px_rgba(124,77,255,0.24)]`}
+      className={`profile-control__avatar profile-control__avatar--${size} ${baseClassName} flex items-center justify-center rounded-full bg-[#7c4dff] font-semibold text-white`}
     >
       {initial}
     </span>
@@ -53,29 +52,23 @@ export function ProfileControl({
   user,
   sessionStatus,
   isSubmitting = false,
+  menuActions = [],
   onSignIn,
   onSignOut,
   onNavigateProfile,
   onPrimaryAction,
-  primaryActionLabel = "My Profile",
+  primaryActionLabel = "My profile",
   primaryActionIcon: PrimaryActionIcon = UserRound,
-  primaryActionVariant = "outline",
-  align = "left",
-  edgeAligned = false,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [avatarSrc, setAvatarSrc] = useState(null);
   const [uploadError, setUploadError] = useState("");
   const inputRef = useRef(null);
   const containerRef = useRef(null);
+  const menuId = useId();
 
   const email = user?.email ?? "";
   const isSignedIn = sessionStatus === "signed-in" && Boolean(user);
-
-  const drawerWidth = useMemo(() => {
-    const emailWidth = Math.max(email.length + 8, 28);
-    return `min(88vw, max(320px, ${emailWidth}ch))`;
-  }, [email]);
 
   useEffect(() => {
     let isActive = true;
@@ -124,11 +117,11 @@ export function ProfileControl({
       return undefined;
     }
 
-    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("pointerdown", handlePointerDown, true);
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("pointerdown", handlePointerDown, true);
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen]);
@@ -170,14 +163,20 @@ export function ProfileControl({
     (onPrimaryAction ?? onNavigateProfile)?.();
   }
 
+  function handleMenuActionClick(onSelect) {
+    setIsOpen(false);
+    onSelect?.();
+  }
+
   return (
-    <div
-      ref={containerRef}
-      className={`profile-control relative z-[60] h-full ${align === "right" ? "ml-auto" : ""}`}
-    >
+    <div ref={containerRef} className="profile-control relative z-[60]">
       <button
         type="button"
-        className={`profile-control__button inline-flex max-w-full items-center gap-3 overflow-hidden border border-[#d7e6fb] bg-[#e8f0fe] text-left text-[#1a73e8] shadow-[0_10px_22px_rgba(26,115,232,0.12)] transition-[transform,background-color,box-shadow] duration-[250ms] ease-[cubic-bezier(0.4,0,0.2,1)] hover:scale-[1.036] hover:bg-[#d9e9ff] hover:shadow-[0_12px_26px_rgba(26,115,232,0.16)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 ${edgeAligned ? "h-full rounded-none rounded-br-[22px] border-l-0 border-t-0 px-5 py-0" : "rounded-[18px] px-3 py-2"}`}
+        className="profile-control__button inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#bfd0e6] bg-white p-[2px] text-[#1a73e8] shadow-[0_2px_8px_rgba(23,50,77,0.1)] transition-[transform,border-color,box-shadow] duration-200 hover:scale-[1.04] hover:border-[#1a73e8] hover:shadow-[0_4px_12px_rgba(26,115,232,0.16)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+        aria-controls={isSignedIn ? menuId : undefined}
+        aria-expanded={isSignedIn ? isOpen : undefined}
+        aria-haspopup={isSignedIn ? "dialog" : undefined}
+        aria-label={isSignedIn ? "Open profile menu" : "Sign in"}
         disabled={isSubmitting}
         onClick={handleProfileClick}
       >
@@ -186,35 +185,32 @@ export function ProfileControl({
         ) : (
           <SignedOutAvatar />
         )}
-        <span className="profile-control__meta flex min-w-0 flex-col items-start">
-          <span className="profile-control__eyebrow text-[11px] font-semibold uppercase tracking-[0.08em] text-[#5f84c9]">
-            Profile
-          </span>
-          {isSignedIn ? (
-            <span className="profile-control__value max-w-[16rem] truncate text-[14px] font-semibold">
-              {email}
-            </span>
-          ) : (
-            <span className="profile-control__value inline-flex items-center gap-2 text-[14px] font-semibold">
-              <LogIn className="h-4 w-4" />
-              Sign In
-            </span>
-          )}
-        </span>
       </button>
 
       {isSignedIn && isOpen ? (
-        <>
-          <div
-            className="fixed inset-0 z-[55] bg-transparent"
-            aria-hidden="true"
-            onClick={() => setIsOpen(false)}
-          />
-          <aside
-            className="fixed left-0 top-0 z-[56] flex h-dvh flex-col items-center gap-4 overflow-y-auto border-r border-[#d7e6fb] bg-white/96 px-6 pb-8 pt-22 shadow-[0_18px_44px_rgba(26,115,232,0.16)] backdrop-blur"
-            style={{ width: drawerWidth }}
-          >
-            <ProfileAvatar email={email} avatarSrc={avatarSrc} size="large" />
+        <aside
+          id={menuId}
+          role="dialog"
+          aria-label="Profile menu"
+          className="profile-control__popover absolute right-0 top-[calc(100%+0.5rem)] z-[60] w-[min(16rem,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-[#d8e0ea] bg-white text-[#24292f] shadow-[0_12px_36px_rgba(31,35,40,0.18)]"
+        >
+          <div className="flex flex-col items-center px-6 pb-5 pt-6 text-center">
+            <button
+              type="button"
+              className="group relative rounded-full outline-none ring-offset-4 ring-offset-white focus-visible:ring-2 focus-visible:ring-[#1a73e8]"
+              aria-label="Change your avatar"
+              onClick={() => inputRef.current?.click()}
+            >
+              <span className="block rounded-full border-2 border-white shadow-[0_0_0_2px_#1a73e8] transition-transform duration-200 group-hover:scale-[1.03]">
+                <ProfileAvatar email={email} avatarSrc={avatarSrc} size="large" />
+              </span>
+              <span
+                role="tooltip"
+                className="pointer-events-none absolute left-1/2 top-[calc(100%+0.625rem)] z-10 -translate-x-1/2 whitespace-nowrap rounded-md bg-[#24292f] px-3 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
+              >
+                Change your avatar
+              </span>
+            </button>
 
             <input
               ref={inputRef}
@@ -224,49 +220,61 @@ export function ProfileControl({
               onChange={handleAvatarChange}
             />
 
-            <Button
-              type="button"
-              className="w-full"
-              onClick={() => inputRef.current?.click()}
-            >
-              <ImagePlus className="h-4 w-4" />
-              Upload My Avatar
-            </Button>
-
-            <div className="w-full rounded-[16px] border border-[#d7e6fb] bg-[#eef5ff] px-4 py-3 text-center text-[14px] font-medium text-[#1a73e8]">
+            <p className="mt-6 max-w-full break-all text-sm text-[#57606a]">
               {email}
-            </div>
+            </p>
 
             {uploadError ? (
-              <div className="w-full rounded-[14px] border border-[#ffd2d2] bg-[#fff1f1] px-4 py-3 text-center text-[13px] text-[#b3261e]">
+              <p
+                className="mt-3 rounded-lg bg-[#fff1f1] px-3 py-2 text-xs text-[#b3261e]"
+                aria-live="polite"
+              >
                 {uploadError}
-              </div>
+              </p>
             ) : null}
+          </div>
 
-            {(onPrimaryAction ?? onNavigateProfile) ? (
-              <Button
+          {menuActions.length > 0 ? (
+            <div className="border-t border-[#d8e0ea] p-2 md:hidden">
+              {menuActions.map(({ icon: ActionIcon, label, onSelect }) => (
+                <button
+                  key={label}
+                  type="button"
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors hover:bg-[#f3f4f6] focus-visible:bg-[#f3f4f6] focus-visible:outline-none"
+                  onClick={() => handleMenuActionClick(onSelect)}
+                >
+                  <ActionIcon className="h-4 w-4 text-[#57606a]" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          {(onPrimaryAction ?? onNavigateProfile) ? (
+            <div className="border-t border-[#d8e0ea] p-2">
+              <button
                 type="button"
-                variant={primaryActionVariant}
-                className="w-full"
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors hover:bg-[#f3f4f6] focus-visible:bg-[#f3f4f6] focus-visible:outline-none"
                 onClick={handlePrimaryActionClick}
               >
-                <PrimaryActionIcon className="h-4 w-4" />
+                <PrimaryActionIcon className="h-4 w-4 text-[#57606a]" />
                 {primaryActionLabel}
-              </Button>
-            ) : null}
+              </button>
+            </div>
+          ) : null}
 
-            <Button
+          <div className="border-t border-[#d8e0ea] p-2">
+            <button
               type="button"
-              variant="destructive"
-              className="w-full"
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors hover:bg-[#f3f4f6] focus-visible:bg-[#f3f4f6] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
               disabled={isSubmitting}
               onClick={handleSignOutClick}
             >
-              <LogOut className="h-4 w-4" />
-              {isSubmitting ? "Signing Out" : "Sign Out"}
-            </Button>
-          </aside>
-        </>
+              <LogOut className="h-4 w-4 text-[#57606a]" />
+              {isSubmitting ? "Signing out" : "Sign out"}
+            </button>
+          </div>
+        </aside>
       ) : null}
     </div>
   );

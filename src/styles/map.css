@@ -7,7 +7,7 @@
 
 .map-page {
   box-sizing: border-box;
-  height: calc(100dvh - 64px);
+  height: calc(100dvh - 56px);
   padding: 12px 12px 24px 0;
   overflow: hidden;
 }
@@ -19,6 +19,11 @@
   gap: 5px;
   width: 100%;
   height: 100%;
+}
+
+.map-workspace--single-column {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
 }
 
 .map-dashboard {
@@ -52,6 +57,10 @@
   min-height: 32px;
 }
 
+.map-dashboard--user .map-dashboard__spacer {
+  display: none;
+}
+
 .map-dashboard__tabs-wrap {
   padding: 0 14px 12px;
 }
@@ -75,6 +84,11 @@
   min-height: 0;
   padding: 0 14px 14px;
   box-sizing: border-box;
+}
+
+.map-dashboard--user .map-dashboard__map-wrap {
+  flex: 1 1 auto;
+  height: auto;
 }
 
 .map-dashboard--fullscreen .map-dashboard__spacer {
@@ -548,6 +562,101 @@
   min-width: 0;
   min-height: 0;
   overflow: visible;
+}
+
+.map-info-panel__mode-selector {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  flex: 0 0 auto;
+  padding: 16px 18px;
+  border-bottom: 1px solid #d7e6fb;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+}
+
+.map-info-panel__mode-trigger,
+.map-info-panel__mode-option {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border: 1px solid #1a73e8;
+  border-radius: 12px;
+  background: #1a73e8;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.3;
+  text-align: left;
+  box-shadow: 0 6px 14px rgba(26, 115, 232, 0.24);
+  transition:
+    color 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 160ms ease;
+}
+
+.map-info-panel__mode-trigger:hover {
+  border-color: #1769d2;
+  background: #1769d2;
+  box-shadow: 0 8px 18px rgba(26, 115, 232, 0.28);
+}
+
+.map-info-panel__mode-trigger:active {
+  transform: scale(0.985);
+}
+
+.map-info-panel__mode-chevron {
+  width: 17px;
+  height: 17px;
+  margin-left: auto;
+  flex: 0 0 17px;
+  transition: transform 180ms ease;
+}
+
+.map-info-panel__mode-chevron--open {
+  transform: rotate(180deg);
+}
+
+.map-info-panel__mode-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  display: grid;
+  width: 100%;
+  margin-top: 8px;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid #d7e6fb;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 16px 34px rgba(23, 50, 77, 0.18);
+}
+
+.map-info-panel__mode-option {
+  min-height: 42px;
+  border-color: transparent;
+  background: transparent;
+  color: #29445f;
+  box-shadow: none;
+}
+
+.map-info-panel__mode-option:hover {
+  border-color: #c7dafb;
+  background: #eef5ff;
+  color: #1a73e8;
+}
+
+.map-info-panel__mode-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  stroke-width: 1.9;
 }
 
 .map-info-panel__header {

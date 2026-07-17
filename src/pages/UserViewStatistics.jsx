@@ -126,11 +126,6 @@ function DaStatistics({ dguid, profile }) {
           </p>
         ) : null}
 
-        <p className="map-info-panel__hint">
-          Click another DA to inspect it. Only the selected DA is highlighted in
-          yellow.
-        </p>
-
         {panelTitle.unorganized ? (
           <p className="map-info-panel__footnote">{UNORGANIZED_FOOTNOTE}</p>
         ) : null}
@@ -186,17 +181,11 @@ function FedStatistics({ fedNum, fedName }) {
 export default function UserViewStatistics({ selection, profilesByDguid }) {
   if (!selection?.type) {
     return (
-      <>
-        <header className="map-info-panel__header">
-          <h2 className="map-info-panel__title map-info-panel__title--centered">Region details</h2>
-        </header>
-        <div className="map-info-panel__body">
-          <p className="map-info-panel__empty">
-            Click a dissemination area or federal electoral district on the map to
-            view details.
-          </p>
-        </div>
-      </>
+      <section className="map-info-panel__body min-w-0 text-left">
+        <p className="map-info-panel__empty text-left">
+          Click a dissemination area on the map to view details.
+        </p>
+      </section>
     );
   }
 

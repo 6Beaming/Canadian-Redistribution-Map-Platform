@@ -43,12 +43,12 @@ export default function AuthOnboarding({
             <div className="onboarding-header">
               <Button
                 aria-label="Back to sign in"
-                className="rounded-full"
+                className="auth-back-button"
                 disabled={isSubmitting}
                 onClick={onLogout}
                 size="icon"
                 type="button"
-                variant="outline"
+                variant="ghost"
               >
                 <ArrowLeft aria-hidden="true" size={22} />
               </Button>
@@ -172,12 +172,12 @@ export default function AuthOnboarding({
             <div className="onboarding-header">
               <Button
                 aria-label="Back to profile"
-                className="rounded-full"
+                className="auth-back-button"
                 disabled={isSubmitting}
                 onClick={onShowProfileForm}
                 size="icon"
                 type="button"
-                variant="outline"
+                variant="ghost"
               >
                 <ArrowLeft aria-hidden="true" size={22} />
               </Button>

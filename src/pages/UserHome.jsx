@@ -1,9 +1,8 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { HorizontalTabs } from "@/components/ui/horizontal-tabs";
 import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
-import { MapInfoPanel, getDefaultPanelView, getPanelViews } from "@/components/non_prebuilt/MapInfoPanel.jsx";
+import { CounterProposalMapToolbar } from "@/components/non_prebuilt/CounterProposalMapToolbar.jsx";
+import { MapInfoPanel, getDefaultPanelView } from "@/components/non_prebuilt/MapInfoPanel.jsx";
 import { MapRegionSelector } from "@/components/non_prebuilt/MapRegionSelector.jsx";
-import UserMenuLeft from "@/components/non_prebuilt/UserMenuLeft.jsx";
 import {
   areDaNeighbours,
   buildDaObjectionIndex,
@@ -64,21 +63,6 @@ export default function UserHome() {
   const metadataIndexCacheRef = useRef(new Map());
   const counterProposalDragFrameRef = useRef(0);
   const pendingCounterProposalDragRef = useRef(null);
-  const views = useMemo(() => getPanelViews("user"), []);
-  const tabItems = useMemo(
-    () =>
-      views.map((item) => ({
-        ...item,
-        disabled:
-          !selection &&
-          item.id !== "statistics" &&
-          item.id !== "comments" &&
-          item.id !== "objection" &&
-          item.id !== "counter-proposal",
-      })),
-    [selection, views],
-  );
-
   useEffect(() => {
     let isMounted = true;
 
@@ -419,6 +403,45 @@ export default function UserHome() {
     setStatus(message);
   }, []);
 
+  const handlePanelViewChange = useCallback((nextView) => {
+    const selectedDguid = selection?.type === "da" ? selection.dguid : null;
+
+    if (selectedDguid) {
+      const selectedFedNum = getFedNumForDguid(selectedDguid);
+      const error = selectedFedNum
+        ? ""
+        : "No FED assignment is available for the selected DA.";
+
+      if (nextView === "objection") {
+        setObjectionWorkflow((current) =>
+          current.step === 1 || !current.firstDguid
+            ? createInitialObjectionWorkflow({
+                step: 2,
+                firstDguid: selectedDguid,
+                error,
+              })
+            : current,
+        );
+      }
+
+      if (nextView === "counter-proposal") {
+        setCounterProposalWorkflow((current) =>
+          current.step === 1 || !current.firstDguid
+            ? createInitialCounterProposalWorkflow({
+                step: 2,
+                firstDguid: selectedDguid,
+                previewMode: "proposal",
+                error,
+              })
+            : current,
+        );
+      }
+    }
+
+    setPanelView(nextView);
+    setIsRolloutOpen(false);
+  }, [getFedNumForDguid, selection]);
+
   const handleToggleFullscreen = useCallback(() => {
     setIsFullscreen((current) => !current);
   }, []);
@@ -498,22 +521,11 @@ export default function UserHome() {
         };
       }
 
-      if (current.step === 5) {
-        return {
-          ...current,
-          step: 4,
-          previewMode: "proposal",
-        };
-      }
-
-      return {
-        ...current,
-        step: 5,
-      };
+      return current;
     });
   }, []);
 
-  const handleCounterProposalConfirmCache = useCallback(() => {
+  const handleCounterProposalConfirmEdit = useCallback(() => {
     setCounterProposalWorkflow((current) => {
       if (!current.cache || current.step !== 3) {
         return current;
@@ -522,33 +534,6 @@ export default function UserHome() {
       return {
         ...current,
         step: 4,
-        previewMode: "proposal",
-      };
-    });
-  }, []);
-
-  const handleCounterProposalConfirmEdit = useCallback(() => {
-    setCounterProposalWorkflow((current) => {
-      if (!current.cache || current.step !== 4) {
-        return current;
-      }
-
-      return {
-        ...current,
-        step: 5,
-      };
-    });
-  }, []);
-
-  const handleCounterProposalConfirmPreview = useCallback(() => {
-    setCounterProposalWorkflow((current) => {
-      if (!current.cache || current.step !== 5) {
-        return current;
-      }
-
-      return {
-        ...current,
-        step: 6,
       };
     });
   }, []);
@@ -683,6 +668,52 @@ export default function UserHome() {
     });
   }, []);
 
+  useEffect(() => {
+    if (panelView !== "counter-proposal" || counterProposalWorkflow.step < 3) {
+      return undefined;
+    }
+
+    function handleCounterProposalShortcut(event) {
+      if (
+        !event.ctrlKey
+        || event.altKey
+        || event.metaKey
+        || event.shiftKey
+      ) {
+        return;
+      }
+
+      const target = event.target;
+      const isEditableTarget = target instanceof HTMLElement
+        && (target.isContentEditable || ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName));
+
+      if (isEditableTarget) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+
+      if (key === "z") {
+        event.preventDefault();
+        handleCounterProposalUndo();
+      } else if (key === "y") {
+        event.preventDefault();
+        handleCounterProposalRedo();
+      }
+    }
+
+    window.addEventListener("keydown", handleCounterProposalShortcut);
+
+    return () => {
+      window.removeEventListener("keydown", handleCounterProposalShortcut);
+    };
+  }, [
+    counterProposalWorkflow.step,
+    handleCounterProposalRedo,
+    handleCounterProposalUndo,
+    panelView,
+  ]);
+
   const handleCounterProposalPreviewModeChange = useCallback((nextPreviewMode) => {
     setCounterProposalWorkflow((current) => {
       if (!current.cache) {
@@ -712,7 +743,7 @@ export default function UserHome() {
     }
 
     const showProposal = counterProposalWorkflow.previewMode === "proposal";
-    const showEditor = showProposal && counterProposalWorkflow.step >= 4;
+    const showEditor = showProposal && counterProposalWorkflow.step >= 3;
 
     return {
       featureCollection: showProposal
@@ -731,25 +762,14 @@ export default function UserHome() {
 
   return (
     <div className="map-page">
-      <div className="map-workspace">
-        <UserMenuLeft />
+      <div className="map-workspace map-workspace--single-column">
         <div
-          className={`map-dashboard${isFullscreen ? " map-dashboard--fullscreen" : ""}`}
+          className={`map-dashboard map-dashboard--user${isFullscreen ? " map-dashboard--fullscreen" : ""}`}
         >
           <section className="map-dashboard__main" aria-label="Map workspace">
             {!isFullscreen ? (
               <div className="map-dashboard__spacer" aria-hidden="true" />
             ) : null}
-
-            <div className="map-dashboard__tabs-wrap">
-              <HorizontalTabs
-                items={tabItems}
-                value={panelView}
-                onValueChange={setPanelView}
-                className="map-dashboard__tabs"
-                listClassName="map-dashboard__tabs-list"
-              />
-            </div>
 
             <div className="map-dashboard__map-wrap">
               <div className="sr-only" aria-live="polite">
@@ -778,6 +798,13 @@ export default function UserHome() {
                 rolloutEnabled={isRolloutOpen}
                 rolloutCategoryId={rolloutCategoryId}
               />
+              <CounterProposalMapToolbar
+                isVisible={panelView === "counter-proposal" && counterProposalWorkflow.step >= 3}
+                onPreviewModeChange={handleCounterProposalPreviewModeChange}
+                onRedo={handleCounterProposalRedo}
+                onUndo={handleCounterProposalUndo}
+                workflow={counterProposalWorkflow}
+              />
             </div>
           </section>
 
@@ -786,6 +813,7 @@ export default function UserHome() {
             selection={selection}
             profilesByDguid={profilesByDguid}
             panelView={panelView}
+            onPanelViewChange={handlePanelViewChange}
             rolloutEnabled={isRolloutOpen}
             rolloutCategoryId={rolloutCategoryId}
             objectionGeometryIndex={objectionGeometryIndex}
@@ -794,12 +822,7 @@ export default function UserHome() {
             onObjectionConfirmReview={handleObjectionConfirmReview}
             counterProposalWorkflow={counterProposalWorkflow}
             onCounterProposalBackStep={handleCounterProposalBackStep}
-            onCounterProposalConfirmCache={handleCounterProposalConfirmCache}
             onCounterProposalConfirmEdit={handleCounterProposalConfirmEdit}
-            onCounterProposalConfirmPreview={handleCounterProposalConfirmPreview}
-            onCounterProposalPreviewModeChange={handleCounterProposalPreviewModeChange}
-            onCounterProposalRedo={handleCounterProposalRedo}
-            onCounterProposalUndo={handleCounterProposalUndo}
             onRolloutHoverChange={handleRolloutHoverChange}
             onRolloutSelect={handleRolloutSelect}
           />

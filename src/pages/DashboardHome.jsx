@@ -1,9 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { HorizontalTabs } from "@/components/ui/horizontal-tabs";
+import { useCallback, useEffect, useState } from "react";
 import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
-import { MapInfoPanel, getDefaultPanelView, getPanelViews } from "@/components/non_prebuilt/MapInfoPanel.jsx";
+import { MapInfoPanel, getDefaultPanelView } from "@/components/non_prebuilt/MapInfoPanel.jsx";
 import { MapRegionSelector } from "@/components/non_prebuilt/MapRegionSelector.jsx";
-import CommissionerMenuLeft from "@/components/non_prebuilt/CommissionerMenuLeft.jsx";
 import { DEFAULT_ROLLOUT_CATEGORY_ID } from "@/lib/map/rolloutPlan.js";
 import { mapApi } from "@/services/mapApi.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
@@ -18,8 +16,6 @@ export default function DashboardHome() {
   const [panelView, setPanelView] = useState(getDefaultPanelView("commissioner"));
   const [isRolloutOpen, setIsRolloutOpen] = useState(false);
   const [rolloutCategoryId, setRolloutCategoryId] = useState(DEFAULT_ROLLOUT_CATEGORY_ID);
-  const views = useMemo(() => getPanelViews("commissioner"), []);
-  const tabItems = useMemo(() => views.map((item) => ({ ...item })), [views]);
 
   useEffect(() => {
     let isMounted = true;
@@ -118,26 +114,11 @@ export default function DashboardHome() {
 
   return (
     <div className="map-page">
-      <div className="map-workspace">
-        <CommissionerMenuLeft />
+      <div className="map-workspace map-workspace--single-column">
         <div
-          className={`map-dashboard${isFullscreen ? " map-dashboard--fullscreen" : ""}`}
+          className={`map-dashboard map-dashboard--user${isFullscreen ? " map-dashboard--fullscreen" : ""}`}
         >
           <section className="map-dashboard__main" aria-label="Map workspace">
-            {!isFullscreen ? (
-              <div className="map-dashboard__spacer" aria-hidden="true" />
-            ) : null}
-
-            <div className="map-dashboard__tabs-wrap">
-              <HorizontalTabs
-                items={tabItems}
-                value={panelView}
-                onValueChange={setPanelView}
-                className="map-dashboard__tabs"
-                listClassName="map-dashboard__tabs-list"
-              />
-            </div>
-
             <div className="map-dashboard__map-wrap">
               <div className="sr-only" aria-live="polite">
                 {status}
@@ -167,6 +148,7 @@ export default function DashboardHome() {
             selection={selection}
             profilesByDguid={profilesByDguid}
             panelView={panelView}
+            onPanelViewChange={setPanelView}
             rolloutEnabled={isRolloutOpen}
             rolloutCategoryId={rolloutCategoryId}
             onRolloutHoverChange={handleRolloutHoverChange}

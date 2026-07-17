@@ -1,42 +1,17 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  WorkflowActionFooter,
+  workflowActionButtonClassName,
+} from "@/components/non_prebuilt/WorkflowActionFooter.jsx";
 import { useAuth } from "@/contexts/AuthContext.jsx";
 import { addComment } from "@/services/commentsApi";
 import { toast } from "sonner";
 
-const PROFILE_SYNC_NOTICE =
-  "Attention: Your submitted information will be synchronized with your Profile information.";
 const SIGN_IN_NOTICE = "Please sign in to submit your comment.";
-
-const provinceLabels = new Map([
-  ["AB", "Alberta"],
-  ["BC", "British Columbia"],
-  ["MB", "Manitoba"],
-  ["NB", "New Brunswick"],
-  ["NL", "Newfoundland and Labrador"],
-  ["NS", "Nova Scotia"],
-  ["NT", "Northwest Territories"],
-  ["NU", "Nunavut"],
-  ["ON", "Ontario"],
-  ["PE", "Prince Edward Island"],
-  ["QC", "Quebec"],
-  ["SK", "Saskatchewan"],
-  ["YT", "Yukon"],
-]);
-
-function getProfileSnapshot(user) {
-  return {
-    email: user?.email || "",
-    firstName: user?.firstName || "",
-    lastName: user?.lastName || "",
-    province: provinceLabels.get(user?.province) || user?.province || "",
-    postalCode: user?.postalCode || "",
-    phoneNumber: user?.phoneNumber || "",
-  };
-}
 
 function FieldHoverHint({ message }) {
   return (
@@ -50,31 +25,9 @@ function FieldHoverHint({ message }) {
   );
 }
 
-function ProfileField({ id, label, value, disabled, message, type = "text" }) {
-  return (
-    <div className="group/comment-control grid min-w-0 gap-2">
-      <Label htmlFor={id}>{label}</Label>
-      <Input
-        className={
-          disabled
-            ? "min-w-0 cursor-not-allowed bg-gray-100 text-gray-500"
-            : "min-w-0 cursor-default bg-[#f8fbff] text-[#3c4043]"
-        }
-        disabled={disabled}
-        id={id}
-        readOnly={!disabled}
-        type={type}
-        value={value}
-      />
-      <FieldHoverHint message={message} />
-    </div>
-  );
-}
-
-export default function UserMakeComments({ proposalId, fedNum, dguid }) {
+export default function UserMakeComments({ proposalId, fedNum, dguid, daName, hasSelection }) {
   const { sessionStatus, user } = useAuth();
   const isSignedIn = sessionStatus === "signed-in";
-  const profile = useMemo(() => getProfileSnapshot(user), [user]);
   const [comment, setComment] = useState("");
   const [title, setTitle] = useState("");
 
@@ -90,7 +43,7 @@ export default function UserMakeComments({ proposalId, fedNum, dguid }) {
     if (!isSignedIn) return;
 
     if (title == "") {
-      toast.error("Comment Title cannot be empty.", {
+      toast.error("Title cannot be empty.", {
         duration: 1000,
       });
       return;
@@ -127,78 +80,28 @@ export default function UserMakeComments({ proposalId, fedNum, dguid }) {
     }
   }
 
-  const profileFieldMessage = isSignedIn ? PROFILE_SYNC_NOTICE : SIGN_IN_NOTICE;
   const commentFieldMessage = isSignedIn ? "" : SIGN_IN_NOTICE;
-  const emailFieldMessage = isSignedIn ? "" : SIGN_IN_NOTICE;
+
+  if (!hasSelection) {
+    return (
+      <section className="min-w-0 text-left">
+        <p className="map-info-panel__empty text-left">
+          Click a dissemination area on the map to leave a comment.
+        </p>
+      </section>
+    );
+  }
 
   return (
-    <section className="grid min-w-0 gap-5 overflow-x-hidden">
-      <div className="grid gap-1">
-        <h2 className="text-[18px] font-semibold text-[#17324d]">Make Comments</h2>
-        <p className="text-sm text-[#5f6368]">
-          Review the synchronized profile information below and draft your comment for the current area. This view is front-end only and does not submit or store data.
-        </p>
-      </div>
-
-      <form className="grid min-w-0 gap-4 overflow-x-hidden">
-        <ProfileField
-          disabled
-          id="comment-profile-email"
-          label="Email"
-          message={emailFieldMessage}
-          type="email"
-          value={profile.email}
-        />
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <ProfileField
-            disabled={!isSignedIn}
-            id="comment-profile-first-name"
-            label="First Name"
-            message={profileFieldMessage}
-            value={profile.firstName}
-          />
-          <ProfileField
-            disabled={!isSignedIn}
-            id="comment-profile-last-name"
-            label="Last Name"
-            message={profileFieldMessage}
-            value={profile.lastName}
-          />
-        </div>
-
-        <ProfileField
-          disabled={!isSignedIn}
-          id="comment-profile-province"
-          label="Province Or Territory"
-          message={profileFieldMessage}
-          value={profile.province}
-        />
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <ProfileField
-            disabled={!isSignedIn}
-            id="comment-profile-postal-code"
-            label="Postal Code"
-            message={profileFieldMessage}
-            value={profile.postalCode}
-          />
-          <ProfileField
-            disabled={!isSignedIn}
-            id="comment-profile-phone-number"
-            label="Phone Number"
-            message={profileFieldMessage}
-            value={profile.phoneNumber}
-          />
-        </div>
-
-        <div className="group/comment-control grid min-w-0 gap-2">
-          <Label htmlFor="comment-title">Comment Title</Label>
+    <section className="grid min-w-0 gap-5 text-left">
+      <form className="grid min-w-0 gap-4 text-left">
+        <div className="group/comment-control grid min-w-0 gap-1">
+          <Label className="justify-self-start text-left" htmlFor="comment-title">Title</Label>
           <Input
             className={
               isSignedIn
-                ? "min-w-0 bg-white text-[#3c4043]"
-                : "min-w-0 cursor-not-allowed bg-gray-100 text-gray-500"
+                ? "min-w-0 bg-white text-left text-[#3c4043]"
+                : "min-w-0 cursor-not-allowed bg-gray-100 text-left text-gray-500"
             }
             disabled={!isSignedIn}
             id="comment-title"
@@ -209,31 +112,36 @@ export default function UserMakeComments({ proposalId, fedNum, dguid }) {
           <FieldHoverHint message={commentFieldMessage} />
         </div>
 
-        <div className="group/comment-control grid min-w-0 gap-2">
-          <Label htmlFor="comment-content">Comment Input</Label>
+        <div className="group/comment-control grid min-w-0 gap-1">
+          <Label className="justify-self-start text-left" htmlFor="comment-content">Comment</Label>
           <Textarea
             className={
               isSignedIn
-                ? "min-h-32 w-full bg-white text-[#3c4043]"
-                : "min-h-32 w-full cursor-not-allowed bg-gray-100 text-gray-500"
+                ? "min-h-32 w-full bg-white text-left text-[#3c4043]"
+                : "min-h-32 w-full cursor-not-allowed bg-gray-100 text-left text-gray-500"
             }
             disabled={!isSignedIn}
             id="comment-content"
             onChange={handleCommentChange}
-            placeholder={isSignedIn ? "Type your comment here." : "Please sign in to submit your comment."}
+            placeholder={isSignedIn ? `Write your comment about ${daName}.` : "Please sign in to submit your comment."}
             value={comment}
           />
           <FieldHoverHint message={commentFieldMessage} />
         </div>
 
-        <div className="group/comment-control grid gap-2">
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            <Button disabled={!isSignedIn} type="button" onClick={handleSubmitComment}>
+        <WorkflowActionFooter columns={1}>
+          <div className="group/comment-control grid min-w-0 justify-items-end gap-2 text-right">
+            <Button
+              className={workflowActionButtonClassName}
+              disabled={!isSignedIn}
+              type="button"
+              onClick={handleSubmitComment}
+            >
               Submit Comment
             </Button>
+            <FieldHoverHint message={commentFieldMessage} />
           </div>
-          <FieldHoverHint message={commentFieldMessage} />
-        </div>
+        </WorkflowActionFooter>
       </form>
     </section>
   );
