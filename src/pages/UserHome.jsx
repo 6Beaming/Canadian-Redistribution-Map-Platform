@@ -668,6 +668,52 @@ export default function UserHome() {
     });
   }, []);
 
+  useEffect(() => {
+    if (panelView !== "counter-proposal" || counterProposalWorkflow.step < 3) {
+      return undefined;
+    }
+
+    function handleCounterProposalShortcut(event) {
+      if (
+        !event.ctrlKey
+        || event.altKey
+        || event.metaKey
+        || event.shiftKey
+      ) {
+        return;
+      }
+
+      const target = event.target;
+      const isEditableTarget = target instanceof HTMLElement
+        && (target.isContentEditable || ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName));
+
+      if (isEditableTarget) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+
+      if (key === "z") {
+        event.preventDefault();
+        handleCounterProposalUndo();
+      } else if (key === "y") {
+        event.preventDefault();
+        handleCounterProposalRedo();
+      }
+    }
+
+    window.addEventListener("keydown", handleCounterProposalShortcut);
+
+    return () => {
+      window.removeEventListener("keydown", handleCounterProposalShortcut);
+    };
+  }, [
+    counterProposalWorkflow.step,
+    handleCounterProposalRedo,
+    handleCounterProposalUndo,
+    panelView,
+  ]);
+
   const handleCounterProposalPreviewModeChange = useCallback((nextPreviewMode) => {
     setCounterProposalWorkflow((current) => {
       if (!current.cache) {

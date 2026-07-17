@@ -27,11 +27,12 @@ export function CounterProposalMapToolbar({
         role="toolbar"
       >
         <Button
+          aria-keyshortcuts="Control+Z"
           aria-label="Undo boundary change"
           className="h-9 w-9 min-w-0 rounded-full p-0"
           disabled={!canUndo}
           size="icon-sm"
-          title="Undo"
+          title="Undo (Ctrl+Z)"
           type="button"
           variant="outline"
           onClick={onUndo}
@@ -39,11 +40,12 @@ export function CounterProposalMapToolbar({
           <Undo2 className="h-4 w-4" />
         </Button>
         <Button
+          aria-keyshortcuts="Control+Y"
           aria-label="Redo boundary change"
           className="h-9 w-9 min-w-0 rounded-full p-0"
           disabled={!canRedo}
           size="icon-sm"
-          title="Redo"
+          title="Redo (Ctrl+Y)"
           type="button"
           variant="outline"
           onClick={onRedo}
