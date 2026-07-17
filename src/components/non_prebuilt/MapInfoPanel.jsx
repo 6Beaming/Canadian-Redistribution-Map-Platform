@@ -4,8 +4,8 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Flag,
   GitCompareArrows,
-  MapPinned,
   MessageSquareText,
 } from "lucide-react";
 import UserViewStatistics from "@/pages/UserViewStatistics.jsx";
@@ -48,7 +48,7 @@ export function getDefaultPanelView(variant) {
 const USER_PANEL_VIEW_ICONS = {
   statistics: BarChart3,
   comments: MessageSquareText,
-  objection: MapPinned,
+  objection: Flag,
   "counter-proposal": GitCompareArrows,
 };
 
@@ -596,12 +596,7 @@ export function MapInfoPanel({
   onObjectionConfirmReview,
   counterProposalWorkflow,
   onCounterProposalBackStep,
-  onCounterProposalConfirmCache,
   onCounterProposalConfirmEdit,
-  onCounterProposalConfirmPreview,
-  onCounterProposalPreviewModeChange,
-  onCounterProposalRedo,
-  onCounterProposalUndo,
   onRolloutHoverChange,
   onRolloutSelect,
 }) {
@@ -889,8 +884,10 @@ export function MapInfoPanel({
             <div className="map-info-panel__embedded">
               <UserMakeComments
                 proposalId={null}
-                fedNum={fedNum}
+                fedNum={selection?.fedNum ?? fedNum}
                 dguid={dguid}
+                daName={profile ? getDaPanelTitle(profile).text : ""}
+                hasSelection={hasSelection}
               />
             </div>
           );
@@ -916,12 +913,7 @@ export function MapInfoPanel({
               <UserMakeCounterProposal
                 geometryIndex={objectionGeometryIndex}
                 onBackStep={onCounterProposalBackStep}
-                onConfirmCache={onCounterProposalConfirmCache}
                 onConfirmEdit={onCounterProposalConfirmEdit}
-                onConfirmPreview={onCounterProposalConfirmPreview}
-                onPreviewModeChange={onCounterProposalPreviewModeChange}
-                onRedo={onCounterProposalRedo}
-                onUndo={onCounterProposalUndo}
                 profilesByDguid={profilesByDguid}
                 workflow={counterProposalWorkflow}
               />

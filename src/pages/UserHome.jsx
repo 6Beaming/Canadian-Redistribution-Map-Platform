@@ -1,5 +1,6 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
+import { CounterProposalMapToolbar } from "@/components/non_prebuilt/CounterProposalMapToolbar.jsx";
 import { MapInfoPanel, getDefaultPanelView } from "@/components/non_prebuilt/MapInfoPanel.jsx";
 import { MapRegionSelector } from "@/components/non_prebuilt/MapRegionSelector.jsx";
 import {
@@ -486,22 +487,11 @@ export default function UserHome() {
         };
       }
 
-      if (current.step === 5) {
-        return {
-          ...current,
-          step: 4,
-          previewMode: "proposal",
-        };
-      }
-
-      return {
-        ...current,
-        step: 5,
-      };
+      return current;
     });
   }, []);
 
-  const handleCounterProposalConfirmCache = useCallback(() => {
+  const handleCounterProposalConfirmEdit = useCallback(() => {
     setCounterProposalWorkflow((current) => {
       if (!current.cache || current.step !== 3) {
         return current;
@@ -510,33 +500,6 @@ export default function UserHome() {
       return {
         ...current,
         step: 4,
-        previewMode: "proposal",
-      };
-    });
-  }, []);
-
-  const handleCounterProposalConfirmEdit = useCallback(() => {
-    setCounterProposalWorkflow((current) => {
-      if (!current.cache || current.step !== 4) {
-        return current;
-      }
-
-      return {
-        ...current,
-        step: 5,
-      };
-    });
-  }, []);
-
-  const handleCounterProposalConfirmPreview = useCallback(() => {
-    setCounterProposalWorkflow((current) => {
-      if (!current.cache || current.step !== 5) {
-        return current;
-      }
-
-      return {
-        ...current,
-        step: 6,
       };
     });
   }, []);
@@ -700,7 +663,7 @@ export default function UserHome() {
     }
 
     const showProposal = counterProposalWorkflow.previewMode === "proposal";
-    const showEditor = showProposal && counterProposalWorkflow.step >= 4;
+    const showEditor = showProposal && counterProposalWorkflow.step >= 3;
 
     return {
       featureCollection: showProposal
@@ -755,6 +718,13 @@ export default function UserHome() {
                 rolloutEnabled={isRolloutOpen}
                 rolloutCategoryId={rolloutCategoryId}
               />
+              <CounterProposalMapToolbar
+                isVisible={panelView === "counter-proposal" && counterProposalWorkflow.step >= 3}
+                onPreviewModeChange={handleCounterProposalPreviewModeChange}
+                onRedo={handleCounterProposalRedo}
+                onUndo={handleCounterProposalUndo}
+                workflow={counterProposalWorkflow}
+              />
             </div>
           </section>
 
@@ -772,12 +742,7 @@ export default function UserHome() {
             onObjectionConfirmReview={handleObjectionConfirmReview}
             counterProposalWorkflow={counterProposalWorkflow}
             onCounterProposalBackStep={handleCounterProposalBackStep}
-            onCounterProposalConfirmCache={handleCounterProposalConfirmCache}
             onCounterProposalConfirmEdit={handleCounterProposalConfirmEdit}
-            onCounterProposalConfirmPreview={handleCounterProposalConfirmPreview}
-            onCounterProposalPreviewModeChange={handleCounterProposalPreviewModeChange}
-            onCounterProposalRedo={handleCounterProposalRedo}
-            onCounterProposalUndo={handleCounterProposalUndo}
             onRolloutHoverChange={handleRolloutHoverChange}
             onRolloutSelect={handleRolloutSelect}
           />
