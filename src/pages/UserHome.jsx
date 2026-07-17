@@ -749,20 +749,21 @@ export default function UserHome() {
     }
 
     const showProposal = counterProposalWorkflow.previewMode === "proposal";
-    const showEditor = showProposal && counterProposalWorkflow.step >= 3;
+    const showBoundary = showProposal && counterProposalWorkflow.step >= 3;
+    const showHandles = showProposal && counterProposalWorkflow.step === 3;
 
     return {
       featureCollection: showProposal
         ? counterProposalWorkflow.cache.currentFeatureCollection
         : emptyCounterProposalFeatureCollection(),
-      boundaryGeoJson: showEditor
+      boundaryGeoJson: showBoundary
         ? counterProposalWorkflow.cache.sharedBoundaryGeoJson
         : emptyBoundaryFeatureCollection(),
-      handleFeatureCollection: showEditor
+      handleFeatureCollection: showHandles
         ? counterProposalWorkflow.cache.handleFeatureCollection
         : emptyCounterProposalFeatureCollection(),
       selectedHandleId: counterProposalWorkflow.cache.selectedHandleId,
-      editable: showEditor,
+      editable: showHandles,
     };
   }, [counterProposalWorkflow, panelView]);
 
