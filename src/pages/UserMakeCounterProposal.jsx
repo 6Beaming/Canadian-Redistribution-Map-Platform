@@ -158,14 +158,14 @@ function ComparisonValue({ row, side }) {
 
   if (row.areaTransition) {
     return (
-      <span className="flex min-w-0 flex-col items-center justify-center gap-0.5 text-center leading-4">
-        <span className="w-full break-words text-xs text-slate-500">
+      <span className="flex min-w-0 flex-col items-center justify-center gap-0.5 text-center">
+        <span className="text-[14px] font-bold leading-5 text-slate-500">
           {row[`${side}OriginalValue`]}
         </span>
-        <span className={`w-full break-words text-xs font-semibold ${getChangeColorClassName(change)}`}>
+        <span className={`text-[14px] font-bold leading-5 ${getChangeColorClassName(change)}`}>
           ↳ {value}
         </span>
-        <span className={`mt-1 w-full break-words text-xs font-semibold ${getChangeColorClassName(change)}`}>
+        <span className={`text-xs font-semibold leading-4 ${getChangeColorClassName(change)}`}>
           ({row[`${side}DifferenceValue`]})
         </span>
       </span>
@@ -174,7 +174,7 @@ function ComparisonValue({ row, side }) {
 
   return (
     <span
-      className={`${row.prominent ? "text-[15px] font-bold leading-5" : `text-xs ${hasChange ? "font-semibold" : "font-medium"} leading-4`} ${getChangeColorClassName(change)}`}
+      className={`${row.prominent ? "text-[14px] font-bold leading-5" : `text-xs ${hasChange ? "font-semibold" : "font-medium"} leading-4`} ${getChangeColorClassName(change)}`}
     >
       {value}
     </span>
@@ -215,14 +215,14 @@ function ComparisonCard({ first, second, firstImpact, secondImpact }) {
         </p>
       </div>
 
-      <div className="grid grid-cols-3 border-b border-[#d7e6fb] bg-white">
+      <div className="grid grid-cols-[0.7fr_1fr_1fr] border-b border-[#d7e6fb] bg-white">
         <div aria-hidden="true" className="min-h-11 border-r border-[#e8f0fe]" />
         <div className="flex min-h-11 min-w-0 items-center justify-center border-r border-[#e8f0fe] px-1.5 py-1">
           <p className="break-words text-center text-[11px] font-semibold uppercase leading-[14px] text-[#17324d]">
             {first.title}
           </p>
         </div>
-        <div className="flex min-h-11 min-w-0 items-center justify-center px-1.5 py-1">
+        <div className="flex min-h-11 min-w-0 items-center justify-center border-r border-transparent px-1.5 py-1">
           <p className="break-words text-center text-[11px] font-semibold uppercase leading-[14px] text-[#17324d]">
             {second.title}
           </p>
@@ -232,15 +232,15 @@ function ComparisonCard({ first, second, firstImpact, secondImpact }) {
       {rows.map((row, index) => (
         <div
           key={row.label}
-          className={`grid grid-cols-3 bg-white ${index < rows.length - 1 ? "border-b border-[#e8f0fe]" : ""}`}
+          className={`grid grid-cols-[0.7fr_1fr_1fr] bg-white ${index < rows.length - 1 ? "border-b border-[#e8f0fe]" : ""}`}
         >
-          <div className="flex min-w-0 items-center border-r border-[#e8f0fe] bg-[#f8fbff] px-2.5 py-2">
+          <div className="flex min-w-0 items-center border-r border-[#e8f0fe] bg-[#f8fbff] px-2.5 py-1.5">
             <span className="text-xs font-medium leading-4 text-slate-700">{row.label}</span>
           </div>
-          <div className="flex min-w-0 items-center justify-center border-r border-[#e8f0fe] px-2 py-2 text-center">
+          <div className="flex min-w-0 items-center justify-center border-r border-[#e8f0fe] px-2 py-1.5 text-center">
             <ComparisonValue row={row} side="first" />
           </div>
-          <div className="flex min-w-0 items-center justify-center px-2 py-2 text-center">
+          <div className="flex min-w-0 items-center justify-center border-r border-transparent px-2 py-1.5 text-center">
             <ComparisonValue row={row} side="second" />
           </div>
         </div>
@@ -282,7 +282,7 @@ function EditorWorkspaceCard({
             {transfer?.fromDguid && transfer?.toDguid ? (
               <p>
                 <span className="font-bold text-[#17324d]">{formatPopulation(transfer.amount)}</span>{" "}
-                residents are currently estimated to move from{" "}
+                residents are estimated to move from{" "}
                 <span className="font-semibold text-[#17324d]">{getDaDisplay(profilesByDguid, transfer.fromDguid).title}</span>{" "}
                 to{" "}
                 <span className="font-semibold text-[#17324d]">{getDaDisplay(profilesByDguid, transfer.toDguid).title}</span>.
