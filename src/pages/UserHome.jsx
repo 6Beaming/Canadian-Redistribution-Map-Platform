@@ -277,6 +277,10 @@ export default function UserHome() {
         }
 
         if (current.step === 2) {
+          if (current.firstDguid === dguid) {
+            return current;
+          }
+
           const firstFedNum = getFedNumForDguid(current.firstDguid);
 
           if (!objectionGeometryIndex || !firstFedNum || objectionGeometryFedNum !== firstFedNum) {
@@ -288,10 +292,7 @@ export default function UserHome() {
             });
           }
 
-          if (
-            current.firstDguid === dguid ||
-            !areDaNeighbours(objectionGeometryIndex, current.firstDguid, dguid)
-          ) {
+          if (!areDaNeighbours(objectionGeometryIndex, current.firstDguid, dguid)) {
             return createInitialObjectionWorkflow({
               error:
                 "The second DA must be adjacent to the first one. Please select the first DA again.",
@@ -335,6 +336,10 @@ export default function UserHome() {
         }
 
         if (current.step === 2) {
+          if (current.firstDguid === dguid) {
+            return current;
+          }
+
           const firstFedNum = getFedNumForDguid(current.firstDguid);
 
           if (!objectionGeometryIndex || !firstFedNum || objectionGeometryFedNum !== firstFedNum) {
@@ -347,10 +352,7 @@ export default function UserHome() {
             });
           }
 
-          if (
-            current.firstDguid === dguid ||
-            !areDaNeighbours(objectionGeometryIndex, current.firstDguid, dguid)
-          ) {
+          if (!areDaNeighbours(objectionGeometryIndex, current.firstDguid, dguid)) {
             return createInitialCounterProposalWorkflow({
               error:
                 "The second DA must be adjacent to the first one. Please select the first DA again.",
