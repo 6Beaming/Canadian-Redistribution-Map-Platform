@@ -52,6 +52,7 @@
 
 :root {
   --radius: 0.625rem;
+  --button-font-size: 0.875rem;
   --background: oklch(96.438% 0.0329 208.538 / 0.518);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -137,6 +138,13 @@
   width: 0;
   height: 0;
   background: transparent;
+}
+
+button,
+[data-slot="button"],
+button *:not(.profile-control__avatar),
+[data-slot="button"] *:not(.profile-control__avatar) {
+  font-size: var(--button-font-size) !important;
 }
 
 button:not(:disabled) {

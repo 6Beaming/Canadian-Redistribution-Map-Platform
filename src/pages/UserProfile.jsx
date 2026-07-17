@@ -13,6 +13,9 @@ import {
 import { useAuth } from "@/contexts/AuthContext.jsx";
 import { authApi } from "@/services/authApi.js";
 
+const actionButtonClassName = "w-auto min-w-0 px-6 py-2";
+const secondaryActionButtonClassName = `${actionButtonClassName} border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:text-gray-900`;
+
 const provinces = [
   ["AB", "Alberta"],
   ["BC", "British Columbia"],
@@ -55,6 +58,22 @@ export default function UserProfile() {
       setForm(profileFormFromUser(user));
     }
   }, [otpRequired, user]);
+
+  useEffect(() => {
+    if (!status) {
+      return undefined;
+    }
+
+    function dismissStatus() {
+      setStatus("");
+    }
+
+    document.addEventListener("pointerdown", dismissStatus);
+
+    return () => {
+      document.removeEventListener("pointerdown", dismissStatus);
+    };
+  }, [status]);
 
   function resetOtpState() {
     setOtpRequired(false);
@@ -161,8 +180,8 @@ export default function UserProfile() {
   }
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
-      <section className="flex flex-col items-center gap-5 rounded-[24px] border border-[#d7e6fb] bg-white/92 p-6 text-center shadow-[0_16px_38px_rgba(26,115,232,0.08)]">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-6">
+      <section className="flex w-full flex-col items-start gap-5 rounded-[24px] border border-[#d7e6fb] bg-white/92 p-6 text-left shadow-[0_16px_38px_rgba(26,115,232,0.08)]">
         <div className="w-full">
           <h2 className="text-xl font-semibold text-[#17324d]">
             Profile Information
@@ -170,12 +189,12 @@ export default function UserProfile() {
         </div>
 
         <form
-          className="grid w-full max-w-2xl gap-4 text-left"
+          className="grid w-full gap-4 text-left"
           id="public-profile-form"
           onSubmit={handleSubmit}
         >
           <div className="grid gap-2">
-            <Label htmlFor="public-profile-email">Email</Label>
+            <Label className="w-fit justify-self-start text-left" htmlFor="public-profile-email">Email</Label>
             <Input
               className="cursor-not-allowed bg-gray-100 text-gray-600"
               id="public-profile-email"
@@ -187,7 +206,7 @@ export default function UserProfile() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="public-profile-first-name">First Name</Label>
+              <Label className="w-fit justify-self-start text-left" htmlFor="public-profile-first-name">First Name</Label>
               <Input
                 autoComplete="given-name"
                 id="public-profile-first-name"
@@ -200,7 +219,7 @@ export default function UserProfile() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="public-profile-last-name">Last Name</Label>
+              <Label className="w-fit justify-self-start text-left" htmlFor="public-profile-last-name">Last Name</Label>
               <Input
                 autoComplete="family-name"
                 id="public-profile-last-name"
@@ -214,7 +233,7 @@ export default function UserProfile() {
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="public-profile-province">Province Or Territory</Label>
+            <Label className="w-fit justify-self-start text-left" htmlFor="public-profile-province">Province Or Territory</Label>
             <Select
               name="province"
               onOpenChange={(open) => {
@@ -244,7 +263,7 @@ export default function UserProfile() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="public-profile-postal-code">Postal Code</Label>
+              <Label className="w-fit justify-self-start text-left" htmlFor="public-profile-postal-code">Postal Code</Label>
               <Input
                 autoComplete="postal-code"
                 id="public-profile-postal-code"
@@ -258,7 +277,7 @@ export default function UserProfile() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="public-profile-phone">Phone Number</Label>
+              <Label className="w-fit justify-self-start text-left" htmlFor="public-profile-phone">Phone Number</Label>
               <Input
                 autoComplete="tel"
                 id="public-profile-phone"
@@ -280,7 +299,7 @@ export default function UserProfile() {
             </p>
           ) : null}
           {status ? (
-            <p className="form-success" role="status">
+            <p className="w-full rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 text-sm text-green-800" role="status">
               {status}
             </p>
           ) : null}
@@ -293,7 +312,7 @@ export default function UserProfile() {
             onSubmit={handleVerifyOtp}
           >
             <div className="grid gap-2">
-              <Label htmlFor="public-profile-otp">Verification Code</Label>
+              <Label className="w-fit justify-self-start text-left" htmlFor="public-profile-otp">Verification Code</Label>
               <Input
                 autoComplete="one-time-code"
                 id="public-profile-otp"
@@ -306,7 +325,11 @@ export default function UserProfile() {
                 value={otpForm.token}
               />
             </div>
-            <Button disabled={isSubmitting || isVerifying} type="submit">
+            <Button
+              className={actionButtonClassName}
+              disabled={isSubmitting || isVerifying}
+              type="submit"
+            >
               <KeyRound className="h-4 w-4" />
               {isVerifying ? "Verifying" : "Verify Phone"}
             </Button>
@@ -314,22 +337,24 @@ export default function UserProfile() {
         ) : null}
 
         {isEditingProfile ? (
-          <div className="flex flex-wrap justify-center gap-2">
+          <div className="flex w-full flex-wrap items-center justify-between gap-2">
             <Button
+              className={secondaryActionButtonClassName}
+              disabled={isSubmitting || isVerifying}
+              onClick={handleCancelChanges}
+              type="button"
+              variant="outline"
+            >
+              Cancel Changes
+            </Button>
+            <Button
+              className={actionButtonClassName}
               disabled={isSubmitting || isVerifying}
               form="public-profile-form"
               type="submit"
             >
               <Save className="h-4 w-4" />
               {isSubmitting ? "Saving" : "Save Changes"}
-            </Button>
-            <Button
-              disabled={isSubmitting || isVerifying}
-              onClick={handleCancelChanges}
-              type="button"
-              variant="destructive"
-            >
-              Cancel Changes
             </Button>
           </div>
         ) : null}

@@ -16,6 +16,7 @@ const AUTH_PATHS = new Set([
 function getBackRoute(pathname) {
   if (
     pathname === "/users/search-da" ||
+    pathname === "/users/profile" ||
     pathname === "/submissions"
   ) {
     return "/users";
@@ -46,7 +47,13 @@ export default function Header() {
   const backRoute = getBackRoute(pathname);
   const isCommissionerSurface =
     pathname === "/dashboard" || pathname.startsWith("/dashboard/");
-  const showSearch = !isCommissionerSurface || pathname === "/dashboard";
+  const isPublicProfilePage = pathname === "/users/profile";
+  const isPublicSubmissionsPage =
+    pathname === "/submissions" || pathname.startsWith("/submissions/");
+  const showSearch =
+    (!isCommissionerSurface || pathname === "/dashboard") &&
+    !isPublicProfilePage &&
+    !isPublicSubmissionsPage;
 
   async function handleSignOut() {
     if (sessionStatus !== "signed-in") {
@@ -77,6 +84,17 @@ export default function Header() {
           >
             <Map className="h-4 w-4" aria-hidden="true" />
             <span>Map View</span>
+          </Button>
+        ) : backRoute && isPublicProfilePage ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="header__submissions-link h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:px-4"
+            onClick={() => navigate(backRoute)}
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            <span>Back to Map</span>
           </Button>
         ) : backRoute ? (
           <Button
@@ -148,7 +166,7 @@ export default function Header() {
             <ClipboardList className="h-4 w-4" aria-hidden="true" />
             <span className="hidden md:inline">User Submissions</span>
           </Button>
-        ) : (
+        ) : !isPublicProfilePage ? (
           <Button
             type="button"
             variant="outline"
@@ -161,7 +179,7 @@ export default function Header() {
             <ClipboardList className="h-4 w-4" aria-hidden="true" />
             <span className="hidden md:inline">My submissions</span>
           </Button>
-        )}
+        ) : null}
 
         <ProfileControl
           user={user}
