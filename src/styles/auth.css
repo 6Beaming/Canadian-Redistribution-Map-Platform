@@ -53,26 +53,84 @@
 
 .brand-lockup h1 {
   margin: 0;
-}
-
-.brand-lockup h1 {
   color: #111827;
   font-size: 2rem;
   font-weight: 800;
   line-height: 1.2;
+  text-align: center;
+}
+
+.auth-shell .auth-back-button {
+  width: 44px;
+  height: 44px;
+  border-color: transparent;
+  border-radius: 8px;
+  padding: 11px;
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.auth-shell .auth-back-button svg {
+  width: 22px;
+  height: 22px;
+}
+
+.auth-shell .auth-back-button:hover {
+  border-color: transparent;
+  background: #e5e7eb;
+  color: #111827;
+  box-shadow: none;
+  transform: none;
+}
+
+.auth-shell .auth-back-button:active {
+  border-color: #111827;
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.auth-shell .auth-back-button--header {
+  border-color: #8ca3bd;
+  background: #ffffff;
+  color: #29445f;
+  box-shadow: 0 1px 3px rgba(23, 50, 77, 0.06);
+}
+
+.auth-shell .auth-back-button--header:hover {
+  border-color: #1a73e8;
+  background: #eef5ff;
+  color: #1a73e8;
+  box-shadow: 0 3px 8px rgba(26, 115, 232, 0.12);
+}
+
+.auth-shell .auth-back-button--header:active {
+  border-color: #1a73e8;
+  background: #e8f0fe;
+  color: #1a73e8;
 }
 
 .brand-lockup {
+  position: relative;
   display: flex;
+  width: 100%;
+  min-height: 44px;
   align-items: center;
-  gap: 14px;
+  justify-content: center;
 }
 
 .onboarding-header {
+  position: relative;
   display: flex;
+  width: 100%;
+  min-height: 44px;
   align-items: center;
-  justify-content: flex-start;
-  gap: 14px;
+  justify-content: center;
+}
+
+.brand-lockup > .auth-back-button,
+.onboarding-header > .auth-back-button {
+  position: absolute;
+  left: 0;
 }
 
 .login-form {

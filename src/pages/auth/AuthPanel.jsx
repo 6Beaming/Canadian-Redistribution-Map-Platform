@@ -17,11 +17,11 @@ export default function AuthPanel({
             {onBack ? (
               <Button
                 aria-label="Back to public user dashboard"
-                className="rounded-full"
+                className="auth-back-button auth-back-button--header"
                 disabled={isBackDisabled}
                 onClick={onBack}
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="icon"
               >
                 <ArrowLeft aria-hidden="true" size={22} />

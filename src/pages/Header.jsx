@@ -84,7 +84,7 @@ export default function Header() {
             <Map className="h-4 w-4" aria-hidden="true" />
             <span>Map View</span>
           </Button>
-        ) : backRoute && isPublicProfilePage ? (
+        ) : backRoute && (isPublicProfilePage || pathname === "/submissions") ? (
           <Button
             type="button"
             variant="outline"
@@ -165,7 +165,7 @@ export default function Header() {
             <ClipboardList className="h-4 w-4" aria-hidden="true" />
             <span className="hidden md:inline">User Submissions</span>
           </Button>
-        ) : !isPublicProfilePage ? (
+        ) : !isPublicProfilePage && sessionStatus === "signed-in" ? (
           <Button
             type="button"
             variant="outline"
