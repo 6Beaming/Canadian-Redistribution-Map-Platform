@@ -121,7 +121,6 @@ export default function UserMakeObjection({
   neighboring_dguid,
   workflow,
   profilesByDguid,
-  geometryIndex,
   onBackStep,
   onConfirmReview,
 }) {
@@ -179,16 +178,6 @@ export default function UserMakeObjection({
     }
   }
 
-  if (!geometryIndex) {
-    return (
-      <section className="min-w-0 text-left">
-        <p className="map-info-panel__empty text-left">
-          Click a DA on the map to file an objection.
-        </p>
-      </section>
-    );
-  }
-
   return (
     <section className="grid min-w-0 gap-3">
       <div className="grid gap-2">
@@ -203,7 +192,7 @@ export default function UserMakeObjection({
 
       {step === 1 ? (
         <div className="grid min-w-0 gap-4 rounded-[18px] border border-[#d7e6fb] bg-[#f8fbff] p-5">
-          <h3 className="text-[17px] font-semibold text-[#17324d]">Select The First DA</h3>
+          <h3 className="text-[17px] font-semibold text-[#17324d]">Select a DA</h3>
           <p className="text-[14px] leading-6 text-[#5f6368]">
             Click a DA on the map to begin your objection.
           </p>

@@ -404,9 +404,43 @@ export default function UserHome() {
   }, []);
 
   const handlePanelViewChange = useCallback((nextView) => {
+    const selectedDguid = selection?.type === "da" ? selection.dguid : null;
+
+    if (selectedDguid) {
+      const selectedFedNum = getFedNumForDguid(selectedDguid);
+      const error = selectedFedNum
+        ? ""
+        : "No FED assignment is available for the selected DA.";
+
+      if (nextView === "objection") {
+        setObjectionWorkflow((current) =>
+          current.step === 1 || !current.firstDguid
+            ? createInitialObjectionWorkflow({
+                step: 2,
+                firstDguid: selectedDguid,
+                error,
+              })
+            : current,
+        );
+      }
+
+      if (nextView === "counter-proposal") {
+        setCounterProposalWorkflow((current) =>
+          current.step === 1 || !current.firstDguid
+            ? createInitialCounterProposalWorkflow({
+                step: 2,
+                firstDguid: selectedDguid,
+                previewMode: "proposal",
+                error,
+              })
+            : current,
+        );
+      }
+    }
+
     setPanelView(nextView);
     setIsRolloutOpen(false);
-  }, []);
+  }, [getFedNumForDguid, selection]);
 
   const handleToggleFullscreen = useCallback(() => {
     setIsFullscreen((current) => !current);

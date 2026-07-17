@@ -899,7 +899,6 @@ export function MapInfoPanel({
                 fedNum={fedNum}
                 dguid={objectionWorkflow?.firstDguid ?? dguid}
                 neighboring_dguid={objectionWorkflow?.secondDguid ?? null}
-                geometryIndex={objectionGeometryIndex}
                 onBackStep={onObjectionBackStep}
                 onConfirmReview={onObjectionConfirmReview}
                 profilesByDguid={profilesByDguid}
