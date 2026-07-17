@@ -30,7 +30,7 @@ This project is built using the following technologies:
 
 * **Front-end:** React, D3.js
 * **Back-end:** Express.js
-* **Database:** Supabase *(An open-source Firebase alternative providing our <b>PostgreSQL</b> database, authentication, and instant APIs)*
+* **Database:** Supabase (PostgreSQL database, authentication, and real-time APIs)
 * **Testing:** Jest, Cypress
 
 ## Local Development
