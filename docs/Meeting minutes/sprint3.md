@@ -1,11 +1,13 @@
 ### July 7 4-5pm Division of labour
 **Eric:**
-* Pre-centred map
-  * convert postal code
-  * searching based on province, riding 
-* Refactor UI:
+* Pre-centred map + search bar
+  * searching by calling google map search API
+  * Add **My Location** button on the map
+* Refactor UI/UX:
   * Buttons
-  * Making side panel simpler
+  * Making side panel simpler, including simplifying the workflows of user objection & counter-proposal
+  * Header: add search bar + avatar popover dropdown + move the buttons in previous left green pane to header
+  * Consolidate actions into the side panel
 
 **Arvindh:**
 * Integrate backend into the frontend
