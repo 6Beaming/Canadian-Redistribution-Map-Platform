@@ -31,12 +31,13 @@ function getDaDisplay(profilesByDguid, dguid) {
   };
 }
 
-function formatAreaInSquareKilometres(value, showPositiveSign = false) {
+function formatAreaInSquareKilometres(value, showPositiveSign = false, fractionDigits = 2) {
   const areaInSquareKilometres = (Number(value) || 0) / 1_000_000;
-  const roundedValue = Math.round(areaInSquareKilometres * 100) / 100;
+  const roundingFactor = 10 ** fractionDigits;
+  const roundedValue = Math.round(areaInSquareKilometres * roundingFactor) / roundingFactor;
   const formattedValue = Math.abs(roundedValue).toLocaleString("en-CA", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
   });
 
   if (roundedValue < 0) {
@@ -48,6 +49,27 @@ function formatAreaInSquareKilometres(value, showPositiveSign = false) {
   }
 
   return formattedValue;
+}
+
+function getAreaComparisonValues(impact) {
+  const originalArea = Number(impact?.originalArea) || 0;
+  const proposedArea = Number(impact?.currentArea) || 0;
+  let fractionDigits = 2;
+
+  while (
+    originalArea !== proposedArea &&
+    fractionDigits < 6 &&
+    formatAreaInSquareKilometres(originalArea, false, fractionDigits) ===
+      formatAreaInSquareKilometres(proposedArea, false, fractionDigits)
+  ) {
+    fractionDigits += 1;
+  }
+
+  return {
+    original: formatAreaInSquareKilometres(originalArea, false, fractionDigits),
+    proposed: formatAreaInSquareKilometres(proposedArea, false, fractionDigits),
+    difference: formatAreaInSquareKilometres(impact?.areaDelta, true, fractionDigits),
+  };
 }
 
 function formatPopulation(value) {
@@ -160,6 +182,8 @@ function ComparisonValue({ row, side }) {
 }
 
 function ComparisonCard({ first, second, firstImpact, secondImpact }) {
+  const firstAreaValues = getAreaComparisonValues(firstImpact);
+  const secondAreaValues = getAreaComparisonValues(secondImpact);
   const rows = [
     {
       label: "Population Impact",
@@ -171,12 +195,12 @@ function ComparisonCard({ first, second, firstImpact, secondImpact }) {
     },
     {
       label: "Area (km²)",
-      firstOriginalValue: formatAreaInSquareKilometres(firstImpact?.originalArea),
-      secondOriginalValue: formatAreaInSquareKilometres(secondImpact?.originalArea),
-      firstValue: formatAreaInSquareKilometres(firstImpact?.currentArea),
-      secondValue: formatAreaInSquareKilometres(secondImpact?.currentArea),
-      firstDifferenceValue: formatAreaInSquareKilometres(firstImpact?.areaDelta, true),
-      secondDifferenceValue: formatAreaInSquareKilometres(secondImpact?.areaDelta, true),
+      firstOriginalValue: firstAreaValues.original,
+      secondOriginalValue: secondAreaValues.original,
+      firstValue: firstAreaValues.proposed,
+      secondValue: secondAreaValues.proposed,
+      firstDifferenceValue: firstAreaValues.difference,
+      secondDifferenceValue: secondAreaValues.difference,
       firstChange: firstImpact?.areaDelta,
       secondChange: secondImpact?.areaDelta,
       areaTransition: true,
