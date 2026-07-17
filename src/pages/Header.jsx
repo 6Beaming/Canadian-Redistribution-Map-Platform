@@ -15,7 +15,6 @@ const AUTH_PATHS = new Set([
 
 function getBackRoute(pathname) {
   if (
-    pathname === "/users/search-da" ||
     pathname === "/users/profile" ||
     pathname === "/submissions"
   ) {

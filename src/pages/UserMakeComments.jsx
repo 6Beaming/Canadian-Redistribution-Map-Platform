@@ -11,6 +11,8 @@ import { useAuth } from "@/contexts/AuthContext.jsx";
 import { addComment } from "@/services/commentsApi";
 import { toast } from "sonner";
 
+const SIGN_IN_NOTICE = "Please sign in to submit your comment.";
+
 function FieldHoverHint({ message }) {
   return (
     <p
@@ -84,7 +86,7 @@ export default function UserMakeComments({ proposalId, fedNum, dguid, daName, ha
     return (
       <section className="min-w-0 text-left">
         <p className="map-info-panel__empty text-left">
-          Click a DA on the map to leave a comment.
+          Click a dissemination area on the map to leave a comment.
         </p>
       </section>
     );

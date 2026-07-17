@@ -183,7 +183,7 @@ export default function UserViewStatistics({ selection, profilesByDguid }) {
     return (
       <section className="map-info-panel__body min-w-0 text-left">
         <p className="map-info-panel__empty text-left">
-          Click a DA on the map to view details.
+          Click a dissemination area on the map to view details.
         </p>
       </section>
     );

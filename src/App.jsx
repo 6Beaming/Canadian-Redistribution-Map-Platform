@@ -16,7 +16,6 @@ import SignUpPage from "./pages/SignUpPage.jsx";
 import UserHome from "./pages/UserHome.jsx";
 import UserProfile from "./pages/UserProfile.jsx";
 import UserResumeSubmission from "./pages/UserResumeSubmission.jsx";
-import UserSearchDA from "./pages/UserSearchDA.jsx";
 import { Toaster } from "@/components/ui/sonner";
 
 function RequireCommissioner() {
@@ -45,7 +44,6 @@ function App() {
       <Routes>
         <Route path="/" element={<UserHome />} />
         <Route path="/users" element={<UserHome />} />
-        <Route path="/users/search-da" element={<UserSearchDA />} />
         <Route path="/users/profile" element={<UserProfile />} />
         <Route path="/submissions" element={<MySubmissions />} />
         <Route

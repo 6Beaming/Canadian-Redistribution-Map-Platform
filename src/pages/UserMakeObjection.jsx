@@ -13,6 +13,7 @@ import { getDaPanelTitle } from "@/lib/map/profileUtils.js";
 import { toast } from "sonner";
 import { addComment } from "@/services/commentsApi";
 
+const SIGN_IN_NOTICE = "Please sign in to submit your boundary objection.";
 
 function FieldHoverHint({ message }) {
   return (
@@ -192,9 +193,9 @@ export default function UserMakeObjection({
 
       {step === 1 ? (
         <div className="grid min-w-0 gap-4 rounded-[18px] border border-[#d7e6fb] bg-[#f8fbff] p-5">
-          <h3 className="text-[17px] font-semibold text-[#17324d]">Select a DA</h3>
+          <h3 className="text-[17px] font-semibold text-[#17324d]">Select an area</h3>
           <p className="text-[14px] leading-6 text-[#5f6368]">
-            Click a DA on the map to begin your objection.
+            Click a dissemination area on the map to begin your objection.
           </p>
         </div>
       ) : null}
@@ -202,9 +203,9 @@ export default function UserMakeObjection({
       {step === 2 ? (
         <div className="grid min-w-0 gap-4">
           <div className="grid min-w-0 gap-4 rounded-[18px] border border-[#d7e6fb] bg-[#f8fbff] p-5">
-            <h3 className="text-[17px] font-semibold text-[#17324d]">Select a Neighbouring DA</h3>
+            <h3 className="text-[17px] font-semibold text-[#17324d]">Select a neighbouring area</h3>
             <p className="text-[14px] leading-6 text-[#5f6368]">
-              Click a neighbouring DA to decide the boundary.
+              Click a neighbouring dissemination area to decide the boundary.
             </p>
             <div className="grid min-w-0 gap-2 rounded-[14px] border border-[#d7e6fb] bg-white p-4">
               <p className="text-[16px] font-semibold text-[#17324d]">{first.title}</p>

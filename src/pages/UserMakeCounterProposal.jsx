@@ -326,9 +326,9 @@ export default function UserMakeCounterProposal({
 
       {step === 1 ? (
         <div className="grid min-w-0 gap-4 rounded-[18px] border border-[#d7e6fb] bg-[#f8fbff] p-5">
-          <h3 className="text-[17px] font-semibold text-[#17324d]">Select a DA</h3>
+          <h3 className="text-[17px] font-semibold text-[#17324d]">Select an area</h3>
           <p className="text-[14px] leading-6 text-[#5f6368]">
-            Click a DA on the map to begin your counter-proposal.
+            Click a dissemination area on the map to begin your counter-proposal.
           </p>
         </div>
       ) : null}
@@ -336,7 +336,7 @@ export default function UserMakeCounterProposal({
       {step === 2 ? (
         <div className="grid min-w-0 gap-4">
           <div className="grid min-w-0 gap-4 rounded-[18px] border border-[#d7e6fb] bg-[#f8fbff] p-5">
-            <h3 className="text-[17px] font-semibold text-[#17324d]">Select a Neighbouring DA of</h3>
+            <h3 className="text-[17px] font-semibold text-[#17324d]">Select a neighbouring area of</h3>
             <div className="grid min-w-0 gap-2 rounded-[14px] border border-[#d7e6fb] bg-white p-4">
               <p className="text-[16px] font-semibold text-[#17324d]">{first.title}</p>
             </div>
