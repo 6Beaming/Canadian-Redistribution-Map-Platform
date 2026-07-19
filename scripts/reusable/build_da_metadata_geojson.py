@@ -22,7 +22,7 @@ DEFAULT_PROVINCES = ("ab", "bc", "mb", "nb", "nl", "ns", "nt", "nu", "on", "pe",
 
 def require_geopandas():
     try:
-        import geopandas as gpd
+        import geopandas as gpd # type: ignore
     except ImportError as exc:
         raise SystemExit(
             "geopandas is required for scripts/reusable/build_da_metadata_geojson.py. "
@@ -186,7 +186,7 @@ def export_grouped_metadata_geojson(grouped_gdf, metadata_dir: Path, max_file_by
 
 def pd_concat(frames):
     try:
-        import pandas as pd
+        import pandas as pd # type: ignore
     except ImportError as exc:
         raise SystemExit("pandas is required alongside geopandas for this build step.") from exc
     return pd.concat(frames, ignore_index=True)

@@ -644,15 +644,6 @@ function segmentsAreAdjacent(left, right) {
   );
 }
 
-function segmentsShareEndpoint(left, right) {
-  return (
-    coordinatesEqual(left.start, right.start) ||
-    coordinatesEqual(left.start, right.end) ||
-    coordinatesEqual(left.end, right.start) ||
-    coordinatesEqual(left.end, right.end)
-  );
-}
-
 function orientation(start, middle, end, epsilon = 1e-12) {
   const value =
     (middle[1] - start[1]) * (end[0] - middle[0]) -
@@ -665,43 +656,176 @@ function orientation(start, middle, end, epsilon = 1e-12) {
   return value > 0 ? 1 : -1;
 }
 
-function segmentsConflict(left, right) {
-  if (segmentsAreEquivalent(left, right)) {
-    return false;
-  }
-
-  const endpointTouch = segmentsShareEndpoint(left, right);
-
+function segmentsIntersect(left, right) {
   const o1 = orientation(left.start, left.end, right.start);
   const o2 = orientation(left.start, left.end, right.end);
   const o3 = orientation(right.start, right.end, left.start);
   const o4 = orientation(right.start, right.end, left.end);
 
   if (o1 !== o2 && o3 !== o4) {
-    return !endpointTouch;
+    return true;
   }
 
   if (o1 === 0 && isPointOnSegment(right.start, left.start, left.end)) {
-    return !endpointTouch;
+    return true;
   }
 
   if (o2 === 0 && isPointOnSegment(right.end, left.start, left.end)) {
-    return !endpointTouch;
+    return true;
   }
 
   if (o3 === 0 && isPointOnSegment(left.start, right.start, right.end)) {
-    return !endpointTouch;
+    return true;
   }
 
   if (o4 === 0 && isPointOnSegment(left.end, right.start, right.end)) {
-    return !endpointTouch;
+    return true;
   }
 
   return false;
 }
 
+function hasEndpoint(segment, coordinate) {
+  return (
+    coordinatesEqual(segment.start, coordinate) ||
+    coordinatesEqual(segment.end, coordinate)
+  );
+}
+
+function getOtherEndpoint(segment, coordinate) {
+  return coordinatesEqual(segment.start, coordinate) ? segment.end : segment.start;
+}
+
+function segmentsTouchOnlyAt(left, right, coordinate) {
+  if (!hasEndpoint(left, coordinate) || !hasEndpoint(right, coordinate)) {
+    return false;
+  }
+
+  const leftOtherEndpoint = getOtherEndpoint(left, coordinate);
+  const rightOtherEndpoint = getOtherEndpoint(right, coordinate);
+
+  return (
+    !isPointOnSegment(leftOtherEndpoint, right.start, right.end) &&
+    !isPointOnSegment(rightOtherEndpoint, left.start, left.end)
+  );
+}
+
+function getUnmovedSharedEndpoint(changedSegment, candidateSegment, movedCoordinate) {
+  return [changedSegment.start, changedSegment.end].find(
+    (coordinate) =>
+      !coordinatesEqual(coordinate, movedCoordinate) &&
+      hasEndpoint(candidateSegment, coordinate),
+  );
+}
+
+function getSegmentEntryKey(segment) {
+  return [
+    segment.featureDguid,
+    segment.polygonIndex,
+    segment.ringIndex,
+    segment.segmentIndex,
+  ].join(":");
+}
+
+function segmentsConflict(left, right, allowedEndpointTouch = null) {
+  if (!segmentsIntersect(left, right)) {
+    return false;
+  }
+
+  return !(
+    allowedEndpointTouch &&
+    segmentsTouchOnlyAt(left, right, allowedEndpointTouch)
+  );
+}
+
+function isFiniteCoordinate(coordinate) {
+  return (
+    Array.isArray(coordinate) &&
+    Number.isFinite(Number(coordinate[0])) &&
+    Number.isFinite(Number(coordinate[1]))
+  );
+}
+
 function isValidRing(ring) {
-  return Array.isArray(ring) && ring.length >= 4 && coordinatesEqual(ring[0], ring[ring.length - 1]);
+  if (
+    !Array.isArray(ring) ||
+    ring.length < 4 ||
+    !coordinatesEqual(ring[0], ring[ring.length - 1]) ||
+    !ring.every(isFiniteCoordinate)
+  ) {
+    return false;
+  }
+
+  for (let index = 0; index < ring.length - 1; index += 1) {
+    if (coordinatesEqual(ring[index], ring[index + 1])) {
+      return false;
+    }
+  }
+
+  return ringAreaMeters(ring) > 0;
+}
+
+function isFeatureGeometryStructurallyValid(geometry) {
+  if (geometry?.type === "Polygon") {
+    return geometry.coordinates.every(isValidRing);
+  }
+
+  if (geometry?.type === "MultiPolygon") {
+    return geometry.coordinates.every(
+      (polygon) => Array.isArray(polygon) && polygon.length > 0 && polygon.every(isValidRing),
+    );
+  }
+
+  return false;
+}
+
+function isPointStrictlyInsidePolygon(point, polygon) {
+  if (!Array.isArray(polygon) || polygon.length === 0) {
+    return false;
+  }
+
+  if (classifyPointInRing(point, polygon[0]) !== "inside") {
+    return false;
+  }
+
+  return polygon.slice(1).every((ring) => classifyPointInRing(point, ring) === "outside");
+}
+
+function isPointStrictlyInsideGeometry(point, geometry) {
+  if (geometry?.type === "Polygon") {
+    return isPointStrictlyInsidePolygon(point, geometry.coordinates);
+  }
+
+  if (geometry?.type === "MultiPolygon") {
+    return geometry.coordinates.some((polygon) =>
+      isPointStrictlyInsidePolygon(point, polygon),
+    );
+  }
+
+  return false;
+}
+
+function featureInteriorsOverlap(left, right) {
+  let overlaps = false;
+
+  const hasSegmentInside = (feature, otherFeature) => {
+    visitGeometrySegments(getFeatureDguid(feature), feature.geometry, (segment) => {
+      if (overlaps) {
+        return;
+      }
+
+      const midpoint = interpolateCoordinate(segment.start, segment.end, 0.5);
+
+      if (isPointStrictlyInsideGeometry(midpoint, otherFeature.geometry)) {
+        overlaps = true;
+      }
+    });
+  };
+
+  hasSegmentInside(left, right);
+  hasSegmentInside(right, left);
+
+  return overlaps;
 }
 
 function isFeatureGeometryWithinAllowedRegion(allowedFeatures, feature) {
@@ -781,9 +905,15 @@ function isHandleMoveWithinAllowedRegion(cache, handle, nextCoordinate) {
     return false;
   }
 
+  const changedSegmentKeys = new Set(changedSegments.map(getSegmentEntryKey));
+
   const allSegments = [];
 
   for (const feature of nextCurrentFeatures) {
+    if (!isFeatureGeometryStructurallyValid(feature.geometry)) {
+      return false;
+    }
+
     if (!isFeatureGeometryWithinAllowedRegion(cache.originalFeatures, feature)) {
       return false;
     }
@@ -795,6 +925,18 @@ function isHandleMoveWithinAllowedRegion(cache, handle, nextCoordinate) {
 
   if (allSegments.length === 0) {
     return false;
+  }
+
+  for (let leftIndex = 0; leftIndex < nextCurrentFeatures.length; leftIndex += 1) {
+    for (
+      let rightIndex = leftIndex + 1;
+      rightIndex < nextCurrentFeatures.length;
+      rightIndex += 1
+    ) {
+      if (featureInteriorsOverlap(nextCurrentFeatures[leftIndex], nextCurrentFeatures[rightIndex])) {
+        return false;
+      }
+    }
   }
 
   for (const changedSegment of changedSegments) {
@@ -812,12 +954,37 @@ function isHandleMoveWithinAllowedRegion(cache, handle, nextCoordinate) {
     for (const candidateSegment of allSegments) {
       if (
         segmentsAreAdjacent(changedSegment, candidateSegment) ||
-        segmentsAreEquivalent(changedSegment, candidateSegment)
+        (changedSegment.featureDguid !== candidateSegment.featureDguid &&
+          segmentsAreEquivalent(changedSegment, candidateSegment))
       ) {
         continue;
       }
 
-      if (segmentsConflict(changedSegment, candidateSegment)) {
+      const candidateIsChanged = changedSegmentKeys.has(
+        getSegmentEntryKey(candidateSegment),
+      );
+
+      if (
+        candidateIsChanged &&
+        changedSegment.featureDguid !== candidateSegment.featureDguid &&
+        segmentsTouchOnlyAt(changedSegment, candidateSegment, nextCoordinate)
+      ) {
+        continue;
+      }
+
+      const allowedEndpointTouch = getUnmovedSharedEndpoint(
+        changedSegment,
+        candidateSegment,
+        nextCoordinate,
+      );
+
+      if (
+        segmentsConflict(
+          changedSegment,
+          candidateSegment,
+          allowedEndpointTouch,
+        )
+      ) {
         return false;
       }
     }

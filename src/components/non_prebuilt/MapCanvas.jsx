@@ -197,13 +197,14 @@ function buildInitialMapBounds() {
   const sourceBounds = new maplibregl.LngLatBounds(CANADA_BOUNDS.sw, CANADA_BOUNDS.ne);
   const sw = sourceBounds.getSouthWest();
   const ne = sourceBounds.getNorthEast();
+  const MAX_RENDERABLE_LATITUDE = 84.9;
   const lngPad = (ne.lng - sw.lng) * 0.058;
   const southPad = (ne.lat - sw.lat) * 0.08;
   const northPad = (ne.lat - sw.lat) * 0.16;
 
   return new maplibregl.LngLatBounds(
     [sw.lng - lngPad, Math.max(-84.5, sw.lat - southPad)],
-    [ne.lng + lngPad, Math.min(85.25, ne.lat + northPad)],
+    [ne.lng + lngPad, Math.min(MAX_RENDERABLE_LATITUDE, ne.lat + northPad)],
   );
 }
 

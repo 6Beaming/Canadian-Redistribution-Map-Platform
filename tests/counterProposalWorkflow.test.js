@@ -34,6 +34,31 @@ function createReportedPairCache() {
   );
 }
 
+function createSimpleAdjacentPairCache() {
+  const firstFeature = {
+    type: "Feature",
+    properties: { DGUID: "first", land_area: 1, population: 1 },
+    geometry: {
+      type: "Polygon",
+      coordinates: [[[0, 0], [1, 0], [1, 0.5], [1, 1], [0, 1], [0, 0]]],
+    },
+  };
+  const secondFeature = {
+    type: "Feature",
+    properties: { DGUID: "second", land_area: 1, population: 1 },
+    geometry: {
+      type: "Polygon",
+      coordinates: [[[1, 0], [2, 0], [2, 1], [1, 1], [1, 0.5], [1, 0]]],
+    },
+  };
+  const index = buildDaObjectionIndex({
+    type: "FeatureCollection",
+    features: [firstFeature, secondFeature],
+  });
+
+  return buildCounterProposalCache(index, new Map(), "first", "second");
+}
+
 function getBoundaryEndpoints(boundaryGeoJson) {
   const verticesById = new Map();
 
@@ -100,4 +125,33 @@ test("counter-proposal endpoints are not exposed as draggable handles", () => {
   );
 
   assert.strictEqual(attemptedMove, cache);
+});
+
+test("counter-proposal constrains a handle before it creates a degenerate or overlapping edge", () => {
+  const cache = createSimpleAdjacentPairCache();
+  const handle = cache.handles.find(
+    (entry) => entry.coordinate[0] === 1 && entry.coordinate[1] === 0.5,
+  );
+
+  assert.ok(handle);
+
+  for (const invalidTarget of [[1, 0], [0, 0]]) {
+    const nextCache = previewCounterProposalHandleMove(
+      cache,
+      handle.id,
+      invalidTarget,
+    );
+    const movedHandle = nextCache.handles.find((entry) => entry.id === handle.id);
+
+    assert.notStrictEqual(nextCache, cache);
+    assert.notDeepEqual(movedHandle?.coordinate, invalidTarget);
+
+    nextCache.currentFeatures.forEach((feature) => {
+      feature.geometry.coordinates.forEach((ring) => {
+        for (let index = 0; index < ring.length - 1; index += 1) {
+          assert.notDeepEqual(ring[index], ring[index + 1]);
+        }
+      });
+    });
+  }
 });
