@@ -172,6 +172,16 @@ function requireSupabaseAdminClient() {
   return supabase;
 }
 
+export function getSupabaseAdminDataClient() {
+  const testDouble = getSupabaseTestDouble("getSupabaseAdminDataClient");
+
+  if (testDouble) {
+    return testDouble();
+  }
+
+  return requireSupabaseAdminClient();
+}
+
 export async function getSupabaseProfileEmailsAsAdmin(userIds = []) {
   const normalizedUserIds = [...new Set(
     userIds.map((userId) => String(userId ?? "").trim()).filter(Boolean),

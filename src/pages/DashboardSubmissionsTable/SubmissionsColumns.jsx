@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 export const commissionerStatusStyles = {
   accepted: "bg-green-100 text-green-700",
   pending: "bg-yellow-100 text-yellow-700",
+  "archive-request": "bg-blue-100 text-blue-700",
   rejected: "bg-red-100 text-red-700",
   archived: "bg-purple-100 text-purple-700",
 };
@@ -11,6 +12,7 @@ export const commissionerStatusStyles = {
 export const commissionerStatusMessages = {
   accepted: "View your colleagues' work for this in the shared workspace.",
   pending: "Start evaluating this in the shared workspace.",
+  "archive-request": "Carefully evaluate whether this submission can be archived.",
   rejected: "Change your attitude towards this in the shared workspace.",
   archived: "View and rollback this committed submission in the archive tree.",
 };
@@ -20,6 +22,9 @@ export function normalizeCommissionerStatus(status) {
 
   if (["accepted", "approved", "addressed"].includes(normalized)) return "accepted";
   if (normalized === "rejected") return "rejected";
+  if (["archive-request", "archive_request", "archive_requested"].includes(normalized)) {
+    return "archive-request";
+  }
   if (["archived", "achived", "archive"].includes(normalized)) return "archived";
   return "pending";
 }
@@ -88,6 +93,16 @@ const columns = [
   {
     accessorKey: "title",
     header: "Title",
+    cell: ({ row }) => {
+      const title = String(row.getValue("title") ?? "").trim();
+      const compactTitle = title.length > 10 ? `${title.slice(0, 10)}...` : title;
+
+      return (
+        <span className="inline-block max-w-[13ch] truncate align-bottom" title={title}>
+          {compactTitle || "—"}
+        </span>
+      );
+    },
   },
   {
     accessorKey: "status",
@@ -99,7 +114,9 @@ const columns = [
         <span
           className={`inline-flex w-[clamp(6.5rem,10vw,8.25rem)] items-center justify-center rounded-full px-3 py-1 text-center font-medium ${commissionerStatusStyles[status]}`}
         >
-          {status}
+          {status === "archive-request"
+            ? "Archive Request"
+            : status.charAt(0).toUpperCase() + status.slice(1)}
         </span>
       );
     },

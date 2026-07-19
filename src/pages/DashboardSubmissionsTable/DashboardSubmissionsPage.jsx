@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 
 import columns, { normalizeCommissionerStatus } from "./SubmissionsColumns";
 import SubmissionsTable from "./SubmissionsTable";
-import { getAllComments } from "@/services/commentsApi";
+import { getCommissionerSubmissionRows } from "@/services/tempWorkspace.js";
 import { useEffect, useState } from "react";
 
 export default function DashBoardSubmissionsPage() {
@@ -14,7 +14,7 @@ export default function DashBoardSubmissionsPage() {
     async function loadSubmissions() {
 
       try {
-        const data = await getAllComments();
+        const data = await getCommissionerSubmissionRows();
 
         setSubmissions(
           data.map((submission) => ({
@@ -23,7 +23,9 @@ export default function DashBoardSubmissionsPage() {
             submittedBy: submission.profile?.email ?? "Unknown",
             type: submission.type,
             title: submission.title,
-            community_name: submission.dissemination_areas?.community_name ?? "Unknown",
+            community_name:
+              submission.dissemination_areas?.community_name ??
+              (submission.source === "temporary-counter-proposal" ? "Yukon" : "Unknown"),
             status: normalizeCommissionerStatus(submission.status),
           }))
 
@@ -48,7 +50,7 @@ export default function DashBoardSubmissionsPage() {
               navigate(
                 submission.status === "archived"
                   ? "/dashboard/archivedTree"
-                  : "/dashboard/workspace",
+                  : `/dashboard/workspace?focus=${encodeURIComponent(submission.id)}`,
               )
             }
           />

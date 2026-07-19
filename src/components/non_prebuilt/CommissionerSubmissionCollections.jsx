@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,88 +12,27 @@ import {
 } from "@/components/ui/card";
 import { MISSING_DA_POPULATION, MVP_FED_NUM } from "@/lib/map/constants.js";
 import { getDaPanelTitle, getDaPopulationDisplay } from "@/lib/map/profileUtils.js";
+import {
+  getDashboardSubmissionsForDguid,
+  subscribeWorkspaceState,
+} from "@/services/tempWorkspace.js";
 
-const COLLECTION_COPY = {
-  comments: {
-    title: "Comments",
-    cards: [
-      {
-        title: "Community access concern",
-        subtitle: "Placeholder submission",
-        body:
-          "Residents note that the current draft should keep the Dawson and Whitehorse service patterns easier to follow for future outreach rounds.",
-      },
-      {
-        title: "Population balance note",
-        subtitle: "Placeholder submission",
-        body:
-          "A recurring placeholder review asks for stronger narrative context around census balance, travel distance, and local identity before any boundary change is advanced.",
-      },
-      {
-        title: "Geography continuity request",
-        subtitle: "Placeholder submission",
-        body:
-          "This mock collection keeps a consistent review pattern so the commissioner workspace can exercise long scrolling and repeated card layouts safely.",
-      },
-    ],
-  },
-  "boundaries-objections": {
-    title: "Boundaries Objections",
-    cards: [
-      {
-        title: "Northern corridor objection",
-        subtitle: "Placeholder objection",
-        body:
-          "This placeholder objection argues that a proposed split would weaken community continuity and complicate representation across long-distance service corridors.",
-      },
-      {
-        title: "Neighbourhood cohesion objection",
-        subtitle: "Placeholder objection",
-        body:
-          "Reviewers request that existing DA groupings remain together unless stronger supporting evidence is provided for a new electoral boundary transition.",
-      },
-      {
-        title: "Accessibility objection",
-        subtitle: "Placeholder objection",
-        body:
-          "A repeated mock item keeps the collection tall enough to validate scrollbar hiding, panel overflow, and mobile drag behavior under realistic content density.",
-      },
-    ],
-  },
-  "counter-proposal": {
-    title: "Counter-Proposal",
-    cards: [
-      {
-        title: "Alternative north-south split",
-        subtitle: "Placeholder counter-proposal",
-        body:
-          "A sample counter-proposal suggests preserving community links first, then redistributing population using a smaller adjustment around neighbouring DA edges.",
-      },
-      {
-        title: "Transit-aligned alternative",
-        subtitle: "Placeholder counter-proposal",
-        body:
-          "This placeholder plan keeps primary travel corridors and service hubs grouped together so that public participation remains easier to interpret on the map.",
-      },
-      {
-        title: "Minimal-change scenario",
-        subtitle: "Placeholder counter-proposal",
-        body:
-          "The final placeholder entry favors the least disruptive edit path and exists mainly to keep every Yukon DA panel filled with the same stable demo content.",
-      },
-    ],
-  },
+const PANEL_COLLECTION_KEYS = {
+  comments: "comments",
+  "boundaries-objections": "objections",
+  "counter-proposal": "counterProposals",
+};
+
+const STATUS_STYLES = {
+  pending: "bg-yellow-100 text-yellow-700",
+  "archive-request": "bg-blue-100 text-blue-700",
 };
 
 function formatPopulation(value) {
-  if (value === MISSING_DA_POPULATION) {
-    return MISSING_DA_POPULATION;
-  }
-
+  if (value === MISSING_DA_POPULATION) return MISSING_DA_POPULATION;
   if (value === null || value === undefined || Number.isNaN(Number(value))) {
     return MISSING_DA_POPULATION;
   }
-
   return Number(value).toLocaleString();
 }
 
@@ -106,66 +46,66 @@ function FedSummary({ fedNum, fedName }) {
       </header>
       <div className="map-info-panel__body">
         <dl className="map-info-panel__details">
-          <dt>FED</dt>
-          <dd>
-            <code>{String(fedNum ?? "—")}</code>
-          </dd>
+          <dt>FED</dt><dd><code>{String(fedNum ?? "—")}</code></dd>
         </dl>
         <p className="map-info-panel__hint">
-          Yukon DA collections appear when a dissemination area is selected on the map.
+          Select a dissemination area to review its active submissions.
         </p>
       </div>
     </>
   );
 }
 
-function WorkspaceCardButton() {
+function WorkspaceCardButton({ submissionId }) {
   const navigate = useNavigate();
-
   return (
     <Button
       className="min-w-0 px-4 py-2 text-[13px]"
       size="sm"
       variant="outline"
-      onClick={() => navigate("/dashboard/workspace")}
+      onClick={() => navigate(`/dashboard/workspace?focus=${encodeURIComponent(submissionId)}`)}
     >
-      <svg
-        aria-hidden="true"
-        className="h-4 w-4"
-        viewBox="0 0 20 20"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="M6 14L14 6M8 6H14V12"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+      <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 20 20" fill="none">
+        <path d="M6 14L14 6M8 6H14V12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
       Workspace
     </Button>
   );
 }
 
-export function CommissionerSubmissionCollections({
-  panelView,
-  selection,
-  profilesByDguid,
-}) {
-  const collection = COLLECTION_COPY[panelView] ?? COLLECTION_COPY.comments;
+export function CommissionerSubmissionCollections({ panelView, selection, profilesByDguid }) {
+  const [collections, setCollections] = useState({
+    comments: [],
+    objections: [],
+    counterProposals: [],
+  });
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (selection?.type !== "da") return undefined;
+
+    const load = () => {
+      setIsLoading(true);
+      return getDashboardSubmissionsForDguid(selection.dguid)
+        .then((nextCollections) => {
+          if (isMounted) setCollections(nextCollections);
+        })
+        .finally(() => {
+          if (isMounted) setIsLoading(false);
+        });
+    };
+    load();
+    const unsubscribe = subscribeWorkspaceState(load);
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [selection?.dguid, selection?.type]);
 
   if (!selection?.type) {
-    return (
-      <div className="map-info-panel__body">
-        <p className="map-info-panel__empty">
-          Select a dissemination area to review submissions for this location.
-        </p>
-      </div>
-    );
+    return <div className="map-info-panel__body"><p className="map-info-panel__empty">Select a dissemination area to review submissions for this location.</p></div>;
   }
-
   if (selection.type === "fed") {
     return <FedSummary fedNum={selection.fedNum} fedName={selection.fedName} />;
   }
@@ -173,47 +113,42 @@ export function CommissionerSubmissionCollections({
   const profile = profilesByDguid.get(selection.dguid);
   const panelTitle = getDaPanelTitle(profile);
   const population = getDaPopulationDisplay(profile);
+  const submissions = collections[PANEL_COLLECTION_KEYS[panelView] ?? "comments"] ?? [];
 
   return (
     <>
       <header className="map-info-panel__header">
-        <h2 className="map-info-panel__title map-info-panel__title--centered">
-          {panelTitle.text}
-        </h2>
+        <h2 className="map-info-panel__title map-info-panel__title--centered">{panelTitle.text}</h2>
       </header>
       <div className="map-info-panel__body map-info-panel__body--stacked">
         <dl className="map-info-panel__details">
-          <dt>DGUID</dt>
-          <dd>
-            <code>{selection.dguid ?? "—"}</code>
-          </dd>
-
-          <dt>Population (2021)</dt>
-          <dd>{formatPopulation(population)}</dd>
-
-          <dt>FED</dt>
-          <dd>
-            <code>{MVP_FED_NUM}</code>
-          </dd>
+          <dt>DGUID</dt><dd><code>{selection.dguid ?? "—"}</code></dd>
+          <dt>Population (2021)</dt><dd>{formatPopulation(population)}</dd>
+          <dt>FED</dt><dd><code>{profile?.fed_num ?? MVP_FED_NUM}</code></dd>
         </dl>
 
         <div className="map-info-panel__collection-stack">
-          {collection.cards.map((card, index) => (
-            <Card key={`${collection.title}-${index}`} size="sm" className="max-w-none">
+          {isLoading ? <p className="map-info-panel__empty">Loading submissions...</p> : null}
+          {!isLoading && !submissions.length ? (
+            <p className="map-info-panel__empty">No Submission Found</p>
+          ) : null}
+          {submissions.map((submission) => (
+            <Card key={submission.id} size="sm" className="max-w-none">
               <CardHeader>
                 <div className="flex items-start justify-between gap-3">
                   <CardAccent className="mt-2 shrink-0" />
-                  <CardAction className="shrink-0">
-                    <WorkspaceCardButton />
-                  </CardAction>
+                  <CardAction className="shrink-0"><WorkspaceCardButton submissionId={submission.id} /></CardAction>
                 </div>
                 <div className="space-y-1">
-                  <CardTitle>{card.title}</CardTitle>
-                  <CardDescription>{card.subtitle}</CardDescription>
+                  <CardTitle>{submission.title || "Untitled submission"}</CardTitle>
+                  <CardDescription>{submission.authorEmail || "Unknown submitter"}</CardDescription>
                 </div>
               </CardHeader>
-              <CardContent>
-                <p className="text-[14px] leading-6 text-[#5f6368]">{card.body}</p>
+              <CardContent className="space-y-3">
+                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[submission.status]}`}>
+                  {submission.status === "archive-request" ? "Archive Request" : "Pending"}
+                </span>
+                <p className="text-[14px] leading-6 text-[#5f6368]">{submission.comment || "No submission content."}</p>
               </CardContent>
             </Card>
           ))}

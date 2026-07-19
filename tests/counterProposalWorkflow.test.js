@@ -19,6 +19,18 @@ const fedGeometry = JSON.parse(
     "utf8",
   ),
 );
+const yukonFedGeometry = JSON.parse(
+  fs.readFileSync(
+    new URL("../src/data/map/metadata/fed_60001.geojson", import.meta.url),
+    "utf8",
+  ),
+);
+const temporaryCounterProposalData = JSON.parse(
+  fs.readFileSync(
+    new URL("../src/data/map/temp.json", import.meta.url),
+    "utf8",
+  ),
+);
 const selectedFeatures = fedGeometry.features.filter((feature) =>
   [FIRST_DGUID, SECOND_DGUID].includes(feature.properties?.DGUID),
 );
@@ -128,6 +140,29 @@ test("counter-proposal endpoints are not exposed as draggable handles", () => {
   );
 
   assert.strictEqual(attemptedMove, cache);
+});
+
+test("the large Yukon counter-proposal fixture produces a visible valid boundary change", () => {
+  const fixture = temporaryCounterProposalData.submissions.find(
+    (submission) => submission.id === "temp-counter-proposal-006",
+  );
+  assert.ok(fixture);
+
+  const selected = yukonFedGeometry.features.filter((feature) =>
+    [fixture.dguid, fixture.neighboring_dguid].includes(feature.properties?.DGUID),
+  );
+  const index = buildDaObjectionIndex({ type: "FeatureCollection", features: selected });
+  const cache = buildCounterProposalCache(index, new Map(), fixture.dguid, fixture.neighboring_dguid);
+  const operation = fixture.geometry_edit.operations[0];
+  const nextCache = previewCounterProposalHandleMove(
+    cache,
+    operation.handle_id,
+    operation.requested_coordinate,
+  );
+  const movedHandle = nextCache.handles.find((handle) => handle.id === operation.handle_id);
+
+  assert.deepEqual(movedHandle?.coordinate, operation.requested_coordinate);
+  assert.ok(Math.abs(nextCache.impacts.byDguid[fixture.dguid].areaDelta) > 4_000_000);
 });
 
 test("counter-proposal constrains a handle before it creates a degenerate or overlapping edge", () => {

@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 1,
+  "source": "local-demo-fixture",
+  "description": "Temporary Yukon counter-proposal submissions. Geometry is hydrated from canonical metadata and replayed through the current JSTS-safe editor.",
+  "submissions": [
+    {
+      "id": "temp-counter-proposal-001",
+      "proposal_id": null,
+      "user_id": "00000000-0000-4000-8000-000000000001",
+      "profile": { "email": "example@test.com" },
+      "comment": "Move this short segment eastward to keep the river-side service area together while preserving the surrounding boundary network.",
+      "fed_num": "60001",
+      "dguid": "2021S051260010118",
+      "neighboring_dguid": "2021S051260010304",
+      "title": "River-side service continuity adjustment",
+      "type": "counter-proposal",
+      "status": "pending",
+      "created_at": "2026-07-20T14:30:00.000Z",
+      "geometry_edit": {
+        "source_asset": "metadata/fed_60001.geojson",
+        "operations": [
+          {
+            "handle_id": "-139.823812,67.591625",
+            "requested_coordinate": [-139.82281249209422, 67.59162491910055]
+          }
+        ]
+      }
+    },
+    {
+      "id": "temp-counter-proposal-002",
+      "proposal_id": null,
+      "user_id": "00000000-0000-4000-8000-000000000001",
+      "profile": { "email": "example@test.com" },
+      "comment": "This minimal local shift better follows the existing community edge and leaves the broader Yukon boundary pattern unchanged.",
+      "fed_num": "60001",
+      "dguid": "2021S051260010128",
+      "neighboring_dguid": "2021S051260010295",
+      "title": "Minimal community-edge correction",
+      "type": "counter-proposal",
+      "status": "accepted",
+      "created_at": "2026-07-18T09:15:00.000Z",
+      "geometry_edit": {
+        "source_asset": "metadata/fed_60001.geojson",
+        "operations": [
+          {
+            "handle_id": "-136.535370,62.826794",
+            "requested_coordinate": [-136.5343704915324, 62.82679447781023]
+          }
+        ]
+      }
+    },
+    {
+      "id": "temp-counter-proposal-003",
+      "proposal_id": null,
+      "user_id": "00000000-0000-4000-8000-000000000001",
+      "profile": { "email": "example@test.com" },
+      "comment": "A small northern adjustment gives the first DA a cleaner edge without changing any unrelated boundary.",
+      "fed_num": "60001",
+      "dguid": "2021S051260010181",
+      "neighboring_dguid": "2021S051260010238",
+      "title": "Northern edge refinement",
+      "type": "counter-proposal",
+      "status": "pending",
+      "created_at": "2026-07-17T16:40:00.000Z",
+      "geometry_edit": {
+        "source_asset": "metadata/fed_60001.geojson",
+        "operations": [
+          {
+            "handle_id": "-135.792078,60.847233",
+            "requested_coordinate": [-135.7910779751958, 60.84723279253057]
+          }
+        ]
+      }
+    },
+    {
+      "id": "temp-counter-proposal-004",
+      "proposal_id": null,
+      "user_id": "00000000-0000-4000-8000-000000000001",
+      "profile": { "email": "example@test.com" },
+      "comment": "This alternative keeps the same DA pair but shifts a different local vertex to reduce an awkward bend along the shared boundary.",
+      "fed_num": "60001",
+      "dguid": "2021S051260010181",
+      "neighboring_dguid": "2021S051260010238",
+      "title": "Shared-edge bend alternative",
+      "type": "counter-proposal",
+      "status": "rejected",
+      "created_at": "2026-07-15T11:05:00.000Z",
+      "geometry_edit": {
+        "source_asset": "metadata/fed_60001.geojson",
+        "operations": [
+          {
+            "handle_id": "-135.792790,60.847158",
+            "requested_coordinate": [-135.79179048444402, 60.84715778549618]
+          }
+        ]
+      }
+    },
+    {
+      "id": "temp-counter-proposal-005",
+      "proposal_id": null,
+      "user_id": "00000000-0000-4000-8000-000000000001",
+      "profile": { "email": "example@test.com" },
+      "comment": "A third scenario for the same pair transfers only a narrow wedge, preserving the original boundary everywhere else.",
+      "fed_num": "60001",
+      "dguid": "2021S051260010181",
+      "neighboring_dguid": "2021S051260010238",
+      "title": "Narrow-wedge alternative",
+      "type": "counter-proposal",
+      "status": "archived",
+      "created_at": "2026-07-12T08:20:00.000Z",
+      "geometry_edit": {
+        "source_asset": "metadata/fed_60001.geojson",
+        "operations": [
+          {
+            "handle_id": "-135.791389,60.847138",
+            "requested_coordinate": [-135.79038895466664, 60.847137784338585]
+          }
+        ]
+      }
+    },
+    {
+      "id": "temp-counter-proposal-006",
+      "proposal_id": null,
+      "user_id": "00000000-0000-4000-8000-000000000001",
+      "profile": { "email": "example@test.com" },
+      "comment": "This larger service-area realignment moves a mid-boundary vertex roughly half a kilometre east, creating a visibly different but topologically valid proposal for review.",
+      "fed_num": "60001",
+      "dguid": "2021S051260010128",
+      "neighboring_dguid": "2021S051260010295",
+      "title": "Large service-area realignment",
+      "type": "counter-proposal",
+      "status": "pending",
+      "created_at": "2026-07-21T10:00:00.000Z",
+      "geometry_edit": {
+        "source_asset": "metadata/fed_60001.geojson",
+        "operations": [
+          {
+            "handle_id": "-136.513763,62.795853",
+            "requested_coordinate": [-136.50376250350084, 62.79585265401809]
+          }
+        ]
+      }
+    }
+  ]
+}

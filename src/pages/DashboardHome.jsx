@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
 import { MapInfoPanel, getDefaultPanelView } from "@/components/non_prebuilt/MapInfoPanel.jsx";
 import { MapRegionSelector } from "@/components/non_prebuilt/MapRegionSelector.jsx";
 import { DEFAULT_ROLLOUT_CATEGORY_ID } from "@/lib/map/rolloutPlan.js";
 import { mapApi } from "@/services/mapApi.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
-import { loadDemoSubmissionHeatmap } from "@/lib/map/heatmap.js";
+import { loadSubmissionHeatmap } from "@/lib/map/heatmap.js";
+import { loadArchivedMapEffect } from "@/lib/map/archivedMapEffect.js";
+import { subscribeWorkspaceState } from "@/services/tempWorkspace.js";
 import "@/styles/map.css";
 
 export default function DashboardHome() {
+  const [searchParams] = useSearchParams();
   const [status, setStatus] = useState("Loading map...");
   const [selection, setSelection] = useState(null);
   const [rolloutHoverSelection, setRolloutHoverSelection] = useState(null);
@@ -18,11 +22,13 @@ export default function DashboardHome() {
   const [isRolloutOpen, setIsRolloutOpen] = useState(false);
   const [rolloutCategoryId, setRolloutCategoryId] = useState(DEFAULT_ROLLOUT_CATEGORY_ID);
   const [heatmap, setHeatmap] = useState(null);
+  const [archivedMap, setArchivedMap] = useState(null);
+  const initialArchivedMapEnabled = searchParams.get("archivedMap") === "1";
 
   useEffect(() => {
     let isMounted = true;
 
-    loadDemoSubmissionHeatmap()
+    const loadHeatmap = () => loadSubmissionHeatmap()
       .then((nextHeatmap) => {
         if (isMounted) {
           setHeatmap(nextHeatmap);
@@ -33,10 +39,32 @@ export default function DashboardHome() {
         // data is unavailable.
       });
 
+    loadHeatmap();
+    const unsubscribe = subscribeWorkspaceState(loadHeatmap);
+
     return () => {
       isMounted = false;
+      unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!profilesByDguid.size) return undefined;
+    let isMounted = true;
+    const load = () => loadArchivedMapEffect(profilesByDguid)
+      .then((nextArchivedMap) => {
+        if (isMounted) setArchivedMap(nextArchivedMap);
+      })
+      .catch(() => {
+        if (isMounted) setArchivedMap(null);
+      });
+    load();
+    const unsubscribe = subscribeWorkspaceState(load);
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [profilesByDguid]);
 
   useEffect(() => {
     let isMounted = true;
@@ -161,6 +189,8 @@ export default function DashboardHome() {
                 rolloutEnabled={isRolloutOpen}
                 rolloutCategoryId={rolloutCategoryId}
                 heatmap={heatmap}
+                archivedMap={archivedMap}
+                initialArchivedMapEnabled={initialArchivedMapEnabled}
               />
             </div>
           </section>

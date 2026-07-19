@@ -23,13 +23,17 @@ import { getCommentsUser } from "@/services/commentsApi";
 const statusStyles = {
   accepted: "bg-green-100 px-3 py-1 text-green-700",
   pending: "bg-yellow-100 px-3 py-1 text-yellow-700",
+  "archive-request": "bg-blue-100 px-3 py-1 text-blue-700",
   rejected: "bg-red-100 px-3 py-1 text-red-700",
+  archived: "bg-purple-100 px-3 py-1 text-purple-700",
 };
 
 const statusMessages = {
   accepted: "The commissioners have accepted your submission. We appreciate your contribution!",
   pending: "Your submission has been received and is waiting for review.",
+  "archive-request": "The commissioners are evaluating whether this submission should be archived.",
   rejected: "Sorry, your submission was rejected. Click to resubmit.",
+  archived: "This submission has been committed to the archive tree.",
 };
 
 const clickableStatuses = new Set(["rejected"]);
@@ -39,6 +43,8 @@ function normalizeSubmissionStatus(status) {
 
   if (["accepted", "approved", "addressed"].includes(normalized)) return "accepted";
   if (normalized === "rejected") return "rejected";
+  if (["archive_request", "archive_requested"].includes(normalized)) return "archive-request";
+  if (["archived", "achived", "archive"].includes(normalized)) return "archived";
   return "pending";
 }
 
@@ -94,7 +100,9 @@ const columns = [
       return (
         <div className="flex justify-start">
           <span className={`inline-flex w-[132px] items-center justify-center rounded-full whitespace-nowrap text-center font-medium ${statusStyles[status]}`}>
-            {status}
+            {status === "archive-request"
+              ? "Archive Request"
+              : status.charAt(0).toUpperCase() + status.slice(1)}
           </span>
         </div>
       );

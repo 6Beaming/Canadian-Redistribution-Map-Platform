@@ -3,8 +3,10 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
 import Header from "./pages/Header.jsx";
 import AcceptInvitePage from "./pages/AcceptInvitePage.jsx";
 import ArchivedTree from "./pages/ArchivedTree.jsx";
+import ArchivedDifference from "./pages/ArchivedDifference.jsx";
 import CommissionerProfile from "./pages/CommissionerProfile.jsx";
 import CommissionerWorkspace from "./pages/CommissionerWorkspace.jsx";
+import WorkspaceReview from "./pages/WorkspaceReview.jsx";
 import DashboardGraphs from "./pages/DashboardGraphs.jsx";
 import DashboardHome from "./pages/DashboardHome.jsx";
 import DashBoardSubmissionsPage from "./pages/DashboardSubmissionsTable/DashboardSubmissionsPage.jsx";
@@ -65,7 +67,9 @@ function App() {
           />
           <Route path="/dashboard/profile" element={<CommissionerProfile />} />
           <Route path="/dashboard/workspace" element={<CommissionerWorkspace />} />
+          <Route path="/dashboard/workspace/:submissionId" element={<WorkspaceReview />} />
           <Route path="/dashboard/archivedTree" element={<ArchivedTree />} />
+          <Route path="/dashboard/archivedTree/:submissionId/difference" element={<ArchivedDifference />} />
         </Route>
       </Routes>
       <Toaster position="top-center" offset="80px" closeButton/>

@@ -7,7 +7,8 @@ import { requireAuth } from "../middleware/requireAuth.js";
 
 const router = Router();
 
-// Get all comments for Yukon boundary proposals
+// LEGACY READ API: this proposal-scoped route still needs requireAuth and
+// authorization policy before it can be treated as a production endpoint.
 router.get("/proposal/:proposalId", async (req, res) => {
   const supabase = getSupabaseClient();
   const { proposalId } = req.params;
@@ -81,7 +82,8 @@ router.get("/", requireAuth, requireCommissioner, async (req, res) => {
   res.json(result);
 });
 
-// Get all comments for a userId
+// LEGACY USER READ API: author identity must be derived from req.user and the
+// requested user id must be authorized before this route is production-ready.
 router.get("/:user_id", async (req, res) => {
   const supabase = getSupabaseClient();
   const { user_id } = req.params;
@@ -96,7 +98,8 @@ router.get("/:user_id", async (req, res) => {
   res.json(data);
 });
 
-// Add comment to boundary proposal (only for Yukon proposals)
+// LEGACY WRITE API: currently accepts body.user_id. Refactor to requireAuth,
+// derive req.user.id server-side, and validate comment/objection geometry.
 router.post("/", async (req, res) => {
   const supabase = getSupabaseClient();
   const { proposal_id, user_id, comment, fed_num, dguid, title, neighboring_dguid, type } = req.body;
@@ -133,7 +136,8 @@ router.post("/", async (req, res) => {
   res.status(201).json(data[0]);
 });
 
-// Delete a comment/submission
+// LEGACY DELETE API: add requireAuth and an author/commissioner authorization
+// check before this endpoint is exposed outside the demonstration environment.
 router.delete("/:commentId", async (req, res) => {
   const supabase = getSupabaseClient();
   const { commentId } = req.params;

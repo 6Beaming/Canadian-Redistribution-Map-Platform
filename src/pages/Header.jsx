@@ -14,6 +14,14 @@ const AUTH_PATHS = new Set([
 ]);
 
 function getBackRoute(pathname) {
+  if (pathname.startsWith("/dashboard/archivedTree/") && pathname.endsWith("/difference")) {
+    return "/dashboard/archivedTree";
+  }
+
+  if (pathname.startsWith("/dashboard/workspace/")) {
+    return "/dashboard/workspace";
+  }
+
   if (
     pathname === "/users/profile" ||
     pathname === "/submissions"
@@ -46,6 +54,8 @@ export default function Header() {
   const backRoute = getBackRoute(pathname);
   const isCommissionerSurface =
     pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+  const isWorkspaceReview = pathname.startsWith("/dashboard/workspace/");
+  const isArchivedDifference = pathname.startsWith("/dashboard/archivedTree/") && pathname.endsWith("/difference");
   const isPublicProfilePage = pathname === "/users/profile";
   const isPublicSubmissionsPage =
     pathname === "/submissions" || pathname.startsWith("/submissions/");
@@ -79,10 +89,10 @@ export default function Header() {
             variant="outline"
             size="sm"
             className="header__nav-button"
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate(backRoute)}
           >
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            <span>Back to Map</span>
+            <span>{isWorkspaceReview ? "Back to Workspace" : isArchivedDifference ? "Back to Archived Tree" : "Back to Map"}</span>
           </Button>
         ) : backRoute && (isPublicProfilePage || pathname === "/submissions") ? (
           <Button

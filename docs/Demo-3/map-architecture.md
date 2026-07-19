@@ -1,184 +1,177 @@
 # Demo 3 Map Architecture
 
-## Overview
+## 1. Purpose
 
-The Demo 3 map is a layered MapLibre application designed around two different
-representations of the same baseline geography:
+The Demo 3 map is a MapLibre application that separates fast national
+presentation from exact local workflow geometry. PMTiles renders the baseline
+map; FED-scoped canonical GeoJSON is loaded only when a workflow needs precise
+DA pair boundaries. Google Map Tiles is a visual raster basemap only and is
+never used as an electoral-boundary authority.
 
-1. **PMTiles render assets** provide fast, tiled national rendering.
-2. **FED-scoped canonical GeoJSON metadata** provides the exact geometry needed
-   for a small interactive editing session.
+The architecture supports public map interaction, exact objection and
+counter-proposal review, a Commissioner-only submission heatmap, and a
+Commissioner-only Archived Map overlay.
 
-The map never treats the Google basemap as an electoral-boundary source. Google
-Map Tiles supplies only the visual road-map background. FED and Dissemination
-Area (DA) fills, outlines, selection state, and workflow geometry are rendered
-from repository-owned assets.
+## 2. Geographic Asset Model
 
-## Data Layout
-
-| Location | Purpose |
+| Location | Runtime purpose |
 | --- | --- |
-| `src/data/map/metadata/` | Canonical FED-scoped DA GeoJSON shards. These are lazy-loaded for an active pair workflow. |
-| `src/data/map/render/` | Browser render assets, including `da_boundaries_available.pmtiles` and DA label GeoJSON. |
-| `src/data/map/reference/` | Stable FED boundaries, FED labels, and FED names. |
-| `src/data/map/manifests/` | Render and rollout manifests that describe available assets. |
-| `src/data/map/indexes/` | Small denormalized indexes used for profiles and the temporary heatmap fixture. |
+| `src/data/map/render/` | DA PMTiles render bundle and labels used for normal MapLibre rendering. |
+| `src/data/map/metadata/` | Canonical FED-scoped DA GeoJSON shards, loaded lazily for a focused pair. |
+| `src/data/map/reference/` | FED boundaries, labels, and names. |
+| `src/data/map/manifests/` | Render and rollout manifests. |
+| `src/data/map/indexes/` | Compact profile/index inputs. |
+| `src/data/map/temp.json` | Development-only Counter-Proposal fixture data; not a geographic source of truth. |
 
-The canonical metadata is intentionally sharded by FED. The application can
-load the exact geometry for two selected DAs without downloading a national
-GeoJSON file, while PMTiles remains responsible for normal map rendering.
-
-## Asset Build Pipeline
-
-The reusable scripts form a one-way production pipeline:
+The build pipeline remains one way:
 
 ```text
-Statistics Canada source files
+Statistics Canada source data
   -> build_da_metadata_geojson.py
-  -> FED-scoped canonical metadata GeoJSON
-  -> collect_da_profiles.py / sync_da_metadata.py
-  -> profile index and enriched metadata
+  -> canonical FED-scoped GeoJSON metadata
+  -> profile enrichment/index scripts
   -> build_da_render_bundle.py
-  -> PMTiles, labels, and DA asset manifest
+  -> PMTiles, labels, and manifests
 ```
 
-Supporting scripts generate FED labels and rollout metadata. The temporary
-combined GeoJSON used to produce PMTiles is a build artifact and is not a
-runtime dependency.
+Runtime workflows never rewrite the baseline metadata or PMTiles bundle.
 
-## MapLibre Sources and Layers
+## 3. MapLibre Layers and Interaction Rules
 
-`MapCanvas.jsx` owns the MapLibre instance, source registration, layer order,
-feature-state updates, and pointer events. The important rendering layers are:
+`src/components/non_prebuilt/MapCanvas.jsx` owns source/layer registration,
+feature state, control lifecycle, pointer handling, and ordering. The primary
+stack is:
 
-1. Google road-map raster layers, when a Google Map Tiles session is available.
-2. FED fill and outline layers from the FED reference asset.
-3. DA fill and outline layers from the PMTiles render bundle.
-4. FED and DA label layers.
-5. Workflow-only GeoJSON overlays for objection and counter-proposal views.
+1. optional Google road-map raster tiles;
+2. FED fill and outline layers;
+3. DA PMTiles fill and outline layers;
+4. FED and DA labels;
+5. workflow GeoJSON overlays, heatmap mode, and archived-map overlays.
 
-All electoral boundaries use the shared deep-blue `#243b6b` line treatment. The
-line widths scale with zoom so the boundary remains legible without looking
-heavy at national scale. At zoom level 7 and above, Enabled FED outlines are
-suppressed while DA outlines remain visible. This prevents a FED outline from
-visually doubling an underlying DA boundary near a cross-FED edge. Data Blocked
-FED outlines remain visible because they are still an interactive regional
-surface.
+All electoral outlines use the shared deep-blue boundary colour and responsive
+line widths. Enabled FED outlines disappear at detailed DA zoom to prevent
+cross-FED DA/FED double drawing; Data Blocked FED outlines remain available.
+Initial and maximum latitude bounds are clamped to the Web Mercator limit
+(`85.051129`) so the map cannot expose a blank northern raster region.
 
-The initial bounds and maximum bounds are clamped to the Web Mercator latitude
-limit (`85.051129`). This removes the blank strip previously visible when the
-map was panned beyond the raster provider's renderable northern extent.
+`src/lib/map/interactionMode.js` defines interaction policy. Enabled DAs remain
+selectable; Enabled FEDs are not InfoPanel targets; Data Blocked FEDs retain
+their special interaction. Objection focus, counter-edit, and counter-review
+modes disable unrelated DA/FED hover and click actions.
 
-## Presentation and Interaction State
+## 4. Exact Pair Rendering
 
-The map uses feature state for selection, hover, rollout visibility, and DA
-overrides. The interaction policy lives in `src/lib/map/interactionMode.js`:
+`src/lib/map/objectionWorkflow.js` creates a normalized edge index from the
+canonical metadata. It contains feature lookup, adjacency, pair shared segments,
+and edge ownership. Cross-FED selections merge both relevant metadata shards
+before this index is built.
 
-- Enabled DAs are interactive.
-- Enabled FEDs are not interactive and do not open an InfoPanel state.
-- Data Blocked FEDs remain interactive.
-- Objection focus, counter-edit, and counter-review modes lock hover and click
-  interactions for all unrelated DAs and FEDs.
+Focused pair rendering intentionally does not draw PMTiles and GeoJSON for the
+same DA at once:
 
-This keeps the normal browsing map responsive while keeping the user focused on
-the selected pair once a workflow enters its detailed stage.
+1. MapCanvas sets feature state for the selected DGUIDs.
+2. PMTiles fill/outline rules suppress the selected baseline features.
+3. A single exact GeoJSON collection draws the pair exterior.
+4. The shared edge is drawn independently as the workflow/edit line.
+5. The outer edges shared with non-selected neighbours remain represented by
+   the focused exact collection, not a duplicate baseline edge.
 
-## Pair Workflows
+This is used for public objection, counter-proposal editing, Workspace review,
+and Archived Difference. It prevents visual PMTiles/GeoJSON offsets without
+changing canonical metadata.
 
-`UserHome.jsx` lazy-loads the canonical metadata shards required for the
-selected DAs. When a pair crosses a FED boundary, both source FEDs are merged
-before an adjacency index is built.
+## 5. Geometry Editing and Read-only Review
 
-`src/lib/map/objectionWorkflow.js` builds a normalized edge index containing:
+`src/lib/map/counterProposalWorkflow.js` uses JSTS for the client-side editing
+guard. Candidate moves must retain valid polygons, preserve pair area within
+tolerance, avoid pair overlap, stay in the original pair envelope, and clear
+unrelated boundaries. A binary backoff stops an invalid drag at its last legal
+position. Repeated non-closure vertices found in some source pairs are repaired
+only in an editing clone; canonical files are not changed.
 
-- `featureByDguid`
-- `adjacencyByDguid`
-- `boundarySegmentsByPair`
-- `edgeOwners`
+The same exact overlay machinery is reused in read-only pages:
 
-Edges are normalized to six decimal places before ownership is calculated.
-Adjacency is therefore inferred from shared edge ownership rather than from a
-fragile visual overlap or a search over rendered tiles.
+- `WorkspaceReview.jsx` displays selected live/temporary submissions. For a
+  Counter-Proposal, Original/Proposed toggling changes source data without
+  recreating the map or fitting the camera again.
+- `ArchivedDifference.jsx` displays a selected archived version and its latest
+  branch version. It is read-only and contains no editor or Commissioner comment
+  input.
 
-During objection and counter-proposal focus, PMTiles remains the baseline for
-the rest of the map, but the selected pair switches to exact GeoJSON rendering.
-The selected DA PMTiles fill is excluded with feature state, and the normal DA
-outline is temporarily hidden for the focused pair. A single exact GeoJSON
-boundary collection then draws the pair exterior, while the actual shared edge
-is drawn separately as the red workflow boundary. This avoids the visible
-PMTiles/GeoJSON double-outline effect and still retains pair-to-neighbour outer
-edges.
+Client-side JSTS is immediate UX validation, not a server trust boundary.
+Future Counter-Proposal and objection submission APIs must validate and store
+server-approved geometry.
 
-The Original and Proposed views use the same focused rendering model. The
-Proposed counter-proposal view adds only the editable shared-boundary line and
-its handles.
+## 6. Commissioner Optional Modes
 
-## Geometry Validation and Repair
+### 6.1 Submission Heatmap
 
-`src/lib/map/counterProposalWorkflow.js` uses JSTS 2.12.1 for geometry
-validation. Candidate moves are evaluated in projected coordinates and must:
+`src/lib/map/heatmap.js` is a standalone optional module:
 
-- produce valid DA geometries;
-- preserve the combined pair area within a small tolerance;
-- avoid interior overlap between the two DAs;
-- stay inside the original pair envelope; and
-- maintain at least two metres of clearance from unrelated boundaries.
-
-When a drag approaches an invalid position, the editor uses binary backoff to
-stop at the last valid coordinate instead of committing an invalid polygon.
-
-A small number of baseline pairs contain repeated non-closure vertices. Before
-creating an editing session, the workflow clones only the selected pair and
-removes those duplicate vertices if that repair yields valid geometry. Canonical
-metadata is not modified. If a pair cannot be safely normalized, the workflow
-reports the condition instead of allowing a corrupt edit.
-
-## Heatmap Module
-
-The Commissioner heatmap is an optional MapCanvas feature, not a default map
-behavior. Its implementation is isolated in `src/lib/map/heatmap.js`:
-
-- `loadDemoSubmissionHeatmap()` loads the current committed demonstration
-  fixture, `src/data/map/indexes/da_submissions.json`.
-- `buildSubmissionHeatmapFillExpression()` creates the MapLibre fill-color
-  expression.
-- `createSubmissionHeatmapControl()` owns the control icon and accessibility
-  state.
-- `hasSubmissionHeatmapData()` prevents the feature from being mounted without
-  data.
-
-`DashboardHome.jsx` is the only current caller. It loads the fixture and passes
-`heatmap` to its Commissioner `MapCanvas`; public-user MapCanvas instances do
-not pass that prop and never create a heatmap control. MapCanvas also mounts the
-control after either the map or asynchronous heatmap data becomes ready. This
-fixes the prior race where the control could be omitted when the map initialized
-before the fixture import completed.
-
-The fixture is intentionally not a live submission aggregate. Replacing it
-with a backend endpoint is contained to the heatmap loader contract and does
-not require changes to MapCanvas layer logic.
-
-## Main Frontend Responsibilities
-
-| File | Responsibility |
+| Export | Responsibility |
 | --- | --- |
-| `src/components/non_prebuilt/MapCanvas.jsx` | MapLibre lifecycle, sources, layers, feature state, controls, and pointer handling. |
-| `src/components/non_prebuilt/MapInfoPanel.jsx` | Responsive map-side information and workflow panel. |
-| `src/lib/map/heatmap.js` | Optional Commissioner heatmap fixture loader, paint expression, and control. |
-| `src/lib/map/interactionMode.js` | Explicit interaction permissions for browse and workflow modes. |
-| `src/lib/map/objectionWorkflow.js` | Exact edge ownership, adjacency, shared boundaries, and pair exterior geometry. |
-| `src/lib/map/counterProposalWorkflow.js` | JSTS validation, safe repair, drag constraints, and edit history. |
-| `src/pages/UserHome.jsx` | Public workflow state and lazy metadata loading. |
-| `src/pages/DashboardHome.jsx` | Commissioner map entry and the only heatmap injection point. |
+| `loadSubmissionHeatmap()` | Requests the current hybrid submission aggregate from `tempWorkspace`. |
+| `hasSubmissionHeatmapData()` | Prevents an empty control/layer mount. |
+| `buildSubmissionHeatmapFillExpression()` | Produces the MapLibre DA fill expression. |
+| `createSubmissionHeatmapControl()` | Creates the accessible MapLibre toggle control. |
 
-## Operational Notes
+`DashboardHome.jsx` is the sole caller and passes the resulting `heatmap` prop
+to its Commissioner MapCanvas. Public-user maps omit the prop completely.
+Today the aggregate counts active pending and archive-request items from live
+Supabase feedback/objections plus local Counter-Proposal fixtures. The future
+replacement is an authenticated server aggregate keyed by DGUID; MapCanvas does
+not need to change when that loader changes.
 
-- PMTiles requests require HTTP byte-range support. The local map asset service
-  provides this for `.pmtiles` files.
-- `VITE_GOOGLE_MAPS_API_KEY` is stored in the root `.env` file distributed
-  through the project Google Drive shared folder. `.env` is Git-ignored and
-  must not be committed; `.env.local` is not used by this project.
-- The map remains usable without Google Map Tiles. Local electoral geometry and
-  interaction do not depend on the basemap session.
-- Current server routes and the next backend work are documented in
-  [map-backend.md](./map-backend.md).
+### 6.2 Archived Map
+
+`src/lib/map/archivedMapEffect.js` is another optional module. It retrieves
+durable archive records through `getArchiveTreeRecords()`, selects each branch's
+persisted latest version, and returns:
+
+- affected DGUIDs for the green archived outline treatment;
+- exact proposed GeoJSON features, if available; and
+- override DGUIDs for mutual PMTiles/GeoJSON rendering.
+
+The Dashboard Archived Map control is available only to the Commissioner map.
+It is a read-only visualisation; it does not mutate Archive Tree data. Archived
+Counter-Proposal fidelity remains constrained by the absence of a durable
+Counter-Proposal geometry-write protocol.
+
+## 7. Map-related Data Flows
+
+```text
+Normal MapCanvas
+  -> /api/map asset service
+  -> PMTiles + labels + profile index + selected FED GeoJSON metadata
+
+Focused objection / counter workflow
+  -> canonical metadata shards
+  -> edge index + JSTS-safe geometry
+  -> MapCanvas focused GeoJSON source and feature-state PMTiles exclusion
+
+Commissioner heatmap
+  -> loadSubmissionHeatmap()
+  -> tempWorkspace.getSubmissionHeatmap()
+  -> protected GET /api/comments + local temp.json fixture
+
+Archived Map
+  -> loadArchivedMapEffect()
+  -> GET /api/workspace/archive
+  -> Supabase archive_tree snapshots + canonical metadata hydration
+```
+
+The first two paths are baseline map-data paths. The latter two are submission
+views and must eventually consume dedicated backend read models rather than the
+transitional `tempWorkspace` adapter.
+
+## 8. Configuration and Operations
+
+- The Google Map Tiles key and related client environment variables live in the
+  root `.env`, which is Git-ignored and distributed through the project shared
+  drive. `.env.local` is not used.
+- The local map asset service supports HTTP byte ranges required by PMTiles.
+- The electoral map remains functional when Google tiles fail because map
+  geometry, selection, overlays, and workflow metadata are repository-owned.
+- Map-related API contracts, write paths, and pending refactors are documented
+  in [map-backend.md](./map-backend.md). Workspace and archive implementation
+  details are documented in [workspace.md](./workspace.md).

@@ -64,6 +64,10 @@ import {
   hasSubmissionHeatmapData,
 } from "@/lib/map/heatmap.js";
 import {
+  createArchivedMapControl,
+  hasArchivedMapData,
+} from "@/lib/map/archivedMapEffect.js";
+import {
   buildGoogleRoadmapTileUrl,
   getGoogleRoadmapSession,
   hasGoogleMapTilesApiKey,
@@ -123,6 +127,31 @@ function paddedMaxBounds(bounds, factor = 0.35) {
     [sw.lng - padLng, clampLatitude(sw.lat - padLat)],
     [ne.lng + padLng, clampLatitude(ne.lat + padLat)]
   );
+}
+
+function getGeoJsonBounds(geoJson) {
+  const bounds = new maplibregl.LngLatBounds();
+
+  function extendCoordinates(coordinates) {
+    if (!Array.isArray(coordinates)) return;
+    if (
+      coordinates.length >= 2 &&
+      Number.isFinite(Number(coordinates[0])) &&
+      Number.isFinite(Number(coordinates[1]))
+    ) {
+      bounds.extend([Number(coordinates[0]), Number(coordinates[1])]);
+      return;
+    }
+    coordinates.forEach(extendCoordinates);
+  }
+
+  const features = geoJson?.type === "FeatureCollection"
+    ? geoJson.features
+    : geoJson?.type === "Feature"
+      ? [geoJson]
+      : [];
+  features?.forEach((feature) => extendCoordinates(feature?.geometry?.coordinates));
+  return bounds.isEmpty() ? null : bounds;
 }
 
 function createBoundaryControl(buttonRef, getBoundariesVisible, onToggle) {
@@ -402,17 +431,22 @@ function daFillPaint(
 
 function daOutlinePaint(minZoom = DEFAULT_DA_RENDER_MIN_ZOOM, showBoundaries = true) {
   return {
-    "line-color": MAP_BOUNDARY_COLOR,
+    "line-color": [
+      "case",
+      ["boolean", ["feature-state", "archived"], false],
+      "#078f70",
+      MAP_BOUNDARY_COLOR,
+    ],
     "line-width": [
       "interpolate",
       ["linear"],
       ["zoom"],
       minZoom,
-       0.9,
+      ["case", ["boolean", ["feature-state", "archived"], false], 2.1, 0.9],
       minZoom + 5,
-       1.3,
+      ["case", ["boolean", ["feature-state", "archived"], false], 3.4, 1.3],
       minZoom + 10,
-       1.75,
+      ["case", ["boolean", ["feature-state", "archived"], false], 4.8, 1.75],
     ],
     "line-opacity": [
       "case",
@@ -465,14 +499,24 @@ export function MapCanvas({
   rolloutEnabled = false,
   rolloutCategoryId = null,
   heatmap = null,
+  archivedMap = null,
+  initialArchivedMapEnabled = false,
   interactionMode = MAP_INTERACTION_MODE.BROWSE,
   workflowFocusDguids = [],
+  focusGeoJson = null,
+  focusMaxZoom = 15,
 }) {
   const [heatmapEnabled, setHeatmapEnabled] = useState(false);
+  const [archivedMapEnabled, setArchivedMapEnabled] = useState(initialArchivedMapEnabled);
   const heatmapEnabledRef = useRef(false);
   const heatmapButtonRef = useRef(null);
   const heatmapControlRef = useRef(null);
   const heatmapFillExpressionRef = useRef(null);
+  const archivedMapEnabledRef = useRef(initialArchivedMapEnabled);
+  const archivedMapButtonRef = useRef(null);
+  const archivedMapControlRef = useRef(null);
+  const archivedDaIdsRef = useRef(new Set());
+  const archivedOverrideDaIdsRef = useRef(new Set());
   const interactionModeRef = useRef(interactionMode);
   const overriddenDaIdsRef = useRef(new Set());
   const workflowFocusActiveRef = useRef(false);
@@ -498,6 +542,7 @@ export function MapCanvas({
   const applyPresentationModeRef = useRef(null);
   const applyBoundaryVisibilityRef = useRef(null);
   const applyHeatmapModeRef = useRef(null);
+  const applyArchivedMapRef = useRef(null);
   const applySelectionRef = useRef(null);
   const applyExternalHoverRef = useRef(null);
   const applyObjectionPreviewRef = useRef(null);
@@ -529,6 +574,7 @@ export function MapCanvas({
   onStatusChangeRef.current = onStatusChange;
   boundariesVisibleRef.current = boundariesVisible;
   heatmapEnabledRef.current = heatmapEnabled;
+  archivedMapEnabledRef.current = archivedMapEnabled;
   heatmapFillExpressionRef.current = hasSubmissionHeatmapData(heatmap)
     ? buildSubmissionHeatmapFillExpression(heatmap.countsByDguid)
     : null;
@@ -568,6 +614,13 @@ export function MapCanvas({
   }, [heatmapEnabled]);
 
   useEffect(() => {
+    const button = archivedMapButtonRef.current;
+    if (!button) return;
+    button.classList.toggle("active", archivedMapEnabled);
+    button.setAttribute("aria-pressed", String(archivedMapEnabled));
+  }, [archivedMapEnabled]);
+
+  useEffect(() => {
     const map = mapRef.current;
 
     if (!map || !isMapReadyRef.current) {
@@ -580,7 +633,11 @@ export function MapCanvas({
       const control = createSubmissionHeatmapControl(
         heatmapButtonRef,
         () => heatmapEnabledRef.current,
-        () => setHeatmapEnabled((current) => !current),
+        () => setHeatmapEnabled((current) => {
+          const next = !current;
+          if (next) setArchivedMapEnabled(false);
+          return next;
+        }),
       );
 
       map.addControl(control, "top-right");
@@ -594,6 +651,34 @@ export function MapCanvas({
       heatmapButtonRef.current = null;
     }
   }, [heatmap, mapReadyTick]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapReadyRef.current) return;
+    const available = hasArchivedMapData(archivedMap);
+
+    if (available && !archivedMapControlRef.current) {
+      const control = createArchivedMapControl(
+        archivedMapButtonRef,
+        () => archivedMapEnabledRef.current,
+        () => setArchivedMapEnabled((current) => {
+          const next = !current;
+          if (next) setHeatmapEnabled(false);
+          return next;
+        }),
+      );
+      map.addControl(control, "top-right");
+      archivedMapControlRef.current = control;
+      return;
+    }
+
+    if (!available && archivedMapControlRef.current) {
+      map.removeControl(archivedMapControlRef.current);
+      archivedMapControlRef.current = null;
+      archivedMapButtonRef.current = null;
+      setArchivedMapEnabled(false);
+    }
+  }, [archivedMap, mapReadyTick]);
 
   useEffect(() => {
     if (!hasSubmissionHeatmapData(heatmap) && heatmapEnabled) {
@@ -661,6 +746,19 @@ export function MapCanvas({
   }, [interactionMode, mapReadyTick]);
 
   useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapReadyRef.current || !focusGeoJson) return;
+    const bounds = getGeoJsonBounds(focusGeoJson);
+    if (!bounds) return;
+
+    map.fitBounds(bounds, {
+      padding: 34,
+      maxZoom: Math.min(MAP_ZOOM.MAX, focusMaxZoom),
+      duration: 700,
+    });
+  }, [focusGeoJson, focusMaxZoom, mapReadyTick]);
+
+  useEffect(() => {
     if (!isMapReadyRef.current || !applyPresentationModeRef.current) {
       return;
     }
@@ -683,6 +781,11 @@ export function MapCanvas({
 
     applyHeatmapModeRef.current(heatmapEnabled);
   }, [heatmap, heatmapEnabled, mapReadyTick]);
+
+  useEffect(() => {
+    if (!isMapReadyRef.current || !applyArchivedMapRef.current) return;
+    applyArchivedMapRef.current(archivedMap, archivedMapEnabled);
+  }, [archivedMap, archivedMapEnabled, mapReadyTick]);
 
   useEffect(() => {
     const setFedState = setFedStateRef.current;
@@ -1514,6 +1617,40 @@ export function MapCanvas({
       });
     }
 
+    function addArchivedMapLayers() {
+      map.addSource("archived-map-overrides", {
+        type: "geojson",
+        data: EMPTY_COUNTER_PROPOSAL_FEATURES,
+        promoteId: "DGUID",
+      });
+      map.addLayer({
+        id: "archived-map-fill",
+        type: "fill",
+        source: "archived-map-overrides",
+        layout: { visibility: "none" },
+        paint: {
+          "fill-color": "#6fd7b5",
+          "fill-opacity": 0.42,
+          "fill-outline-color": TRANSPARENT_BOUNDARY_COLOR,
+        },
+      });
+      map.addLayer({
+        id: "archived-map-outline",
+        type: "line",
+        source: "archived-map-overrides",
+        layout: {
+          visibility: "none",
+          "line-join": "round",
+          "line-cap": "round",
+        },
+        paint: {
+          "line-color": "#078f70",
+          "line-width": ["interpolate", ["linear"], ["zoom"], 4, 2.4, 8, 4.2, 12, 6.2],
+          "line-opacity": 1,
+        },
+      });
+    }
+
     function syncDaOutlineVisibility() {
       if (map.getLayer("da-outline")) {
         map.setLayoutProperty(
@@ -1793,6 +1930,44 @@ export function MapCanvas({
       applySelectionTarget(latestSelectionPropRef.current);
     }
 
+    function applyArchivedMap(nextData, enabled) {
+      const nextArchivedIds = enabled
+        ? new Set((nextData?.dguids ?? []).map(String))
+        : new Set();
+      const nextOverrideIds = enabled
+        ? new Set((nextData?.overrideDguids ?? []).map(String))
+        : new Set();
+
+      archivedDaIdsRef.current.forEach((id) => {
+        if (!nextArchivedIds.has(id)) setDaFeatureState(id, { archived: false });
+      });
+      nextArchivedIds.forEach((id) => {
+        if (!archivedDaIdsRef.current.has(id)) setDaFeatureState(id, { archived: true });
+      });
+      archivedOverrideDaIdsRef.current.forEach((id) => {
+        if (!nextOverrideIds.has(id) && !overriddenDaIdsRef.current.has(id)) {
+          setDaFeatureState(id, { overridden: false });
+        }
+      });
+      nextOverrideIds.forEach((id) => {
+        if (!archivedOverrideDaIdsRef.current.has(id)) setDaFeatureState(id, { overridden: true });
+      });
+
+      archivedDaIdsRef.current = nextArchivedIds;
+      archivedOverrideDaIdsRef.current = nextOverrideIds;
+      const source = map.getSource("archived-map-overrides");
+      if (source && typeof source.setData === "function") {
+        source.setData(enabled
+          ? nextData?.featureCollection ?? EMPTY_COUNTER_PROPOSAL_FEATURES
+          : EMPTY_COUNTER_PROPOSAL_FEATURES);
+      }
+      ["archived-map-fill", "archived-map-outline"].forEach((layerId) => {
+        if (map.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, "visibility", enabled ? "visible" : "none");
+        }
+      });
+    }
+
     function applyInteractionMode(mode) {
       if (isMapFeatureInteractionLocked(mode)) {
         setInternalHover(null);
@@ -1809,6 +1984,7 @@ export function MapCanvas({
     applyPresentationModeRef.current = setPresentationMode;
     applyBoundaryVisibilityRef.current = applyBoundaryVisibility;
     applyHeatmapModeRef.current = setHeatmapMode;
+    applyArchivedMapRef.current = applyArchivedMap;
 
     const onClick = (event) => {
       if (skipNextClickRef.current) {
@@ -1965,6 +2141,7 @@ export function MapCanvas({
         const daBundle = await addDaLayers(assetManifest);
         addObjectionBoundaryLayers();
         addCounterProposalLayers();
+        addArchivedMapLayers();
         const initialLabelScale = labelScreenScale(containerRef.current?.clientWidth ?? 0);
 
         addFedLabelLayers(fedLabels, initialLabelScale);
@@ -2058,8 +2235,13 @@ export function MapCanvas({
       applyPresentationModeRef.current = null;
       applyBoundaryVisibilityRef.current = null;
       applyHeatmapModeRef.current = null;
+      applyArchivedMapRef.current = null;
       heatmapControlRef.current = null;
       heatmapButtonRef.current = null;
+      archivedMapControlRef.current = null;
+      archivedMapButtonRef.current = null;
+      archivedDaIdsRef.current = new Set();
+      archivedOverrideDaIdsRef.current = new Set();
       applySelectionRef.current = null;
       applyExternalHoverRef.current = null;
       applyObjectionPreviewRef.current = null;

@@ -802,6 +802,28 @@
   padding: clamp(12px, 1.4vw, 18px) clamp(12px, 1.6vw, 20px) clamp(14px, 1.6vw, 20px);
 }
 
+.archived-map-button.active {
+  outline: 2px solid #087f70;
+  background: #e6faf4;
+  color: #087f70;
+}
+
+.maplibregl-ctrl-group button.archived-map-button {
+  overflow: hidden;
+  line-height: 0;
+  cursor: pointer;
+}
+
+.maplibregl-ctrl-group button.archived-map-button svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 17px;
+  height: 17px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
 .map-info-panel button {
   min-width: 0;
   font-size: clamp(9px, 1vw, 14px) !important;
