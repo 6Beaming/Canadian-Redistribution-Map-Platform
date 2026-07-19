@@ -2,9 +2,9 @@ import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
 import Header from "./pages/Header.jsx";
 import AcceptInvitePage from "./pages/AcceptInvitePage.jsx";
+import ArchivedTree from "./pages/ArchivedTree.jsx";
 import CommissionerProfile from "./pages/CommissionerProfile.jsx";
 import CommissionerWorkspace from "./pages/CommissionerWorkspace.jsx";
-import AuditLogPage from "./pages/AuditLogTable/AuditLogPage.jsx";
 import DashboardGraphs from "./pages/DashboardGraphs.jsx";
 import DashboardHome from "./pages/DashboardHome.jsx";
 import DashBoardSubmissionsPage from "./pages/DashboardSubmissionsTable/DashboardSubmissionsPage.jsx";
@@ -59,13 +59,13 @@ function App() {
         <Route element={<RequireCommissioner />}>
           <Route path="/dashboard" element={<DashboardHome />} />
           <Route path="/dashboard/graphs" element={<DashboardGraphs />} />
-          <Route path="/dashboard/auditlog" element={<AuditLogPage />} />
           <Route
             path="/dashboard/submissionsTable"
             element={<DashBoardSubmissionsPage />}
           />
           <Route path="/dashboard/profile" element={<CommissionerProfile />} />
           <Route path="/dashboard/workspace" element={<CommissionerWorkspace />} />
+          <Route path="/dashboard/archivedTree" element={<ArchivedTree />} />
         </Route>
       </Routes>
       <Toaster position="top-center" offset="80px" closeButton/>

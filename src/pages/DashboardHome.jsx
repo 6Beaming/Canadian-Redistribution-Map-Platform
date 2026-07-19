@@ -5,6 +5,7 @@ import { MapRegionSelector } from "@/components/non_prebuilt/MapRegionSelector.j
 import { DEFAULT_ROLLOUT_CATEGORY_ID } from "@/lib/map/rolloutPlan.js";
 import { mapApi } from "@/services/mapApi.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
+import { loadDemoSubmissionHeatmap } from "@/lib/map/heatmap.js";
 import "@/styles/map.css";
 
 export default function DashboardHome() {
@@ -16,6 +17,26 @@ export default function DashboardHome() {
   const [panelView, setPanelView] = useState(getDefaultPanelView("commissioner"));
   const [isRolloutOpen, setIsRolloutOpen] = useState(false);
   const [rolloutCategoryId, setRolloutCategoryId] = useState(DEFAULT_ROLLOUT_CATEGORY_ID);
+  const [heatmap, setHeatmap] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    loadDemoSubmissionHeatmap()
+      .then((nextHeatmap) => {
+        if (isMounted) {
+          setHeatmap(nextHeatmap);
+        }
+      })
+      .catch(() => {
+        // The Commissioner map remains usable when the optional visualization
+        // data is unavailable.
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -139,6 +160,7 @@ export default function DashboardHome() {
                 onToggleFullscreen={handleToggleFullscreen}
                 rolloutEnabled={isRolloutOpen}
                 rolloutCategoryId={rolloutCategoryId}
+                heatmap={heatmap}
               />
             </div>
           </section>

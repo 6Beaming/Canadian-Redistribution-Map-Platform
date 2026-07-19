@@ -52,6 +52,14 @@ export function getRolloutArea(fedNum) {
   return allAreas.find((area) => area.fedNum === String(fedNum)) ?? null;
 }
 
+export function isEnabledFed(fedNum) {
+  return getRolloutArea(fedNum)?.categoryId === "enabled";
+}
+
+export function isDataBlockedFed(fedNum) {
+  return getRolloutArea(fedNum)?.categoryId === "data-blocked";
+}
+
 export function getRolloutColor(categoryId) {
   return getRolloutCategory(categoryId).color;
 }

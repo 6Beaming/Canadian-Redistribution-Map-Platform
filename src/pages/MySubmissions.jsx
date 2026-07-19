@@ -21,28 +21,40 @@ import { useAuth } from "../contexts/AuthContext.jsx";
 import { getCommentsUser } from "@/services/commentsApi";
 
 const statusStyles = {
-  Approved: "bg-green-100 px-3 py-1 text-sm text-green-700",
-  Rejected: "bg-red-100 px-3 py-1 text-sm text-red-700",
-  pending: "bg-blue-100 px-3 py-1 text-sm text-blue-700",
-  "Under Review": "bg-yellow-100 px-3 py-1 text-sm text-yellow-700",
+  accepted: "bg-green-100 px-3 py-1 text-green-700",
+  pending: "bg-yellow-100 px-3 py-1 text-yellow-700",
+  rejected: "bg-red-100 px-3 py-1 text-red-700",
 };
 
 const statusMessages = {
-  Approved: "The commissioners has approved your submission, we appreciate your contribution!",
-  Rejected: "Sorry, your submission was rejected, click to resubmit.",
+  accepted: "The commissioners have accepted your submission. We appreciate your contribution!",
   pending: "Your submission has been received and is waiting for review.",
-  "Under Review": "We have let the commissioners know, please be patient.",
+  rejected: "Sorry, your submission was rejected. Click to resubmit.",
 };
 
-const clickableStatuses = new Set(["Rejected"]);
+const clickableStatuses = new Set(["rejected"]);
+
+function normalizeSubmissionStatus(status) {
+  const normalized = String(status ?? "pending").trim().toLowerCase().replaceAll(" ", "_");
+
+  if (["accepted", "approved", "addressed"].includes(normalized)) return "accepted";
+  if (normalized === "rejected") return "rejected";
+  return "pending";
+}
 
 const columns = [
   {
     accessorKey: "id",
     header: "Reference ID",
-    cell: ({ row }) => (
-      <span className="font-mono text-sm">{row.getValue("id")}</span>
-    ),
+    cell: ({ row }) => {
+      const referenceId = String(row.getValue("id") ?? "");
+
+      return (
+        <span className="font-mono text-sm" title={referenceId}>
+          {referenceId ? `${referenceId.slice(0, 5)}...` : "—"}
+        </span>
+      );
+    },
   },
   {
     accessorKey: "submittedAt",
@@ -120,7 +132,7 @@ export default function MySubmissions() {
             type: submission.type,
             title: submission.title,
             community_name: submission.dissemination_areas?.community_name ?? "Unknown",
-            status: submission.status,
+            status: normalizeSubmissionStatus(submission.status),
           }))
 
         );
@@ -148,11 +160,10 @@ export default function MySubmissions() {
   }
 
   return (
-    <div className="px-4 py-6 md:px-6">
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 overflow-x-auto">
-        <div className="min-w-[960px]">
-          <div className="overflow-visible rounded-lg border border-gray-200 shadow-sm">
-            <Table>
+    <div className="px-[clamp(0.5rem,2vw,1.5rem)] py-[clamp(1rem,3vw,1.5rem)]">
+      <div className="submissions-page__content flex flex-col gap-4">
+        <div className="submissions-table-shell rounded-lg border border-gray-200 shadow-sm">
+            <Table className="min-w-[60rem]">
               <TableHeader className="bg-gray-50">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id} className="h-12">
@@ -218,13 +229,13 @@ export default function MySubmissions() {
                 )}
               </TableBody>
             </Table>
-          </div>
+        </div>
 
-          <div className="flex items-center justify-between py-4">
+          <div className="submissions-pagination flex items-center justify-between py-4">
             <p className="text-sm text-gray-500">
               Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
             </p>
-            <div className="flex items-center gap-2">
+            <div className="submissions-pagination__actions">
               <Button
                 variant="outline"
                 size="sm"
@@ -244,7 +255,6 @@ export default function MySubmissions() {
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
-          </div>
         </div>
       </div>
     </div>

@@ -9,5 +9,5 @@ local Express asset server.
 - `manifests/`: runtime asset manifests and rollout tables
 - `indexes/`: frontend/server lookup indexes
 
-See [docs/map-architecture.md](../../../docs/map-architecture.md) for the full
+See [docs/Demo-3/map-architecture.md](../../../docs/Demo-3/map-architecture.md) for the full
 production and runtime flow.

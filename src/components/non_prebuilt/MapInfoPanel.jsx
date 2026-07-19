@@ -375,11 +375,15 @@ function RolloutCategoryPanel({
     submenuModeRef.current = area.daItems.length ? "hover" : "none";
     setSubmenuFedNum(area.daItems.length ? area.fedNum : "");
     updateSubmenuAnchor(area.daItems.length ? anchorNode : null);
-    onHoverTargetChange?.({
-      type: "fed",
-      fedNum: area.fedNum,
-      fedName: area.name,
-    });
+    if (!area.daItems.length) {
+      onHoverTargetChange?.({
+        type: "fed",
+        fedNum: area.fedNum,
+        fedName: area.name,
+      });
+    } else {
+      onHoverTargetChange?.(null);
+    }
   }
 
   function handleFedItemLeave(area, event) {
@@ -425,27 +429,22 @@ function RolloutCategoryPanel({
       if (submenuFedNum !== area.fedNum) {
         submenuModeRef.current = "locked";
         setSubmenuFedNum(area.fedNum);
-        onHoverTargetChange?.({
-          type: "fed",
-          fedNum: area.fedNum,
-          fedName: area.name,
-        });
+        onHoverTargetChange?.(null);
         return;
       }
 
       if (submenuModeRef.current === "hover") {
         submenuModeRef.current = "locked";
         setSubmenuFedNum(area.fedNum);
-        onHoverTargetChange?.({
-          type: "fed",
-          fedNum: area.fedNum,
-          fedName: area.name,
-        });
+        onHoverTargetChange?.(null);
         return;
       }
 
       if (submenuModeRef.current === "locked") {
-        handleFedSelect(area);
+        submenuModeRef.current = "none";
+        setSubmenuFedNum("");
+        setSubmenuAnchor(null);
+        onHoverTargetChange?.(null);
         return;
       }
     }

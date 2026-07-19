@@ -7,6 +7,7 @@ import {
   areDaNeighbours,
   buildDaObjectionIndex,
   emptyBoundaryFeatureCollection,
+  getPairOuterBoundaryFeatureCollection,
   getSharedBoundaryFeatureCollection,
 } from "@/lib/map/objectionWorkflow.js";
 import {
@@ -27,6 +28,7 @@ import {
   normalizeDaAssetManifest,
 } from "@/lib/map/daAssetManifest.js";
 import { DEFAULT_ROLLOUT_CATEGORY_ID } from "@/lib/map/rolloutPlan.js";
+import { MAP_INTERACTION_MODE } from "@/lib/map/interactionMode.js";
 import { mapApi } from "@/services/mapApi.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
 import "@/styles/map.css";
@@ -49,7 +51,6 @@ export default function UserHome() {
   const [assetManifest, setAssetManifest] = useState(() => getFallbackDaAssetManifest());
   const [profilesByDguid, setProfilesByDguid] = useState(new Map());
   const [objectionGeometryIndex, setObjectionGeometryIndex] = useState(null);
-  const [objectionGeometryFedNum, setObjectionGeometryFedNum] = useState("");
   const [objectionWorkflow, setObjectionWorkflow] = useState(() =>
     createInitialObjectionWorkflow(),
   );
@@ -202,10 +203,37 @@ export default function UserHome() {
     [assetManifest],
   );
 
+  const ensureMetadataIndexForFeds = useCallback(
+    async (fedNums) => {
+      const normalizedFedNums = [...new Set(
+        (fedNums ?? []).map((fedNum) => String(fedNum ?? "").trim()).filter(Boolean),
+      )].sort();
+      const cacheKey = `pair:${normalizedFedNums.join("|")}`;
+
+      if (!normalizedFedNums.length) {
+        return null;
+      }
+
+      if (metadataIndexCacheRef.current.has(cacheKey)) {
+        return metadataIndexCacheRef.current.get(cacheKey);
+      }
+
+      const indexes = await Promise.all(
+        normalizedFedNums.map((fedNum) => ensureMetadataIndexForFed(fedNum)),
+      );
+      const merged = buildDaObjectionIndex({
+        type: "FeatureCollection",
+        features: indexes.flatMap((index) => Array.from(index.featureByDguid.values())),
+      });
+      metadataIndexCacheRef.current.set(cacheKey, merged);
+      return merged;
+    },
+    [ensureMetadataIndexForFed],
+  );
+
   useEffect(() => {
     if (panelView !== "objection" && panelView !== "counter-proposal") {
       setObjectionGeometryIndex(null);
-      setObjectionGeometryFedNum("");
       return;
     }
 
@@ -213,17 +241,23 @@ export default function UserHome() {
       panelView === "objection"
         ? objectionWorkflow.firstDguid
         : counterProposalWorkflow.firstDguid;
+    const activeWorkflowStep =
+      panelView === "objection"
+        ? objectionWorkflow.step
+        : counterProposalWorkflow.step;
     const activeFedNum = getFedNumForDguid(activeFirstDguid);
+
+    if (activeWorkflowStep >= 3) {
+      return;
+    }
 
     if (!activeFirstDguid || !activeFedNum) {
       setObjectionGeometryIndex(null);
-      setObjectionGeometryFedNum("");
       return;
     }
 
     let isCancelled = false;
     setObjectionGeometryIndex(null);
-    setObjectionGeometryFedNum(activeFedNum);
 
     ensureMetadataIndexForFed(activeFedNum)
       .then((nextIndex) => {
@@ -232,7 +266,6 @@ export default function UserHome() {
         }
 
         setObjectionGeometryIndex(nextIndex);
-        setObjectionGeometryFedNum(activeFedNum);
       })
       .catch((error) => {
         if (isCancelled) {
@@ -248,135 +281,126 @@ export default function UserHome() {
     };
   }, [
     counterProposalWorkflow.firstDguid,
+    counterProposalWorkflow.step,
     ensureMetadataIndexForFed,
     getFedNumForDguid,
     objectionWorkflow.firstDguid,
+    objectionWorkflow.step,
     panelView,
   ]);
 
-  const handleDaSelect = useCallback((dguid) => {
+  const handleDaSelect = useCallback(async (dguid) => {
     setRolloutHoverSelection(null);
     setIsRolloutOpen(false);
 
     if (panelView === "objection") {
       const currentFedNum = getFedNumForDguid(dguid);
 
-      if (objectionWorkflow.step <= 2 || !objectionWorkflow.firstDguid) {
+      if (objectionWorkflow.step === 1 || !objectionWorkflow.firstDguid) {
         setSelection({ type: "da", dguid });
+        setObjectionWorkflow(createInitialObjectionWorkflow({
+          step: 2,
+          firstDguid: dguid,
+          error: currentFedNum ? "" : "No FED assignment is available for the selected DA.",
+        }));
+        return;
       }
 
-      setObjectionWorkflow((current) => {
-        if (current.step === 1 || !current.firstDguid) {
-          return createInitialObjectionWorkflow({
-            step: 2,
-            firstDguid: dguid,
-            error: currentFedNum
-              ? ""
-              : "No FED assignment is available for the selected DA.",
-          });
-        }
+      if (objectionWorkflow.step !== 2 || objectionWorkflow.firstDguid === dguid) {
+        return;
+      }
 
-        if (current.step === 2) {
-          if (current.firstDguid === dguid) {
-            return current;
-          }
+      setSelection({ type: "da", dguid });
+      const firstDguid = objectionWorkflow.firstDguid;
+      const firstFedNum = getFedNumForDguid(firstDguid);
 
-          const firstFedNum = getFedNumForDguid(current.firstDguid);
-
-          if (!objectionGeometryIndex || !firstFedNum || objectionGeometryFedNum !== firstFedNum) {
+      try {
+        const pairIndex = await ensureMetadataIndexForFeds([firstFedNum, currentFedNum]);
+        setObjectionGeometryIndex(pairIndex);
+        setObjectionWorkflow((current) => {
+          if (current.step !== 2 || current.firstDguid !== firstDguid) return current;
+          if (!areDaNeighbours(pairIndex, firstDguid, dguid)) {
             return createInitialObjectionWorkflow({
-              step: 2,
-              firstDguid: current.firstDguid,
-              error:
-                "The selected FED geometry is still loading. Please wait a moment and pick the neighbouring DA again.",
+              error: "The second DA must be adjacent to the first one. Please select the first DA again.",
             });
           }
-
-          if (!areDaNeighbours(objectionGeometryIndex, current.firstDguid, dguid)) {
-            return createInitialObjectionWorkflow({
-              error:
-                "The second DA must be adjacent to the first one. Please select the first DA again.",
-            });
-          }
-
           return createInitialObjectionWorkflow({
             step: 3,
-            firstDguid: current.firstDguid,
+            firstDguid,
             secondDguid: dguid,
-            boundaryGeoJson: getSharedBoundaryFeatureCollection(
-              objectionGeometryIndex,
-              current.firstDguid,
-              dguid,
-            ),
+            boundaryGeoJson: getSharedBoundaryFeatureCollection(pairIndex, firstDguid, dguid),
           });
-        }
-
-        return current;
-      });
+        });
+      } catch (error) {
+        setObjectionWorkflow((current) => createInitialObjectionWorkflow({
+          step: 2,
+          firstDguid: current.firstDguid,
+          error: `Could not load the neighbouring FED geometry: ${error.message}`,
+        }));
+      }
       return;
     }
 
     if (panelView === "counter-proposal") {
       const currentFedNum = getFedNumForDguid(dguid);
 
-      if (counterProposalWorkflow.step <= 2 || !counterProposalWorkflow.firstDguid) {
+      if (counterProposalWorkflow.step === 1 || !counterProposalWorkflow.firstDguid) {
         setSelection({ type: "da", dguid });
+        setCounterProposalWorkflow(createInitialCounterProposalWorkflow({
+          step: 2,
+          firstDguid: dguid,
+          previewMode: "proposal",
+          error: currentFedNum ? "" : "No FED assignment is available for the selected DA.",
+        }));
+        return;
       }
 
-      setCounterProposalWorkflow((current) => {
-        if (current.step === 1 || !current.firstDguid) {
-          return createInitialCounterProposalWorkflow({
-            step: 2,
-            firstDguid: dguid,
-            previewMode: "proposal",
-            error: currentFedNum
-              ? ""
-              : "No FED assignment is available for the selected DA.",
-          });
-        }
+      if (counterProposalWorkflow.step !== 2 || counterProposalWorkflow.firstDguid === dguid) {
+        return;
+      }
 
-        if (current.step === 2) {
-          if (current.firstDguid === dguid) {
-            return current;
+      setSelection({ type: "da", dguid });
+      const firstDguid = counterProposalWorkflow.firstDguid;
+      const firstFedNum = getFedNumForDguid(firstDguid);
+
+      try {
+        const pairIndex = await ensureMetadataIndexForFeds([firstFedNum, currentFedNum]);
+        setObjectionGeometryIndex(pairIndex);
+        setCounterProposalWorkflow((current) => {
+          if (current.step !== 2 || current.firstDguid !== firstDguid) return current;
+          if (!areDaNeighbours(pairIndex, firstDguid, dguid)) {
+            return createInitialCounterProposalWorkflow({
+              error: "The second DA must be adjacent to the first one. Please select the first DA again.",
+            });
           }
+          const cache = buildCounterProposalCache(pairIndex, profilesByDguid, firstDguid, dguid);
 
-          const firstFedNum = getFedNumForDguid(current.firstDguid);
-
-          if (!objectionGeometryIndex || !firstFedNum || objectionGeometryFedNum !== firstFedNum) {
+          if (!cache || cache.sourceGeometryIssues?.length) {
+            const issue = cache?.sourceGeometryIssues?.[0]?.reason ?? "The selected DA geometry is unavailable.";
             return createInitialCounterProposalWorkflow({
               step: 2,
-              firstDguid: current.firstDguid,
+              firstDguid,
               previewMode: "proposal",
-              error:
-                "The selected FED geometry is still loading. Please wait a moment and pick the neighbouring DA again.",
+              error: `This neighbouring pair cannot be normalized safely: ${issue}`,
             });
           }
-
-          if (!areDaNeighbours(objectionGeometryIndex, current.firstDguid, dguid)) {
-            return createInitialCounterProposalWorkflow({
-              error:
-                "The second DA must be adjacent to the first one. Please select the first DA again.",
-            });
-          }
-
-          const cache = buildCounterProposalCache(
-            objectionGeometryIndex,
-            profilesByDguid,
-            current.firstDguid,
-            dguid,
-          );
 
           return createInitialCounterProposalWorkflow({
             step: 3,
-            firstDguid: current.firstDguid,
+            firstDguid,
             secondDguid: dguid,
             previewMode: "proposal",
             cache,
           });
-        }
-
-        return current;
-      });
+        });
+      } catch (error) {
+        setCounterProposalWorkflow((current) => createInitialCounterProposalWorkflow({
+          step: 2,
+          firstDguid: current.firstDguid,
+          previewMode: "proposal",
+          error: `Could not load the neighbouring FED geometry: ${error.message}`,
+        }));
+      }
       return;
     }
 
@@ -385,12 +409,11 @@ export default function UserHome() {
     counterProposalWorkflow.firstDguid,
     counterProposalWorkflow.step,
     getFedNumForDguid,
-    objectionGeometryFedNum,
-    objectionGeometryIndex,
     objectionWorkflow.firstDguid,
     objectionWorkflow.step,
     panelView,
     profilesByDguid,
+    ensureMetadataIndexForFeds,
   ]);
 
   const handleFedSelect = useCallback((fedNum, fedName) => {
@@ -740,10 +763,23 @@ export default function UserHome() {
       return null;
     }
 
+    const dguids = [objectionWorkflow.firstDguid, objectionWorkflow.secondDguid]
+      .filter(Boolean);
+
     return {
       boundaryGeoJson: objectionWorkflow.boundaryGeoJson,
+      featureCollection: {
+        type: "FeatureCollection",
+        features: dguids
+          .map((dguid) => objectionGeometryIndex?.featureByDguid.get(String(dguid)))
+          .filter(Boolean),
+      },
+      outerBoundaryGeoJson: getPairOuterBoundaryFeatureCollection(
+        objectionGeometryIndex,
+        dguids,
+      ),
     };
-  }, [objectionWorkflow.boundaryGeoJson, objectionWorkflow.step, panelView]);
+  }, [objectionGeometryIndex, objectionWorkflow, panelView]);
 
   const counterProposalPreview = useMemo(() => {
     if (panelView !== "counter-proposal" || !counterProposalWorkflow.cache) {
@@ -751,15 +787,36 @@ export default function UserHome() {
     }
 
     const showProposal = counterProposalWorkflow.previewMode === "proposal";
-    const showBoundary = showProposal && counterProposalWorkflow.step >= 3;
+    const showBoundary = counterProposalWorkflow.step >= 3;
     const showHandles = showProposal && counterProposalWorkflow.step === 3;
+    const originalFeatureCollection = {
+      type: "FeatureCollection",
+      features: counterProposalWorkflow.cache.originalFeatures ?? [],
+    };
+    const originalPairIndex = buildDaObjectionIndex(originalFeatureCollection);
+    const originalBoundaryGeoJson = getSharedBoundaryFeatureCollection(
+      originalPairIndex,
+      counterProposalWorkflow.firstDguid,
+      counterProposalWorkflow.secondDguid,
+    );
+    const visibleFeatureCollection = showProposal
+      ? counterProposalWorkflow.cache.currentFeatureCollection
+      : originalFeatureCollection;
+    const visiblePairIndex = showProposal
+      ? counterProposalWorkflow.cache.pairIndex
+      : originalPairIndex;
+    const dguids = [counterProposalWorkflow.firstDguid, counterProposalWorkflow.secondDguid]
+      .filter(Boolean);
 
     return {
-      featureCollection: showProposal
-        ? counterProposalWorkflow.cache.currentFeatureCollection
-        : emptyCounterProposalFeatureCollection(),
+      featureCollection: visibleFeatureCollection,
       boundaryGeoJson: showBoundary
-        ? counterProposalWorkflow.cache.sharedBoundaryGeoJson
+        ? showProposal
+          ? counterProposalWorkflow.cache.sharedBoundaryGeoJson
+          : originalBoundaryGeoJson
+        : emptyBoundaryFeatureCollection(),
+      outerBoundaryGeoJson: showBoundary
+        ? getPairOuterBoundaryFeatureCollection(visiblePairIndex, dguids)
         : emptyBoundaryFeatureCollection(),
       handleFeatureCollection: showHandles
         ? counterProposalWorkflow.cache.handleFeatureCollection
@@ -768,6 +825,37 @@ export default function UserHome() {
       editable: showHandles,
     };
   }, [counterProposalWorkflow, panelView]);
+
+  const interactionMode = useMemo(() => {
+    if (panelView === "objection") {
+      return objectionWorkflow.step >= 3
+        ? MAP_INTERACTION_MODE.OBJECTION_FOCUS
+        : MAP_INTERACTION_MODE.PAIR_SELECT;
+    }
+
+    if (panelView === "counter-proposal") {
+      if (counterProposalWorkflow.step >= 3) {
+        return counterProposalWorkflow.previewMode === "proposal"
+          ? MAP_INTERACTION_MODE.COUNTER_EDIT
+          : MAP_INTERACTION_MODE.COUNTER_REVIEW;
+      }
+      return MAP_INTERACTION_MODE.PAIR_SELECT;
+    }
+
+    return MAP_INTERACTION_MODE.BROWSE;
+  }, [counterProposalWorkflow.previewMode, counterProposalWorkflow.step, objectionWorkflow.step, panelView]);
+
+  const workflowFocusDguids = useMemo(() => {
+    if (panelView === "objection" && objectionWorkflow.step >= 3) {
+      return [objectionWorkflow.firstDguid, objectionWorkflow.secondDguid].filter(Boolean);
+    }
+
+    if (panelView === "counter-proposal" && counterProposalWorkflow.step >= 3) {
+      return [counterProposalWorkflow.firstDguid, counterProposalWorkflow.secondDguid].filter(Boolean);
+    }
+
+    return [];
+  }, [counterProposalWorkflow.firstDguid, counterProposalWorkflow.secondDguid, counterProposalWorkflow.step, objectionWorkflow.firstDguid, objectionWorkflow.secondDguid, objectionWorkflow.step, panelView]);
 
   return (
     <div className="map-page">
@@ -806,6 +894,8 @@ export default function UserHome() {
                 onToggleFullscreen={handleToggleFullscreen}
                 rolloutEnabled={isRolloutOpen}
                 rolloutCategoryId={rolloutCategoryId}
+                interactionMode={interactionMode}
+                workflowFocusDguids={workflowFocusDguids}
               />
               <CounterProposalMapToolbar
                 isVisible={panelView === "counter-proposal" && counterProposalWorkflow.step >= 3}

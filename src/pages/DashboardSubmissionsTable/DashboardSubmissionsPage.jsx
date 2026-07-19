@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 
-import columns from "./SubmissionsColumns"
-import SubmissionsTable from "./SubmissionsTable"
+import columns, { normalizeCommissionerStatus } from "./SubmissionsColumns";
+import SubmissionsTable from "./SubmissionsTable";
 import { getAllComments } from "@/services/commentsApi";
 import { useEffect, useState } from "react";
 
@@ -19,14 +19,12 @@ export default function DashBoardSubmissionsPage() {
         setSubmissions(
           data.map((submission) => ({
             id: submission.id,
-            date: submission.created_at,
-            submittedBy: submission.profile
-              ? `${submission.profile.first_name} ${submission.profile.last_name}`
-              : "Unknown",
+            submittedAt: submission.created_at,
+            submittedBy: submission.profile?.email ?? "Unknown",
             type: submission.type,
             title: submission.title,
             community_name: submission.dissemination_areas?.community_name ?? "Unknown",
-            status: submission.status,
+            status: normalizeCommissionerStatus(submission.status),
           }))
 
         );
@@ -39,13 +37,20 @@ export default function DashBoardSubmissionsPage() {
   }, []);
 
   return (
-    <div className="px-4 py-6 md:px-6">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6">
+    <div className="px-[clamp(0.5rem,2vw,1.5rem)] py-[clamp(1rem,3vw,1.5rem)]">
+      <div className="submissions-page__content flex flex-col gap-6">
         <div>
           <SubmissionsTable
             columns={columns}
             data={submissions}
-            onRowClick={() => navigate("/dashboard/workspace")}
+            onOpenAnalytics={() => navigate("/dashboard/graphs")}
+            onRowClick={(submission) =>
+              navigate(
+                submission.status === "archived"
+                  ? "/dashboard/archivedTree"
+                  : "/dashboard/workspace",
+              )
+            }
           />
         </div>
       </div>

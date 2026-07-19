@@ -2,7 +2,7 @@
 
 **Bundle audited:** `CRMP-full-data.zip` (~863 MB unpacked; 212 files in archive inventory; additional files after nested zip extraction)  
 **Audit date:** 2026-06-19  
-**Audit source:** `docs/data_schema_audit_report.txt`  
+**Audit source:** `docs/Demo-1/data_schema_audit_report.txt`  
 **Reference documents (canonical expected layout):** `CRMP-full-data/README.md`, `CRMP-full-data/redist-mini-guide.md`
 
 This document lists files and folders **described in the canonical schema** that are **absent or incomplete** in the audited zip, and summarizes **how those gaps affect the intended dataset architecture** (building-block geometry + profile joins + FED statistics). Paths and naming match the schema documents.

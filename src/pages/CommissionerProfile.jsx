@@ -7,7 +7,7 @@ import { useAuth } from "@/contexts/AuthContext.jsx";
 import { authApi } from "@/services/authApi.js";
 
 const actionButtonClassName = "w-auto min-w-0 px-6 py-2";
-const secondaryActionButtonClassName = `${actionButtonClassName} border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:text-gray-900`;
+const secondaryActionButtonClassName = actionButtonClassName;
 const inviteTriggerButtonClassName = "w-fit min-w-0 border-[#1a73e8] bg-transparent px-4 py-1.5 text-[#1a73e8] hover:bg-[#e8f0fe] hover:text-[#1a73e8]";
 
 function profileFormFromUser(user) {
@@ -157,7 +157,7 @@ function CommissionerInformationForm() {
               disabled={isSubmitting}
               onClick={handleCancel}
               type="button"
-              variant="outline"
+              variant="destructive"
             >
               Cancel Changes
             </Button>
@@ -266,7 +266,7 @@ export default function CommissionerProfile() {
                 disabled={isSendingInvite}
                 onClick={handleInviteCancel}
                 type="button"
-                variant="outline"
+                variant="destructive"
               >
                 Cancel
               </Button>
@@ -334,7 +334,7 @@ export default function CommissionerProfile() {
                   setIsInviteConfirmationOpen(false);
                 }}
                 type="button"
-                variant="outline"
+                variant="destructive"
               >
                 Cancel
               </Button>

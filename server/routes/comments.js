@@ -1,5 +1,9 @@
 import { Router } from "express";
-import { getSupabaseClient } from "../lib/supabase.js";
+import {
+  getSupabaseClient,
+  getSupabaseProfileEmailsAsAdmin,
+} from "../lib/supabase.js";
+import { requireAuth } from "../middleware/requireAuth.js";
 
 const router = Router();
 
@@ -32,8 +36,17 @@ router.get("/proposal/:proposalId", async (req, res) => {
 
 
 
-// Get all comments
-router.get("/", async (req, res) => {
+function requireCommissioner(req, res, next) {
+  if (req.profile?.role !== "commissioner") {
+    res.status(403).json({ error: "Commissioner access is required." });
+    return;
+  }
+
+  next();
+}
+
+// Get all comments for the Commissioner submissions table.
+router.get("/", requireAuth, requireCommissioner, async (req, res) => {
   const supabase = getSupabaseClient();
 
   const { data, error } = await supabase
@@ -51,18 +64,10 @@ router.get("/", async (req, res) => {
 
   let profiles = [];
 
-  if (userIds.length > 0) {
-    const { data: profileData, error: profileError } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name")
-      .in("id", userIds);
-
-
-    if (profileError) {
-      return res.status(500).json({ error: profileError.message });
-    }
-
-    profiles = profileData;
+  try {
+    profiles = await getSupabaseProfileEmailsAsAdmin(userIds);
+  } catch (profileError) {
+    return res.status(500).json({ error: profileError.message });
   }
 
   // Merge profiles into submissions

@@ -43,6 +43,7 @@ export async function getAllComments(){
         `/api/comments/`, 
         {
             method:"GET",
+            credentials:"include",
         }
     );
 
