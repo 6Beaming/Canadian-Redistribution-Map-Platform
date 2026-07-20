@@ -132,13 +132,21 @@ export default function DashboardHome() {
   }, [isRolloutOpen]);
 
   const handleDaSelect = useCallback((dguid) => {
-    setSelection({ type: "da", dguid });
+    setSelection((current) =>
+      current?.type === "da" && String(current.dguid) === String(dguid)
+        ? null
+        : { type: "da", dguid },
+    );
     setRolloutHoverSelection(null);
     setIsRolloutOpen(false);
   }, []);
 
   const handleFedSelect = useCallback((fedNum, fedName) => {
-    setSelection({ type: "fed", fedNum, fedName });
+    setSelection((current) =>
+      current?.type === "fed" && String(current.fedNum) === String(fedNum)
+        ? null
+        : { type: "fed", fedNum, fedName },
+    );
     setRolloutHoverSelection(null);
     setIsRolloutOpen(false);
   }, []);

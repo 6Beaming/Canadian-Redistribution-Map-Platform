@@ -405,7 +405,11 @@ export default function UserHome() {
       return;
     }
 
-    setSelection({ type: "da", dguid });
+    setSelection((current) =>
+      current?.type === "da" && String(current.dguid) === String(dguid)
+        ? null
+        : { type: "da", dguid },
+    );
   }, [
     counterProposalWorkflow.firstDguid,
     counterProposalWorkflow.step,
@@ -418,7 +422,11 @@ export default function UserHome() {
   ]);
 
   const handleFedSelect = useCallback((fedNum, fedName) => {
-    setSelection({ type: "fed", fedNum, fedName });
+    setSelection((current) =>
+      current?.type === "fed" && String(current.fedNum) === String(fedNum)
+        ? null
+        : { type: "fed", fedNum, fedName },
+    );
     setRolloutHoverSelection(null);
     setIsRolloutOpen(false);
   }, []);
@@ -495,6 +503,8 @@ export default function UserHome() {
   const handleObjectionBackStep = useCallback(() => {
     if (objectionWorkflow.step === 2) {
       setSelection(null);
+    } else if (objectionWorkflow.step === 3 && objectionWorkflow.firstDguid) {
+      setSelection({ type: "da", dguid: objectionWorkflow.firstDguid });
     }
 
     setObjectionWorkflow((current) => {
@@ -520,7 +530,7 @@ export default function UserHome() {
         boundaryGeoJson: current.boundaryGeoJson,
       });
     });
-  }, [objectionWorkflow.step]);
+  }, [objectionWorkflow.firstDguid, objectionWorkflow.step]);
 
   const handleObjectionConfirmReview = useCallback(() => {
     setObjectionWorkflow((current) => {
@@ -538,6 +548,11 @@ export default function UserHome() {
   const handleCounterProposalBackStep = useCallback(() => {
     if (counterProposalWorkflow.step === 2) {
       setSelection(null);
+    } else if (
+      counterProposalWorkflow.step === 3
+      && counterProposalWorkflow.firstDguid
+    ) {
+      setSelection({ type: "da", dguid: counterProposalWorkflow.firstDguid });
     }
 
     setCounterProposalWorkflow((current) => {
@@ -567,7 +582,7 @@ export default function UserHome() {
 
       return current;
     });
-  }, [counterProposalWorkflow.step]);
+  }, [counterProposalWorkflow.firstDguid, counterProposalWorkflow.step]);
 
   const handleCounterProposalConfirmEdit = useCallback(() => {
     setCounterProposalWorkflow((current) => {
