@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
 import { MapInfoPanel, getDefaultPanelView } from "@/components/non_prebuilt/MapInfoPanel.jsx";
 import { MapRegionSelector } from "@/components/non_prebuilt/MapRegionSelector.jsx";
+import { useAuth } from "@/contexts/AuthContext.jsx";
 import { DEFAULT_ROLLOUT_CATEGORY_ID } from "@/lib/map/rolloutPlan.js";
+import { getProvinceMapView } from "@/lib/map/provinceView.js";
 import { mapApi } from "@/services/mapApi.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
 import { loadSubmissionHeatmap } from "@/lib/map/heatmap.js";
@@ -12,6 +14,7 @@ import { subscribeWorkspaceState } from "@/services/tempWorkspace.js";
 import "@/styles/map.css";
 
 export default function DashboardHome({ mapSearchTarget = null }) {
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState("Loading map...");
   const [selection, setSelection] = useState(null);
@@ -24,6 +27,11 @@ export default function DashboardHome({ mapSearchTarget = null }) {
   const [heatmap, setHeatmap] = useState(null);
   const [archivedMap, setArchivedMap] = useState(null);
   const initialArchivedMapEnabled = searchParams.get("archivedMap") === "1";
+  const commissionerProvinceView = useMemo(
+    () => getProvinceMapView(user?.province),
+    [user?.province],
+  );
+  const activeMapTarget = mapSearchTarget ?? commissionerProvinceView?.mapTarget ?? null;
 
   useEffect(() => {
     let isMounted = true;
@@ -188,7 +196,8 @@ export default function DashboardHome({ mapSearchTarget = null }) {
               />
               <MapCanvas
                 isFullscreen={isFullscreen}
-                mapSearchTarget={mapSearchTarget}
+                mapSearchTarget={activeMapTarget}
+                highlightedProvincePrUid={commissionerProvinceView?.pruid ?? null}
                 selection={selection}
                 externalHoverSelection={rolloutHoverSelection}
                 onDaSelect={handleDaSelect}

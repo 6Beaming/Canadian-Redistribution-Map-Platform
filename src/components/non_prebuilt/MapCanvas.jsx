@@ -129,6 +129,27 @@ function getMapTargetViewport(target) {
   return viewport.map((corner) => corner.slice(0, 2));
 }
 
+function getMapTargetFitBoundsOptions(target) {
+  const options = target?.fitBoundsOptions;
+
+  return {
+    padding: options?.padding ?? 72,
+    maxZoom: Number.isFinite(options?.maxZoom) ? options.maxZoom : 15,
+  };
+}
+
+function provinceHighlightFilter(pruid) {
+  if (!pruid) {
+    return ["==", ["get", "fed_num"], ""];
+  }
+
+  return [
+    "==",
+    ["slice", ["to-string", ["get", "fed_num"]], 0, 2],
+    String(pruid),
+  ];
+}
+
 function createFullscreenControl(buttonRef, getIsFullscreen, onToggle) {
   return {
     onAdd() {
@@ -521,6 +542,7 @@ function buildWorkflowFocusExclusionFilter(dguids) {
 export function MapCanvas({
   isFullscreen = false,
   mapSearchTarget = null,
+  highlightedProvincePrUid = null,
   postalAreaTarget = null,
   selection = null,
   externalHoverSelection = null,
@@ -821,17 +843,15 @@ export function MapCanvas({
   useEffect(() => {
     const map = mapRef.current;
     const coordinates = getMapTargetCoordinates(mapSearchTarget);
+    const viewport = getMapTargetViewport(mapSearchTarget);
 
-    if (!map || !isMapReadyRef.current || !coordinates) {
+    if (!map || !isMapReadyRef.current || (!coordinates && !viewport)) {
       return;
     }
 
-    const viewport = getMapTargetViewport(mapSearchTarget);
-
     if (viewport) {
       map.fitBounds(viewport, {
-        padding: 72,
-        maxZoom: 15,
+        ...getMapTargetFitBoundsOptions(mapSearchTarget),
         duration: 700,
       });
     } else {
@@ -846,18 +866,31 @@ export function MapCanvas({
       });
     }
 
-    if (mapSearchTarget?.showMarker === false) {
+    if (mapSearchTarget?.showMarker === false || !coordinates) {
       searchMarkerRef.current?.remove();
       searchMarkerRef.current = null;
-    } else if (!searchMarkerRef.current) {
-      searchMarkerRef.current = new maplibregl.Marker({
-        color: "#1a73e8",
-      });
+    } else {
+      if (!searchMarkerRef.current) {
+        searchMarkerRef.current = new maplibregl.Marker({
+          color: "#1a73e8",
+        });
+      }
+
+      searchMarkerRef.current.setLngLat(coordinates).addTo(map);
     }
 
-    searchMarkerRef.current?.setLngLat(coordinates).addTo(map);
     onStatusChangeRef.current?.(`Map moved to ${mapSearchTarget.label || "the selected place"}.`);
   }, [mapReadyTick, mapSearchTarget]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!map || !isMapReadyRef.current || !map.getLayer("province-highlight")) {
+      return;
+    }
+
+    map.setFilter("province-highlight", provinceHighlightFilter(highlightedProvincePrUid));
+  }, [highlightedProvincePrUid, mapReadyTick]);
 
   useEffect(() => {
     if (!isMapReadyRef.current || !applySelectionRef.current) {
@@ -1081,7 +1114,7 @@ export function MapCanvas({
     const initialView = initialViewport
       ? {
           bounds: initialViewport,
-          fitBoundsOptions: { padding: 72, maxZoom: 15 },
+          fitBoundsOptions: getMapTargetFitBoundsOptions(mapSearchTarget),
         }
       : initialCoordinates
         ? {
@@ -1263,6 +1296,26 @@ export function MapCanvas({
       map.addLayer(layer);
     }
 
+    function addProvinceHighlightLayer(useVectorTiles) {
+      const layer = {
+        id: "province-highlight",
+        type: "fill",
+        source: "fed-2023",
+        filter: provinceHighlightFilter(highlightedProvincePrUid),
+        paint: {
+          "fill-color": "#b9d4ff",
+          "fill-opacity": 0.28,
+          "fill-outline-color": TRANSPARENT_BOUNDARY_COLOR,
+        },
+      };
+
+      if (useVectorTiles) {
+        layer["source-layer"] = FED_SOURCE_LAYER;
+      }
+
+      map.addLayer(layer);
+    }
+
     function addFedOutlineLayer(useVectorTiles) {
       const layer = {
         id: "fed-outline",
@@ -1395,6 +1448,7 @@ export function MapCanvas({
           promoteId: { [FED_SOURCE_LAYER]: "fed_num" }
         });
         addFedFillLayer(true);
+        addProvinceHighlightLayer(true);
         addFedOutlineLayer(true);
         return "pmtiles";
       }
@@ -1406,6 +1460,7 @@ export function MapCanvas({
         promoteId: "fed_num"
       });
       addFedFillLayer(false);
+      addProvinceHighlightLayer(false);
       addFedOutlineLayer(false);
       return "geojson";
     }
@@ -1461,6 +1516,14 @@ export function MapCanvas({
     }
 
     function setPresentationMode(showRollout) {
+      if (map.getLayer("province-highlight")) {
+        map.setLayoutProperty(
+          "province-highlight",
+          "visibility",
+          showRollout ? "none" : "visible",
+        );
+      }
+
       if (map.getLayer("fed-fill")) {
         map.setPaintProperty(
           "fed-fill",
