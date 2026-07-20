@@ -561,6 +561,7 @@ export function MapCanvas({
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const searchMarkerRef = useRef(null);
+  const postalAreaMarkerRef = useRef(null);
   const fullscreenBtnRef = useRef(null);
   const boundaryBtnRef = useRef(null);
   const postalAreaButtonRef = useRef(null);
@@ -748,7 +749,26 @@ export function MapCanvas({
       return;
     }
 
-    const available = Boolean(getMapTargetCoordinates(postalAreaTarget));
+    const coordinates = getMapTargetCoordinates(postalAreaTarget);
+    const available = Boolean(coordinates);
+
+    if (available) {
+      if (!postalAreaMarkerRef.current) {
+        const marker = new maplibregl.Marker({ color: "#1a73e8" });
+        const markerElement = marker.getElement();
+
+        markerElement.classList.add("map-postal-area-marker");
+        markerElement.setAttribute("aria-label", "My Postal Area");
+        markerElement.setAttribute("role", "img");
+        markerElement.title = "My Postal Area";
+        postalAreaMarkerRef.current = marker;
+      }
+
+      postalAreaMarkerRef.current.setLngLat(coordinates).addTo(map);
+    } else {
+      postalAreaMarkerRef.current?.remove();
+      postalAreaMarkerRef.current = null;
+    }
 
     if (available && !postalAreaControlRef.current) {
       const control = createPostalAreaControl(postalAreaButtonRef, () => {
@@ -2446,6 +2466,8 @@ export function MapCanvas({
       archivedMapButtonRef.current = null;
       postalAreaControlRef.current = null;
       postalAreaButtonRef.current = null;
+      postalAreaMarkerRef.current?.remove();
+      postalAreaMarkerRef.current = null;
       searchMarkerRef.current?.remove();
       searchMarkerRef.current = null;
       archivedDaIdsRef.current = new Set();
