@@ -4,7 +4,8 @@ import { mountMapApiService } from "./map-api-service/index.js";
 import authRouter from "./routes/auth.js";
 import commentsRouter from "./routes/comments.js";
 import commentTagsRouter from "./routes/commentTags.js";
-import auditLogRouter from "./routes/auditLog.js";
+import workspaceRouter from "./routes/workspace.js";
+import { requireAuth } from "./middleware/requireAuth.js";
 
 
 const app = express();
@@ -35,9 +36,11 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api/auth", authRouter);
-app.use("/api/comments", commentsRouter);
+// All submission routes require a verified session. commentsRouter applies the
+// role-specific public/commissioner safeguard to each individual operation.
+app.use("/api/comments", requireAuth, commentsRouter);
 app.use("/api/comment-tags", commentTagsRouter);
-app.use("/api/audit-log", auditLogRouter);
+app.use("/api/workspace", workspaceRouter);
 
 mountMapApiService(app);
 

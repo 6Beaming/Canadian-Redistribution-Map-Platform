@@ -39,8 +39,8 @@ This project is built using the following technologies:
    ```bash
    npm install
    ```
-2. Copy `.env.example` to `.env` or `.env.local` and set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `SIGNUP_EMAIL_REDIRECT_URL`, `PASSWORD_RESET_REDIRECT_URL`, and `VITE_GOOGLE_MAPS_API_KEY`.
-   Keep the Google key in a local untracked file. Each teammate needs either the shared development key or their own key with `localhost` and `127.0.0.1` referrer access enabled in Google Cloud Console.
+2. Download the current root `.env` file from the project Google Drive shared folder and place it in the repository root. The file is Git-ignored and is the only local environment file used by this project. It contains `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `SIGNUP_EMAIL_REDIRECT_URL`, `PASSWORD_RESET_REDIRECT_URL`, and `VITE_GOOGLE_MAPS_API_KEY`.
+   Do not commit the downloaded file or create a `.env.local` override. Each teammate must use the shared project configuration or obtain a replacement Google key with `localhost` and `127.0.0.1` referrer access enabled in Google Cloud Console.
 3. Start the React frontend and Express backend:
    ```bash
    npm run dev
@@ -53,7 +53,7 @@ This project is built using the following technologies:
 - FED reference assets live in `src/data/map/reference/`.
 - Runtime lookup files live in `src/data/map/manifests/` and `src/data/map/indexes/`.
 - Raw external StatCan CSV inputs stay outside the committed map bundle under `data/external/statcan/`.
-- The current map architecture is documented in [docs/map-architecture.md](docs/map-architecture.md).
+- The current map architecture is documented in [docs/Demo-3/map-architecture.md](docs/Demo-3/map-architecture.md).
 
 ## Team information
 **Team Name:** Five Guys

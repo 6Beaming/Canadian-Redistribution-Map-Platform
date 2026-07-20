@@ -266,11 +266,11 @@ export function ProfileControl({
           <div className="border-t border-[#d8e0ea] p-2">
             <button
               type="button"
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors hover:bg-[#f3f4f6] focus-visible:bg-[#f3f4f6] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex w-full items-center gap-3 rounded-lg bg-[#b3261e] px-3 py-2.5 text-left text-sm font-medium text-white transition-colors hover:bg-[#d23f31] focus-visible:bg-[#d23f31] focus-visible:outline-none active:bg-[#8f1d18] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={isSubmitting}
               onClick={handleSignOutClick}
             >
-              <LogOut className="h-4 w-4 text-[#57606a]" />
+              <LogOut className="h-4 w-4 text-white" />
               {isSubmitting ? "Signing out" : "Sign out"}
             </button>
           </div>

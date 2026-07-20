@@ -7,7 +7,7 @@ function WorkflowActionFooter({ children, columns = 2, className }) {
   return (
     <div
       className={cn(
-        "mt-2 flex w-full items-center gap-4 border-t border-[#d7e6fb] pt-4",
+        "workflow-action-footer mt-2 flex w-full items-center gap-4 border-t border-[#d7e6fb] pt-4",
         columns === 1 ? "justify-end" : "justify-between",
         className,
       )}

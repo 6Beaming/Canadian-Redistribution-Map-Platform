@@ -3,10 +3,16 @@ import {
   getSharedBoundaryFeatureCollection,
 } from "./objectionWorkflow.js";
 import { getDaPopulationDisplay } from "./profileUtils.js";
+import "jsts/org/locationtech/jts/monkey.js";
+import GeoJSONReader from "jsts/org/locationtech/jts/io/GeoJSONReader.js";
+import IsValidOp from "jsts/org/locationtech/jts/operation/valid/IsValidOp.js";
 
 const STORAGE_KEY = "counter-proposal-cache";
 const MAX_HISTORY_ENTRIES = 10;
 const EARTH_RADIUS_METERS = 6378137;
+const GEOJSON_READER = new GeoJSONReader();
+const TOPOLOGY_AREA_EPSILON = 1e-14;
+const MINIMUM_NODE_CLEARANCE_METERS = 2;
 
 function cloneValue(value) {
   if (typeof structuredClone === "function") {
@@ -22,6 +28,10 @@ function normalizeNumber(value) {
 
 function coordinateKey(coordinate) {
   return `${normalizeNumber(coordinate[0])},${normalizeNumber(coordinate[1])}`;
+}
+
+function exactCoordinateKey(coordinate) {
+  return `${Number(coordinate[0]).toFixed(12)},${Number(coordinate[1]).toFixed(12)}`;
 }
 
 function createFeatureCollection(features = []) {
@@ -75,22 +85,6 @@ function visitGeometryCoordinates(geometry, callback) {
       });
     });
   }
-}
-
-function getCoordinateReference(geometry, polygonIndex, ringIndex, coordinateIndex) {
-  if (!geometry) {
-    return null;
-  }
-
-  if (geometry.type === "Polygon") {
-    return geometry.coordinates?.[ringIndex]?.[coordinateIndex] ?? null;
-  }
-
-  if (geometry.type === "MultiPolygon") {
-    return geometry.coordinates?.[polygonIndex]?.[ringIndex]?.[coordinateIndex] ?? null;
-  }
-
-  return null;
 }
 
 function setCoordinateReference(
@@ -324,110 +318,6 @@ function geometryAreaMeters(geometry) {
   return 0;
 }
 
-function isPointOnSegment(point, start, end, epsilon = 1e-9) {
-  const cross =
-    (point[1] - start[1]) * (end[0] - start[0]) -
-    (point[0] - start[0]) * (end[1] - start[1]);
-
-  if (Math.abs(cross) > epsilon) {
-    return false;
-  }
-
-  const dot =
-    (point[0] - start[0]) * (end[0] - start[0]) +
-    (point[1] - start[1]) * (end[1] - start[1]);
-
-  if (dot < -epsilon) {
-    return false;
-  }
-
-  const squaredLength =
-    (end[0] - start[0]) * (end[0] - start[0]) +
-    (end[1] - start[1]) * (end[1] - start[1]);
-
-  return dot <= squaredLength + epsilon;
-}
-
-function classifyPointInRing(point, ring) {
-  if (!Array.isArray(ring) || ring.length < 3) {
-    return "outside";
-  }
-
-  let inside = false;
-
-  for (let index = 0, previous = ring.length - 1; index < ring.length; previous = index, index += 1) {
-    const currentPoint = ring[index];
-    const previousPoint = ring[previous];
-
-    if (isPointOnSegment(point, previousPoint, currentPoint)) {
-      return "boundary";
-    }
-
-    const intersects =
-      currentPoint[1] > point[1] !== previousPoint[1] > point[1] &&
-      point[0] <
-        ((previousPoint[0] - currentPoint[0]) * (point[1] - currentPoint[1])) /
-          (previousPoint[1] - currentPoint[1]) +
-          currentPoint[0];
-
-    if (intersects) {
-      inside = !inside;
-    }
-  }
-
-  return inside ? "inside" : "outside";
-}
-
-function isPointCoveredByPolygon(point, polygon) {
-  if (!Array.isArray(polygon) || !polygon.length) {
-    return false;
-  }
-
-  const outerRingPosition = classifyPointInRing(point, polygon[0]);
-
-  if (outerRingPosition === "outside") {
-    return false;
-  }
-
-  if (outerRingPosition === "boundary") {
-    return true;
-  }
-
-  for (const hole of polygon.slice(1)) {
-    const holePosition = classifyPointInRing(point, hole);
-
-    if (holePosition === "boundary") {
-      return true;
-    }
-
-    if (holePosition === "inside") {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-function isPointInGeometry(point, geometry) {
-  if (!geometry) {
-    return false;
-  }
-
-  if (geometry.type === "Polygon") {
-    return isPointCoveredByPolygon(point, geometry.coordinates);
-  }
-
-  if (geometry.type === "MultiPolygon") {
-    return geometry.coordinates.some((polygon) => isPointCoveredByPolygon(point, polygon));
-  }
-
-  return false;
-}
-
-function isPointWithinFeatureSet(features, point) {
-  return features.some((feature) => isPointInGeometry(point, feature.geometry));
-}
-
 function getRingReference(geometry, polygonIndex, ringIndex) {
   if (!geometry) {
     return null;
@@ -455,138 +345,11 @@ function coordinatesEqual(left, right, epsilon = 1e-9) {
   );
 }
 
-function segmentLengthMeters(start, end) {
-  const [x0, y0] = projectLngLatToMeters(start);
-  const [x1, y1] = projectLngLatToMeters(end);
-  return Math.hypot(x1 - x0, y1 - y0);
-}
-
-function getSegmentSampleCount(start, end) {
-  return Math.min(240, Math.max(24, Math.ceil(segmentLengthMeters(start, end) / 1500)));
-}
-
-function visitGeometrySegments(featureDguid, geometry, callback) {
-  if (!geometry) {
-    return;
-  }
-
-  const visitRingSegments = (ring, polygonIndex, ringIndex) => {
-    if (!Array.isArray(ring) || ring.length < 2) {
-      return;
-    }
-
-    const segmentCount = ring.length - 1;
-
-    for (let segmentIndex = 0; segmentIndex < segmentCount; segmentIndex += 1) {
-      callback({
-        featureDguid,
-        polygonIndex,
-        ringIndex,
-        ringLength: ring.length,
-        segmentCount,
-        segmentIndex,
-        startIndex: segmentIndex,
-        endIndex: segmentIndex + 1,
-        start: ring[segmentIndex],
-        end: ring[segmentIndex + 1],
-      });
-    }
-  };
-
-  if (geometry.type === "Polygon") {
-    geometry.coordinates.forEach((ring, ringIndex) => {
-      visitRingSegments(ring, 0, ringIndex);
-    });
-    return;
-  }
-
-  if (geometry.type === "MultiPolygon") {
-    geometry.coordinates.forEach((polygon, polygonIndex) => {
-      polygon.forEach((ring, ringIndex) => {
-        visitRingSegments(ring, polygonIndex, ringIndex);
-      });
-    });
-  }
-}
-
 function interpolateCoordinate(start, end, weight) {
   return [
     start[0] + (end[0] - start[0]) * weight,
     start[1] + (end[1] - start[1]) * weight,
   ];
-}
-
-function isSegmentWithinFeatureSet(features, start, end, sampleCount = 18) {
-  for (let step = 0; step <= sampleCount; step += 1) {
-    const weight = step / sampleCount;
-    const point = interpolateCoordinate(start, end, weight);
-
-    if (!isPointWithinFeatureSet(features, point)) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-function getRingMoveIndex(ring, coordinateIndex) {
-  if (!Array.isArray(ring) || ring.length < 2) {
-    return -1;
-  }
-
-  const lastIndex = ring.length - 1;
-  return coordinateIndex === lastIndex ? 0 : coordinateIndex;
-}
-
-function buildChangedSegmentEntries(feature, occurrence) {
-  const ring = getRingReference(
-    feature?.geometry,
-    occurrence.polygonIndex,
-    occurrence.ringIndex,
-  );
-
-  if (!Array.isArray(ring) || ring.length < 4) {
-    return [];
-  }
-
-  const moveIndex = getRingMoveIndex(ring, occurrence.coordinateIndex);
-
-  if (moveIndex < 0 || moveIndex >= ring.length - 1) {
-    return [];
-  }
-
-  const lastIndex = ring.length - 1;
-  const previousStartIndex = moveIndex === 0 ? lastIndex - 1 : moveIndex - 1;
-  const previousEndIndex = moveIndex === 0 ? lastIndex : moveIndex;
-  const nextStartIndex = moveIndex;
-  const nextEndIndex = moveIndex + 1;
-
-  return [
-    {
-      featureDguid: occurrence.featureDguid,
-      polygonIndex: occurrence.polygonIndex,
-      ringIndex: occurrence.ringIndex,
-      ringLength: ring.length,
-      segmentCount: ring.length - 1,
-      segmentIndex: previousStartIndex,
-      startIndex: previousStartIndex,
-      endIndex: previousEndIndex,
-      start: ring[previousStartIndex],
-      end: ring[previousEndIndex],
-    },
-    {
-      featureDguid: occurrence.featureDguid,
-      polygonIndex: occurrence.polygonIndex,
-      ringIndex: occurrence.ringIndex,
-      ringLength: ring.length,
-      segmentCount: ring.length - 1,
-      segmentIndex: nextStartIndex,
-      startIndex: nextStartIndex,
-      endIndex: nextEndIndex,
-      start: ring[nextStartIndex],
-      end: ring[nextEndIndex],
-    },
-  ].filter((entry) => !coordinatesEqual(entry.start, entry.end));
 }
 
 function buildMovedCurrentFeatures(currentFeatures, handle, nextCoordinate) {
@@ -614,128 +377,344 @@ function buildMovedCurrentFeatures(currentFeatures, handle, nextCoordinate) {
   return nextCurrentFeatures;
 }
 
-function segmentsAreEquivalent(left, right) {
+function isFiniteCoordinate(coordinate) {
   return (
-    (coordinatesEqual(left.start, right.start) && coordinatesEqual(left.end, right.end)) ||
-    (coordinatesEqual(left.start, right.end) && coordinatesEqual(left.end, right.start))
+    Array.isArray(coordinate) &&
+    Number.isFinite(Number(coordinate[0])) &&
+    Number.isFinite(Number(coordinate[1]))
   );
 }
 
-function segmentsAreAdjacent(left, right) {
+function projectGeoJsonCoordinates(coordinates) {
+  if (!Array.isArray(coordinates)) {
+    return coordinates;
+  }
+
   if (
-    left.featureDguid !== right.featureDguid ||
-    left.polygonIndex !== right.polygonIndex ||
-    left.ringIndex !== right.ringIndex
+    coordinates.length >= 2 &&
+    Number.isFinite(Number(coordinates[0])) &&
+    Number.isFinite(Number(coordinates[1]))
+  ) {
+    return projectLngLatToMeters(coordinates);
+  }
+
+  return coordinates.map(projectGeoJsonCoordinates);
+}
+
+function projectGeoJsonGeometry(geometry) {
+  if (!geometry?.type || !geometry.coordinates) {
+    return null;
+  }
+
+  return {
+    type: geometry.type,
+    coordinates: projectGeoJsonCoordinates(geometry.coordinates),
+  };
+}
+
+function readProjectedGeometry(geometry) {
+  const projectedGeometry = projectGeoJsonGeometry(geometry);
+  return projectedGeometry ? GEOJSON_READER.read(projectedGeometry) : null;
+}
+
+function readProjectedPoint(coordinate) {
+  return GEOJSON_READER.read({
+    type: "Point",
+    coordinates: projectLngLatToMeters(coordinate),
+  });
+}
+
+function isValidRing(ring) {
+  if (
+    !Array.isArray(ring) ||
+    ring.length < 4 ||
+    !coordinatesEqual(ring[0], ring[ring.length - 1]) ||
+    !ring.every(isFiniteCoordinate)
   ) {
     return false;
   }
 
-  if (left.segmentIndex === right.segmentIndex) {
-    return true;
+  for (let index = 0; index < ring.length - 1; index += 1) {
+    if (coordinatesEqual(ring[index], ring[index + 1])) {
+      return false;
+    }
   }
 
-  if (Math.abs(left.segmentIndex - right.segmentIndex) === 1) {
-    return true;
-  }
-
-  return (
-    (left.segmentIndex === 0 && right.segmentIndex === left.segmentCount - 1) ||
-    (right.segmentIndex === 0 && left.segmentIndex === right.segmentCount - 1)
-  );
+  return ringAreaMeters(ring) > 0;
 }
 
-function segmentsShareEndpoint(left, right) {
-  return (
-    coordinatesEqual(left.start, right.start) ||
-    coordinatesEqual(left.start, right.end) ||
-    coordinatesEqual(left.end, right.start) ||
-    coordinatesEqual(left.end, right.end)
-  );
-}
-
-function orientation(start, middle, end, epsilon = 1e-12) {
-  const value =
-    (middle[1] - start[1]) * (end[0] - middle[0]) -
-    (middle[0] - start[0]) * (end[1] - middle[1]);
-
-  if (Math.abs(value) <= epsilon) {
-    return 0;
+function isFeatureGeometryStructurallyValid(geometry) {
+  if (geometry?.type === "Polygon") {
+    return geometry.coordinates.every(isValidRing);
   }
 
-  return value > 0 ? 1 : -1;
-}
-
-function segmentsConflict(left, right) {
-  if (segmentsAreEquivalent(left, right)) {
-    return false;
-  }
-
-  const endpointTouch = segmentsShareEndpoint(left, right);
-
-  const o1 = orientation(left.start, left.end, right.start);
-  const o2 = orientation(left.start, left.end, right.end);
-  const o3 = orientation(right.start, right.end, left.start);
-  const o4 = orientation(right.start, right.end, left.end);
-
-  if (o1 !== o2 && o3 !== o4) {
-    return !endpointTouch;
-  }
-
-  if (o1 === 0 && isPointOnSegment(right.start, left.start, left.end)) {
-    return !endpointTouch;
-  }
-
-  if (o2 === 0 && isPointOnSegment(right.end, left.start, left.end)) {
-    return !endpointTouch;
-  }
-
-  if (o3 === 0 && isPointOnSegment(left.start, right.start, right.end)) {
-    return !endpointTouch;
-  }
-
-  if (o4 === 0 && isPointOnSegment(left.end, right.start, right.end)) {
-    return !endpointTouch;
+  if (geometry?.type === "MultiPolygon") {
+    return geometry.coordinates.every(
+      (polygon) => Array.isArray(polygon) && polygon.length > 0 && polygon.every(isValidRing),
+    );
   }
 
   return false;
 }
 
-function isValidRing(ring) {
-  return Array.isArray(ring) && ring.length >= 4 && coordinatesEqual(ring[0], ring[ring.length - 1]);
+function getGeometryValidationIssue(geometry) {
+  try {
+    const projectedGeometry = readProjectedGeometry(geometry);
+
+    if (!projectedGeometry) {
+      return { reason: "Geometry could not be read." };
+    }
+
+    const validity = new IsValidOp(projectedGeometry);
+
+    if (validity.isValid()) {
+      return null;
+    }
+
+    return {
+      reason: validity.getValidationError()?.getMessage() ?? "Invalid geometry.",
+    };
+  } catch {
+    return { reason: "Geometry could not be validated." };
+  }
 }
 
-function isFeatureGeometryWithinAllowedRegion(allowedFeatures, feature) {
-  let isValid = true;
-
-  visitGeometryCoordinates(feature.geometry, ({ coordinate }) => {
-    if (!isValid || isPointWithinFeatureSet(allowedFeatures, coordinate)) {
-      return;
-    }
-
-    isValid = false;
-  });
-
-  if (!isValid) {
-    return false;
+function visitGeometryRings(geometry, callback) {
+  if (geometry?.type === "Polygon") {
+    geometry.coordinates.forEach((ring, ringIndex) => callback(ring, 0, ringIndex));
+    return;
   }
 
-  visitGeometrySegments(getFeatureDguid(feature), feature.geometry, (segment) => {
-    if (
-      !isValid ||
-      isSegmentWithinFeatureSet(
-        allowedFeatures,
-        segment.start,
-        segment.end,
-        getSegmentSampleCount(segment.start, segment.end),
-      )
-    ) {
+  if (geometry?.type === "MultiPolygon") {
+    geometry.coordinates.forEach((polygon, polygonIndex) => {
+      polygon.forEach((ring, ringIndex) => callback(ring, polygonIndex, ringIndex));
+    });
+  }
+}
+
+function buildDuplicateVertexRemovalCandidates(feature) {
+  const candidates = [];
+
+  visitGeometryRings(feature.geometry, (ring, polygonIndex, ringIndex) => {
+    if (!Array.isArray(ring) || ring.length < 5) {
       return;
     }
 
-    isValid = false;
+    const firstIndexByCoordinate = new Map();
+
+    for (let coordinateIndex = 0; coordinateIndex < ring.length - 1; coordinateIndex += 1) {
+      const coordinate = ring[coordinateIndex];
+      const key = exactCoordinateKey(coordinate);
+      const firstIndex = firstIndexByCoordinate.get(key);
+
+      if (firstIndex === undefined) {
+        firstIndexByCoordinate.set(key, coordinateIndex);
+        continue;
+      }
+
+      const candidate = cloneValue(feature);
+      const candidateRing = getRingReference(
+        candidate.geometry,
+        polygonIndex,
+        ringIndex,
+      );
+
+      candidateRing?.splice(coordinateIndex, 1);
+      candidates.push({
+        feature: candidate,
+        removedCoordinate: [...coordinate],
+        polygonIndex,
+        ringIndex,
+        coordinateIndex,
+        duplicateOfIndex: firstIndex,
+      });
+    }
   });
 
-  return isValid;
+  return candidates;
+}
+
+function repairDuplicateRingVertex(feature) {
+  const sourceFeature = cloneValue(feature);
+  const sourceIssue = getGeometryValidationIssue(sourceFeature.geometry);
+
+  if (!sourceIssue) {
+    return { feature: sourceFeature, repair: null, issue: null };
+  }
+
+  const sourceArea = geometryAreaMeters(sourceFeature.geometry);
+  const repair = buildDuplicateVertexRemovalCandidates(sourceFeature)
+    .filter(({ feature: candidate }) => isFeatureGeometryStructurallyValid(candidate.geometry))
+    .filter(({ feature: candidate }) => !getGeometryValidationIssue(candidate.geometry))
+    .sort((left, right) => {
+      const leftAreaDelta = Math.abs(geometryAreaMeters(left.feature.geometry) - sourceArea);
+      const rightAreaDelta = Math.abs(geometryAreaMeters(right.feature.geometry) - sourceArea);
+      return leftAreaDelta - rightAreaDelta;
+    })[0];
+
+  if (!repair) {
+    return { feature: sourceFeature, repair: null, issue: sourceIssue };
+  }
+
+  const repairedArea = geometryAreaMeters(repair.feature.geometry);
+
+  return {
+    feature: repair.feature,
+    repair: {
+      type: "remove-duplicate-ring-vertex",
+      dguid: getFeatureDguid(sourceFeature),
+      removedCoordinate: repair.removedCoordinate,
+      polygonIndex: repair.polygonIndex,
+      ringIndex: repair.ringIndex,
+      coordinateIndex: repair.coordinateIndex,
+      duplicateOfIndex: repair.duplicateOfIndex,
+      areaDeltaMeters: repairedArea - sourceArea,
+    },
+    issue: null,
+  };
+}
+
+function normalizeCounterProposalSourceFeatures(features) {
+  const repairs = [];
+  const issues = [];
+  const normalizedFeatures = features.map((feature) => {
+    const result = repairDuplicateRingVertex(feature);
+
+    if (result.repair) {
+      repairs.push(result.repair);
+    }
+
+    if (result.issue) {
+      issues.push({
+        dguid: getFeatureDguid(feature),
+        ...result.issue,
+      });
+    }
+
+    return result.feature;
+  });
+
+  return { features: normalizedFeatures, repairs, issues };
+}
+
+/**
+ * JSTS is the authoritative topology check for an edited DA pair.  Both DA
+ * geometries must stay valid, remain covered by their original combined area,
+ * have no interior overlap, and still cover exactly that original area.  The
+ * final equality check catches both illegal cuts (gaps) and folded overlaps.
+ */
+function hasValidCounterProposalTopology(originalFeatures, currentFeatures) {
+  try {
+    if (!Array.isArray(originalFeatures) || !Array.isArray(currentFeatures) || currentFeatures.length !== 2) {
+      return false;
+    }
+
+    const originalGeometries = originalFeatures.map((feature) =>
+      readProjectedGeometry(feature.geometry),
+    );
+    const currentGeometries = currentFeatures.map((feature) =>
+      readProjectedGeometry(feature.geometry),
+    );
+
+    if (originalGeometries.some((geometry) => !geometry?.isValid())) {
+      return false;
+    }
+
+    if (currentGeometries.some((geometry) => !geometry?.isValid())) {
+      return false;
+    }
+
+    const allowedArea = originalGeometries[0].union(originalGeometries[1]);
+    const currentArea = currentGeometries[0].union(currentGeometries[1]);
+
+    if (currentGeometries.some((geometry) => !allowedArea.covers(geometry))) {
+      return false;
+    }
+
+    const interiorOverlap = currentGeometries[0]
+      .intersection(currentGeometries[1])
+      .getArea();
+
+    return interiorOverlap <= TOPOLOGY_AREA_EPSILON && allowedArea.equalsTopo(currentArea);
+  } catch {
+    // JSTS throws a topology error for invalid candidate geometries. Treat it
+    // exactly like a rejected drag rather than leaving the map in an invalid state.
+    return false;
+  }
+}
+
+function visitRingSegments(ring, callback) {
+  if (!Array.isArray(ring) || ring.length < 2) {
+    return;
+  }
+
+  for (let index = 0; index < ring.length - 1; index += 1) {
+    callback(ring[index], ring[index + 1]);
+  }
+}
+
+function visitGeometrySegments(geometry, callback) {
+  if (geometry?.type === "Polygon") {
+    geometry.coordinates.forEach((ring) => visitRingSegments(ring, callback));
+    return;
+  }
+
+  if (geometry?.type === "MultiPolygon") {
+    geometry.coordinates.forEach((polygon) => {
+      polygon.forEach((ring) => visitRingSegments(ring, callback));
+    });
+  }
+}
+
+function hasSufficientNodeClearance(currentFeatures, nextCoordinate) {
+  const nonIncidentSegments = [];
+
+  currentFeatures.forEach((feature) => {
+    visitGeometrySegments(feature.geometry, (start, end) => {
+      if (coordinatesEqual(start, nextCoordinate) || coordinatesEqual(end, nextCoordinate)) {
+        return;
+      }
+
+      nonIncidentSegments.push([
+        projectLngLatToMeters(start),
+        projectLngLatToMeters(end),
+      ]);
+    });
+  });
+
+  if (!nonIncidentSegments.length) {
+    return true;
+  }
+
+  const candidatePoint = readProjectedPoint(nextCoordinate);
+  const nonIncidentBoundary = GEOJSON_READER.read({
+    type: "MultiLineString",
+    coordinates: nonIncidentSegments,
+  });
+
+  return candidatePoint.distance(nonIncidentBoundary) >= MINIMUM_NODE_CLEARANCE_METERS;
+}
+
+function isStrictlyInsideOriginalPair(originalFeatures, nextCoordinate) {
+  try {
+    const originalGeometries = originalFeatures.map((feature) =>
+      readProjectedGeometry(feature.geometry),
+    );
+
+    if (originalGeometries.some((geometry) => !geometry?.isValid())) {
+      return false;
+    }
+
+    const allowedArea = originalGeometries[0].union(originalGeometries[1]);
+    const candidatePoint = readProjectedPoint(nextCoordinate);
+
+    return (
+      allowedArea.contains(candidatePoint) &&
+      candidatePoint.distance(allowedArea.getBoundary()) >= MINIMUM_NODE_CLEARANCE_METERS
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isHandleMoveWithinAllowedRegion(cache, handle, nextCoordinate) {
@@ -743,7 +722,7 @@ function isHandleMoveWithinAllowedRegion(cache, handle, nextCoordinate) {
     return false;
   }
 
-  if (!isPointWithinFeatureSet(cache.originalFeatures, nextCoordinate)) {
+  if (!isStrictlyInsideOriginalPair(cache.originalFeatures, nextCoordinate)) {
     return false;
   }
 
@@ -752,78 +731,16 @@ function isHandleMoveWithinAllowedRegion(cache, handle, nextCoordinate) {
     handle,
     nextCoordinate,
   );
-  const featureLookup = new Map(
-    nextCurrentFeatures.map((feature) => [getFeatureDguid(feature), feature]),
-  );
-  const changedSegments = [];
 
-  for (const occurrence of handle.occurrences) {
-    const feature = featureLookup.get(occurrence.featureDguid);
-
-    if (!feature) {
-      continue;
-    }
-
-    const ring = getRingReference(
-      feature.geometry,
-      occurrence.polygonIndex,
-      occurrence.ringIndex,
-    );
-
-    if (!isValidRing(ring)) {
-      return false;
-    }
-
-    changedSegments.push(...buildChangedSegmentEntries(feature, occurrence));
-  }
-
-  if (!changedSegments.length) {
+  if (nextCurrentFeatures.some((feature) => !isFeatureGeometryStructurallyValid(feature.geometry))) {
     return false;
   }
 
-  const allSegments = [];
-
-  for (const feature of nextCurrentFeatures) {
-    if (!isFeatureGeometryWithinAllowedRegion(cache.originalFeatures, feature)) {
-      return false;
-    }
-
-    visitGeometrySegments(getFeatureDguid(feature), feature.geometry, (segment) => {
-      allSegments.push(segment);
-    });
-  }
-
-  if (allSegments.length === 0) {
+  if (!hasSufficientNodeClearance(nextCurrentFeatures, nextCoordinate)) {
     return false;
   }
 
-  for (const changedSegment of changedSegments) {
-    if (
-      !isSegmentWithinFeatureSet(
-        cache.originalFeatures,
-        changedSegment.start,
-        changedSegment.end,
-        getSegmentSampleCount(changedSegment.start, changedSegment.end),
-      )
-    ) {
-      return false;
-    }
-
-    for (const candidateSegment of allSegments) {
-      if (
-        segmentsAreAdjacent(changedSegment, candidateSegment) ||
-        segmentsAreEquivalent(changedSegment, candidateSegment)
-      ) {
-        continue;
-      }
-
-      if (segmentsConflict(changedSegment, candidateSegment)) {
-        return false;
-      }
-    }
-  }
-
-  return true;
+  return hasValidCounterProposalTopology(cache.originalFeatures, nextCurrentFeatures);
 }
 
 function constrainHandleMoveCoordinate(cache, handle, nextCoordinate) {
@@ -1022,6 +939,8 @@ export function writeCounterProposalStorage(workflow) {
       firstDguid: workflow.cache.firstDguid,
       secondDguid: workflow.cache.secondDguid,
       populationByDguid: workflow.cache.populationByDguid,
+      sourceGeometryRepairs: workflow.cache.sourceGeometryRepairs,
+      sourceGeometryIssues: workflow.cache.sourceGeometryIssues,
       currentFeatures: workflow.cache.currentFeatures,
       history: workflow.cache.history,
       future: workflow.cache.future,
@@ -1045,8 +964,21 @@ export function buildCounterProposalCache(
     return null;
   }
 
-  const originalFeatures = [cloneValue(firstFeature), cloneValue(secondFeature)];
+  const normalization = normalizeCounterProposalSourceFeatures([
+    firstFeature,
+    secondFeature,
+  ]);
+  const originalFeatures = normalization.features;
   const currentFeatures = cloneValue(originalFeatures);
+  const sourceGeometryIssues = [...normalization.issues];
+
+  if (!sourceGeometryIssues.length && !hasValidCounterProposalTopology(originalFeatures, currentFeatures)) {
+    sourceGeometryIssues.push({
+      dguid: `${String(firstDguid)}|${String(secondDguid)}`,
+      reason: "The repaired DA pair does not form a valid shared-boundary topology.",
+    });
+  }
+
   const populationByDguid = getPopulationLookup(
     profilesByDguid,
     String(firstDguid),
@@ -1061,6 +993,8 @@ export function buildCounterProposalCache(
     secondDguid: String(secondDguid),
     originalFeatures,
     populationByDguid,
+    sourceGeometryRepairs: normalization.repairs,
+    sourceGeometryIssues,
     history: [],
     future: [],
   };

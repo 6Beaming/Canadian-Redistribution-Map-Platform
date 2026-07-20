@@ -1,6 +1,6 @@
 # Actual Redistricting Data Guide
 
-This document describes the **actual** contents of `CRMP-full-data.zip` as recorded in **`docs/data_schema_audit_report.txt`** (generated 2026-06-19; bundle root `CRMP-full-data/CRMP-full-data`; **210 files** schema-sampled, **212** in archive inventory).
+This document describes the **actual** contents of `CRMP-full-data.zip` as recorded in **`docs/Demo-1/data_schema_audit_report.txt`** (generated 2026-06-19; bundle root `CRMP-full-data/CRMP-full-data`; **210 files** schema-sampled, **212** in archive inventory).
 
 It mirrors the structure of `CRMP-full-data/redist-mini-guide.md` but reflects **what is on disk**, including paths and formats not listed in the canonical schema documents.
 
@@ -239,7 +239,7 @@ Not shipped as files. Build offline from `{prov}_dissemination_areas.gpkg` touch
 
 | Item | Value |
 |------|-------|
-| Report | `docs/data_schema_audit_report.txt` |
+| Report | `docs/Demo-1/data_schema_audit_report.txt` |
 | Generated | 2026-06-19T19:37:29 |
 | Archive inventory | 212 files |
 | Schema-sampled | 210 files |

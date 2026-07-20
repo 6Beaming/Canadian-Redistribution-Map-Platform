@@ -169,6 +169,7 @@ export function buildDaObjectionIndex(geojson) {
     featureByDguid,
     adjacencyByDguid,
     boundarySegmentsByPair,
+    edgeOwners,
   };
 }
 
@@ -205,6 +206,46 @@ export function getSharedBoundaryFeatureCollection(index, leftDguid, rightDguid)
         coordinates: segment,
       },
     })),
+  };
+}
+
+export function getPairOuterBoundaryFeatureCollection(index, dguids) {
+  const focusedDguids = new Set((dguids ?? []).map(String).filter(Boolean));
+
+  if (!index?.edgeOwners || !focusedDguids.size) {
+    return emptyBoundaryFeatureCollection();
+  }
+
+  const boundaryFeatures = [];
+
+  index.edgeOwners.forEach(({ dguidSet, segment }) => {
+    const focusedOwnerCount = Array.from(dguidSet).filter((dguid) =>
+      focusedDguids.has(String(dguid)),
+    ).length;
+
+    // One focused owner means this is the pair's exterior boundary. That is
+    // true both for a coast/uncovered edge and for an edge shared with an
+    // unselected neighbour. An edge owned by both focused DAs is the editable
+    // internal boundary and is drawn separately in red.
+    if (focusedOwnerCount !== 1) {
+      return;
+    }
+
+    boundaryFeatures.push({
+      type: "Feature",
+      properties: {
+        id: `pair-outer-boundary:${boundaryFeatures.length}`,
+      },
+      geometry: {
+        type: "LineString",
+        coordinates: segment,
+      },
+    });
+  });
+
+  return {
+    type: "FeatureCollection",
+    features: boundaryFeatures,
   };
 }
 

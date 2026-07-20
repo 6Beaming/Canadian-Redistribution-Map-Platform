@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, BarChart3, ClipboardList, Map, ScrollText, Search, UserRound } from "lucide-react";
+import { ArrowLeft, ClipboardList, Search, UserRound } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ProfileControl } from "@/components/non_prebuilt/ProfileControl.jsx";
@@ -13,11 +13,20 @@ const AUTH_PATHS = new Set([
   "/sign-up"
 ]);
 
-function getBackRoute(pathname) {
-  if (
-    pathname === "/users/profile" ||
-    pathname === "/submissions"
-  ) {
+function getBackRoute(pathname, isCommissioner) {
+  if (pathname.startsWith("/dashboard/archivedTree/") && pathname.endsWith("/difference")) {
+    return "/dashboard/archivedTree";
+  }
+
+  if (pathname.startsWith("/dashboard/workspace/")) {
+    return "/dashboard/workspace";
+  }
+
+  if (pathname === "/submissions") {
+    return isCommissioner ? "/dashboard" : "/users";
+  }
+
+  if (pathname === "/users/profile") {
     return "/users";
   }
 
@@ -43,43 +52,23 @@ export default function Header() {
     return null;
   }
 
-  const backRoute = getBackRoute(pathname);
+  const isCommissioner = user?.role === "commissioner";
+  const backRoute = getBackRoute(pathname, isCommissioner);
   const isCommissionerSurface =
     pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+  const isWorkspaceReview = pathname.startsWith("/dashboard/workspace/");
+  const isArchivedDifference = pathname.startsWith("/dashboard/archivedTree/") && pathname.endsWith("/difference");
   const isPublicProfilePage = pathname === "/users/profile";
   const isPublicSubmissionsPage =
     pathname === "/submissions" || pathname.startsWith("/submissions/");
+  // A Commissioner may reach the user-submissions route from an existing link.
+  // Keep its navigation/profile context commissioner-owned and never expose the
+  // public-only "My Submissions" header action on that route.
+  const isCommissionerContext = isCommissionerSurface || (isCommissioner && isPublicSubmissionsPage);
   const showSearch =
     (!isCommissionerSurface || pathname === "/dashboard") &&
     !isPublicProfilePage &&
     !isPublicSubmissionsPage;
-  const mobileProfileActions = isCommissionerSurface
-    ? [
-        {
-          icon: BarChart3,
-          label: "Analytics",
-          onSelect: () => navigate("/dashboard/graphs"),
-        },
-        {
-          icon: ScrollText,
-          label: "Audit Logs",
-          onSelect: () => navigate("/dashboard/auditlog"),
-        },
-        {
-          icon: ClipboardList,
-          label: "User Submissions",
-          onSelect: () => navigate("/dashboard/submissionsTable"),
-        },
-      ]
-    : !isPublicProfilePage && sessionStatus === "signed-in"
-      ? [
-          {
-            icon: ClipboardList,
-            label: "My submissions",
-            onSelect: () => navigate("/submissions"),
-          },
-        ]
-      : [];
 
   async function handleSignOut() {
     if (sessionStatus !== "signed-in") {
@@ -98,25 +87,25 @@ export default function Header() {
   }
 
   return (
-    <header className="header relative z-50 flex h-14 w-full items-center justify-center border-b border-[#d7e6fb] bg-background text-[#17324d]">
-      <div className="header__left-slot absolute inset-y-0 left-0 z-10 flex items-center px-3 md:px-4">
-        {backRoute && isCommissionerSurface ? (
+    <header className="header relative z-50 grid h-14 w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center border-b border-[#d7e6fb] bg-background text-[#17324d]">
+      <div className="header__left-slot z-10 flex min-w-0 items-center px-[clamp(0.4rem,1.2vw,1rem)]">
+        {backRoute && isCommissionerContext ? (
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="header__submissions-link h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:px-4"
-            onClick={() => navigate("/dashboard")}
+            className="header__nav-button"
+            onClick={() => navigate(backRoute)}
           >
-            <Map className="h-4 w-4" aria-hidden="true" />
-            <span>Map View</span>
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            <span>{isWorkspaceReview ? "Back to Workspace" : isArchivedDifference ? "Back to Archived Tree" : "Back to Map"}</span>
           </Button>
         ) : backRoute && (isPublicProfilePage || pathname === "/submissions") ? (
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="header__submissions-link h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:px-4"
+            className="header__nav-button"
             onClick={() => navigate(backRoute)}
           >
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
@@ -145,65 +134,38 @@ export default function Header() {
           <input
             type="search"
             aria-label="Search by address or postal code"
-            className="h-10 w-full rounded-full border border-[#c9d8eb] bg-white py-2 pl-11 pr-4 text-sm text-[#17324d] shadow-[0_2px_8px_rgba(23,50,77,0.06)] outline-none transition-[border-color,box-shadow] placeholder:text-[#7a8797] focus:border-[#1a73e8] focus:shadow-[0_0_0_3px_rgba(26,115,232,0.14)]"
+            className="header__search-input h-10 w-full rounded-full border border-[#c9d8eb] bg-white py-2 pl-11 pr-4 text-[#17324d] shadow-[0_2px_8px_rgba(23,50,77,0.06)] outline-none transition-[border-color,box-shadow] placeholder:text-[#7a8797] focus:border-[#1a73e8] focus:shadow-[0_0_0_3px_rgba(26,115,232,0.14)]"
             placeholder="Search by address or postal code..."
           />
         </div>
       ) : null}
 
-      <div className="header__right-slot absolute inset-y-0 right-0 z-10 flex items-center justify-end gap-2 px-3 md:gap-4 md:px-4">
-        {isCommissionerSurface ? (
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              aria-label="Analytics"
-              className="header__submissions-link hidden h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:inline-flex md:px-4"
-              onClick={() => navigate("/dashboard/graphs")}
-            >
-              <BarChart3 className="h-4 w-4" aria-hidden="true" />
-              <span className="hidden md:inline">Analytics</span>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              aria-label="Audit logs"
-              className="header__submissions-link hidden h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:inline-flex md:px-4"
-              onClick={() => navigate("/dashboard/auditlog")}
-            >
-              <ScrollText className="h-4 w-4" aria-hidden="true" />
-              <span className="hidden md:inline">Audit Logs</span>
-            </Button>
-          </>
-        ) : null}
-
-        {isCommissionerSurface ? (
+      <div className="header__right-slot z-10 flex min-w-0 items-center justify-end gap-[clamp(0.35rem,1vw,1rem)] px-[clamp(0.4rem,1.2vw,1rem)]">
+        {isCommissionerSurface && pathname !== "/dashboard/submissionsTable" ? (
           <Button
             type="button"
             variant="outline"
             size="sm"
             aria-current={pathname === "/dashboard/submissionsTable" ? "page" : undefined}
             aria-label="User submissions"
-            className="header__submissions-link hidden h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:inline-flex md:px-4"
+            className="header__nav-button"
             onClick={() => navigate("/dashboard/submissionsTable")}
           >
             <ClipboardList className="h-4 w-4" aria-hidden="true" />
-            <span className="hidden md:inline">User Submissions</span>
+            <span>User Submissions</span>
           </Button>
-        ) : !isPublicProfilePage && sessionStatus === "signed-in" ? (
+        ) : !isCommissioner && !isPublicProfilePage && !isPublicSubmissionsPage && sessionStatus === "signed-in" ? (
           <Button
             type="button"
             variant="outline"
             size="sm"
             aria-current={pathname.startsWith("/submissions") ? "page" : undefined}
-            aria-label="My submissions"
-            className="header__submissions-link hidden h-10 gap-2 rounded-lg border border-[#8ca3bd] bg-white px-2 py-1.5 text-sm font-semibold text-[#29445f] shadow-[0_1px_3px_rgba(23,50,77,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-[#1a73e8] hover:bg-[#eef5ff] hover:text-[#1a73e8] hover:shadow-[0_3px_8px_rgba(26,115,232,0.12)] md:inline-flex md:px-4"
+            aria-label="My Submissions"
+            className="header__nav-button"
             onClick={() => navigate("/submissions")}
           >
             <ClipboardList className="h-4 w-4" aria-hidden="true" />
-            <span className="hidden md:inline">My submissions</span>
+            <span>My Submissions</span>
           </Button>
         ) : null}
 
@@ -211,11 +173,10 @@ export default function Header() {
           user={user}
           sessionStatus={sessionStatus}
           isSubmitting={isSubmitting}
-          menuActions={mobileProfileActions}
           onSignIn={() => navigate("/sign-in")}
           onSignOut={handleSignOut}
           onPrimaryAction={() =>
-            navigate(isCommissionerSurface ? "/dashboard/profile" : "/users/profile")
+            navigate(isCommissionerContext ? "/dashboard/profile" : "/users/profile")
           }
           primaryActionLabel="My profile"
           primaryActionIcon={UserRound}

@@ -1,0 +1,153 @@
+import { useEffect, useMemo, useState } from "react";
+import { Download, GitFork, Search } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { ArchivedTreeCanvas } from "@/components/non_prebuilt/ArchivedTreeCanvas.jsx";
+import { ArchivedTreePanel } from "@/components/non_prebuilt/ArchivedTreePanel.jsx";
+import {
+  buildArchiveTree,
+  filterArchiveTree,
+  findArchiveVersion,
+} from "@/lib/archiveTree.js";
+import { buildProfileIndex } from "@/lib/map/profileUtils.js";
+import { mapApi } from "@/services/mapApi.js";
+import {
+  deleteArchiveBranch,
+  getArchiveTreeRecords,
+  revertArchiveBranch,
+} from "@/services/tempWorkspace.js";
+import "@/styles/archive-tree.css";
+
+export default function ArchivedTree() {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [records, setRecords] = useState([]);
+  const [profilesByDguid, setProfilesByDguid] = useState(new Map());
+  const [query, setQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [reloadVersion, setReloadVersion] = useState(0);
+  const selectedId = searchParams.get("selected");
+
+  useEffect(() => {
+    let isMounted = true;
+    mapApi.getDaProfiles()
+      .then((payload) => {
+        if (isMounted) setProfilesByDguid(buildProfileIndex(payload).index);
+      })
+      .catch(() => {
+        // Snapshot fields remain usable when profile metadata is unavailable.
+      });
+    return () => { isMounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    getArchiveTreeRecords()
+      .then((nextRecords) => {
+        if (!isMounted) return;
+        setRecords(nextRecords);
+        setError("");
+      })
+      .catch((loadError) => {
+        if (isMounted) setError(loadError.message || "Archived records could not be loaded.");
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => { isMounted = false; };
+  }, [reloadVersion]);
+
+  const categories = useMemo(
+    () => buildArchiveTree(records, profilesByDguid),
+    [profilesByDguid, records],
+  );
+  const visibleCategories = useMemo(
+    () => filterArchiveTree(categories, query),
+    [categories, query],
+  );
+  const selection = useMemo(
+    () => findArchiveVersion(categories, selectedId),
+    [categories, selectedId],
+  );
+  const branchCount = categories.reduce((count, category) => count + category.branches.length, 0);
+  const versionCount = categories.reduce(
+    (count, category) => count + category.branches.reduce((sum, branch) => sum + branch.versions.length, 0),
+    0,
+  );
+
+  function selectVersion(_category, _branch, version) {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set("selected", version.id);
+      return next;
+    }, { replace: true });
+  }
+
+  function clearSelection() {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("selected");
+      return next;
+    }, { replace: true });
+  }
+
+  return (
+    <main className="archive-tree-page" aria-labelledby="archive-tree-title">
+      <header className="archive-tree-toolbar">
+        <div className="archive-tree-heading">
+          <span><GitFork aria-hidden="true" /></span>
+          <div>
+            <h1 id="archive-tree-title">Archived Tree</h1>
+            <p>Browse archived branches and restore historical submission versions.</p>
+          </div>
+        </div>
+        <div className="archive-tree-controls">
+          <label>
+            <Search aria-hidden="true" />
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search submissions by DA or Community Name..."
+              aria-label="Search archived submissions"
+            />
+          </label>
+          <button type="button" className="archive-export-button" title="Export is planned for a later milestone">
+            <Download aria-hidden="true" /> Export
+          </button>
+        </div>
+      </header>
+
+      {error ? <p className="archive-tree-notice" role="alert">{error}</p> : null}
+      <div className="archive-tree-summary" aria-live="polite">
+        {isLoading ? "Loading archived submissions..." : `${branchCount} branches · ${versionCount} immutable versions`}
+      </div>
+
+      <div className="archive-tree-layout">
+        <ArchivedTreeCanvas
+          categories={visibleCategories}
+          selectedVersionId={selectedId}
+          onSelect={selectVersion}
+          onOpenMap={(category) => navigate(`/dashboard?archivedMap=1&archiveCategory=${encodeURIComponent(category.id)}`)}
+        />
+        <ArchivedTreePanel
+          selection={selection}
+          onClose={clearSelection}
+          onViewDifference={(_category, branch, version) => navigate(
+            `/dashboard/archivedTree/${encodeURIComponent(version.id)}/difference?branch=${encodeURIComponent(branch.key)}`,
+          )}
+          onDeleteBranch={async (branch) => {
+            await deleteArchiveBranch(branch.key);
+            clearSelection();
+            setReloadVersion((current) => current + 1);
+          }}
+          onRevertVersion={async (branch, version) => {
+            await revertArchiveBranch(branch.key, version.id);
+            setReloadVersion((current) => current + 1);
+          }}
+        />
+      </div>
+    </main>
+  );
+}

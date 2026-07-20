@@ -2,9 +2,11 @@ import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
 import Header from "./pages/Header.jsx";
 import AcceptInvitePage from "./pages/AcceptInvitePage.jsx";
+import ArchivedTree from "./pages/ArchivedTree.jsx";
+import ArchivedDifference from "./pages/ArchivedDifference.jsx";
 import CommissionerProfile from "./pages/CommissionerProfile.jsx";
 import CommissionerWorkspace from "./pages/CommissionerWorkspace.jsx";
-import AuditLogPage from "./pages/AuditLogTable/AuditLogPage.jsx";
+import WorkspaceReview from "./pages/WorkspaceReview.jsx";
 import DashboardGraphs from "./pages/DashboardGraphs.jsx";
 import DashboardHome from "./pages/DashboardHome.jsx";
 import DashBoardSubmissionsPage from "./pages/DashboardSubmissionsTable/DashboardSubmissionsPage.jsx";
@@ -16,6 +18,7 @@ import SignUpPage from "./pages/SignUpPage.jsx";
 import UserHome from "./pages/UserHome.jsx";
 import UserProfile from "./pages/UserProfile.jsx";
 import UserResumeSubmission from "./pages/UserResumeSubmission.jsx";
+import { RouteLoadingOverlay } from "./components/non_prebuilt/RouteLoadingOverlay.jsx";
 import { Toaster } from "@/components/ui/sonner";
 
 function RequireCommissioner() {
@@ -36,20 +39,40 @@ function RequireCommissioner() {
   return <Outlet />;
 }
 
+// Public map and personal-submission routes must never become a fallback
+// surface for a signed-in Commissioner. The server enforces the same boundary
+// for public submission APIs.
+function RequirePublicUser() {
+  const { sessionStatus, user } = useAuth();
+
+  if (sessionStatus === "checking") {
+    return null;
+  }
+
+  if (user?.role === "commissioner") {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <Outlet />;
+}
+
 function App() {
   return (
     <AuthProvider>
       <Header />
+      <RouteLoadingOverlay />
 
       <Routes>
-        <Route path="/" element={<UserHome />} />
-        <Route path="/users" element={<UserHome />} />
-        <Route path="/users/profile" element={<UserProfile />} />
-        <Route path="/submissions" element={<MySubmissions />} />
-        <Route
-          path="/submissions/:submissionId"
-          element={<UserResumeSubmission />}
-        />
+        <Route element={<RequirePublicUser />}>
+          <Route path="/" element={<UserHome />} />
+          <Route path="/users" element={<UserHome />} />
+          <Route path="/users/profile" element={<UserProfile />} />
+          <Route path="/submissions" element={<MySubmissions />} />
+          <Route
+            path="/submissions/:submissionId"
+            element={<UserResumeSubmission />}
+          />
+        </Route>
         <Route path="/sign-in" element={<SignInPage />} />
         <Route path="/sign-up" element={<SignUpPage />} />
         <Route path="/forgot-password" element={<ResetPasswordRequestPage />} />
@@ -59,13 +82,15 @@ function App() {
         <Route element={<RequireCommissioner />}>
           <Route path="/dashboard" element={<DashboardHome />} />
           <Route path="/dashboard/graphs" element={<DashboardGraphs />} />
-          <Route path="/dashboard/auditlog" element={<AuditLogPage />} />
           <Route
             path="/dashboard/submissionsTable"
             element={<DashBoardSubmissionsPage />}
           />
           <Route path="/dashboard/profile" element={<CommissionerProfile />} />
           <Route path="/dashboard/workspace" element={<CommissionerWorkspace />} />
+          <Route path="/dashboard/workspace/:submissionId" element={<WorkspaceReview />} />
+          <Route path="/dashboard/archivedTree" element={<ArchivedTree />} />
+          <Route path="/dashboard/archivedTree/:submissionId/difference" element={<ArchivedDifference />} />
         </Route>
       </Routes>
       <Toaster position="top-center" offset="80px" closeButton/>

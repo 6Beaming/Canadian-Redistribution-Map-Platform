@@ -1,0 +1,58 @@
+import assert from "node:assert/strict";
+import { test } from "@jest/globals";
+import {
+  buildArchiveTree,
+  filterArchiveTree,
+  findArchiveVersion,
+} from "../src/lib/archiveTree.js";
+
+function record(id, mergedAt, extra = {}) {
+  return {
+    mergedAt,
+    mergedBy: `${id}@example.com`,
+    submission: {
+      id,
+      type: "counter-proposal",
+      dguid: "da-2",
+      neighboring_dguid: "da-1",
+      title: `Version ${id}`,
+      ...extra,
+    },
+  };
+}
+
+test("Archived Tree groups a DA pair into an ordered version branch", () => {
+  const records = [
+    record("version-2", "2026-07-20T10:00:00.000Z"),
+    record("version-1", "2026-07-19T10:00:00.000Z"),
+  ];
+  const categories = buildArchiveTree(records);
+  const branch = categories.find((entry) => entry.id === "counter-proposals").branches[0];
+
+  assert.equal(branch.key, "counter-proposal:da-1|da-2");
+  assert.deepEqual(branch.versions.map((version) => version.label), ["v1", "v2"]);
+  assert.equal(branch.latestVersion.id, "version-2");
+  assert.equal(findArchiveVersion(categories, "version-1").branch.key, branch.key);
+});
+
+test("the Supabase is_latest marker selects an older real snapshot as Latest", () => {
+  const records = [
+    record("version-1", "2026-07-19T10:00:00.000Z"),
+    record("version-2", "2026-07-20T10:00:00.000Z"),
+  ];
+  records[0].isLatest = true;
+  records[1].isLatest = false;
+  const categories = buildArchiveTree(records);
+  const branch = categories.find((entry) => entry.id === "counter-proposals").branches[0];
+
+  assert.equal(branch.latestVersion.id, "version-1");
+});
+
+test("archive search matches community name and full submission IDs", () => {
+  const profiles = new Map([["da-2", { community_name: "Whitehorse" }]]);
+  const categories = buildArchiveTree([record("archive-identifier-123", "2026-07-20T10:00:00.000Z")], profiles);
+
+  assert.equal(filterArchiveTree(categories, "Whitehorse")[2].branches.length, 1);
+  assert.equal(filterArchiveTree(categories, "identifier-123")[2].branches.length, 1);
+  assert.equal(filterArchiveTree(categories, "Dawson")[2].branches.length, 0);
+});

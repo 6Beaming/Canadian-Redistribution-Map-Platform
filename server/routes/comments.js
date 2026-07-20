@@ -1,10 +1,15 @@
 import { Router } from "express";
-import { getSupabaseClient } from "../lib/supabase.js";
+import {
+  getSupabaseClient,
+  getSupabaseProfileEmailsAsAdmin,
+} from "../lib/supabase.js";
+import { requirePublicUser } from "../middleware/requireAuth.js";
 
 const router = Router();
 
-// Get all comments for Yukon boundary proposals
-router.get("/proposal/:proposalId", async (req, res) => {
+// Public-only proposal read. requireAuth is registered in server/app.js;
+// this route adds the role boundary that prevents Commissioner fall-through.
+router.get("/proposal/:proposalId", requirePublicUser, async (req, res) => {
   const supabase = getSupabaseClient();
   const { proposalId } = req.params;
 
@@ -32,8 +37,17 @@ router.get("/proposal/:proposalId", async (req, res) => {
 
 
 
-// Get all comments
-router.get("/", async (req, res) => {
+function requireCommissioner(req, res, next) {
+  if (req.profile?.role !== "commissioner") {
+    res.status(403).json({ error: "Commissioner access is required." });
+    return;
+  }
+
+  next();
+}
+
+// Get all comments for the Commissioner submissions table.
+router.get("/", requireCommissioner, async (req, res) => {
   const supabase = getSupabaseClient();
 
   const { data, error } = await supabase
@@ -51,18 +65,10 @@ router.get("/", async (req, res) => {
 
   let profiles = [];
 
-  if (userIds.length > 0) {
-    const { data: profileData, error: profileError } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name")
-      .in("id", userIds);
-
-
-    if (profileError) {
-      return res.status(500).json({ error: profileError.message });
-    }
-
-    profiles = profileData;
+  try {
+    profiles = await getSupabaseProfileEmailsAsAdmin(userIds);
+  } catch (profileError) {
+    return res.status(500).json({ error: profileError.message });
   }
 
   // Merge profiles into submissions
@@ -76,10 +82,15 @@ router.get("/", async (req, res) => {
   res.json(result);
 });
 
-// Get all comments for a userId
-router.get("/:user_id", async (req, res) => {
+// Public-only self read. The URL id is checked against the verified session to
+// prevent a signed-in user from enumerating another user's submissions.
+router.get("/:user_id", requirePublicUser, async (req, res) => {
   const supabase = getSupabaseClient();
   const { user_id } = req.params;
+
+  if (user_id !== req.user.id) {
+    return res.status(403).json({ error: "You can only view your own submissions." });
+  }
 
   const { data, error } = await supabase
     .from("submissions")
@@ -91,10 +102,12 @@ router.get("/:user_id", async (req, res) => {
   res.json(data);
 });
 
-// Add comment to boundary proposal (only for Yukon proposals)
-router.post("/", async (req, res) => {
+// Public-only submission write. The author is derived from the verified
+// session; geometry-specific validation remains a dedicated follow-up API.
+router.post("/", requirePublicUser, async (req, res) => {
   const supabase = getSupabaseClient();
-  const { proposal_id, user_id, comment, fed_num, dguid, title, neighboring_dguid, type } = req.body;
+  const { proposal_id, comment, fed_num, dguid, title, neighboring_dguid, type } = req.body;
+  const user_id = req.user.id;
 
   // Verify proposal exists
   if (proposal_id) {
@@ -128,8 +141,9 @@ router.post("/", async (req, res) => {
   res.status(201).json(data[0]);
 });
 
-// Delete a comment/submission
-router.delete("/:commentId", async (req, res) => {
+// Public-only owned-submission delete. A Commissioner uses Workspace/Archive
+// APIs instead and cannot mutate public submissions through this route.
+router.delete("/:commentId", requirePublicUser, async (req, res) => {
   const supabase = getSupabaseClient();
   const { commentId } = req.params;
 
@@ -137,6 +151,7 @@ router.delete("/:commentId", async (req, res) => {
     .from("submissions")
     .delete()
     .eq("id", commentId)
+    .eq("user_id", req.user.id)
     .eq("type", "feedback");
 
   if (error) return res.status(500).json({ error: error.message });

@@ -19,6 +19,7 @@ import {
   getRolloutAccentColor,
   getRolloutAreas,
   getRolloutCategory,
+  isDataBlockedFed,
 } from "@/lib/map/rolloutPlan.js";
 
 const TOGGLE_SIZE = 54;
@@ -53,7 +54,7 @@ const PANEL_VIEW_ICONS = {
   "counter-proposal": GitCompareArrows,
 };
 
-function PanelModeSelector({ activeView, onViewChange, variant }) {
+function PanelModeSelector({ activeView, onViewChange, variant, workflowLocked = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const selectorRef = useRef(null);
   const views = getPanelViews(variant);
@@ -87,7 +88,14 @@ function PanelModeSelector({ activeView, onViewChange, variant }) {
     };
   }, [isOpen]);
 
+  useEffect(() => {
+    if (workflowLocked) {
+      setIsOpen(false);
+    }
+  }, [workflowLocked]);
+
   function handleSelect(nextView) {
+    if (workflowLocked) return;
     setIsOpen(false);
     onViewChange?.(nextView);
   }
@@ -100,6 +108,9 @@ function PanelModeSelector({ activeView, onViewChange, variant }) {
           className="map-info-panel__mode-trigger"
           aria-haspopup="menu"
           aria-expanded={isOpen}
+          aria-label={workflowLocked ? "Workflow selector is locked until you return to step 1" : undefined}
+          disabled={workflowLocked}
+          title={workflowLocked ? "Use the workflow's Back controls to return to step 1 before changing activities." : undefined}
           onClick={() => setIsOpen((current) => !current)}
         >
           <ActiveIcon className="map-info-panel__mode-icon" aria-hidden="true" />
@@ -110,7 +121,7 @@ function PanelModeSelector({ activeView, onViewChange, variant }) {
           />
         </button>
 
-        {isOpen ? (
+        {isOpen && !workflowLocked ? (
           <div
             className="map-info-panel__mode-menu absolute left-0 top-full z-20 w-full"
             role="menu"
@@ -375,11 +386,15 @@ function RolloutCategoryPanel({
     submenuModeRef.current = area.daItems.length ? "hover" : "none";
     setSubmenuFedNum(area.daItems.length ? area.fedNum : "");
     updateSubmenuAnchor(area.daItems.length ? anchorNode : null);
-    onHoverTargetChange?.({
-      type: "fed",
-      fedNum: area.fedNum,
-      fedName: area.name,
-    });
+    if (!area.daItems.length) {
+      onHoverTargetChange?.({
+        type: "fed",
+        fedNum: area.fedNum,
+        fedName: area.name,
+      });
+    } else {
+      onHoverTargetChange?.(null);
+    }
   }
 
   function handleFedItemLeave(area, event) {
@@ -425,27 +440,22 @@ function RolloutCategoryPanel({
       if (submenuFedNum !== area.fedNum) {
         submenuModeRef.current = "locked";
         setSubmenuFedNum(area.fedNum);
-        onHoverTargetChange?.({
-          type: "fed",
-          fedNum: area.fedNum,
-          fedName: area.name,
-        });
+        onHoverTargetChange?.(null);
         return;
       }
 
       if (submenuModeRef.current === "hover") {
         submenuModeRef.current = "locked";
         setSubmenuFedNum(area.fedNum);
-        onHoverTargetChange?.({
-          type: "fed",
-          fedNum: area.fedNum,
-          fedName: area.name,
-        });
+        onHoverTargetChange?.(null);
         return;
       }
 
       if (submenuModeRef.current === "locked") {
-        handleFedSelect(area);
+        submenuModeRef.current = "none";
+        setSubmenuFedNum("");
+        setSubmenuAnchor(null);
+        onHoverTargetChange?.(null);
         return;
       }
     }
@@ -584,6 +594,28 @@ function RolloutCategoryPanel({
   );
 }
 
+function DataBlockedFedPanel({ fedNum, fedName }) {
+  return (
+    <>
+      <header className="map-info-panel__header">
+        <h2 className="map-info-panel__title map-info-panel__title--centered">
+          {fedName || `FED ${fedNum}`}
+        </h2>
+      </header>
+      <div className="map-info-panel__body map-info-panel__body--stacked">
+        <section className="map-info-panel__blocked-notice" role="status">
+          <h3>Data currently blocked</h3>
+          <p>
+            DA-level data for this federal electoral district is not currently
+            available. Use the Toggle in the upper-left corner to view areas
+            with active data.
+          </p>
+        </section>
+      </div>
+    </>
+  );
+}
+
 export function MapInfoPanel({
   selection,
   profilesByDguid,
@@ -603,6 +635,13 @@ export function MapInfoPanel({
   onRolloutSelect,
 }) {
   const hasSelection = Boolean(selection?.type);
+  const isDataBlockedFedSelection =
+    selection?.type === "fed" && isDataBlockedFed(selection.fedNum);
+  const isWorkflowSelectorLocked =
+    variant === "user" && (
+      (panelView === "objection" && (objectionWorkflow?.step ?? 1) >= 2)
+      || (panelView === "counter-proposal" && (counterProposalWorkflow?.step ?? 1) >= 2)
+    );
   const [isMobile, setIsMobile] = useState(
     () => typeof window !== "undefined" && window.innerWidth <= 576,
   );
@@ -870,6 +909,10 @@ export function MapInfoPanel({
       );
     }
 
+    if (isDataBlockedFedSelection) {
+      return <DataBlockedFedPanel fedNum={selection.fedNum} fedName={selection.fedName} />;
+    }
+
     if (variant === "user") {
       if (!hasSelection && panelView === "statistics") {
         return (
@@ -997,11 +1040,14 @@ export function MapInfoPanel({
           </div>
         ) : null}
 
-        <PanelModeSelector
-          activeView={panelView}
-          onViewChange={onPanelViewChange}
-          variant={variant}
-        />
+        {!isDataBlockedFedSelection ? (
+          <PanelModeSelector
+            activeView={panelView}
+            onViewChange={onPanelViewChange}
+            variant={variant}
+            workflowLocked={isWorkflowSelectorLocked}
+          />
+        ) : null}
 
         <div className="map-info-panel__content">{renderPanelContent()}</div>
       </aside>

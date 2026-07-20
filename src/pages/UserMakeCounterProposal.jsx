@@ -14,6 +14,11 @@ import { getDaPanelTitle } from "@/lib/map/profileUtils.js";
 const SIGN_IN_NOTICE = "Please sign in to submit your counter-proposal.";
 const balancedActionButtonClassName = `${workflowActionButtonClassName} w-[calc(50%-0.25rem)] max-w-[188px] px-2 text-[13px]`;
 
+function SignInSubmissionNotice({ message }) {
+  if (!message) return null;
+
+  return <p className="workflow-submit-notice" role="note">{message}</p>;
+}
 
 function getDaDisplay(profilesByDguid, dguid) {
   if (!dguid) {
@@ -406,7 +411,7 @@ export default function UserMakeCounterProposal({
             {textFieldMessage ? <FieldHoverHint message={textFieldMessage} /> : null}
           </div>
 
-          <div className="group/comment-control grid min-w-0 gap-1">
+          <div className="grid min-w-0 gap-1">
             <WorkflowActionFooter className="mt-0 gap-2">
               <Button
                 className={balancedActionButtonClassName}
@@ -426,7 +431,7 @@ export default function UserMakeCounterProposal({
                 Submit
               </Button>
             </WorkflowActionFooter>
-            {textFieldMessage ? <FieldHoverHint message={textFieldMessage} /> : null}
+            <SignInSubmissionNotice message={textFieldMessage} />
           </div>
         </div>
       ) : null}

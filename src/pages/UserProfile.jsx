@@ -14,7 +14,7 @@ import { useAuth } from "@/contexts/AuthContext.jsx";
 import { authApi } from "@/services/authApi.js";
 
 const actionButtonClassName = "w-auto min-w-0 px-6 py-2";
-const secondaryActionButtonClassName = `${actionButtonClassName} border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:text-gray-900`;
+const secondaryActionButtonClassName = actionButtonClassName;
 
 const provinces = [
   ["AB", "Alberta"],
@@ -343,7 +343,7 @@ export default function UserProfile() {
               disabled={isSubmitting || isVerifying}
               onClick={handleCancelChanges}
               type="button"
-              variant="outline"
+              variant="destructive"
             >
               Cancel Changes
             </Button>

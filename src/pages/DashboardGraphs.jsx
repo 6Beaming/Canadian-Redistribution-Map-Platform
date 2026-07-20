@@ -1,12 +1,8 @@
-import { BarChart3, Files, UserCheck } from "lucide-react";
+import { BarChart3, UserCheck } from "lucide-react";
 import { SubmissionsGraph } from "@/components/non_prebuilt/submissionsGraph";
-import { Button } from "@/components/ui/button";
 import { Card, CardAccent, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useNavigate } from "react-router-dom";
 
 export default function DashboardGraphs() {
-  const navigate = useNavigate();
-
   return (
     <div className="min-h-[calc(100dvh-3.5rem)] overflow-y-auto bg-[linear-gradient(180deg,#f8fbff_0%,#eef5ff_100%)] px-4 py-6 md:px-6">
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
@@ -25,12 +21,6 @@ export default function DashboardGraphs() {
                   Review submission volume, support trends, and objection activity in one dedicated analytics space without colliding with the map workspace.
                 </p>
               </div>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <Button onClick={() => navigate("/dashboard/submissionsTable")}>
-                <Files className="h-4 w-4" />
-                All Submission
-              </Button>
             </div>
           </div>
         </section>

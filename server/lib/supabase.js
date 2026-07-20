@@ -172,6 +172,38 @@ function requireSupabaseAdminClient() {
   return supabase;
 }
 
+export function getSupabaseAdminDataClient() {
+  const testDouble = getSupabaseTestDouble("getSupabaseAdminDataClient");
+
+  if (testDouble) {
+    return testDouble();
+  }
+
+  return requireSupabaseAdminClient();
+}
+
+export async function getSupabaseProfileEmailsAsAdmin(userIds = []) {
+  const normalizedUserIds = [...new Set(
+    userIds.map((userId) => String(userId ?? "").trim()).filter(Boolean),
+  )];
+
+  if (!normalizedUserIds.length) {
+    return [];
+  }
+
+  const supabase = requireSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id,email")
+    .in("id", normalizedUserIds);
+
+  if (error) {
+    throw error;
+  }
+
+  return data ?? [];
+}
+
 export function isSupabaseAdminConfigured() {
   const testDouble = getSupabaseTestDouble("isSupabaseAdminConfigured");
 
