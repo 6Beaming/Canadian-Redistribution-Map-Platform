@@ -31,6 +31,12 @@ import {
   requireAuth,
   requirePendingProfileAuth
 } from "../middleware/requireAuth.js";
+import {
+  geocodeCanadianPostalCode,
+  getPostalMapCenter,
+  isGoogleGeocodingConfigured,
+  shouldRefreshPostalGeocode
+} from "../lib/googleGeocoding.js";
 
 const router = Router();
 
@@ -192,12 +198,35 @@ function isPublicProfileComplete(profile) {
   );
 }
 
+async function postalGeocodeUpdates(profile) {
+  if (!isGoogleGeocodingConfigured()) {
+    return {};
+  }
+
+  try {
+    const result = await geocodeCanadianPostalCode({
+      postalCode: profile.postalCode,
+      province: profile.province
+    });
+
+    return {
+      postal_geocoded_at: new Date().toISOString(),
+      postal_latitude: result?.latitude ?? null,
+      postal_longitude: result?.longitude ?? null
+    };
+  } catch (error) {
+    console.warn("Unable to geocode a profile postal code:", error.message);
+    return {};
+  }
+}
+
 function publicUser(user, profile = null) {
   const storedRole = profile?.role || "public_user";
   const role = storedRole === "user" ? "public_user" : storedRole;
   const fullName = profile
     ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim()
     : "";
+  const mapCenter = getPostalMapCenter(profile);
 
   return {
     email: user.email,
@@ -205,6 +234,7 @@ function publicUser(user, profile = null) {
     firstName: profile?.first_name || null,
     id: user.id,
     lastName: profile?.last_name || null,
+    mapCenter,
     name: fullName || null,
     phoneNumber: profile?.phone || null,
     postalCode: profile?.postal_code || null,
@@ -236,6 +266,34 @@ function publicProfileInformationUpdates(user, profile) {
     province: profile.province,
     role: "public_user"
   };
+}
+
+async function profileWithPostalMapCenter(accessToken, userId, profile) {
+  const profileRole = profile?.role || "public_user";
+
+  if (
+    !["public_user", "user"].includes(profileRole) ||
+    !shouldRefreshPostalGeocode(profile)
+  ) {
+    return profile;
+  }
+
+  const geocodeUpdates = await postalGeocodeUpdates({
+    postalCode: profile.postal_code,
+    province: profile.province
+  });
+
+  if (!Object.keys(geocodeUpdates).length) {
+    return profile;
+  }
+
+  try {
+    return await updateSupabaseProfile(accessToken, userId, geocodeUpdates);
+  } catch (error) {
+    // Map centering is optional and must not prevent session restoration.
+    console.warn("Unable to save a profile map center:", error.message);
+    return profile;
+  }
 }
 
 function pendingOtpState(pendingProfile) {
@@ -339,7 +397,12 @@ function getCommissionerInviteRedirectUrl() {
 }
 
 async function applySessionCookiesForUser(res, session, user) {
-  const profile = await getSupabaseProfile(session.access_token, user.id);
+  const storedProfile = await getSupabaseProfile(session.access_token, user.id);
+  const profile = await profileWithPostalMapCenter(
+    session.access_token,
+    user.id,
+    storedProfile
+  );
   const publicUserData = publicUser(user, profile);
 
   if (!publicUserData.profileComplete) {
@@ -680,6 +743,9 @@ router.post(
         return;
       }
 
+      const geocodeUpdates = pendingInvite
+        ? {}
+        : await postalGeocodeUpdates(pendingProfile);
       const completedProfile = await upsertSupabaseProfile(req.accessToken, {
         email: req.user.email,
         first_name: pendingProfile.firstName,
@@ -691,7 +757,8 @@ router.post(
         province: inviterProfile?.province || pendingProfile.province,
         role: pendingInvite
           ? "commissioner"
-          : existingProfile?.role || "public_user"
+          : existingProfile?.role || "public_user",
+        ...geocodeUpdates
       });
 
       if (pendingInvite) {
@@ -746,8 +813,14 @@ router.post("/password-reset", async (req, res, next) => {
   }
 });
 
-router.get("/me", requireAuth, (req, res) => {
-  res.json({ user: publicUser(req.user, req.profile) });
+router.get("/me", requireAuth, async (req, res) => {
+  const profile = await profileWithPostalMapCenter(
+    req.accessToken,
+    req.user.id,
+    req.profile
+  );
+
+  res.json({ user: publicUser(req.user, profile) });
 });
 
 router.patch("/me", requireAuth, async (req, res, next) => {
@@ -802,12 +875,21 @@ router.patch("/me", requireAuth, async (req, res, next) => {
     }
 
     const phoneChanged = requiredString(req.profile?.phone) !== phoneNational;
+    const geocodeUpdates = shouldRefreshPostalGeocode(req.profile, {
+      postalCode: validation.profile.postalCode,
+      province: validation.profile.province
+    })
+      ? await postalGeocodeUpdates(validation.profile)
+      : {};
 
     if (phoneChanged) {
       const updatedProfile = await updateSupabaseProfile(
         req.accessToken,
         req.user.id,
-        publicProfileInformationUpdates(req.user, validation.profile)
+        {
+          ...publicProfileInformationUpdates(req.user, validation.profile),
+          ...geocodeUpdates
+        }
       );
 
       await startSupabasePhoneVerification(
@@ -828,7 +910,10 @@ router.patch("/me", requireAuth, async (req, res, next) => {
     const updatedProfile = await updateSupabaseProfile(
       req.accessToken,
       req.user.id,
-      publicProfileUpdates(req.user, validation.profile)
+      {
+        ...publicProfileUpdates(req.user, validation.profile),
+        ...geocodeUpdates
+      }
     );
 
     clearPendingProfileUpdateCookie(res);

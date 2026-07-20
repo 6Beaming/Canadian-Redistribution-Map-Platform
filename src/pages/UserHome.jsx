@@ -31,6 +31,7 @@ import { DEFAULT_ROLLOUT_CATEGORY_ID } from "@/lib/map/rolloutPlan.js";
 import { MAP_INTERACTION_MODE } from "@/lib/map/interactionMode.js";
 import { mapApi } from "@/services/mapApi.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
+import { useAuth } from "@/contexts/AuthContext.jsx";
 import "@/styles/map.css";
 
 function createInitialObjectionWorkflow(overrides = {}) {
@@ -45,6 +46,7 @@ function createInitialObjectionWorkflow(overrides = {}) {
 }
 
 export default function UserHome({ mapSearchTarget = null }) {
+  const { user } = useAuth();
   const [status, setStatus] = useState("Loading map...");
   const [selection, setSelection] = useState(null);
   const [rolloutHoverSelection, setRolloutHoverSelection] = useState(null);
@@ -64,6 +66,22 @@ export default function UserHome({ mapSearchTarget = null }) {
   const metadataIndexCacheRef = useRef(new Map());
   const counterProposalDragFrameRef = useRef(0);
   const pendingCounterProposalDragRef = useRef(null);
+  const profileMapTarget = useMemo(() => {
+    const latitude = Number(user?.mapCenter?.latitude);
+    const longitude = Number(user?.mapCenter?.longitude);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return null;
+    }
+
+    return {
+      label: "your postal code",
+      location: [longitude, latitude],
+      showMarker: false,
+      zoom: 12,
+    };
+  }, [user?.mapCenter?.latitude, user?.mapCenter?.longitude]);
+  const effectiveMapSearchTarget = mapSearchTarget || profileMapTarget;
 
   useEffect(() => {
     let isMounted = true;
@@ -908,7 +926,7 @@ export default function UserHome({ mapSearchTarget = null }) {
               />
               <MapCanvas
                 isFullscreen={isFullscreen}
-                mapSearchTarget={mapSearchTarget}
+                mapSearchTarget={effectiveMapSearchTarget}
                 selection={selection}
                 externalHoverSelection={rolloutHoverSelection}
                 objectionPreview={objectionPreview}

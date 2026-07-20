@@ -96,6 +96,37 @@ const CANADA_DEFAULT_VIEW_BOUNDS = [
   [CANADA_BOUNDS.ne[0], 73],
 ];
 
+function getMapTargetCoordinates(target) {
+  const coordinates = target?.location;
+
+  if (
+    !Array.isArray(coordinates)
+    || coordinates.length < 2
+    || !coordinates.slice(0, 2).every(Number.isFinite)
+  ) {
+    return null;
+  }
+
+  return coordinates.slice(0, 2);
+}
+
+function getMapTargetViewport(target) {
+  const viewport = target?.viewport;
+
+  if (
+    !Array.isArray(viewport)
+    || viewport.length !== 2
+    || !viewport.every((corner) =>
+      Array.isArray(corner)
+      && corner.length >= 2
+      && corner.slice(0, 2).every(Number.isFinite))
+  ) {
+    return null;
+  }
+
+  return viewport.map((corner) => corner.slice(0, 2));
+}
+
 function createFullscreenControl(buttonRef, getIsFullscreen, onToggle) {
   return {
     onAdd() {
@@ -700,50 +731,42 @@ export function MapCanvas({
 
   useEffect(() => {
     const map = mapRef.current;
-    const coordinates = mapSearchTarget?.location;
+    const coordinates = getMapTargetCoordinates(mapSearchTarget);
 
-    if (
-      !map
-      || !isMapReadyRef.current
-      || !Array.isArray(coordinates)
-      || coordinates.length < 2
-      || !coordinates.every(Number.isFinite)
-    ) {
+    if (!map || !isMapReadyRef.current || !coordinates) {
       return;
     }
 
-    const viewport = mapSearchTarget?.viewport;
+    const viewport = getMapTargetViewport(mapSearchTarget);
 
-    if (
-      Array.isArray(viewport)
-      && viewport.length === 2
-      && viewport.every((corner) =>
-        Array.isArray(corner)
-        && corner.length >= 2
-        && corner.every(Number.isFinite))
-    ) {
+    if (viewport) {
       map.fitBounds(viewport, {
         padding: 72,
         maxZoom: 15,
         duration: 700,
       });
     } else {
+      const targetZoom = Number.isFinite(mapSearchTarget?.zoom)
+        ? mapSearchTarget.zoom
+        : 14;
+
       map.flyTo({
         center: coordinates,
-        zoom: Math.max(map.getZoom(), 14),
+        zoom: Math.max(map.getZoom(), targetZoom),
         duration: 700,
       });
     }
 
-    if (!searchMarkerRef.current) {
+    if (mapSearchTarget?.showMarker === false) {
+      searchMarkerRef.current?.remove();
+      searchMarkerRef.current = null;
+    } else if (!searchMarkerRef.current) {
       searchMarkerRef.current = new maplibregl.Marker({
         color: "#1a73e8",
       });
     }
 
-    searchMarkerRef.current
-      .setLngLat(coordinates)
-      .addTo(map);
+    searchMarkerRef.current?.setLngLat(coordinates).addTo(map);
     onStatusChangeRef.current?.(`Map moved to ${mapSearchTarget.label || "the selected place"}.`);
   }, [mapReadyTick, mapSearchTarget]);
 
@@ -963,11 +986,29 @@ export function MapCanvas({
     const protocol = new Protocol();
     maplibregl.addProtocol("pmtiles", protocol.tile);
 
+    const initialCoordinates = getMapTargetCoordinates(mapSearchTarget);
+    const initialViewport = getMapTargetViewport(mapSearchTarget);
+    const initialView = initialViewport
+      ? {
+          bounds: initialViewport,
+          fitBoundsOptions: { padding: 72, maxZoom: 15 },
+        }
+      : initialCoordinates
+        ? {
+            center: initialCoordinates,
+            zoom: Number.isFinite(mapSearchTarget?.zoom)
+              ? mapSearchTarget.zoom
+              : 14,
+          }
+        : {
+            bounds: CANADA_DEFAULT_VIEW_BOUNDS,
+            fitBoundsOptions: { padding: 12 },
+          };
+
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: WHITE_BASEMAP_STYLE,
-      bounds: CANADA_DEFAULT_VIEW_BOUNDS,
-      fitBoundsOptions: { padding: 12 },
+      ...initialView,
       minZoom: MAP_ZOOM.MIN,
       maxZoom: MAP_ZOOM.MAX,
       maxBounds: CANADA_VIEW_BOUNDS,
