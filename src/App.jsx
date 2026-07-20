@@ -18,6 +18,7 @@ import SignUpPage from "./pages/SignUpPage.jsx";
 import UserHome from "./pages/UserHome.jsx";
 import UserProfile from "./pages/UserProfile.jsx";
 import UserResumeSubmission from "./pages/UserResumeSubmission.jsx";
+import { RouteLoadingOverlay } from "./components/non_prebuilt/RouteLoadingOverlay.jsx";
 import { Toaster } from "@/components/ui/sonner";
 
 function RequireCommissioner() {
@@ -59,6 +60,7 @@ function App() {
   return (
     <AuthProvider>
       <Header />
+      <RouteLoadingOverlay />
 
       <Routes>
         <Route element={<RequirePublicUser />}>

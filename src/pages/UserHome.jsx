@@ -31,6 +31,7 @@ import { DEFAULT_ROLLOUT_CATEGORY_ID } from "@/lib/map/rolloutPlan.js";
 import { MAP_INTERACTION_MODE } from "@/lib/map/interactionMode.js";
 import { mapApi } from "@/services/mapApi.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
+import { notifyRouteReady } from "@/components/non_prebuilt/RouteLoadingOverlay.jsx";
 import "@/styles/map.css";
 
 function createInitialObjectionWorkflow(overrides = {}) {
@@ -61,9 +62,17 @@ export default function UserHome() {
   const [panelView, setPanelView] = useState(getDefaultPanelView("user"));
   const [isRolloutOpen, setIsRolloutOpen] = useState(false);
   const [rolloutCategoryId, setRolloutCategoryId] = useState(DEFAULT_ROLLOUT_CATEGORY_ID);
+  const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false);
   const metadataIndexCacheRef = useRef(new Map());
   const counterProposalDragFrameRef = useRef(0);
   const pendingCounterProposalDragRef = useRef(null);
+
+  useEffect(() => {
+    if (!isInitialDataLoaded) return undefined;
+    const frame = window.requestAnimationFrame(notifyRouteReady);
+    return () => window.cancelAnimationFrame(frame);
+  }, [isInitialDataLoaded]);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -85,6 +94,9 @@ export default function UserHome() {
         if (isMounted) {
           setStatus(`Error: ${error.message}`);
         }
+      })
+      .finally(() => {
+        if (isMounted) setIsInitialDataLoaded(true);
       });
 
     return () => {

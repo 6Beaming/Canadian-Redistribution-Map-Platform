@@ -11,6 +11,7 @@ import {
   getWorkspaceReviewerEmails,
   normalizeWorkspaceStatus,
 } from "@/services/tempWorkspace.js";
+import { notifyRouteReady } from "@/components/non_prebuilt/RouteLoadingOverlay.jsx";
 import "@/styles/map.css";
 import "@/styles/workspace-review.css";
 
@@ -32,6 +33,10 @@ export default function WorkspaceReview() {
   const [comparisonView, setComparisonView] = useState("proposed");
   const [status, setStatus] = useState("Loading submission workspace...");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (submission || error) notifyRouteReady();
+  }, [error, submission]);
 
   useEffect(() => {
     let isMounted = true;

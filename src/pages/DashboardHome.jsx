@@ -9,6 +9,7 @@ import { buildProfileIndex } from "@/lib/map/profileUtils.js";
 import { loadSubmissionHeatmap } from "@/lib/map/heatmap.js";
 import { loadArchivedMapEffect } from "@/lib/map/archivedMapEffect.js";
 import { subscribeWorkspaceState } from "@/services/tempWorkspace.js";
+import { notifyRouteReady } from "@/components/non_prebuilt/RouteLoadingOverlay.jsx";
 import "@/styles/map.css";
 
 export default function DashboardHome() {
@@ -23,7 +24,14 @@ export default function DashboardHome() {
   const [rolloutCategoryId, setRolloutCategoryId] = useState(DEFAULT_ROLLOUT_CATEGORY_ID);
   const [heatmap, setHeatmap] = useState(null);
   const [archivedMap, setArchivedMap] = useState(null);
+  const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false);
   const initialArchivedMapEnabled = searchParams.get("archivedMap") === "1";
+
+  useEffect(() => {
+    if (!isInitialDataLoaded) return undefined;
+    const frame = window.requestAnimationFrame(notifyRouteReady);
+    return () => window.cancelAnimationFrame(frame);
+  }, [isInitialDataLoaded]);
 
   useEffect(() => {
     let isMounted = true;
@@ -83,6 +91,9 @@ export default function DashboardHome() {
         if (isMounted) {
           setStatus(`Error: ${error.message}`);
         }
+      })
+      .finally(() => {
+        if (isMounted) setIsInitialDataLoaded(true);
       });
 
     return () => {
