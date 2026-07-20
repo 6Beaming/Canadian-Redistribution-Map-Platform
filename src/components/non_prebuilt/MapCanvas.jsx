@@ -463,6 +463,7 @@ function buildWorkflowFocusExclusionFilter(dguids) {
 
 export function MapCanvas({
   isFullscreen = false,
+  mapSearchTarget = null,
   selection = null,
   externalHoverSelection = null,
   objectionPreview = null,
@@ -501,6 +502,7 @@ export function MapCanvas({
   const workflowFocusActiveRef = useRef(false);
   const containerRef = useRef(null);
   const mapRef = useRef(null);
+  const searchMarkerRef = useRef(null);
   const fullscreenBtnRef = useRef(null);
   const boundaryBtnRef = useRef(null);
   const onToggleFullscreenRef = useRef(onToggleFullscreen);
@@ -695,6 +697,55 @@ export function MapCanvas({
 
     return () => cancelAnimationFrame(frame);
   }, [isFullscreen]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const coordinates = mapSearchTarget?.location;
+
+    if (
+      !map
+      || !isMapReadyRef.current
+      || !Array.isArray(coordinates)
+      || coordinates.length < 2
+      || !coordinates.every(Number.isFinite)
+    ) {
+      return;
+    }
+
+    const viewport = mapSearchTarget?.viewport;
+
+    if (
+      Array.isArray(viewport)
+      && viewport.length === 2
+      && viewport.every((corner) =>
+        Array.isArray(corner)
+        && corner.length >= 2
+        && corner.every(Number.isFinite))
+    ) {
+      map.fitBounds(viewport, {
+        padding: 72,
+        maxZoom: 15,
+        duration: 700,
+      });
+    } else {
+      map.flyTo({
+        center: coordinates,
+        zoom: Math.max(map.getZoom(), 14),
+        duration: 700,
+      });
+    }
+
+    if (!searchMarkerRef.current) {
+      searchMarkerRef.current = new maplibregl.Marker({
+        color: "#1a73e8",
+      });
+    }
+
+    searchMarkerRef.current
+      .setLngLat(coordinates)
+      .addTo(map);
+    onStatusChangeRef.current?.(`Map moved to ${mapSearchTarget.label || "the selected place"}.`);
+  }, [mapReadyTick, mapSearchTarget]);
 
   useEffect(() => {
     if (!isMapReadyRef.current || !applySelectionRef.current) {
@@ -2255,6 +2306,8 @@ export function MapCanvas({
       heatmapButtonRef.current = null;
       archivedMapControlRef.current = null;
       archivedMapButtonRef.current = null;
+      searchMarkerRef.current?.remove();
+      searchMarkerRef.current = null;
       archivedDaIdsRef.current = new Set();
       archivedOverrideDaIdsRef.current = new Set();
       applySelectionRef.current = null;

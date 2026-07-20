@@ -226,6 +226,49 @@ button:disabled {
   font-size: clamp(0.7rem, 1.2vw, 0.875rem);
 }
 
+.header__place-search,
+.header__place-autocomplete {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.header__place-autocomplete {
+  height: 2.5rem;
+  border: 1px solid #c9d8eb;
+  border-radius: 9999px;
+  background-color: #ffffff;
+  color: #17324d;
+  color-scheme: light;
+  box-shadow: 0 2px 8px rgba(23, 50, 77, 0.06);
+  font-size: clamp(0.7rem, 1.2vw, 0.875rem);
+}
+
+.header__place-autocomplete::part(input),
+.header__place-autocomplete::part(focus-ring) {
+  border-radius: 9999px;
+}
+
+.header__place-autocomplete::part(prediction-list) {
+  margin-top: 0.4rem;
+  border: 1px solid #c9d8eb;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgba(23, 50, 77, 0.16);
+}
+
+.header__place-autocomplete--error {
+  border-color: #dc2626;
+  color: #b91c1c;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+.header__place-autocomplete--error::part(input),
+.header__place-autocomplete--error::part(input)::placeholder {
+  color: #b91c1c;
+  opacity: 1;
+}
+
 .header__nav-button {
   height: 2.5rem;
   min-width: 0;

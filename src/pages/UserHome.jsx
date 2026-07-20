@@ -44,7 +44,7 @@ function createInitialObjectionWorkflow(overrides = {}) {
   };
 }
 
-export default function UserHome() {
+export default function UserHome({ mapSearchTarget = null }) {
   const [status, setStatus] = useState("Loading map...");
   const [selection, setSelection] = useState(null);
   const [rolloutHoverSelection, setRolloutHoverSelection] = useState(null);
@@ -908,6 +908,7 @@ export default function UserHome() {
               />
               <MapCanvas
                 isFullscreen={isFullscreen}
+                mapSearchTarget={mapSearchTarget}
                 selection={selection}
                 externalHoverSelection={rolloutHoverSelection}
                 objectionPreview={objectionPreview}

@@ -11,7 +11,7 @@ import { loadArchivedMapEffect } from "@/lib/map/archivedMapEffect.js";
 import { subscribeWorkspaceState } from "@/services/tempWorkspace.js";
 import "@/styles/map.css";
 
-export default function DashboardHome() {
+export default function DashboardHome({ mapSearchTarget = null }) {
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState("Loading map...");
   const [selection, setSelection] = useState(null);
@@ -188,6 +188,7 @@ export default function DashboardHome() {
               />
               <MapCanvas
                 isFullscreen={isFullscreen}
+                mapSearchTarget={mapSearchTarget}
                 selection={selection}
                 externalHoverSelection={rolloutHoverSelection}
                 onDaSelect={handleDaSelect}
