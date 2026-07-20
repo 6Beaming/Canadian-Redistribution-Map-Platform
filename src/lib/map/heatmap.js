@@ -16,8 +16,8 @@ export const loadDemoSubmissionHeatmap = loadSubmissionHeatmap;
 export function hasSubmissionHeatmapData(heatmap) {
   return Boolean(
     heatmap?.countsByDguid &&
-      typeof heatmap.countsByDguid === "object" &&
-      Object.keys(heatmap.countsByDguid).length,
+    typeof heatmap.countsByDguid === "object" &&
+    Object.keys(heatmap.countsByDguid).length,
   );
 }
 
@@ -32,21 +32,27 @@ function buildSubmissionCountExpression(countsByDguid = {}) {
   return expression;
 }
 
-export function buildSubmissionHeatmapFillExpression(countsByDguid = {}) {
+export function buildSubmissionHeatmapFillExpression(countsByDguid = {}, totalSubmissions = 1) {
+
+  const maxIntensity = Math.max(
+    totalSubmissions * 0.35,
+    1
+  );
+
   return [
     "interpolate",
     ["linear"],
     buildSubmissionCountExpression(countsByDguid),
     0, "rgba(0,0,0,0)",
-    1, "#fff7bc",
-    10, "#fee391",
-    25, "#fec44f",
-    50, "#fe9929",
-    75, "#ec7014",
-    100, "#f03b20",
-    150, "#de2d26",
-    200, "#bd0026",
-    220, "#800026",
+
+    maxIntensity * 0.05, "#fff7bc",
+    maxIntensity * 0.15, "#fee391",
+    maxIntensity * 0.30, "#fec44f",
+    maxIntensity * 0.45, "#fe9929",
+    maxIntensity * 0.60, "#ec7014",
+    maxIntensity * 0.75, "#f03b20",
+    maxIntensity * 0.90, "#bd0026",
+    maxIntensity, "#800026",
   ];
 }
 

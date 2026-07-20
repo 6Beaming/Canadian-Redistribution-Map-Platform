@@ -37,6 +37,19 @@ export async function getCommentsForDA(proposalId){
 }
 
 
+// Get total number of comments/submissions
+export async function getTotalComments(){
+    const res = await fetch(
+        `/api/comments/count`,
+        {
+            method:"GET",
+            credentials:"include",
+        }
+    );
+
+    return handleResponse(res);
+}
+
 
 // Get all comments 
 export async function getAllComments(){

@@ -73,6 +73,7 @@ import {
   hasGoogleMapTilesApiKey,
 } from "@/services/googleMapTilesApi.js";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { getTotalComments } from "@/services/commentsApi";
 
 const EXPAND_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5"/><path d="M20 9V4h-5"/><path d="M4 15v5h5"/><path d="M20 15v5h-5"/></svg>`;
 
@@ -275,41 +276,41 @@ function buildBlinkCategoryDaExpression(categoryId, hiddenValue, visibleValue) {
 function fedFillPaint(showRollout, showBoundaries = true) {
   const fillColor = showRollout
     ? [
-        "case",
-        ["boolean", ["feature-state", "selected"], false],
-        SELECTED_COLOR,
-        ["boolean", ["feature-state", "hover"], false],
-        HOVER_COLOR,
-        FED_ROLLOUT_FILL_EXPRESSION,
-      ]
+      "case",
+      ["boolean", ["feature-state", "selected"], false],
+      SELECTED_COLOR,
+      ["boolean", ["feature-state", "hover"], false],
+      HOVER_COLOR,
+      FED_ROLLOUT_FILL_EXPRESSION,
+    ]
     : [
-        "case",
-        ["boolean", ["feature-state", "selected"], false],
-        SELECTED_COLOR,
-        ["boolean", ["feature-state", "hover"], false],
-        HOVER_COLOR,
-        "#ffffff",
-      ];
+      "case",
+      ["boolean", ["feature-state", "selected"], false],
+      SELECTED_COLOR,
+      ["boolean", ["feature-state", "hover"], false],
+      HOVER_COLOR,
+      "#ffffff",
+    ];
 
   const fillOpacity = showRollout
     ? [
-        "case",
-        ["boolean", ["feature-state", "selected"], false],
-        0.85,
-        ["boolean", ["feature-state", "hover"], false],
-        0.75,
-        ["boolean", ["feature-state", "blinkHidden"], false],
-        0.22,
-        0.68,
-      ]
+      "case",
+      ["boolean", ["feature-state", "selected"], false],
+      0.85,
+      ["boolean", ["feature-state", "hover"], false],
+      0.75,
+      ["boolean", ["feature-state", "blinkHidden"], false],
+      0.22,
+      0.68,
+    ]
     : [
-        "case",
-        ["boolean", ["feature-state", "selected"], false],
-        0.85,
-        ["boolean", ["feature-state", "hover"], false],
-        0.75,
-        TRANSPARENT_INTERACTION_OPACITY,
-      ];
+      "case",
+      ["boolean", ["feature-state", "selected"], false],
+      0.85,
+      ["boolean", ["feature-state", "hover"], false],
+      0.75,
+      TRANSPARENT_INTERACTION_OPACITY,
+    ];
 
   return {
     "fill-color": fillColor,
@@ -329,13 +330,13 @@ function fedOutlinePaint(showBoundaries = true) {
       ["linear"],
       ["zoom"],
       0,
-       0.9,
+      0.9,
       4,
-       1.35,
+      1.35,
       8,
-       1.95,
+      1.95,
       12,
-       2.55,
+      2.55,
     ],
     // MapLibre permits `zoom` only as the input of a top-level step/interpolate
     // expression. Before the DA-detail threshold, use the normal opacity; at
@@ -360,23 +361,23 @@ function daFillPaint(
 ) {
   const fillColor = showRollout
     ? [
+      "case",
+      ["boolean", ["feature-state", "selected"], false],
+      SELECTED_COLOR,
+      ["boolean", ["feature-state", "hover"], false],
+      HOVER_COLOR,
+      BLOCKED_DA_FILL_EXPRESSION,
+    ]
+    : heatmapEnabled
+      ? [
         "case",
         ["boolean", ["feature-state", "selected"], false],
         SELECTED_COLOR,
         ["boolean", ["feature-state", "hover"], false],
         HOVER_COLOR,
-        BLOCKED_DA_FILL_EXPRESSION,
+        heatmapFillExpression ?? "#ffffff",
       ]
-    : heatmapEnabled
-      ? [
-          "case",
-          ["boolean", ["feature-state", "selected"], false],
-          SELECTED_COLOR,
-          ["boolean", ["feature-state", "hover"], false],
-          HOVER_COLOR,
-          heatmapFillExpression ?? "#ffffff",
-        ]
-    : [
+      : [
         "case",
         ["boolean", ["feature-state", "selected"], false],
         SELECTED_COLOR,
@@ -387,27 +388,27 @@ function daFillPaint(
 
   const fillOpacity = showRollout
     ? [
-        "case",
-        ["boolean", ["feature-state", "selected"], false],
-        0.85,
-        ["boolean", ["feature-state", "hover"], false],
-        0.72,
-        buildBlinkCategoryDaExpression(
-          rolloutCategoryId,
-          blinkHidden ? 0.18 : 0.58,
-          0.58,
-        ),
-      ]
+      "case",
+      ["boolean", ["feature-state", "selected"], false],
+      0.85,
+      ["boolean", ["feature-state", "hover"], false],
+      0.72,
+      buildBlinkCategoryDaExpression(
+        rolloutCategoryId,
+        blinkHidden ? 0.18 : 0.58,
+        0.58,
+      ),
+    ]
     : heatmapEnabled
       ? [
-          "case",
-          ["boolean", ["feature-state", "selected"], false],
-          0.88,
-          ["boolean", ["feature-state", "hover"], false],
-          0.82,
-          0.74,
-        ]
-    : [
+        "case",
+        ["boolean", ["feature-state", "selected"], false],
+        0.88,
+        ["boolean", ["feature-state", "hover"], false],
+        0.82,
+        0.74,
+      ]
+      : [
         "case",
         ["boolean", ["feature-state", "selected"], false],
         0.85,
@@ -560,6 +561,8 @@ export function MapCanvas({
   const isMapReadyRef = useRef(false);
   const [mapReadyTick, setMapReadyTick] = useState(0);
   const [boundariesVisible, setBoundariesVisible] = useState(true);
+  const [totalSubmissions, setTotalSubmissions] = useState(0);
+  const totalSubmissionsRef = useRef(0);
 
   onToggleFullscreenRef.current = onToggleFullscreen;
   isFullscreenRef.current = isFullscreen;
@@ -576,9 +579,24 @@ export function MapCanvas({
   heatmapEnabledRef.current = heatmapEnabled;
   archivedMapEnabledRef.current = archivedMapEnabled;
   heatmapFillExpressionRef.current = hasSubmissionHeatmapData(heatmap)
-    ? buildSubmissionHeatmapFillExpression(heatmap.countsByDguid)
+    ? buildSubmissionHeatmapFillExpression(heatmap.countsByDguid, totalSubmissionsRef.current)
     : null;
   interactionModeRef.current = interactionMode;
+
+  useEffect(() => {
+    async function fetchTotalSubmissions() {
+      try {
+        const data = await getTotalComments();
+
+        setTotalSubmissions(data.totalSubmissions);
+        totalSubmissionsRef.current = data.totalSubmissions;
+      } catch (error) {
+        console.error("Failed to fetch total submissions:", error);
+      }
+    }
+
+    fetchTotalSubmissions();
+  }, [heatmap, totalSubmissions]);
 
   useEffect(() => {
     const button = fullscreenBtnRef.current;

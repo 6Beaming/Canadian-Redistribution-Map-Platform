@@ -1,8 +1,26 @@
 import { BarChart3, UserCheck } from "lucide-react";
 import { SubmissionsGraph } from "@/components/non_prebuilt/submissionsGraph";
 import { Card, CardAccent, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useState } from "react";
+import { getTotalComments } from "@/services/commentsApi";
 
 export default function DashboardGraphs() {
+
+  const [totalSubmissions, setTotalSubmissions] = useState(0);
+
+  useEffect(() => {
+    async function fetchTotalSubmissions() {
+      try {
+        const data = await getTotalComments();
+        setTotalSubmissions(data.totalSubmissions);
+      } catch (error) {
+        console.error("Failed to fetch total submissions:", error);
+      }
+    }
+
+    fetchTotalSubmissions();
+  }, []);
+
   return (
     <div className="min-h-[calc(100dvh-3.5rem)] overflow-y-auto bg-[linear-gradient(180deg,#f8fbff_0%,#eef5ff_100%)] px-4 py-6 md:px-6">
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
@@ -35,7 +53,7 @@ export default function DashboardGraphs() {
               </CardDescription>
             </CardHeader>
             <CardContent className="gap-3">
-              <div className="text-5xl font-bold text-[#1a73e8]">128</div>
+              <div className="text-5xl font-bold text-[#1a73e8]">{totalSubmissions}</div>
               <div className="inline-flex w-fit items-center gap-2 rounded-full bg-[#eef8ef] px-3 py-1 text-sm font-semibold text-[#17682b]">
                 <UserCheck className="h-4 w-4" />
                 Active review cycle
