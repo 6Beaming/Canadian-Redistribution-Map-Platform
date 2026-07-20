@@ -91,9 +91,9 @@ const FED_OUTLINE_HIDE_AT_ZOOM = 7;
 const EMPTY_OBJECTION_BOUNDARY = emptyBoundaryFeatureCollection();
 const EMPTY_COUNTER_PROPOSAL_FEATURES = emptyCounterProposalFeatureCollection();
 const CANADA_VIEW_BOUNDS = [CANADA_BOUNDS.sw, CANADA_BOUNDS.ne];
-const CANADA_VIEW_CENTER = [
-  (CANADA_BOUNDS.sw[0] + CANADA_BOUNDS.ne[0]) / 2,
-  (CANADA_BOUNDS.sw[1] + CANADA_BOUNDS.ne[1]) / 2,
+const CANADA_DEFAULT_VIEW_BOUNDS = [
+  CANADA_BOUNDS.sw,
+  [CANADA_BOUNDS.ne[0], 73],
 ];
 
 function createFullscreenControl(buttonRef, getIsFullscreen, onToggle) {
@@ -966,8 +966,8 @@ export function MapCanvas({
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: WHITE_BASEMAP_STYLE,
-      center: CANADA_VIEW_CENTER,
-      zoom: MAP_ZOOM.INITIAL,
+      bounds: CANADA_DEFAULT_VIEW_BOUNDS,
+      fitBoundsOptions: { padding: 12 },
       minZoom: MAP_ZOOM.MIN,
       maxZoom: MAP_ZOOM.MAX,
       maxBounds: CANADA_VIEW_BOUNDS,
@@ -2239,11 +2239,6 @@ export function MapCanvas({
         applyInteractionMode(interactionModeRef.current);
         setPresentationMode(rolloutEnabled);
         applyBoundaryVisibility(boundariesVisibleRef.current);
-
-        map.fitBounds(CANADA_VIEW_BOUNDS, {
-          padding: { top: 92, right: 64, bottom: 72, left: 64 },
-          duration: 0,
-        });
 
         const daCount =
           daBundle.featureCount ||
