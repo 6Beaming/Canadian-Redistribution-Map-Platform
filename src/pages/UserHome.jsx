@@ -927,6 +927,7 @@ export default function UserHome({ mapSearchTarget = null }) {
               <MapCanvas
                 isFullscreen={isFullscreen}
                 mapSearchTarget={effectiveMapSearchTarget}
+                postalAreaTarget={profileMapTarget}
                 selection={selection}
                 externalHoverSelection={rolloutHoverSelection}
                 objectionPreview={objectionPreview}

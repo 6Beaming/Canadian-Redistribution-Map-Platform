@@ -85,6 +85,8 @@ const BOUNDARY_ON_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2
 
 const BOUNDARY_OFF_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m6 6 12 12"/></svg>`;
 
+const POSTAL_AREA_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>`;
+
 const MAP_BOUNDARY_COLOR = "#243b6b";
 const TRANSPARENT_BOUNDARY_COLOR = "rgba(36, 59, 107, 0)";
 const FED_OUTLINE_HIDE_AT_ZOOM = 7;
@@ -196,6 +198,30 @@ function createBoundaryControl(buttonRef, getBoundariesVisible, onToggle) {
       button.setAttribute("aria-pressed", String(getBoundariesVisible()));
       button.title = getBoundariesVisible() ? "Hide boundaries" : "Show boundaries";
       button.addEventListener("click", onToggle);
+
+      buttonRef.current = button;
+      container.appendChild(button);
+      return container;
+    },
+    onRemove() {
+      buttonRef.current = null;
+    }
+  };
+}
+
+function createPostalAreaControl(buttonRef, onActivate) {
+  return {
+    onAdd() {
+      const container = document.createElement("div");
+      container.className = "maplibregl-ctrl maplibregl-ctrl-group";
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "maplibregl-ctrl-icon map-postal-area-btn";
+      button.innerHTML = POSTAL_AREA_ICON;
+      button.setAttribute("aria-label", "Center map on My Postal Area");
+      button.title = "My Postal Area";
+      button.addEventListener("click", onActivate);
 
       buttonRef.current = button;
       container.appendChild(button);
@@ -495,6 +521,7 @@ function buildWorkflowFocusExclusionFilter(dguids) {
 export function MapCanvas({
   isFullscreen = false,
   mapSearchTarget = null,
+  postalAreaTarget = null,
   selection = null,
   externalHoverSelection = null,
   objectionPreview = null,
@@ -536,6 +563,9 @@ export function MapCanvas({
   const searchMarkerRef = useRef(null);
   const fullscreenBtnRef = useRef(null);
   const boundaryBtnRef = useRef(null);
+  const postalAreaButtonRef = useRef(null);
+  const postalAreaControlRef = useRef(null);
+  const postalAreaTargetRef = useRef(postalAreaTarget);
   const onToggleFullscreenRef = useRef(onToggleFullscreen);
   const onDaSelectRef = useRef(onDaSelect);
   const onFedSelectRef = useRef(onFedSelect);
@@ -587,6 +617,7 @@ export function MapCanvas({
   onDaSelectRef.current = onDaSelect;
   onFedSelectRef.current = onFedSelect;
   onStatusChangeRef.current = onStatusChange;
+  postalAreaTargetRef.current = postalAreaTarget;
   boundariesVisibleRef.current = boundariesVisible;
   heatmapEnabledRef.current = heatmapEnabled;
   archivedMapEnabledRef.current = archivedMapEnabled;
@@ -709,6 +740,44 @@ export function MapCanvas({
       setArchivedMapEnabled(false);
     }
   }, [archivedMap, mapReadyTick]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!map || !isMapReadyRef.current) {
+      return;
+    }
+
+    const available = Boolean(getMapTargetCoordinates(postalAreaTarget));
+
+    if (available && !postalAreaControlRef.current) {
+      const control = createPostalAreaControl(postalAreaButtonRef, () => {
+        const target = postalAreaTargetRef.current;
+        const coordinates = getMapTargetCoordinates(target);
+
+        if (!coordinates) {
+          return;
+        }
+
+        map.flyTo({
+          center: coordinates,
+          zoom: Number.isFinite(target?.zoom) ? target.zoom : 12,
+          duration: 700,
+        });
+        onStatusChangeRef.current?.("Map moved to your postal area.");
+      });
+
+      map.addControl(control, "top-right");
+      postalAreaControlRef.current = control;
+      return;
+    }
+
+    if (!available && postalAreaControlRef.current) {
+      map.removeControl(postalAreaControlRef.current);
+      postalAreaControlRef.current = null;
+      postalAreaButtonRef.current = null;
+    }
+  }, [mapReadyTick, postalAreaTarget]);
 
   useEffect(() => {
     if (!hasSubmissionHeatmapData(heatmap) && heatmapEnabled) {
@@ -983,6 +1052,7 @@ export function MapCanvas({
   useEffect(() => {
     if (!containerRef.current) return undefined;
 
+    let attributionCollapseObserver = null;
     const protocol = new Protocol();
     maplibregl.addProtocol("pmtiles", protocol.tile);
 
@@ -1024,6 +1094,37 @@ export function MapCanvas({
     workflowFocusActiveRef.current = false;
     map.addControl(new maplibregl.NavigationControl(), "top-right");
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
+    const attributionElement = containerRef.current?.querySelector(
+      ".maplibregl-ctrl-attrib",
+    );
+
+    const collapseInitialAttribution = () => {
+      if (!attributionElement?.classList.contains("maplibregl-compact")) {
+        return false;
+      }
+
+      attributionElement.classList.remove("maplibregl-compact-show");
+      attributionElement.removeAttribute("open");
+      return true;
+    };
+
+    if (
+      !collapseInitialAttribution()
+      && attributionElement
+      && typeof MutationObserver !== "undefined"
+    ) {
+      attributionCollapseObserver = new MutationObserver(() => {
+        if (collapseInitialAttribution()) {
+          attributionCollapseObserver?.disconnect();
+          attributionCollapseObserver = null;
+        }
+      });
+      attributionCollapseObserver.observe(attributionElement, {
+        attributes: true,
+        childList: true,
+        subtree: true,
+      });
+    }
     map.addControl(
       createFullscreenControl(
         fullscreenBtnRef,
@@ -2327,6 +2428,7 @@ export function MapCanvas({
     });
 
     return () => {
+      attributionCollapseObserver?.disconnect();
       labelResizeObserver?.disconnect();
       isMapReadyRef.current = false;
       if (blinkIntervalRef.current) {
@@ -2342,6 +2444,8 @@ export function MapCanvas({
       heatmapButtonRef.current = null;
       archivedMapControlRef.current = null;
       archivedMapButtonRef.current = null;
+      postalAreaControlRef.current = null;
+      postalAreaButtonRef.current = null;
       searchMarkerRef.current?.remove();
       searchMarkerRef.current = null;
       archivedDaIdsRef.current = new Set();

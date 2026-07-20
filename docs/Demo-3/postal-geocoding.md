@@ -52,6 +52,9 @@ The implementation is split between
 7. [`UserHome.jsx`](../../src/pages/UserHome.jsx) passes the centre to
    [`MapCanvas.jsx`](../../src/components/non_prebuilt/MapCanvas.jsx), which
    uses it when creating the map so there is no initial Canada-view camera jump.
+8. When a stored centre is available, MapCanvas displays a **My Postal Area**
+   location-pin control. Selecting it returns the map to the stored centre at
+   postal-area zoom without making another Google request.
 
 Commissioner profiles do not use public-user postal centering and are skipped by
 this geocoding flow.
