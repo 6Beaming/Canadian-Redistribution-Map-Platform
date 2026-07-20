@@ -8,7 +8,6 @@ import { buildProfileIndex } from "@/lib/map/profileUtils.js";
 import { mapApi } from "@/services/mapApi.js";
 import { hydrateWorkspaceSubmission } from "@/services/tempCounterProposal.js";
 import { getArchiveTreeRecords } from "@/services/tempWorkspace.js";
-import { notifyRouteReady } from "@/components/non_prebuilt/RouteLoadingOverlay.jsx";
 import "@/styles/map.css";
 import "@/styles/workspace-review.css";
 import "@/styles/archive-tree.css";
@@ -49,10 +48,6 @@ export default function ArchivedDifference() {
   const [view, setView] = useState("selected");
   const [status, setStatus] = useState("Loading archived difference...");
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (error || (selectedEntry && latestEntry)) notifyRouteReady();
-  }, [error, latestEntry, selectedEntry]);
 
   useEffect(() => {
     let isMounted = true;

@@ -18,7 +18,6 @@ import {
   getWorkspaceSubmissions,
   subscribeWorkspaceState,
 } from "@/services/tempWorkspace.js";
-import { notifyRouteReady } from "@/components/non_prebuilt/RouteLoadingOverlay.jsx";
 import "@/styles/workspace.css";
 
 const VISIBLE_LIST_ITEMS = 3;
@@ -589,10 +588,6 @@ export default function CommissionerWorkspace() {
   const [filterDraft, setFilterDraft] = useState(() => createExpansionState(true));
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const filterRef = useRef(null);
-
-  useEffect(() => {
-    if (!isLoading) notifyRouteReady();
-  }, [isLoading]);
 
   useEffect(() => {
     let isMounted = true;

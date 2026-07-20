@@ -1,121 +1,93 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 
-const ROUTE_LOADING_READY_EVENT = "crmp:route-loading-ready";
-// Keep a brief transition cue without covering a page that has already
-// completed its first render.
-const MINIMUM_ROUTE_LOADING_MS = 100;
-const DEFAULT_ROUTE_FAILSAFE_MS = 650;
-const DATA_ROUTE_FAILSAFE_MS = 6000;
+// Fixed transition durations. Keep the full scale explicit so route timings can
+// be tuned without coupling the animation to API, MapLibre, or React render
+// completion.
+const ROUTE_LOADING_DURATION_MS = Object.freeze({
+  INSTANT: 100,
+  BRIEF: 300,
+  STANDARD: 500,
+  EXTENDED: 1000,
+  SUBMISSION_TABLE: 1500,
+  MAP_HANDOFF: 2000,
+});
 
-function isDataRoute(pathname) {
-  return pathname === "/"
-    || pathname === "/users"
-    || pathname === "/dashboard"
-    || pathname.startsWith("/dashboard/workspace")
+function isWorkspaceOrArchivePath(pathname) {
+  return pathname.startsWith("/dashboard/workspace")
     || pathname.startsWith("/dashboard/archivedTree");
 }
 
-/**
- * Marks the current route as ready after its first meaningful data render.
- * Data-heavy pages use this instead of relying on a guessed loading duration.
- */
-export function notifyRouteReady() {
-  window.dispatchEvent(new Event(ROUTE_LOADING_READY_EVENT));
+function isWorkspaceOrArchiveMapPath(pathname) {
+  return /^\/dashboard\/workspace\/[^/]+$/.test(pathname)
+    || /^\/dashboard\/archivedTree\/[^/]+\/difference$/.test(pathname);
+}
+
+function getRouteLoadingDuration(fromPathname, toPathname) {
+  // Workspace and Archived Tree use this handoff both before returning to the
+  // Commissioner map and when a tree/list item opens its MapCanvas review or
+  // archived-difference child page, regardless of request readiness.
+  if (
+    isWorkspaceOrArchivePath(fromPathname)
+    && (toPathname === "/dashboard" || isWorkspaceOrArchiveMapPath(toPathname))
+  ) {
+    return ROUTE_LOADING_DURATION_MS.MAP_HANDOFF;
+  }
+
+  // The submissions table itself and its handoff into a Workspace review both
+  // use the longer table-transition treatment.
+  if (toPathname === "/dashboard/submissionsTable") {
+    return ROUTE_LOADING_DURATION_MS.SUBMISSION_TABLE;
+  }
+
+  if (
+    fromPathname === "/dashboard/submissionsTable"
+    && toPathname.startsWith("/dashboard/workspace")
+  ) {
+    return ROUTE_LOADING_DURATION_MS.SUBMISSION_TABLE;
+  }
+
+  return 0;
 }
 
 /**
- * Global client-side route transition feedback. BrowserRouter ultimately uses
- * History API mutations for useNavigate(), so this also covers existing pages
- * without requiring each caller to adopt a custom navigation wrapper.
+ * Fixed-duration navigation feedback for the explicitly selected Commissioner
+ * transitions. It deliberately has no relationship with data fetch or map
+ * readiness so page loading cannot extend or shorten the animation.
  */
 export function RouteLoadingOverlay() {
   const location = useLocation();
   const [isVisible, setIsVisible] = useState(false);
+  const previousPathnameRef = useRef(location.pathname);
   const hasObservedInitialLocationRef = useRef(false);
-  const transitionIdRef = useRef(0);
-  const transitionStartedAtRef = useRef(0);
-  const completionTimerRef = useRef(null);
-  const failsafeTimerRef = useRef(null);
+  const timerRef = useRef(null);
 
-  const clearTransitionTimers = useCallback(() => {
-    window.clearTimeout(completionTimerRef.current);
-    window.clearTimeout(failsafeTimerRef.current);
-    completionTimerRef.current = null;
-    failsafeTimerRef.current = null;
-  }, []);
+  useLayoutEffect(() => {
+    const fromPathname = previousPathnameRef.current;
+    const toPathname = location.pathname;
+    previousPathnameRef.current = toPathname;
 
-  const finishTransition = useCallback((transitionId = transitionIdRef.current) => {
-    if (transitionId !== transitionIdRef.current) return;
-
-    window.clearTimeout(failsafeTimerRef.current);
-    failsafeTimerRef.current = null;
-
-    const remainingDuration = Math.max(
-      0,
-      MINIMUM_ROUTE_LOADING_MS - (Date.now() - transitionStartedAtRef.current),
-    );
-
-    window.clearTimeout(completionTimerRef.current);
-    completionTimerRef.current = window.setTimeout(() => {
-      if (transitionId === transitionIdRef.current) {
-        setIsVisible(false);
-      }
-    }, remainingDuration);
-  }, []);
-
-  const beginTransition = useCallback((pathname = window.location.pathname) => {
-    clearTransitionTimers();
-    const transitionId = transitionIdRef.current + 1;
-    transitionIdRef.current = transitionId;
-    transitionStartedAtRef.current = Date.now();
-    setIsVisible(true);
-
-    const failsafeDuration = isDataRoute(pathname)
-      ? DATA_ROUTE_FAILSAFE_MS
-      : DEFAULT_ROUTE_FAILSAFE_MS;
-    failsafeTimerRef.current = window.setTimeout(
-      () => finishTransition(transitionId),
-      failsafeDuration,
-    );
-  }, [clearTransitionTimers, finishTransition]);
-
-  useEffect(() => {
-    const originalPushState = window.history.pushState;
-    const originalReplaceState = window.history.replaceState;
-
-    function wrapHistoryMethod(method) {
-      return function wrappedHistoryMethod(...args) {
-        beginTransition();
-        return method.apply(window.history, args);
-      };
-    }
-
-    window.history.pushState = wrapHistoryMethod(originalPushState);
-    window.history.replaceState = wrapHistoryMethod(originalReplaceState);
-    const handlePopState = () => beginTransition(window.location.pathname);
-    window.addEventListener("popstate", handlePopState);
-    window.addEventListener(ROUTE_LOADING_READY_EVENT, finishTransition);
-
-    return () => {
-      window.history.pushState = originalPushState;
-      window.history.replaceState = originalReplaceState;
-      window.removeEventListener("popstate", handlePopState);
-      window.removeEventListener(ROUTE_LOADING_READY_EVENT, finishTransition);
-      clearTransitionTimers();
-    };
-  }, [beginTransition, clearTransitionTimers, finishTransition]);
-
-  useEffect(() => {
     if (!hasObservedInitialLocationRef.current) {
       hasObservedInitialLocationRef.current = true;
-      return;
+      return undefined;
     }
 
-    // Covers router redirects and recalculates the fallback for the target
-    // page (for example, a Workspace route gets the longer safety window).
-    beginTransition(location.pathname);
-  }, [beginTransition, location.key, location.pathname]);
+    window.clearTimeout(timerRef.current);
+    const duration = getRouteLoadingDuration(fromPathname, toPathname);
+
+    if (!duration) {
+      setIsVisible(false);
+      return undefined;
+    }
+
+    setIsVisible(true);
+    timerRef.current = window.setTimeout(() => {
+      setIsVisible(false);
+      timerRef.current = null;
+    }, duration);
+
+    return () => window.clearTimeout(timerRef.current);
+  }, [location.key, location.pathname]);
 
   if (!isVisible) return null;
 

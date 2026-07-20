@@ -15,7 +15,6 @@ import {
   getArchiveTreeRecords,
   revertArchiveBranch,
 } from "@/services/tempWorkspace.js";
-import { notifyRouteReady } from "@/components/non_prebuilt/RouteLoadingOverlay.jsx";
 import "@/styles/archive-tree.css";
 
 export default function ArchivedTree() {
@@ -28,10 +27,6 @@ export default function ArchivedTree() {
   const [error, setError] = useState("");
   const [reloadVersion, setReloadVersion] = useState(0);
   const selectedId = searchParams.get("selected");
-
-  useEffect(() => {
-    if (!isLoading) notifyRouteReady();
-  }, [isLoading]);
 
   useEffect(() => {
     let isMounted = true;
