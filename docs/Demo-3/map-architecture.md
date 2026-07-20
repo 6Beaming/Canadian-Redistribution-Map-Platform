@@ -173,12 +173,28 @@ transitional `tempWorkspace` adapter.
 
 ## 8. Configuration and Operations
 
-- The Google Map Tiles key and related client environment variables live in the
-  root `.env`, which is Git-ignored and distributed through the project shared
-  drive. `.env.local` is not used.
+### 8.1 Google Maps API keys
+
+The browser and backend use separate Google Maps API key values, even when both
+keys belong to the same Google Cloud project and billing account. This limits
+the effect of an exposed or misused key because each credential can call only
+the APIs required by its runtime.
+
+| Environment variable | Exposure and restrictions |
+| --- | --- |
+| `VITE_GOOGLE_MAPS_API_KEY` | Exposed in browser JavaScript. Restrict it by the production and development website/HTTP referrers, and restrict it to Places API (New), Map Tiles API, and any other Google Maps browser APIs used by the app. |
+| `GOOGLE_MAPS_SERVER_API_KEY` | Never expose it to the browser or use a `VITE_` prefix. Restrict it to the Geocoding API and, when the production hosting platform provides a stable outbound IP address, restrict it to that server IP address. |
+
+If you attempt to use your frontend key (which expects an HTTP Referrer) on your backend server to call the Geocoding API, Google's security checks will fail. The server does not send the expected website URL in the headers, so Google will instantly reject the request with an authentication error.
+
+### 8.2 Other operations
+
 - The local map asset service supports HTTP byte ranges required by PMTiles.
 - The electoral map remains functional when Google tiles fail because map
   geometry, selection, overlays, and workflow metadata are repository-owned.
+- Public-user postal-code centering, profile columns, migration steps, and retry
+  behaviour are documented in
+  [postal-geocoding.md](./postal-geocoding.md).
 - Map-related API contracts, write paths, and pending refactors are documented
   in [map-backend.md](./map-backend.md). Workspace and archive implementation
   details are documented in [workspace.md](./workspace.md).
