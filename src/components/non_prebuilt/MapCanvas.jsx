@@ -85,10 +85,14 @@ const BOUNDARY_OFF_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 
 
 const MAP_BOUNDARY_COLOR = "#243b6b";
 const TRANSPARENT_BOUNDARY_COLOR = "rgba(36, 59, 107, 0)";
-const WEB_MERCATOR_MAX_LATITUDE = 85.051129;
 const FED_OUTLINE_HIDE_AT_ZOOM = 7;
 const EMPTY_OBJECTION_BOUNDARY = emptyBoundaryFeatureCollection();
 const EMPTY_COUNTER_PROPOSAL_FEATURES = emptyCounterProposalFeatureCollection();
+const CANADA_VIEW_BOUNDS = [CANADA_BOUNDS.sw, CANADA_BOUNDS.ne];
+const CANADA_VIEW_CENTER = [
+  (CANADA_BOUNDS.sw[0] + CANADA_BOUNDS.ne[0]) / 2,
+  (CANADA_BOUNDS.sw[1] + CANADA_BOUNDS.ne[1]) / 2,
+];
 
 function createFullscreenControl(buttonRef, getIsFullscreen, onToggle) {
   return {
@@ -115,19 +119,6 @@ function createFullscreenControl(buttonRef, getIsFullscreen, onToggle) {
       buttonRef.current = null;
     }
   };
-}
-
-function paddedMaxBounds(bounds, factor = 0.35) {
-  const sw = bounds.getSouthWest();
-  const ne = bounds.getNorthEast();
-  const padLng = (ne.lng - sw.lng) * factor;
-  const padLat = (ne.lat - sw.lat) * factor;
-  const clampLatitude = (value) =>
-    Math.max(-WEB_MERCATOR_MAX_LATITUDE, Math.min(WEB_MERCATOR_MAX_LATITUDE, value));
-  return new maplibregl.LngLatBounds(
-    [sw.lng - padLng, clampLatitude(sw.lat - padLat)],
-    [ne.lng + padLng, clampLatitude(ne.lat + padLat)]
-  );
 }
 
 function getGeoJsonBounds(geoJson) {
@@ -195,21 +186,6 @@ function buildRolloutFedMembershipExpression(fedNums, truthyValue, fallbackValue
 
   expression.push(fallbackValue);
   return expression;
-}
-
-function buildInitialMapBounds() {
-  const sourceBounds = new maplibregl.LngLatBounds(CANADA_BOUNDS.sw, CANADA_BOUNDS.ne);
-  const sw = sourceBounds.getSouthWest();
-  const ne = sourceBounds.getNorthEast();
-  const MAX_RENDERABLE_LATITUDE = WEB_MERCATOR_MAX_LATITUDE;
-  const lngPad = (ne.lng - sw.lng) * 0.058;
-  const southPad = (ne.lat - sw.lat) * 0.08;
-  const northPad = (ne.lat - sw.lat) * 0.16;
-
-  return new maplibregl.LngLatBounds(
-    [sw.lng - lngPad, Math.max(-84.5, sw.lat - southPad)],
-    [ne.lng + lngPad, Math.min(MAX_RENDERABLE_LATITUDE, ne.lat + northPad)],
-  );
 }
 
 function boundaryHighlightStateExpression() {
@@ -936,10 +912,11 @@ export function MapCanvas({
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: WHITE_BASEMAP_STYLE,
-      center: [-135, 63.5],
+      center: CANADA_VIEW_CENTER,
       zoom: MAP_ZOOM.INITIAL,
       minZoom: MAP_ZOOM.MIN,
       maxZoom: MAP_ZOOM.MAX,
+      maxBounds: CANADA_VIEW_BOUNDS,
       renderWorldCopies: false,
       maxPitch: 0,
       attributionControl: false,
@@ -2184,18 +2161,10 @@ export function MapCanvas({
         setPresentationMode(rolloutEnabled);
         applyBoundaryVisibility(boundariesVisibleRef.current);
 
-        const initialBounds = buildInitialMapBounds();
-        map.fitBounds(initialBounds, {
+        map.fitBounds(CANADA_VIEW_BOUNDS, {
           padding: { top: 92, right: 64, bottom: 72, left: 64 },
           duration: 0,
         });
-
-        map.setMaxBounds(
-          paddedMaxBounds(
-            initialBounds,
-            0.24
-          )
-        );
 
         const daCount =
           daBundle.featureCount ||
