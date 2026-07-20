@@ -876,7 +876,8 @@ test("PATCH /api/auth/me updates commissioner profile fields", async () => {
   const response = await request("PATCH", "/api/auth/me", {
     body: {
       firstName: "Amazing",
-      lastName: "Grace"
+      lastName: "Grace",
+      province: "BC"
     },
     cookie: sessionCookies()
   });
@@ -884,16 +885,45 @@ test("PATCH /api/auth/me updates commissioner profile fields", async () => {
   assert.equal(response.status, 200);
   assert.equal(response.body.message, "Profile information updated.");
   assert.equal(response.body.user.name, "Amazing Grace");
+  assert.equal(response.body.user.province, "BC");
   assert.deepEqual(profileUpdates, [
     {
       accessToken: "access-token",
       userId: commissionerUser.id,
       updates: {
         first_name: "Amazing",
-        last_name: "Grace"
+        last_name: "Grace",
+        province: "BC"
       }
     }
   ]);
+});
+
+test("PATCH /api/auth/me rejects an invalid commissioner province", async () => {
+  let updateCount = 0;
+
+  setSupabaseTestDoubles({
+    getSupabaseClient: () =>
+      authenticatedSupabaseDouble({ user: commissionerUser }),
+    getSupabaseProfile: async () => commissionerProfile,
+    updateSupabaseProfile: async () => {
+      updateCount += 1;
+      return commissionerProfile;
+    }
+  });
+
+  const response = await request("PATCH", "/api/auth/me", {
+    body: {
+      firstName: "Amazing",
+      lastName: "Grace",
+      province: "XX"
+    },
+    cookie: sessionCookies()
+  });
+
+  assert.equal(response.status, 400);
+  assert.equal(response.body.error, "Select a valid province or territory.");
+  assert.equal(updateCount, 0);
 });
 
 test("POST /api/auth/me/phone-otp saves the pending phone after OTP verification", async () => {

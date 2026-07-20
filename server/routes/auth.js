@@ -132,25 +132,10 @@ function validatePublicProfile(body) {
 function validateCommissionerProfile(body) {
   const firstName = requiredString(body?.firstName);
   const lastName = requiredString(body?.lastName);
-
-  if (!firstName || !lastName) {
-    return { error: "First name and last name are required." };
-  }
-
-  return {
-    profile: {
-      firstName,
-      lastName
-    }
-  };
-}
-
-function validateCommissionerOnboardingProfile(body) {
-  const validation = validateCommissionerProfile(body);
   const province = requiredString(body?.province).toUpperCase();
 
-  if (validation.error) {
-    return validation;
+  if (!firstName || !lastName || !province) {
+    return { error: "First name, last name, and province are required." };
   }
 
   if (!VALID_PROVINCES.has(province)) {
@@ -159,7 +144,8 @@ function validateCommissionerOnboardingProfile(body) {
 
   return {
     profile: {
-      ...validation.profile,
+      firstName,
+      lastName,
       province
     }
   };
@@ -597,7 +583,7 @@ router.post("/profile", requirePendingProfileAuth, async (req, res, next) => {
     const pendingInvite = await getPendingCommissionerInvite(req.user.email);
 
     if (pendingInvite) {
-      const validation = validateCommissionerOnboardingProfile(req.body);
+      const validation = validateCommissionerProfile(req.body);
 
       if (validation.error) {
         res.status(400).json({ error: validation.error });
@@ -840,7 +826,8 @@ router.patch("/me", requireAuth, async (req, res, next) => {
         req.user.id,
         {
           first_name: validation.profile.firstName,
-          last_name: validation.profile.lastName
+          last_name: validation.profile.lastName,
+          province: validation.profile.province
         }
       );
 
