@@ -51,6 +51,8 @@ import {
   getAllRolloutAreas,
   getRolloutAreas,
   getRolloutColor,
+  isDataBlockedFed,
+  isEnabledFed,
 } from "@/lib/map/rolloutPlan.js";
 import {
   canInteractWithDa,
@@ -515,6 +517,7 @@ export function MapCanvas({
   const fedSourceModeRef = useRef("pmtiles");
   const daSourceModeRef = useRef("geojson");
   const daSourceLayerRef = useRef(DEFAULT_DA_SOURCE_LAYER);
+  const daRenderMinZoomRef = useRef(DEFAULT_DA_RENDER_MIN_ZOOM);
   const setFedStateRef = useRef(null);
   const applyPresentationModeRef = useRef(null);
   const applyBoundaryVisibilityRef = useRef(null);
@@ -1209,6 +1212,7 @@ export function MapCanvas({
       );
 
       daSourceLayerRef.current = sourceLayer;
+      daRenderMinZoomRef.current = minZoom;
 
       if (!pmtilesPath) {
         throw new Error(
@@ -1722,7 +1726,7 @@ export function MapCanvas({
       applyLabelScale(map, labelScreenScale(width));
     }
 
-    function pickInteractiveFeature(point) {
+    function pickMapTarget(point) {
       if (counterProposalPreviewRef.current?.editable && map.getLayer("counter-proposal-handles")) {
         const handleFeatures = map.queryRenderedFeatures(point, {
           layers: ["counter-proposal-handles"],
@@ -1761,6 +1765,16 @@ export function MapCanvas({
         const id = getFeatureId(feature, "fed_num");
         if (id && canInteractWithFed(id, interactionModeRef.current)) {
           return { type: "fed", id };
+        }
+        if (id && isDataBlockedFed(id)) {
+          return { type: "data-blocked", id };
+        }
+        if (
+          id
+          && isEnabledFed(id)
+          && map.getZoom() < daRenderMinZoomRef.current
+        ) {
+          return { type: "zoom-required", id };
         }
       }
 
@@ -1987,14 +2001,16 @@ export function MapCanvas({
         return;
       }
 
-      const hit = pickInteractiveFeature(event.point);
+      const hit = pickMapTarget(event.point);
 
       if (hit?.type === "counter-proposal-handle") {
         onCounterProposalHandleSelectRef.current?.(hit.id);
         return;
       }
 
-      if (!hit) return;
+      if (!hit || hit.type === "data-blocked" || hit.type === "zoom-required") {
+        return;
+      }
 
       setInternalHover(null);
       applySelectionTarget(
@@ -2030,11 +2046,23 @@ export function MapCanvas({
         return;
       }
 
-      const hit = pickInteractiveFeature(event.point);
+      const hit = pickMapTarget(event.point);
 
       if (hit?.type === "counter-proposal-handle") {
         map.getCanvas().style.cursor = "grab";
         setInternalHover(null);
+        return;
+      }
+
+      if (hit?.type === "zoom-required") {
+        map.getCanvas().style.cursor = "zoom-in";
+        setInternalHover(null);
+        return;
+      }
+
+      if (hit?.type === "data-blocked" || hit?.type === "fed") {
+        map.getCanvas().style.cursor = "not-allowed";
+        setInternalHover(hit.type === "fed" ? hit : null);
         return;
       }
 
@@ -2057,7 +2085,7 @@ export function MapCanvas({
     };
 
     const onMouseDown = (event) => {
-      const hit = pickInteractiveFeature(event.point);
+      const hit = pickMapTarget(event.point);
 
       if (hit?.type !== "counter-proposal-handle") {
         return;
