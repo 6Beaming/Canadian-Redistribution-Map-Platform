@@ -3,13 +3,13 @@ import {
   getSupabaseClient,
   getSupabaseProfileEmailsAsAdmin,
 } from "../lib/supabase.js";
-import { requireAuth } from "../middleware/requireAuth.js";
+import { requirePublicUser } from "../middleware/requireAuth.js";
 
 const router = Router();
 
-// LEGACY READ API: this proposal-scoped route still needs requireAuth and
-// authorization policy before it can be treated as a production endpoint.
-router.get("/proposal/:proposalId", async (req, res) => {
+// Public-only proposal read. requireAuth is registered in server/app.js;
+// this route adds the role boundary that prevents Commissioner fall-through.
+router.get("/proposal/:proposalId", requirePublicUser, async (req, res) => {
   const supabase = getSupabaseClient();
   const { proposalId } = req.params;
 
@@ -47,7 +47,7 @@ function requireCommissioner(req, res, next) {
 }
 
 // Get all comments for the Commissioner submissions table.
-router.get("/", requireAuth, requireCommissioner, async (req, res) => {
+router.get("/", requireCommissioner, async (req, res) => {
   const supabase = getSupabaseClient();
 
   const { data, error } = await supabase
@@ -82,11 +82,15 @@ router.get("/", requireAuth, requireCommissioner, async (req, res) => {
   res.json(result);
 });
 
-// LEGACY USER READ API: author identity must be derived from req.user and the
-// requested user id must be authorized before this route is production-ready.
-router.get("/:user_id", async (req, res) => {
+// Public-only self read. The URL id is checked against the verified session to
+// prevent a signed-in user from enumerating another user's submissions.
+router.get("/:user_id", requirePublicUser, async (req, res) => {
   const supabase = getSupabaseClient();
   const { user_id } = req.params;
+
+  if (user_id !== req.user.id) {
+    return res.status(403).json({ error: "You can only view your own submissions." });
+  }
 
   const { data, error } = await supabase
     .from("submissions")
@@ -98,11 +102,12 @@ router.get("/:user_id", async (req, res) => {
   res.json(data);
 });
 
-// LEGACY WRITE API: currently accepts body.user_id. Refactor to requireAuth,
-// derive req.user.id server-side, and validate comment/objection geometry.
-router.post("/", async (req, res) => {
+// Public-only submission write. The author is derived from the verified
+// session; geometry-specific validation remains a dedicated follow-up API.
+router.post("/", requirePublicUser, async (req, res) => {
   const supabase = getSupabaseClient();
-  const { proposal_id, user_id, comment, fed_num, dguid, title, neighboring_dguid, type } = req.body;
+  const { proposal_id, comment, fed_num, dguid, title, neighboring_dguid, type } = req.body;
+  const user_id = req.user.id;
 
   // Verify proposal exists
   if (proposal_id) {
@@ -136,9 +141,9 @@ router.post("/", async (req, res) => {
   res.status(201).json(data[0]);
 });
 
-// LEGACY DELETE API: add requireAuth and an author/commissioner authorization
-// check before this endpoint is exposed outside the demonstration environment.
-router.delete("/:commentId", async (req, res) => {
+// Public-only owned-submission delete. A Commissioner uses Workspace/Archive
+// APIs instead and cannot mutate public submissions through this route.
+router.delete("/:commentId", requirePublicUser, async (req, res) => {
   const supabase = getSupabaseClient();
   const { commentId } = req.params;
 
@@ -146,6 +151,7 @@ router.delete("/:commentId", async (req, res) => {
     .from("submissions")
     .delete()
     .eq("id", commentId)
+    .eq("user_id", req.user.id)
     .eq("type", "feedback");
 
   if (error) return res.status(500).json({ error: error.message });

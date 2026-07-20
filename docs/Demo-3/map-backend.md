@@ -55,20 +55,27 @@ normalizes the records for Workspace, the Commissioner submissions table,
 Dashboard submission cards, and the current heatmap. Comments and objections
 therefore share one list retrieval path.
 
-### 4.2 Current legacy writes and reads that require refactoring
+### 4.2 Current public-route safeguard and remaining refactor work
 
-The following `server/routes/comments.js` methods are retained for the current
-demo flow but are marked with English maintenance comments in source:
+`server/app.js` now registers `requireAuth` for the entire `/api/comments`
+router. `server/routes/comments.js` applies `requirePublicUser` to public
+operations and `requireCommissioner` to the Commissioner-wide list. The same
+role boundary is registered in `App.jsx`: a signed-in Commissioner who manually
+opens a public route is redirected to `/dashboard`.
+
+The following methods remain part of the current demo flow, but still require
+payload/domain refactoring:
 
 | Method | Current behaviour | Required refactor |
 | --- | --- | --- |
-| `GET /proposal/:proposalId` | Reads proposal feedback without an explicit route auth guard. | Apply `requireAuth`, authorize proposal access, and limit output fields. |
-| `GET /:user_id` | Reads user submissions using a URL-supplied identity. | Require auth and allow only the author or an authorized Commissioner. |
-| `POST /` | Inserts a submission and accepts `body.user_id`. | Require auth, derive `user_id` from `req.user.id`, validate fields and type, and split objection writes into a dedicated endpoint. |
-| `DELETE /:commentId` | Deletes feedback with no route-level owner guard. | Require auth and enforce author/Commissioner authorization; prefer soft delete/audit policy where needed. |
+| `GET /proposal/:proposalId` | Authenticated Public-only proposal feedback read. | Add proposal-level access policy and limit output fields. |
+| `GET /:user_id` | Authenticated Public-only self read; verifies `req.params.user_id === req.user.id`. | Consider a separate Commissioner detail endpoint instead of widening this route. |
+| `POST /` | Authenticated Public-only insert; derives `user_id` from `req.user.id`. | Validate fields and type, then split objection writes into a dedicated geometry endpoint. |
+| `DELETE /:commentId` | Authenticated Public-only delete scoped by `id`, `user_id`, and feedback type. | Add soft-delete/audit policy where needed. |
 
-Client-side login checks do not secure these endpoints. This is the highest
-priority submission API hardening work.
+The new dual-sided guard prevents role fall-through and user-ID spoofing on this
+router. Payload validation and durable objection geometry remain the next
+priority.
 
 ### 4.3 Objection geometry
 
@@ -182,8 +189,8 @@ geometry rather than temporary fixture operations.
 
 1. Apply the committed migrations and verify the status constraint and Archive
    RPCs in the target Supabase project.
-2. Secure every legacy comments route and replace body-supplied author IDs with
-   session-derived identities.
+2. Add exhaustive payload validation and proposal-level authorization to the
+   newly authenticated comments routes.
 3. Add dedicated objection and Counter-Proposal write/read APIs with server
    geometry validation, immutable GeoJSON snapshots, and map source revisions.
 4. Implement CRUD endpoints for `workspace_comments`, `workspace_labels`, and

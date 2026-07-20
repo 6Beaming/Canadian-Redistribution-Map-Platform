@@ -873,6 +873,20 @@
   white-space: nowrap;
 }
 
+/* Auth-blocked submit guidance occupies its own full-width row so it cannot
+   compete with paired workflow buttons on a narrow InfoPanel. */
+.map-info-panel .workflow-submit-notice {
+  width: 100%;
+  min-height: 18px;
+  margin: 0;
+  padding: 0 clamp(2px, 0.6vw, 6px);
+  color: #d93025;
+  font-size: clamp(11px, 1.15vw, 12px);
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: right;
+}
+
 .map-info-panel__embedded--stacked {
   justify-content: space-between;
   gap: 16px;
@@ -908,6 +922,32 @@
   font-size: 13px;
   font-weight: 600;
   line-height: 1.5;
+}
+
+.map-info-panel__blocked-notice {
+  display: grid;
+  gap: clamp(0.55rem, 0.9vw, 0.8rem);
+  border: 1px solid #f1d59d;
+  border-radius: 14px;
+  background: #fff9ed;
+  padding: clamp(0.9rem, 1.25vw, 1.1rem);
+  color: #72551d;
+}
+
+.map-info-panel__blocked-notice h3,
+.map-info-panel__blocked-notice p {
+  margin: 0;
+}
+
+.map-info-panel__blocked-notice h3 {
+  color: #62450e;
+  font-size: clamp(0.9rem, 1.05vw, 1rem);
+  font-weight: 720;
+}
+
+.map-info-panel__blocked-notice p {
+  font-size: clamp(0.78rem, 0.95vw, 0.88rem);
+  line-height: 1.55;
 }
 
 .map-info-panel__field {

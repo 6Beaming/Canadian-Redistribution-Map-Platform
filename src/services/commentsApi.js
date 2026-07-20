@@ -29,6 +29,7 @@ export async function getCommentsForDA(proposalId){
         `/api/comments/proposal/${proposalId}`, 
         {
             method:"GET",
+            credentials:"include",
         }
     );
 
@@ -57,6 +58,7 @@ export async function getCommentsUser(user_id){
         `/api/comments/${user_id}`, 
         {
             method:"GET",
+            credentials:"include",
         }
     );
 
@@ -70,6 +72,7 @@ export async function addComment(proposal_id, user_id, comment, fed_num, dguid, 
         `/api/comments/`, 
         {
             method:"POST",
+            credentials:"include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({proposal_id, user_id, comment, fed_num, dguid, title, neighboring_dguid, type})
         }
@@ -84,6 +87,7 @@ export async function deleteComment(commentId){
         `/api/comments/${commentId}`, 
         {
             method:"DELETE",
+            credentials:"include",
         }
     );
 

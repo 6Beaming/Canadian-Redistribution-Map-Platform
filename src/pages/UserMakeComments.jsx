@@ -13,6 +13,12 @@ import { toast } from "sonner";
 
 const SIGN_IN_NOTICE = "Please sign in to submit your comment.";
 
+function SignInSubmissionNotice({ message }) {
+  if (!message) return null;
+
+  return <p className="workflow-submit-notice" role="note">{message}</p>;
+}
+
 function FieldHoverHint({ message }) {
   return (
     <p
@@ -130,18 +136,16 @@ export default function UserMakeComments({ proposalId, fedNum, dguid, daName, ha
         </div>
 
         <WorkflowActionFooter columns={1}>
-          <div className="group/comment-control grid min-w-0 justify-items-end gap-2 text-right">
-            <Button
-              className={workflowActionButtonClassName}
-              disabled={!isSignedIn}
-              type="button"
-              onClick={handleSubmitComment}
-            >
-              Submit Comment
-            </Button>
-            <FieldHoverHint message={commentFieldMessage} />
-          </div>
+          <Button
+            className={workflowActionButtonClassName}
+            disabled={!isSignedIn}
+            type="button"
+            onClick={handleSubmitComment}
+          >
+            Submit Comment
+          </Button>
         </WorkflowActionFooter>
+        <SignInSubmissionNotice message={commentFieldMessage} />
       </form>
     </section>
   );

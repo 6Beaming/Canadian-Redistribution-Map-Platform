@@ -14,6 +14,11 @@ import { getDaPanelTitle } from "@/lib/map/profileUtils.js";
 const SIGN_IN_NOTICE = "Please sign in to submit your counter-proposal.";
 const balancedActionButtonClassName = `${workflowActionButtonClassName} w-[calc(50%-0.25rem)] max-w-[188px] px-2 text-[13px]`;
 
+function SignInSubmissionNotice({ message }) {
+  if (!message) return null;
+
+  return <p className="workflow-submit-notice" role="note">{message}</p>;
+}
 
 function getDaDisplay(profilesByDguid, dguid) {
   if (!dguid) {
@@ -270,7 +275,6 @@ function EditorWorkspaceCard({
   profilesByDguid,
 }) {
   const transfer = cache?.impacts?.transfer ?? null;
-  const sourceGeometryRepairs = cache?.sourceGeometryRepairs ?? [];
 
   return (
     <Card className="max-w-none gap-3 overflow-hidden p-4 hover:translate-y-0 hover:shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
@@ -279,15 +283,6 @@ function EditorWorkspaceCard({
           <p className="text-[13px] leading-5 text-[#5f6368]">
             Drag a boundary point to adjust your proposal
           </p>
-
-          {sourceGeometryRepairs.length ? (
-            <p className="rounded-[12px] border border-[#f4d9a5] bg-[#fff9ed] px-3 py-2 text-[12px] leading-5 text-[#7a6331]">
-              {sourceGeometryRepairs.length === 1
-                ? "One duplicate source boundary vertex was removed for this editing session."
-                : `${sourceGeometryRepairs.length} duplicate source boundary vertices were removed for this editing session.`} {" "}
-              The canonical metadata has not been changed.
-            </p>
-          ) : null}
 
           <CounterProposalComparison
             cache={cache}
@@ -416,7 +411,7 @@ export default function UserMakeCounterProposal({
             {textFieldMessage ? <FieldHoverHint message={textFieldMessage} /> : null}
           </div>
 
-          <div className="group/comment-control grid min-w-0 gap-1">
+          <div className="grid min-w-0 gap-1">
             <WorkflowActionFooter className="mt-0 gap-2">
               <Button
                 className={balancedActionButtonClassName}
@@ -436,7 +431,7 @@ export default function UserMakeCounterProposal({
                 Submit
               </Button>
             </WorkflowActionFooter>
-            {textFieldMessage ? <FieldHoverHint message={textFieldMessage} /> : null}
+            <SignInSubmissionNotice message={textFieldMessage} />
           </div>
         </div>
       ) : null}

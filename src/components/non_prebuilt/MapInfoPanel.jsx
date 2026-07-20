@@ -19,6 +19,7 @@ import {
   getRolloutAccentColor,
   getRolloutAreas,
   getRolloutCategory,
+  isDataBlockedFed,
 } from "@/lib/map/rolloutPlan.js";
 
 const TOGGLE_SIZE = 54;
@@ -583,6 +584,28 @@ function RolloutCategoryPanel({
   );
 }
 
+function DataBlockedFedPanel({ fedNum, fedName }) {
+  return (
+    <>
+      <header className="map-info-panel__header">
+        <h2 className="map-info-panel__title map-info-panel__title--centered">
+          {fedName || `FED ${fedNum}`}
+        </h2>
+      </header>
+      <div className="map-info-panel__body map-info-panel__body--stacked">
+        <section className="map-info-panel__blocked-notice" role="status">
+          <h3>Data currently blocked</h3>
+          <p>
+            DA-level data for this federal electoral district is not currently
+            available. Use the Toggle in the upper-left corner to view areas
+            with active data.
+          </p>
+        </section>
+      </div>
+    </>
+  );
+}
+
 export function MapInfoPanel({
   selection,
   profilesByDguid,
@@ -602,6 +625,8 @@ export function MapInfoPanel({
   onRolloutSelect,
 }) {
   const hasSelection = Boolean(selection?.type);
+  const isDataBlockedFedSelection =
+    selection?.type === "fed" && isDataBlockedFed(selection.fedNum);
   const [isMobile, setIsMobile] = useState(
     () => typeof window !== "undefined" && window.innerWidth <= 576,
   );
@@ -869,6 +894,10 @@ export function MapInfoPanel({
       );
     }
 
+    if (isDataBlockedFedSelection) {
+      return <DataBlockedFedPanel fedNum={selection.fedNum} fedName={selection.fedName} />;
+    }
+
     if (variant === "user") {
       if (!hasSelection && panelView === "statistics") {
         return (
@@ -996,11 +1025,13 @@ export function MapInfoPanel({
           </div>
         ) : null}
 
-        <PanelModeSelector
-          activeView={panelView}
-          onViewChange={onPanelViewChange}
-          variant={variant}
-        />
+        {!isDataBlockedFedSelection ? (
+          <PanelModeSelector
+            activeView={panelView}
+            onViewChange={onPanelViewChange}
+            variant={variant}
+          />
+        ) : null}
 
         <div className="map-info-panel__content">{renderPanelContent()}</div>
       </aside>

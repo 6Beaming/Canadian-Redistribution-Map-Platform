@@ -107,6 +107,19 @@ export async function requireAuth(req, res, next) {
   }
 }
 
+// This is the server counterpart to App.jsx's RequirePublicUser route guard.
+// It is intentionally applied after requireAuth so role checks always use the
+// verified profile rather than an untrusted client value.
+export function requirePublicUser(req, res, next) {
+  const role = req.profile?.role === "user" ? "public_user" : req.profile?.role;
+  if (role !== "public_user") {
+    res.status(403).json({ error: "This endpoint is available to public users only." });
+    return;
+  }
+
+  next();
+}
+
 export async function requirePendingProfileAuth(req, res, next) {
   const session = await loadSession(req, res, {
     accessCookieName: PENDING_ACCESS_COOKIE,

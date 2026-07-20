@@ -13,7 +13,7 @@ const AUTH_PATHS = new Set([
   "/sign-up"
 ]);
 
-function getBackRoute(pathname) {
+function getBackRoute(pathname, isCommissioner) {
   if (pathname.startsWith("/dashboard/archivedTree/") && pathname.endsWith("/difference")) {
     return "/dashboard/archivedTree";
   }
@@ -22,10 +22,11 @@ function getBackRoute(pathname) {
     return "/dashboard/workspace";
   }
 
-  if (
-    pathname === "/users/profile" ||
-    pathname === "/submissions"
-  ) {
+  if (pathname === "/submissions") {
+    return isCommissioner ? "/dashboard" : "/users";
+  }
+
+  if (pathname === "/users/profile") {
     return "/users";
   }
 
@@ -51,7 +52,8 @@ export default function Header() {
     return null;
   }
 
-  const backRoute = getBackRoute(pathname);
+  const isCommissioner = user?.role === "commissioner";
+  const backRoute = getBackRoute(pathname, isCommissioner);
   const isCommissionerSurface =
     pathname === "/dashboard" || pathname.startsWith("/dashboard/");
   const isWorkspaceReview = pathname.startsWith("/dashboard/workspace/");
@@ -59,6 +61,10 @@ export default function Header() {
   const isPublicProfilePage = pathname === "/users/profile";
   const isPublicSubmissionsPage =
     pathname === "/submissions" || pathname.startsWith("/submissions/");
+  // A Commissioner may reach the user-submissions route from an existing link.
+  // Keep its navigation/profile context commissioner-owned and never expose the
+  // public-only "My Submissions" header action on that route.
+  const isCommissionerContext = isCommissionerSurface || (isCommissioner && isPublicSubmissionsPage);
   const showSearch =
     (!isCommissionerSurface || pathname === "/dashboard") &&
     !isPublicProfilePage &&
@@ -83,7 +89,7 @@ export default function Header() {
   return (
     <header className="header relative z-50 grid h-14 w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center border-b border-[#d7e6fb] bg-background text-[#17324d]">
       <div className="header__left-slot z-10 flex min-w-0 items-center px-[clamp(0.4rem,1.2vw,1rem)]">
-        {backRoute && isCommissionerSurface ? (
+        {backRoute && isCommissionerContext ? (
           <Button
             type="button"
             variant="outline"
@@ -148,7 +154,7 @@ export default function Header() {
             <ClipboardList className="h-4 w-4" aria-hidden="true" />
             <span>User Submissions</span>
           </Button>
-        ) : !isPublicProfilePage && !isPublicSubmissionsPage && sessionStatus === "signed-in" ? (
+        ) : !isCommissioner && !isPublicProfilePage && !isPublicSubmissionsPage && sessionStatus === "signed-in" ? (
           <Button
             type="button"
             variant="outline"
@@ -170,7 +176,7 @@ export default function Header() {
           onSignIn={() => navigate("/sign-in")}
           onSignOut={handleSignOut}
           onPrimaryAction={() =>
-            navigate(isCommissionerSurface ? "/dashboard/profile" : "/users/profile")
+            navigate(isCommissionerContext ? "/dashboard/profile" : "/users/profile")
           }
           primaryActionLabel="My profile"
           primaryActionIcon={UserRound}

@@ -15,6 +15,12 @@ import { addComment } from "@/services/commentsApi";
 
 const SIGN_IN_NOTICE = "Please sign in to submit your boundary objection.";
 
+function SignInSubmissionNotice({ message }) {
+  if (!message) return null;
+
+  return <p className="workflow-submit-notice" role="note">{message}</p>;
+}
+
 function FieldHoverHint({ message }) {
   return (
     <p
@@ -281,7 +287,7 @@ export default function UserMakeObjection({
                 <FieldHoverHint message={textFieldMessage} />
               </div>
 
-              <WorkflowActionFooter className="items-start">
+              <WorkflowActionFooter>
                 <Button
                   className={workflowActionButtonClassName}
                   type="button"
@@ -292,18 +298,16 @@ export default function UserMakeObjection({
                   Back to Review
                 </Button>
 
-                <div className="group/comment-control ml-auto grid min-w-0 justify-items-end gap-2 text-right">
-                  <Button
-                    className={workflowActionButtonClassName}
-                    disabled={!isSignedIn}
-                    type="button"
-                    onClick={handleSubmitObjection}
-                  >
-                    Submit Objection
-                  </Button>
-                  <FieldHoverHint message={textFieldMessage} />
-                </div>
+                <Button
+                  className={workflowActionButtonClassName}
+                  disabled={!isSignedIn}
+                  type="button"
+                  onClick={handleSubmitObjection}
+                >
+                  Submit Objection
+                </Button>
               </WorkflowActionFooter>
+              <SignInSubmissionNotice message={textFieldMessage} />
             </div>
           </div>
         </div>

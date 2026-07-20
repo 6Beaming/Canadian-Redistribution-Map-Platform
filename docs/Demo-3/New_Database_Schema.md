@@ -45,8 +45,10 @@ or a revision table linked to it; that decision is listed in Section 8.
 ### 3.1 `auth.users` (Supabase managed)
 
 Supabase owns credentials, sessions, and the canonical authenticated user ID.
-Application routes must derive identity from a verified session and must not
-trust a client-provided user ID.
+Application routes derive identity from a verified session and must not trust a
+client-provided user ID. `server/app.js` registers this protection for the
+comments router, and `App.jsx` prevents Commissioner sessions from entering
+Public-only frontend routes.
 
 ### 3.2 `profiles`
 

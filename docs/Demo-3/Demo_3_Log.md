@@ -122,10 +122,12 @@ until Counter-Proposals store immutable server-side geometry snapshots.
 
 ## 6. Backend and Schema Delivery
 
-- `server/routes/comments.js` protects the Commissioner-wide list route and
-  resolves author emails server-side through the Supabase service-role helper.
-  Other legacy comments routes are documented and marked for
-  authentication/authorization refactoring.
+- `App.jsx` now has a Public-only route safeguard, while `server/app.js`
+  registers authentication for every submissions route. `comments.js` then
+  separates public-only and Commissioner-only operations, preventing a
+  Commissioner session from falling through to the public submission surface.
+  The Commissioner-wide list still resolves author emails server-side through
+  the Supabase service-role helper.
 - `server/routes/workspace.js` is commissioner-only and exposes reviewer
   lookup, temporary status mutation, Archived Tree read, atomic merge, latest
   version revert, and branch deletion.
@@ -158,8 +160,8 @@ owner before the durable Archive Tree endpoints can succeed.
    their existing Supabase tables; remove their `localStorage` adapter.
 3. Add Supabase Realtime or an equivalent server push/query-refresh strategy
    for multi-Commissioner collaboration.
-4. Require authentication and server-derived author identity on every legacy
-   comments endpoint; validate objection pairs and write verified geometry.
+4. Complete server-side validation for comment/objection payloads, validate
+   objection pairs, and write verified immutable geometry.
 5. Replace permanent Archive Tree deletion with a recoverable audit-preserving
    policy if the feature is used outside the demonstration environment.
 

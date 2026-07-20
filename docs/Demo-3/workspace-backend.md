@@ -109,7 +109,9 @@ tables to the browser with permissive policies as a shortcut.
 ### Comments and objections
 
 The protected Commissioner list currently comes from `GET /api/comments`.
-Legacy comment endpoints are not uniformly authenticated and must be secured as
+`server/app.js` registers authentication for the comments router, and
+`comments.js` separates Public-only self-service operations from the
+Commissioner-only list. Payload and geometry validation are still pending as
 described in [map-backend.md](./map-backend.md). Objections store DGUID pair
 identifiers, but their historical GeoJSON is not reliably written by the
 generic `POST /api/comments` route. A dedicated objection API must persist a
@@ -151,5 +153,5 @@ archive deletion with a soft-delete/tombstone policy and retain an audit trail.
 - Keep `.env` Git-ignored and obtain it through the project-approved channel.
 - Use the server-only service-role client only after authentication and role
   checks; it bypasses normal RLS protections.
-- The comments endpoints that still take a `user_id` in the body are technical
-  debt, not an approved anonymous submission design.
+- Comments routes now derive `user_id` from the authenticated session; do not
+  reintroduce client-supplied author identity in future endpoints.

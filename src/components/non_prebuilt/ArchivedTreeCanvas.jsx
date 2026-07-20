@@ -177,13 +177,24 @@ export function ArchivedTreeCanvas({ categories, selectedVersionId, onSelect, on
         context.stroke();
         context.shadowColor = "transparent";
 
-        roundedRect(context, ROOT_X + 14, rootY + 21, 52, 62, 13);
-        const gradient = context.createLinearGradient(ROOT_X + 14, rootY + 21, ROOT_X + 66, rootY + 83);
+        // Keep root-category icon containers square. Canvas does not preserve
+        // CSS aspect ratios, so a taller rectangle makes the three branch icons
+        // appear vertically stretched beside their Workspace counterparts.
+        const rootIconSize = 52;
+        const rootIconX = ROOT_X + 14;
+        const rootIconY = rootY + (ROOT_HEIGHT - rootIconSize) / 2;
+        roundedRect(context, rootIconX, rootIconY, rootIconSize, rootIconSize, 13);
+        const gradient = context.createLinearGradient(
+          rootIconX,
+          rootIconY,
+          rootIconX + rootIconSize,
+          rootIconY + rootIconSize,
+        );
         gradient.addColorStop(0, "#20c9bd");
         gradient.addColorStop(1, category.color);
         context.fillStyle = gradient;
         context.fill();
-        drawIcon(context, category.id, ROOT_X + 22, rootY + 34);
+        drawIcon(context, category.id, rootIconX + 8, rootIconY + 8);
         drawText(context, category.title, ROOT_X + 82, rootY + 42, { size: 13, weight: 750, maxWidth: 165 });
         drawText(context, category.description, ROOT_X + 82, rootY + 66, { size: 11, color: "#60758a", maxWidth: 165 });
         drawText(context, `${category.count} branch${category.count === 1 ? "" : "es"}`, ROOT_X + 82, rootY + 84, { size: 10.5, color: category.color, weight: 700 });

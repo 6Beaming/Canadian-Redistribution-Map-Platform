@@ -38,20 +38,39 @@ function RequireCommissioner() {
   return <Outlet />;
 }
 
+// Public map and personal-submission routes must never become a fallback
+// surface for a signed-in Commissioner. The server enforces the same boundary
+// for public submission APIs.
+function RequirePublicUser() {
+  const { sessionStatus, user } = useAuth();
+
+  if (sessionStatus === "checking") {
+    return null;
+  }
+
+  if (user?.role === "commissioner") {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <Outlet />;
+}
+
 function App() {
   return (
     <AuthProvider>
       <Header />
 
       <Routes>
-        <Route path="/" element={<UserHome />} />
-        <Route path="/users" element={<UserHome />} />
-        <Route path="/users/profile" element={<UserProfile />} />
-        <Route path="/submissions" element={<MySubmissions />} />
-        <Route
-          path="/submissions/:submissionId"
-          element={<UserResumeSubmission />}
-        />
+        <Route element={<RequirePublicUser />}>
+          <Route path="/" element={<UserHome />} />
+          <Route path="/users" element={<UserHome />} />
+          <Route path="/users/profile" element={<UserProfile />} />
+          <Route path="/submissions" element={<MySubmissions />} />
+          <Route
+            path="/submissions/:submissionId"
+            element={<UserResumeSubmission />}
+          />
+        </Route>
         <Route path="/sign-in" element={<SignInPage />} />
         <Route path="/sign-up" element={<SignUpPage />} />
         <Route path="/forgot-password" element={<ResetPasswordRequestPage />} />
