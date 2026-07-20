@@ -4,6 +4,17 @@
 **Delivery status:** Demonstration-ready frontend with a mixed durable and transitional data layer
 **Scope:** Map reliability, submission review, Workspace, Archived Tree, responsive Commissioner UI, and the next database contract
 
+## Update Plan Index
+
+| Planned area | Required implementation | Documentation references |
+| --- | --- | --- |
+| Local map authority | Replace the legacy DGUID foreign-key/join dependency with server-side validation and display hydration from versioned local profile and canonical GeoJSON assets. Supabase stores submission state and immutable snapshots only. | [map-backend.md](./map-backend.md), Section 4.3; [New_Database_Schema.md](./New_Database_Schema.md), Section 3.3; [map-architecture.md](./map-architecture.md), Section 4 |
+| Objection write flow | Add a dedicated authenticated objection API with server-side DA/FED/adjacency validation, a generated pair/boundary snapshot, and baseline asset version/hash. | [map-backend.md](./map-backend.md), Section 4.4; [New_Database_Schema.md](./New_Database_Schema.md), Section 4.3 |
+| Counter-Proposal persistence | Replace the `temp.json` fixture with persistent submission/revision storage, authorised read/write APIs, server-side topology validation, and immutable original/proposed geometry. | [workspace-backend.md](./workspace-backend.md), Section 6; [New_Database_Schema.md](./New_Database_Schema.md), Section 7; [workspace.md](./workspace.md), Section 9 |
+| Workspace collaboration | Replace localStorage comments, labels, archive requests, assignees, and votes with authenticated Commissioner CRUD over the existing Workspace tables. | [workspace-backend.md](./workspace-backend.md), Section 5; [workspace.md](./workspace.md), Section 7; [map-backend.md](./map-backend.md), Section 8 |
+| Query, aggregation, and realtime | Split transitional services into formal repositories, add paginated submission queries, a Commissioner-only heatmap aggregate, and Realtime/server-event synchronization. | [map-backend.md](./map-backend.md), Sections 6-8; [workspace-backend.md](./workspace-backend.md), Section 7; [map-architecture.md](./map-architecture.md), Section 6.1 |
+| Archive policy and deployment | Add recoverable archive/audit policy, verify migrations and Archive RPCs, and keep Supabase credentials service-side in the Git-ignored root `.env`. | [New_Database_Schema.md](./New_Database_Schema.md), Sections 6.2 and 9; [map-backend.md](./map-backend.md), Section 9; [workspace-backend.md](./workspace-backend.md), Section 8 |
+
 ---
 
 ## 1. Delivery Summary
