@@ -46,7 +46,22 @@ function requireCommissioner(req, res, next) {
   next();
 }
 
-// Get all comments for the Commissioner submissions table.
+// Get total number of sumissions
+router.get("/count", async (req, res) => {
+  const supabase = getSupabaseClient();
+
+  const { count, error } = await supabase
+    .from("submissions")
+    .select("*", { count: "exact", head: true });
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  res.json({ totalSubmissions: count });
+});
+
+// Get all submissions for the Commissioner submissions table.
 router.get("/", requireCommissioner, async (req, res) => {
   const supabase = getSupabaseClient();
 
