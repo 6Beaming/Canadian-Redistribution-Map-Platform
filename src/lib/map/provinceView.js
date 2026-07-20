@@ -66,8 +66,8 @@ const PROVINCE_VIEWS = {
     // complete bounds makes the territory occupy only a narrow strip, so use
     // a closer southern/central focus that matches the intended dashboard
     // view while retaining nearby geographic context.
-    location: [-131.8, 62.4],
-    zoom: 5.3,
+    location: [-138.8, 62.3],
+    zoom: 5.4,
   },
 };
 

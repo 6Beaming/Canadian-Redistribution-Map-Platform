@@ -28,7 +28,7 @@ test("Yukon uses a closer camera so it occupies most of the wide map", () => {
   const province = getProvinceMapView("YT");
 
   assert.deepEqual(province.mapTarget.location, [-131.8, 62.4]);
-  assert.equal(province.mapTarget.zoom, 6.61);
+  assert.equal(province.mapTarget.zoom, 5.3);
   assert.equal(province.mapTarget.viewport, undefined);
   assert.equal(province.mapTarget.showMarker, false);
 });

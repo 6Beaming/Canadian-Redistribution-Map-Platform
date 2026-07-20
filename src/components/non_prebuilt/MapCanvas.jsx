@@ -4,6 +4,7 @@ import { Protocol } from "pmtiles";
 import { mapApi } from "@/services/mapApi.js";
 import {
   CANADA_BOUNDS,
+  DA_HOVER_COLOR,
   DATA_BLOCKED_FILL_COLOR,
   DEFAULT_DA_RENDER_MAX_ZOOM,
   DEFAULT_DA_RENDER_MIN_ZOOM,
@@ -421,7 +422,7 @@ function daFillPaint(
       ["boolean", ["feature-state", "selected"], false],
       SELECTED_COLOR,
       ["boolean", ["feature-state", "hover"], false],
-      HOVER_COLOR,
+      DA_HOVER_COLOR,
       BLOCKED_DA_FILL_EXPRESSION,
     ]
     : heatmapEnabled
@@ -429,8 +430,6 @@ function daFillPaint(
         "case",
         ["boolean", ["feature-state", "selected"], false],
         SELECTED_COLOR,
-        ["boolean", ["feature-state", "hover"], false],
-        HOVER_COLOR,
         heatmapFillExpression ?? "#ffffff",
       ]
       : [
@@ -438,7 +437,7 @@ function daFillPaint(
         ["boolean", ["feature-state", "selected"], false],
         SELECTED_COLOR,
         ["boolean", ["feature-state", "hover"], false],
-        HOVER_COLOR,
+        DA_HOVER_COLOR,
         "#ffffff",
       ];
 
@@ -460,8 +459,6 @@ function daFillPaint(
         "case",
         ["boolean", ["feature-state", "selected"], false],
         0.88,
-        ["boolean", ["feature-state", "hover"], false],
-        0.82,
         0.74,
       ]
       : [
@@ -1271,7 +1268,9 @@ export function MapCanvas({
         return null;
       }
 
-      return target.type === "da" ? target.dguid ?? target.id ?? null : null;
+      return target.type === "da" || target.type === "data-blocked-da"
+        ? target.dguid ?? target.id ?? null
+        : null;
     }
 
     function normalizeFedId(target) {
@@ -2031,6 +2030,9 @@ export function MapCanvas({
         if (id && canInteractWithDa(fedNum, interactionModeRef.current)) {
           return { type: "da", id };
         }
+        if (id && isDataBlockedFed(fedNum)) {
+          return { type: "data-blocked-da", id };
+        }
       }
 
       const fedFeatures = map.getLayer("fed-fill")
@@ -2284,7 +2286,12 @@ export function MapCanvas({
         return;
       }
 
-      if (!hit || hit.type === "data-blocked" || hit.type === "zoom-required") {
+      if (
+        !hit
+        || hit.type === "data-blocked"
+        || hit.type === "data-blocked-da"
+        || hit.type === "zoom-required"
+      ) {
         return;
       }
 
@@ -2333,6 +2340,12 @@ export function MapCanvas({
       if (hit?.type === "zoom-required") {
         map.getCanvas().style.cursor = "zoom-in";
         setInternalHover(null);
+        return;
+      }
+
+      if (hit?.type === "data-blocked-da") {
+        map.getCanvas().style.cursor = "not-allowed";
+        setInternalHover(hit);
         return;
       }
 
