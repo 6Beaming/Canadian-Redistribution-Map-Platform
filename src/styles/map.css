@@ -612,6 +612,23 @@
   transform: scale(0.985);
 }
 
+.map-info-panel__mode-trigger:disabled {
+  cursor: not-allowed;
+  border-color: #d7e6fb;
+  background: #eef4fd;
+  color: #6d8198;
+  box-shadow: none;
+  transform: none;
+}
+
+.map-info-panel__mode-trigger:disabled:hover,
+.map-info-panel__mode-trigger:disabled:active {
+  border-color: #d7e6fb;
+  background: #eef4fd;
+  box-shadow: none;
+  transform: none;
+}
+
 .map-info-panel__mode-chevron {
   width: 17px;
   height: 17px;

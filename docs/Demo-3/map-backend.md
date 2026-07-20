@@ -77,7 +77,32 @@ The new dual-sided guard prevents role fall-through and user-ID spoofing on this
 router. Payload validation and durable objection geometry remain the next
 priority.
 
-### 4.3 Objection geometry
+### 4.3 DA reference coverage and local-authority migration
+
+`submissions.dguid` is protected by the existing
+`submissions_dguid_fkey -> dissemination_areas.dguid` relationship. The
+2026-07-20 deployment audit compared the active repository profile index with
+the live reference table: the map exposes 20,374 DGUIDs, while
+`dissemination_areas` has 74 rows, all of which overlap the map index. Thus the
+current generic `POST /api/comments` can write only the seeded Yukon subset;
+posting an otherwise valid selected DA outside that subset returns a 500 foreign
+key error.
+
+This is not caused by migrations `20260719160000` through `20260719180000`:
+they create Workspace/Archive structures and normalize the status CHECK; none
+changes the DGUID foreign key.
+
+The selected target architecture avoids uploading a duplicate national DA
+catalog to Supabase. A replacement migration removes
+`submissions_dguid_fkey`; `GET /api/comments` and `GET /api/comments/:user_id`
+must also remove their `dissemination_areas!submissions_dguid_fkey` joins and
+hydrate DA/community display fields from the versioned local profile index.
+The replacement write API validates primary and neighbouring DGUIDs against
+that same local index and canonical FED metadata before insert, and returns a
+clear 4xx availability error for an unknown or inactive area. This preserves
+geographic integrity without storing national reference geometry in Supabase.
+
+### 4.4 Objection geometry
 
 The live `submissions` table contains `neighboring_dguid` and `geometry JSONB`.
 Current live objection records identify both DAs, but the generic write path does
@@ -88,11 +113,12 @@ evidence if the baseline data changes.
 The recommended replacement is `POST /api/submissions/objections`:
 
 1. authenticate the requester and derive the author from the session;
-2. validate both DGUIDs and their FED scope;
+2. validate both DGUIDs against the deployed local profile index and their FED
+   scope;
 3. load canonical metadata server-side and verify adjacency;
 4. derive the shared edge and selected-pair FeatureCollection server-side;
-5. insert the pair, text payload, geometry snapshot, and a source
-   version/hash in a transaction; and
+5. insert the pair identifiers, text payload, geometry snapshot, and a source
+   asset version/hash in a transaction; and
 6. return a minimal normalized submission response.
 
 The browser may send intended DGUIDs and text, but it must not be the authority

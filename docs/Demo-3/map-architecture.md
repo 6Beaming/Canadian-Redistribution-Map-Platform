@@ -80,6 +80,13 @@ This is used for public objection, counter-proposal editing, Workspace review,
 and Archived Difference. It prevents visual PMTiles/GeoJSON offsets without
 changing canonical metadata.
 
+For submission validation, these repository-owned assets are also the intended
+geographic authority. A future write API validates selected DGUIDs and pair
+topology from the local profile index and canonical FED GeoJSON; it writes only
+the resulting immutable per-submission snapshot to Supabase. The application
+does not need a duplicate national DA geometry/reference upload merely to
+accept a submission.
+
 ## 5. Geometry Editing and Read-only Review
 
 `src/lib/map/counterProposalWorkflow.js` uses JSTS for the client-side editing

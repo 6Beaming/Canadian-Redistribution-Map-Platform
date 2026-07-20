@@ -115,7 +115,12 @@ Commissioner-only list. Payload and geometry validation are still pending as
 described in [map-backend.md](./map-backend.md). Objections store DGUID pair
 identifiers, but their historical GeoJSON is not reliably written by the
 generic `POST /api/comments` route. A dedicated objection API must persist a
-server-validated pair geometry snapshot and source revision/hash.
+server-validated pair geometry snapshot and source revision/hash. The intended
+validation authority is the versioned local map profile index plus canonical
+metadata, not a duplicated national `dissemination_areas` catalog. Until the
+legacy primary-DA foreign key and its PostgREST joins are replaced, however,
+the 74-row Yukon reference table rejects submissions for the other selectable
+map DGUIDs before they can enter Workspace.
 
 ### Counter-Proposals
 

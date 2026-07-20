@@ -54,7 +54,7 @@ const PANEL_VIEW_ICONS = {
   "counter-proposal": GitCompareArrows,
 };
 
-function PanelModeSelector({ activeView, onViewChange, variant }) {
+function PanelModeSelector({ activeView, onViewChange, variant, workflowLocked = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const selectorRef = useRef(null);
   const views = getPanelViews(variant);
@@ -88,7 +88,14 @@ function PanelModeSelector({ activeView, onViewChange, variant }) {
     };
   }, [isOpen]);
 
+  useEffect(() => {
+    if (workflowLocked) {
+      setIsOpen(false);
+    }
+  }, [workflowLocked]);
+
   function handleSelect(nextView) {
+    if (workflowLocked) return;
     setIsOpen(false);
     onViewChange?.(nextView);
   }
@@ -101,6 +108,9 @@ function PanelModeSelector({ activeView, onViewChange, variant }) {
           className="map-info-panel__mode-trigger"
           aria-haspopup="menu"
           aria-expanded={isOpen}
+          aria-label={workflowLocked ? "Workflow selector is locked until you return to step 1" : undefined}
+          disabled={workflowLocked}
+          title={workflowLocked ? "Use the workflow's Back controls to return to step 1 before changing activities." : undefined}
           onClick={() => setIsOpen((current) => !current)}
         >
           <ActiveIcon className="map-info-panel__mode-icon" aria-hidden="true" />
@@ -111,7 +121,7 @@ function PanelModeSelector({ activeView, onViewChange, variant }) {
           />
         </button>
 
-        {isOpen ? (
+        {isOpen && !workflowLocked ? (
           <div
             className="map-info-panel__mode-menu absolute left-0 top-full z-20 w-full"
             role="menu"
@@ -627,6 +637,11 @@ export function MapInfoPanel({
   const hasSelection = Boolean(selection?.type);
   const isDataBlockedFedSelection =
     selection?.type === "fed" && isDataBlockedFed(selection.fedNum);
+  const isWorkflowSelectorLocked =
+    variant === "user" && (
+      (panelView === "objection" && (objectionWorkflow?.step ?? 1) >= 2)
+      || (panelView === "counter-proposal" && (counterProposalWorkflow?.step ?? 1) >= 2)
+    );
   const [isMobile, setIsMobile] = useState(
     () => typeof window !== "undefined" && window.innerWidth <= 576,
   );
@@ -1030,6 +1045,7 @@ export function MapInfoPanel({
             activeView={panelView}
             onViewChange={onPanelViewChange}
             variant={variant}
+            workflowLocked={isWorkflowSelectorLocked}
           />
         ) : null}
 

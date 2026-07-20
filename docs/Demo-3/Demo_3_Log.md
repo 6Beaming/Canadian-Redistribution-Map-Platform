@@ -160,9 +160,13 @@ owner before the durable Archive Tree endpoints can succeed.
    their existing Supabase tables; remove their `localStorage` adapter.
 3. Add Supabase Realtime or an equivalent server push/query-refresh strategy
    for multi-Commissioner collaboration.
-4. Complete server-side validation for comment/objection payloads, validate
+4. Replace the legacy `submissions.dguid` foreign-key/join dependency with
+   server-side validation and display hydration from versioned local map assets.
+   Supabase should store submission state and immutable snapshots, not a
+   duplicate national DA reference catalog.
+5. Complete server-side validation for comment/objection payloads, validate
    objection pairs, and write verified immutable geometry.
-5. Replace permanent Archive Tree deletion with a recoverable audit-preserving
+6. Replace permanent Archive Tree deletion with a recoverable audit-preserving
    policy if the feature is used outside the demonstration environment.
 
 ## 9. Verification

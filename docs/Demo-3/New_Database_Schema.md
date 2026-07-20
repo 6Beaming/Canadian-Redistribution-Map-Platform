@@ -80,6 +80,32 @@ Existing reference table used to show the community name associated with
 The canonical polygon itself remains in the map metadata/PMTiles asset pipeline
 for this milestone.
 
+#### Current coverage gap and target deployment model
+
+The `submissions_dguid_fkey` constraint is already active and correctly rejects
+an unknown primary DA. A 2026-07-20 deployment audit found **20,374** DGUIDs in
+the repository map-profile index, but only **74** rows in
+`dissemination_areas`; all 74 are present in the map index. Consequently, a
+submission for any of the remaining 20,300 selectable map DAs fails at insert
+time with `submissions_dguid_fkey`. This is a pre-existing reference-data
+coverage gap, not a side effect of the Demo 3 Workspace or Archive migrations.
+
+Demo 3 does **not** require duplicating the national DA catalog or canonical
+polygons into Supabase. The target architecture instead makes the versioned
+repository map assets the geographic authority: the server validates DGUIDs,
+FED context, adjacency, and geometry against the local profile index and
+canonical metadata shards. Supabase persists only submission/business state and
+the immutable geometry snapshot required for that submission.
+
+To adopt this model, a follow-up migration must remove
+`submissions_dguid_fkey`, and the read routes must stop using the
+`dissemination_areas!submissions_dguid_fkey` PostgREST join. Those routes
+should resolve community and DA display metadata from the same local map
+profile release used for validation. The replacement API must reject an unknown
+or unavailable DGUID before inserting, so removing the database FK does not
+weaken integrity. Until that API and migration are deployed, the existing FK
+continues to limit writes to the 74 seeded Yukon rows.
+
 ### 3.4 `map_proposals`, `da_assignments`, and `da_adjacency`
 
 These existing tables support the longer-term proposal/assignment model:
@@ -138,6 +164,8 @@ The generic table is intentionally permissive today. Add the following in a
 future migration after data cleanup:
 
 - require a non-empty `title` and `comment` within practical length limits;
+- replace the partial `dissemination_areas` FK dependency with server-side
+  validation against the versioned local map profile/metadata assets;
 - require `dguid` for feedback attached to a DA;
 - require both `dguid` and `neighboring_dguid`, and reject equal DGUIDs, for
   objections and Counter-Proposals;

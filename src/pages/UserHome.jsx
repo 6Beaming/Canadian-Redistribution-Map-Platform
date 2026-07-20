@@ -439,6 +439,18 @@ export default function UserHome() {
   }, []);
 
   const handlePanelViewChange = useCallback((nextView) => {
+    const activePairWorkflowLocksNavigation =
+      (panelView === "objection" && objectionWorkflow.step >= 2)
+      || (panelView === "counter-proposal" && counterProposalWorkflow.step >= 2);
+
+    // Pair workflows own focused GeoJSON, PMTiles feature-state exclusion, and
+    // map interaction mode together. Leaving midway used to detach that state
+    // and could restore only the shared boundary on return. The selector is
+    // disabled as UX; this guard keeps the invariant true for future callers.
+    if (activePairWorkflowLocksNavigation && nextView !== panelView) {
+      return;
+    }
+
     const selectedDguid = selection?.type === "da" ? selection.dguid : null;
 
     if (selectedDguid) {
@@ -475,7 +487,7 @@ export default function UserHome() {
 
     setPanelView(nextView);
     setIsRolloutOpen(false);
-  }, [getFedNumForDguid, selection]);
+  }, [counterProposalWorkflow.step, getFedNumForDguid, objectionWorkflow.step, panelView, selection]);
 
   const handleToggleFullscreen = useCallback(() => {
     setIsFullscreen((current) => !current);
