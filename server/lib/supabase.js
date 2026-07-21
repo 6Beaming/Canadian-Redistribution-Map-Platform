@@ -5,7 +5,7 @@ let supabaseAdminClient;
 let supabaseTestDoubles;
 
 const PROFILE_COLUMNS =
-  "id,email,first_name,last_name,province,postal_code,phone,role,invited_by,created_at";
+  "id,email,first_name,last_name,province,postal_code,postal_latitude,postal_longitude,postal_geocoded_at,phone,role,invited_by,created_at";
 
 export function setSupabaseTestDoubles(doubles = null) {
   supabaseTestDoubles = doubles;

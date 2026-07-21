@@ -13,7 +13,7 @@
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand --coverage",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "check:server": "node --check server/index.js && node --check server/app.js && node --check server/map-api-service/index.js && node --check server/routes/auth.js && node --check server/routes/workspace.js && node --check server/middleware/requireAuth.js && node --check server/lib/cookies.js && node --check server/lib/supabase.js"
+    "check:server": "node --check server/index.js && node --check server/app.js && node --check server/map-api-service/index.js && node --check server/routes/auth.js && node --check server/routes/workspace.js && node --check server/middleware/requireAuth.js && node --check server/lib/cookies.js && node --check server/lib/googleGeocoding.js && node --check server/lib/supabase.js"
   },
   "engines": {
     "node": ">=18"
@@ -21,6 +21,7 @@
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.9",
     "@fontsource-variable/inter": "^5.2.8",
+    "@googlemaps/js-api-loader": "^2.1.1",
     "@supabase/supabase-js": "^2.45.4",
     "@tailwindcss/vite": "^4.3.1",
     "@tanstack/react-table": "^8.21.3",

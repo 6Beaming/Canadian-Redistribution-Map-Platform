@@ -1,27 +1,69 @@
 import { useEffect, useState } from "react";
-import { Save, Send, UserPlus } from "lucide-react";
+import { AlertTriangle, Save, Send, UserPlus } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext.jsx";
 import { authApi } from "@/services/authApi.js";
 
 const actionButtonClassName = "w-auto min-w-0 px-6 py-2";
 const secondaryActionButtonClassName = actionButtonClassName;
 const inviteTriggerButtonClassName = "w-fit min-w-0 border-[#1a73e8] bg-transparent px-4 py-1.5 text-[#1a73e8] hover:bg-[#e8f0fe] hover:text-[#1a73e8]";
+const provinceConfirmationSeconds = 10;
+
+const provinces = [
+  ["AB", "Alberta"],
+  ["BC", "British Columbia"],
+  ["MB", "Manitoba"],
+  ["NB", "New Brunswick"],
+  ["NL", "Newfoundland and Labrador"],
+  ["NS", "Nova Scotia"],
+  ["NT", "Northwest Territories"],
+  ["NU", "Nunavut"],
+  ["ON", "Ontario"],
+  ["PE", "Prince Edward Island"],
+  ["QC", "Quebec"],
+  ["SK", "Saskatchewan"],
+  ["YT", "Yukon"]
+];
+
+function provinceName(code) {
+  return provinces.find(([provinceCode]) => provinceCode === code)?.[1] || code;
+}
 
 function profileFormFromUser(user) {
   return {
     firstName: user?.firstName || "",
-    lastName: user?.lastName || ""
+    lastName: user?.lastName || "",
+    province: user?.province || ""
   };
 }
 
 function CommissionerInformationForm() {
   const { markSignedIn, user } = useAuth();
   const [form, setForm] = useState(() => profileFormFromUser(user));
-  const [isEditingName, setIsEditingName] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isProvinceConfirmationOpen, setIsProvinceConfirmationOpen] =
+    useState(false);
+  const [confirmationSeconds, setConfirmationSeconds] = useState(
+    provinceConfirmationSeconds,
+  );
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
 
@@ -41,6 +83,18 @@ function CommissionerInformationForm() {
     };
   }, [status]);
 
+  useEffect(() => {
+    if (!isProvinceConfirmationOpen || confirmationSeconds <= 0) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setConfirmationSeconds((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [confirmationSeconds, isProvinceConfirmationOpen]);
+
   function handleChange(event) {
     const { name, value } = event.target;
     setForm((currentForm) => ({ ...currentForm, [name]: value }));
@@ -48,21 +102,37 @@ function CommissionerInformationForm() {
     setStatus("");
   }
 
-  function handleStartEditingName() {
-    setIsEditingName(true);
+  function handleStartEditingProfile() {
+    setIsEditingProfile(true);
     setError("");
     setStatus("");
+  }
+
+  function handleProvinceChange(value) {
+    handleStartEditingProfile();
+    setForm((currentForm) => ({ ...currentForm, province: value }));
+  }
+
+  function closeProvinceConfirmation() {
+    if (isSubmitting) {
+      return;
+    }
+
+    setIsProvinceConfirmationOpen(false);
+    setConfirmationSeconds(provinceConfirmationSeconds);
+    setError("");
   }
 
   function handleCancel() {
     setForm(profileFormFromUser(user));
-    setIsEditingName(false);
+    setIsEditingProfile(false);
+    setIsProvinceConfirmationOpen(false);
+    setConfirmationSeconds(provinceConfirmationSeconds);
     setError("");
     setStatus("");
   }
 
-  async function handleSubmit(event) {
-    event.preventDefault();
+  async function saveProfile() {
     setIsSubmitting(true);
     setError("");
     setStatus("");
@@ -71,12 +141,39 @@ function CommissionerInformationForm() {
       const result = await authApi.updateCommissionerProfile(form);
       markSignedIn(result.user);
       setForm(profileFormFromUser(result.user));
-      setIsEditingName(false);
+      setIsEditingProfile(false);
       setStatus(result.message);
+      return true;
     } catch (updateError) {
       setError(updateError.message);
+      return false;
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+
+    if (form.province !== user?.province) {
+      setError("");
+      setStatus("");
+      setConfirmationSeconds(provinceConfirmationSeconds);
+      setIsProvinceConfirmationOpen(true);
+      return;
+    }
+
+    await saveProfile();
+  }
+
+  async function handleConfirmProvinceChange() {
+    if (confirmationSeconds > 0 || isSubmitting) {
+      return;
+    }
+
+    if (await saveProfile()) {
+      setIsProvinceConfirmationOpen(false);
+      setConfirmationSeconds(provinceConfirmationSeconds);
     }
   }
 
@@ -109,7 +206,7 @@ function CommissionerInformationForm() {
               id="commissioner-first-name"
               name="firstName"
               onChange={handleChange}
-              onFocus={handleStartEditingName}
+              onFocus={handleStartEditingProfile}
               required
               value={form.firstName}
             />
@@ -122,7 +219,7 @@ function CommissionerInformationForm() {
               id="commissioner-last-name"
               name="lastName"
               onChange={handleChange}
-              onFocus={handleStartEditingName}
+              onFocus={handleStartEditingProfile}
               required
               value={form.lastName}
             />
@@ -131,12 +228,31 @@ function CommissionerInformationForm() {
 
         <div className="grid gap-2">
           <Label className="w-fit justify-self-start text-left" htmlFor="commissioner-province">Province Or Territory</Label>
-          <Input
-            className="cursor-not-allowed bg-gray-100 text-gray-600"
-            id="commissioner-province"
-            readOnly
-            value={user?.province || ""}
-          />
+          <Select
+            name="province"
+            onOpenChange={(open) => {
+              if (open) {
+                handleStartEditingProfile();
+              }
+            }}
+            onValueChange={handleProvinceChange}
+            value={form.province}
+          >
+            <SelectTrigger
+              className="w-full"
+              id="commissioner-province"
+              onFocus={handleStartEditingProfile}
+            >
+              <SelectValue placeholder="Select province or territory" />
+            </SelectTrigger>
+            <SelectContent>
+              {provinces.map(([code, name]) => (
+                <SelectItem key={code} value={code}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {error ? (
@@ -150,7 +266,7 @@ function CommissionerInformationForm() {
           </p>
         ) : null}
 
-        {isEditingName ? (
+        {isEditingProfile ? (
           <div className="flex w-full flex-wrap items-center justify-between gap-2">
             <Button
               className={secondaryActionButtonClassName}
@@ -172,6 +288,77 @@ function CommissionerInformationForm() {
           </div>
         ) : null}
       </form>
+
+      <AlertDialog
+        onOpenChange={(open) => {
+          if (!open) {
+            closeProvinceConfirmation();
+          }
+        }}
+        open={isProvinceConfirmationOpen}
+      >
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader className="place-items-start text-left">
+            <div className="flex items-center gap-2 text-amber-700">
+              <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+              <AlertDialogTitle>Confirm Province Change</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-left">
+              You are changing your commissioner province from{" "}
+              <span className="font-medium text-gray-900">
+                {provinceName(user?.province)} ({user?.province})
+              </span>{" "}
+              to{" "}
+              <span className="font-medium text-gray-900">
+                {provinceName(form.province)} ({form.province})
+              </span>
+              . This changes the province associated with your commissioner
+              account.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <p
+            aria-live="polite"
+            className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900"
+            role="status"
+          >
+            {confirmationSeconds > 0
+              ? `You can confirm this change in ${confirmationSeconds} second${confirmationSeconds === 1 ? "" : "s"}.`
+              : "You can now confirm the province change."}
+          </p>
+
+          {error ? (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          ) : null}
+
+          <AlertDialogFooter className="sm:justify-between">
+            <Button
+              className={secondaryActionButtonClassName}
+              disabled={isSubmitting}
+              onClick={closeProvinceConfirmation}
+              type="button"
+              variant="outline"
+            >
+              Cancel
+            </Button>
+            <Button
+              className={actionButtonClassName}
+              disabled={confirmationSeconds > 0 || isSubmitting}
+              onClick={handleConfirmProvinceChange}
+              type="button"
+            >
+              <Save className="h-4 w-4" />
+              {isSubmitting
+                ? "Saving"
+                : confirmationSeconds > 0
+                  ? `Confirm in ${confirmationSeconds}s`
+                  : "Confirm Province Change"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }

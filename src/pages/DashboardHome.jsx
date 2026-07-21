@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
 import { MapInfoPanel, getDefaultPanelView } from "@/components/non_prebuilt/MapInfoPanel.jsx";
 import { MapRegionSelector } from "@/components/non_prebuilt/MapRegionSelector.jsx";
+import { useAuth } from "@/contexts/AuthContext.jsx";
 import { DEFAULT_ROLLOUT_CATEGORY_ID } from "@/lib/map/rolloutPlan.js";
+import { getProvinceMapView } from "@/lib/map/provinceView.js";
 import { mapApi } from "@/services/mapApi.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
 import { loadSubmissionHeatmap } from "@/lib/map/heatmap.js";
@@ -11,7 +13,8 @@ import { loadArchivedMapEffect } from "@/lib/map/archivedMapEffect.js";
 import { subscribeWorkspaceState } from "@/services/tempWorkspace.js";
 import "@/styles/map.css";
 
-export default function DashboardHome() {
+export default function DashboardHome({ mapSearchTarget = null }) {
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState("Loading map...");
   const [selection, setSelection] = useState(null);
@@ -24,6 +27,11 @@ export default function DashboardHome() {
   const [heatmap, setHeatmap] = useState(null);
   const [archivedMap, setArchivedMap] = useState(null);
   const initialArchivedMapEnabled = searchParams.get("archivedMap") === "1";
+  const commissionerProvinceView = useMemo(
+    () => getProvinceMapView(user?.province),
+    [user?.province],
+  );
+  const activeMapTarget = mapSearchTarget ?? commissionerProvinceView?.mapTarget ?? null;
 
   useEffect(() => {
     let isMounted = true;
@@ -132,13 +140,21 @@ export default function DashboardHome() {
   }, [isRolloutOpen]);
 
   const handleDaSelect = useCallback((dguid) => {
-    setSelection({ type: "da", dguid });
+    setSelection((current) =>
+      current?.type === "da" && String(current.dguid) === String(dguid)
+        ? null
+        : { type: "da", dguid },
+    );
     setRolloutHoverSelection(null);
     setIsRolloutOpen(false);
   }, []);
 
   const handleFedSelect = useCallback((fedNum, fedName) => {
-    setSelection({ type: "fed", fedNum, fedName });
+    setSelection((current) =>
+      current?.type === "fed" && String(current.fedNum) === String(fedNum)
+        ? null
+        : { type: "fed", fedNum, fedName },
+    );
     setRolloutHoverSelection(null);
     setIsRolloutOpen(false);
   }, []);
@@ -180,6 +196,9 @@ export default function DashboardHome() {
               />
               <MapCanvas
                 isFullscreen={isFullscreen}
+                mapSearchTarget={activeMapTarget}
+                recenterTarget={commissionerProvinceView?.mapTarget ?? null}
+                highlightedProvincePrUid={commissionerProvinceView?.pruid ?? null}
                 selection={selection}
                 externalHoverSelection={rolloutHoverSelection}
                 onDaSelect={handleDaSelect}

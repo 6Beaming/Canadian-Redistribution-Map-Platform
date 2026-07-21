@@ -6,7 +6,8 @@ export const DEFAULT_DA_RENDER_MIN_ZOOM = 5;
 export const DEFAULT_DA_RENDER_MAX_ZOOM = 12;
 
 export const SELECTED_COLOR = "#e8a0a0";
-export const HOVER_COLOR = "#f4d03f";
+export const HOVER_COLOR = "#b9d4ff";
+export const DA_HOVER_COLOR = HOVER_COLOR;
 export const ENABLED_FILL_COLOR = "#1a73e8";
 export const DATA_BLOCKED_FILL_COLOR = "#f6efdf";
 export const TRANSPARENT_INTERACTION_OPACITY = 0.001;

@@ -4,6 +4,7 @@ import { Protocol } from "pmtiles";
 import { mapApi } from "@/services/mapApi.js";
 import {
   CANADA_BOUNDS,
+  DA_HOVER_COLOR,
   DATA_BLOCKED_FILL_COLOR,
   DEFAULT_DA_RENDER_MAX_ZOOM,
   DEFAULT_DA_RENDER_MIN_ZOOM,
@@ -51,6 +52,8 @@ import {
   getAllRolloutAreas,
   getRolloutAreas,
   getRolloutColor,
+  isDataBlockedFed,
+  isEnabledFed,
 } from "@/lib/map/rolloutPlan.js";
 import {
   canInteractWithDa,
@@ -83,12 +86,72 @@ const BOUNDARY_ON_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2
 
 const BOUNDARY_OFF_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m6 6 12 12"/></svg>`;
 
+const POSTAL_AREA_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>`;
+
+const RECENTER_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>`;
+
 const MAP_BOUNDARY_COLOR = "#243b6b";
 const TRANSPARENT_BOUNDARY_COLOR = "rgba(36, 59, 107, 0)";
-const WEB_MERCATOR_MAX_LATITUDE = 85.051129;
 const FED_OUTLINE_HIDE_AT_ZOOM = 7;
 const EMPTY_OBJECTION_BOUNDARY = emptyBoundaryFeatureCollection();
 const EMPTY_COUNTER_PROPOSAL_FEATURES = emptyCounterProposalFeatureCollection();
+const CANADA_VIEW_BOUNDS = [CANADA_BOUNDS.sw, CANADA_BOUNDS.ne];
+const CANADA_DEFAULT_VIEW_BOUNDS = [
+  CANADA_BOUNDS.sw,
+  [CANADA_BOUNDS.ne[0], 73],
+];
+
+function getMapTargetCoordinates(target) {
+  const coordinates = target?.location;
+
+  if (
+    !Array.isArray(coordinates)
+    || coordinates.length < 2
+    || !coordinates.slice(0, 2).every(Number.isFinite)
+  ) {
+    return null;
+  }
+
+  return coordinates.slice(0, 2);
+}
+
+function getMapTargetViewport(target) {
+  const viewport = target?.viewport;
+
+  if (
+    !Array.isArray(viewport)
+    || viewport.length !== 2
+    || !viewport.every((corner) =>
+      Array.isArray(corner)
+      && corner.length >= 2
+      && corner.slice(0, 2).every(Number.isFinite))
+  ) {
+    return null;
+  }
+
+  return viewport.map((corner) => corner.slice(0, 2));
+}
+
+function getMapTargetFitBoundsOptions(target) {
+  const options = target?.fitBoundsOptions;
+
+  return {
+    padding: options?.padding ?? 72,
+    maxZoom: Number.isFinite(options?.maxZoom) ? options.maxZoom : 15,
+  };
+}
+
+function provinceHighlightFilter(pruid) {
+  if (!pruid) {
+    return ["==", ["get", "fed_num"], ""];
+  }
+
+  return [
+    "==",
+    ["slice", ["to-string", ["get", "fed_num"]], 0, 2],
+    String(pruid),
+  ];
+}
 
 function createFullscreenControl(buttonRef, getIsFullscreen, onToggle) {
   return {
@@ -115,19 +178,6 @@ function createFullscreenControl(buttonRef, getIsFullscreen, onToggle) {
       buttonRef.current = null;
     }
   };
-}
-
-function paddedMaxBounds(bounds, factor = 0.35) {
-  const sw = bounds.getSouthWest();
-  const ne = bounds.getNorthEast();
-  const padLng = (ne.lng - sw.lng) * factor;
-  const padLat = (ne.lat - sw.lat) * factor;
-  const clampLatitude = (value) =>
-    Math.max(-WEB_MERCATOR_MAX_LATITUDE, Math.min(WEB_MERCATOR_MAX_LATITUDE, value));
-  return new maplibregl.LngLatBounds(
-    [sw.lng - padLng, clampLatitude(sw.lat - padLat)],
-    [ne.lng + padLng, clampLatitude(ne.lat + padLat)]
-  );
 }
 
 function getGeoJsonBounds(geoJson) {
@@ -183,6 +233,54 @@ function createBoundaryControl(buttonRef, getBoundariesVisible, onToggle) {
   };
 }
 
+function createPostalAreaControl(buttonRef, onActivate) {
+  return {
+    onAdd() {
+      const container = document.createElement("div");
+      container.className = "maplibregl-ctrl maplibregl-ctrl-group";
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "maplibregl-ctrl-icon map-postal-area-btn";
+      button.innerHTML = POSTAL_AREA_ICON;
+      button.setAttribute("aria-label", "Center map on My Postal Area");
+      button.title = "My Postal Area";
+      button.addEventListener("click", onActivate);
+
+      buttonRef.current = button;
+      container.appendChild(button);
+      return container;
+    },
+    onRemove() {
+      buttonRef.current = null;
+    }
+  };
+}
+
+function createRecenterControl(buttonRef, onActivate) {
+  return {
+    onAdd() {
+      const container = document.createElement("div");
+      container.className = "maplibregl-ctrl maplibregl-ctrl-group";
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "maplibregl-ctrl-icon map-recenter-btn";
+      button.innerHTML = RECENTER_ICON;
+      button.setAttribute("aria-label", "Return map to its default position");
+      button.title = "Re-center map";
+      button.addEventListener("click", onActivate);
+
+      buttonRef.current = button;
+      container.appendChild(button);
+      return container;
+    },
+    onRemove() {
+      buttonRef.current = null;
+    }
+  };
+}
+
 function buildRolloutFedMembershipExpression(fedNums, truthyValue, fallbackValue) {
   const expression = [
     "match",
@@ -195,21 +293,6 @@ function buildRolloutFedMembershipExpression(fedNums, truthyValue, fallbackValue
 
   expression.push(fallbackValue);
   return expression;
-}
-
-function buildInitialMapBounds() {
-  const sourceBounds = new maplibregl.LngLatBounds(CANADA_BOUNDS.sw, CANADA_BOUNDS.ne);
-  const sw = sourceBounds.getSouthWest();
-  const ne = sourceBounds.getNorthEast();
-  const MAX_RENDERABLE_LATITUDE = WEB_MERCATOR_MAX_LATITUDE;
-  const lngPad = (ne.lng - sw.lng) * 0.058;
-  const southPad = (ne.lat - sw.lat) * 0.08;
-  const northPad = (ne.lat - sw.lat) * 0.16;
-
-  return new maplibregl.LngLatBounds(
-    [sw.lng - lngPad, Math.max(-84.5, sw.lat - southPad)],
-    [ne.lng + lngPad, Math.min(MAX_RENDERABLE_LATITUDE, ne.lat + northPad)],
-  );
 }
 
 function boundaryHighlightStateExpression() {
@@ -365,7 +448,7 @@ function daFillPaint(
       ["boolean", ["feature-state", "selected"], false],
       SELECTED_COLOR,
       ["boolean", ["feature-state", "hover"], false],
-      HOVER_COLOR,
+      DA_HOVER_COLOR,
       BLOCKED_DA_FILL_EXPRESSION,
     ]
     : heatmapEnabled
@@ -373,8 +456,6 @@ function daFillPaint(
         "case",
         ["boolean", ["feature-state", "selected"], false],
         SELECTED_COLOR,
-        ["boolean", ["feature-state", "hover"], false],
-        HOVER_COLOR,
         heatmapFillExpression ?? "#ffffff",
       ]
       : [
@@ -382,7 +463,7 @@ function daFillPaint(
         ["boolean", ["feature-state", "selected"], false],
         SELECTED_COLOR,
         ["boolean", ["feature-state", "hover"], false],
-        HOVER_COLOR,
+        DA_HOVER_COLOR,
         "#ffffff",
       ];
 
@@ -404,8 +485,6 @@ function daFillPaint(
         "case",
         ["boolean", ["feature-state", "selected"], false],
         0.88,
-        ["boolean", ["feature-state", "hover"], false],
-        0.82,
         0.74,
       ]
       : [
@@ -485,6 +564,10 @@ function buildWorkflowFocusExclusionFilter(dguids) {
 
 export function MapCanvas({
   isFullscreen = false,
+  mapSearchTarget = null,
+  recenterTarget,
+  highlightedProvincePrUid = null,
+  postalAreaTarget = null,
   selection = null,
   externalHoverSelection = null,
   objectionPreview = null,
@@ -523,8 +606,16 @@ export function MapCanvas({
   const workflowFocusActiveRef = useRef(false);
   const containerRef = useRef(null);
   const mapRef = useRef(null);
+  const searchMarkerRef = useRef(null);
+  const postalAreaMarkerRef = useRef(null);
   const fullscreenBtnRef = useRef(null);
   const boundaryBtnRef = useRef(null);
+  const recenterButtonRef = useRef(null);
+  const recenterControlRef = useRef(null);
+  const recenterTargetRef = useRef(recenterTarget);
+  const postalAreaButtonRef = useRef(null);
+  const postalAreaControlRef = useRef(null);
+  const postalAreaTargetRef = useRef(postalAreaTarget);
   const onToggleFullscreenRef = useRef(onToggleFullscreen);
   const onDaSelectRef = useRef(onDaSelect);
   const onFedSelectRef = useRef(onFedSelect);
@@ -539,6 +630,7 @@ export function MapCanvas({
   const fedSourceModeRef = useRef("pmtiles");
   const daSourceModeRef = useRef("geojson");
   const daSourceLayerRef = useRef(DEFAULT_DA_SOURCE_LAYER);
+  const daRenderMinZoomRef = useRef(DEFAULT_DA_RENDER_MIN_ZOOM);
   const setFedStateRef = useRef(null);
   const applyPresentationModeRef = useRef(null);
   const applyBoundaryVisibilityRef = useRef(null);
@@ -575,6 +667,8 @@ export function MapCanvas({
   onDaSelectRef.current = onDaSelect;
   onFedSelectRef.current = onFedSelect;
   onStatusChangeRef.current = onStatusChange;
+  recenterTargetRef.current = recenterTarget;
+  postalAreaTargetRef.current = postalAreaTarget;
   boundariesVisibleRef.current = boundariesVisible;
   heatmapEnabledRef.current = heatmapEnabled;
   archivedMapEnabledRef.current = archivedMapEnabled;
@@ -699,6 +793,109 @@ export function MapCanvas({
   }, [archivedMap, mapReadyTick]);
 
   useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapReadyRef.current) return;
+
+    const available = recenterTarget !== undefined;
+
+    if (available && !recenterControlRef.current) {
+      const control = createRecenterControl(recenterButtonRef, () => {
+        const target = recenterTargetRef.current;
+        const coordinates = getMapTargetCoordinates(target);
+        const viewport = getMapTargetViewport(target);
+
+        if (viewport) {
+          map.fitBounds(viewport, {
+            ...getMapTargetFitBoundsOptions(target),
+            duration: 700,
+          });
+        } else if (coordinates) {
+          map.flyTo({
+            center: coordinates,
+            zoom: Number.isFinite(target?.zoom) ? target.zoom : 14,
+            duration: 700,
+          });
+        } else {
+          map.fitBounds(CANADA_DEFAULT_VIEW_BOUNDS, {
+            padding: 12,
+            duration: 700,
+          });
+        }
+
+        const destination = target?.label || "the Canada default view";
+        onStatusChangeRef.current?.(`Map returned to ${destination}.`);
+      });
+
+      map.addControl(control, "top-right");
+      recenterControlRef.current = control;
+      return;
+    }
+
+    if (!available && recenterControlRef.current) {
+      map.removeControl(recenterControlRef.current);
+      recenterControlRef.current = null;
+      recenterButtonRef.current = null;
+    }
+  }, [mapReadyTick, recenterTarget]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!map || !isMapReadyRef.current) {
+      return;
+    }
+
+    const coordinates = getMapTargetCoordinates(postalAreaTarget);
+    const available = Boolean(coordinates);
+
+    if (available) {
+      if (!postalAreaMarkerRef.current) {
+        const marker = new maplibregl.Marker({ color: "#1a73e8" });
+        const markerElement = marker.getElement();
+
+        markerElement.classList.add("map-postal-area-marker");
+        markerElement.setAttribute("aria-label", "My Postal Area");
+        markerElement.setAttribute("role", "img");
+        markerElement.title = "My Postal Area";
+        postalAreaMarkerRef.current = marker;
+      }
+
+      postalAreaMarkerRef.current.setLngLat(coordinates).addTo(map);
+    } else {
+      postalAreaMarkerRef.current?.remove();
+      postalAreaMarkerRef.current = null;
+    }
+
+    if (available && !postalAreaControlRef.current) {
+      const control = createPostalAreaControl(postalAreaButtonRef, () => {
+        const target = postalAreaTargetRef.current;
+        const coordinates = getMapTargetCoordinates(target);
+
+        if (!coordinates) {
+          return;
+        }
+
+        map.flyTo({
+          center: coordinates,
+          zoom: Number.isFinite(target?.zoom) ? target.zoom : 12,
+          duration: 700,
+        });
+        onStatusChangeRef.current?.("Map moved to your postal area.");
+      });
+
+      map.addControl(control, "top-right");
+      postalAreaControlRef.current = control;
+      return;
+    }
+
+    if (!available && postalAreaControlRef.current) {
+      map.removeControl(postalAreaControlRef.current);
+      postalAreaControlRef.current = null;
+      postalAreaButtonRef.current = null;
+    }
+  }, [mapReadyTick, postalAreaTarget]);
+
+  useEffect(() => {
     if (!hasSubmissionHeatmapData(heatmap) && heatmapEnabled) {
       setHeatmapEnabled(false);
     }
@@ -716,6 +913,58 @@ export function MapCanvas({
 
     return () => cancelAnimationFrame(frame);
   }, [isFullscreen]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const coordinates = getMapTargetCoordinates(mapSearchTarget);
+    const viewport = getMapTargetViewport(mapSearchTarget);
+
+    if (!map || !isMapReadyRef.current || (!coordinates && !viewport)) {
+      return;
+    }
+
+    if (viewport) {
+      map.fitBounds(viewport, {
+        ...getMapTargetFitBoundsOptions(mapSearchTarget),
+        duration: 700,
+      });
+    } else {
+      const targetZoom = Number.isFinite(mapSearchTarget?.zoom)
+        ? mapSearchTarget.zoom
+        : 14;
+
+      map.flyTo({
+        center: coordinates,
+        zoom: Math.max(map.getZoom(), targetZoom),
+        duration: 700,
+      });
+    }
+
+    if (mapSearchTarget?.showMarker === false || !coordinates) {
+      searchMarkerRef.current?.remove();
+      searchMarkerRef.current = null;
+    } else {
+      if (!searchMarkerRef.current) {
+        searchMarkerRef.current = new maplibregl.Marker({
+          color: "#1a73e8",
+        });
+      }
+
+      searchMarkerRef.current.setLngLat(coordinates).addTo(map);
+    }
+
+    onStatusChangeRef.current?.(`Map moved to ${mapSearchTarget.label || "the selected place"}.`);
+  }, [mapReadyTick, mapSearchTarget]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!map || !isMapReadyRef.current || !map.getLayer("province-highlight")) {
+      return;
+    }
+
+    map.setFilter("province-highlight", provinceHighlightFilter(highlightedProvincePrUid));
+  }, [highlightedProvincePrUid, mapReadyTick]);
 
   useEffect(() => {
     if (!isMapReadyRef.current || !applySelectionRef.current) {
@@ -930,16 +1179,36 @@ export function MapCanvas({
   useEffect(() => {
     if (!containerRef.current) return undefined;
 
+    let attributionCollapseObserver = null;
     const protocol = new Protocol();
     maplibregl.addProtocol("pmtiles", protocol.tile);
+
+    const initialCoordinates = getMapTargetCoordinates(mapSearchTarget);
+    const initialViewport = getMapTargetViewport(mapSearchTarget);
+    const initialView = initialViewport
+      ? {
+          bounds: initialViewport,
+          fitBoundsOptions: getMapTargetFitBoundsOptions(mapSearchTarget),
+        }
+      : initialCoordinates
+        ? {
+            center: initialCoordinates,
+            zoom: Number.isFinite(mapSearchTarget?.zoom)
+              ? mapSearchTarget.zoom
+              : 14,
+          }
+        : {
+            bounds: CANADA_DEFAULT_VIEW_BOUNDS,
+            fitBoundsOptions: { padding: 12 },
+          };
 
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: WHITE_BASEMAP_STYLE,
-      center: [-135, 63.5],
-      zoom: MAP_ZOOM.INITIAL,
+      ...initialView,
       minZoom: MAP_ZOOM.MIN,
       maxZoom: MAP_ZOOM.MAX,
+      maxBounds: CANADA_VIEW_BOUNDS,
       renderWorldCopies: false,
       maxPitch: 0,
       attributionControl: false,
@@ -952,6 +1221,37 @@ export function MapCanvas({
     workflowFocusActiveRef.current = false;
     map.addControl(new maplibregl.NavigationControl(), "top-right");
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
+    const attributionElement = containerRef.current?.querySelector(
+      ".maplibregl-ctrl-attrib",
+    );
+
+    const collapseInitialAttribution = () => {
+      if (!attributionElement?.classList.contains("maplibregl-compact")) {
+        return false;
+      }
+
+      attributionElement.classList.remove("maplibregl-compact-show");
+      attributionElement.removeAttribute("open");
+      return true;
+    };
+
+    if (
+      !collapseInitialAttribution()
+      && attributionElement
+      && typeof MutationObserver !== "undefined"
+    ) {
+      attributionCollapseObserver = new MutationObserver(() => {
+        if (collapseInitialAttribution()) {
+          attributionCollapseObserver?.disconnect();
+          attributionCollapseObserver = null;
+        }
+      });
+      attributionCollapseObserver.observe(attributionElement, {
+        attributes: true,
+        childList: true,
+        subtree: true,
+      });
+    }
     map.addControl(
       createFullscreenControl(
         fullscreenBtnRef,
@@ -1045,7 +1345,9 @@ export function MapCanvas({
         return null;
       }
 
-      return target.type === "da" ? target.dguid ?? target.id ?? null : null;
+      return target.type === "da" || target.type === "data-blocked-da"
+        ? target.dguid ?? target.id ?? null
+        : null;
     }
 
     function normalizeFedId(target) {
@@ -1067,6 +1369,26 @@ export function MapCanvas({
       if (useVectorTiles) {
         layer["source-layer"] = FED_SOURCE_LAYER;
       }
+      map.addLayer(layer);
+    }
+
+    function addProvinceHighlightLayer(useVectorTiles) {
+      const layer = {
+        id: "province-highlight",
+        type: "fill",
+        source: "fed-2023",
+        filter: provinceHighlightFilter(highlightedProvincePrUid),
+        paint: {
+          "fill-color": "#b9d4ff",
+          "fill-opacity": 0.28,
+          "fill-outline-color": TRANSPARENT_BOUNDARY_COLOR,
+        },
+      };
+
+      if (useVectorTiles) {
+        layer["source-layer"] = FED_SOURCE_LAYER;
+      }
+
       map.addLayer(layer);
     }
 
@@ -1202,6 +1524,7 @@ export function MapCanvas({
           promoteId: { [FED_SOURCE_LAYER]: "fed_num" }
         });
         addFedFillLayer(true);
+        addProvinceHighlightLayer(true);
         addFedOutlineLayer(true);
         return "pmtiles";
       }
@@ -1213,6 +1536,7 @@ export function MapCanvas({
         promoteId: "fed_num"
       });
       addFedFillLayer(false);
+      addProvinceHighlightLayer(false);
       addFedOutlineLayer(false);
       return "geojson";
     }
@@ -1232,6 +1556,7 @@ export function MapCanvas({
       );
 
       daSourceLayerRef.current = sourceLayer;
+      daRenderMinZoomRef.current = minZoom;
 
       if (!pmtilesPath) {
         throw new Error(
@@ -1267,6 +1592,14 @@ export function MapCanvas({
     }
 
     function setPresentationMode(showRollout) {
+      if (map.getLayer("province-highlight")) {
+        map.setLayoutProperty(
+          "province-highlight",
+          "visibility",
+          showRollout ? "none" : "visible",
+        );
+      }
+
       if (map.getLayer("fed-fill")) {
         map.setPaintProperty(
           "fed-fill",
@@ -1745,7 +2078,7 @@ export function MapCanvas({
       applyLabelScale(map, labelScreenScale(width));
     }
 
-    function pickInteractiveFeature(point) {
+    function pickMapTarget(point) {
       if (counterProposalPreviewRef.current?.editable && map.getLayer("counter-proposal-handles")) {
         const handleFeatures = map.queryRenderedFeatures(point, {
           layers: ["counter-proposal-handles"],
@@ -1774,6 +2107,9 @@ export function MapCanvas({
         if (id && canInteractWithDa(fedNum, interactionModeRef.current)) {
           return { type: "da", id };
         }
+        if (id && isDataBlockedFed(fedNum)) {
+          return { type: "data-blocked-da", id };
+        }
       }
 
       const fedFeatures = map.getLayer("fed-fill")
@@ -1784,6 +2120,16 @@ export function MapCanvas({
         const id = getFeatureId(feature, "fed_num");
         if (id && canInteractWithFed(id, interactionModeRef.current)) {
           return { type: "fed", id };
+        }
+        if (id && isDataBlockedFed(id)) {
+          return { type: "data-blocked", id };
+        }
+        if (
+          id
+          && isEnabledFed(id)
+          && map.getZoom() < daRenderMinZoomRef.current
+        ) {
+          return { type: "zoom-required", id };
         }
       }
 
@@ -2010,14 +2356,21 @@ export function MapCanvas({
         return;
       }
 
-      const hit = pickInteractiveFeature(event.point);
+      const hit = pickMapTarget(event.point);
 
       if (hit?.type === "counter-proposal-handle") {
         onCounterProposalHandleSelectRef.current?.(hit.id);
         return;
       }
 
-      if (!hit) return;
+      if (
+        !hit
+        || hit.type === "data-blocked"
+        || hit.type === "data-blocked-da"
+        || hit.type === "zoom-required"
+      ) {
+        return;
+      }
 
       setInternalHover(null);
       applySelectionTarget(
@@ -2053,11 +2406,29 @@ export function MapCanvas({
         return;
       }
 
-      const hit = pickInteractiveFeature(event.point);
+      const hit = pickMapTarget(event.point);
 
       if (hit?.type === "counter-proposal-handle") {
         map.getCanvas().style.cursor = "grab";
         setInternalHover(null);
+        return;
+      }
+
+      if (hit?.type === "zoom-required") {
+        map.getCanvas().style.cursor = "zoom-in";
+        setInternalHover(null);
+        return;
+      }
+
+      if (hit?.type === "data-blocked-da") {
+        map.getCanvas().style.cursor = "not-allowed";
+        setInternalHover(hit);
+        return;
+      }
+
+      if (hit?.type === "data-blocked" || hit?.type === "fed") {
+        map.getCanvas().style.cursor = "not-allowed";
+        setInternalHover(hit.type === "fed" ? hit : null);
         return;
       }
 
@@ -2080,7 +2451,7 @@ export function MapCanvas({
     };
 
     const onMouseDown = (event) => {
-      const hit = pickInteractiveFeature(event.point);
+      const hit = pickMapTarget(event.point);
 
       if (hit?.type !== "counter-proposal-handle") {
         return;
@@ -2184,19 +2555,6 @@ export function MapCanvas({
         setPresentationMode(rolloutEnabled);
         applyBoundaryVisibility(boundariesVisibleRef.current);
 
-        const initialBounds = buildInitialMapBounds();
-        map.fitBounds(initialBounds, {
-          padding: { top: 92, right: 64, bottom: 72, left: 64 },
-          duration: 0,
-        });
-
-        map.setMaxBounds(
-          paddedMaxBounds(
-            initialBounds,
-            0.24
-          )
-        );
-
         const daCount =
           daBundle.featureCount ||
           assetManifest.assets.reduce(
@@ -2243,6 +2601,7 @@ export function MapCanvas({
     });
 
     return () => {
+      attributionCollapseObserver?.disconnect();
       labelResizeObserver?.disconnect();
       isMapReadyRef.current = false;
       if (blinkIntervalRef.current) {
@@ -2258,6 +2617,14 @@ export function MapCanvas({
       heatmapButtonRef.current = null;
       archivedMapControlRef.current = null;
       archivedMapButtonRef.current = null;
+      recenterControlRef.current = null;
+      recenterButtonRef.current = null;
+      postalAreaControlRef.current = null;
+      postalAreaButtonRef.current = null;
+      postalAreaMarkerRef.current?.remove();
+      postalAreaMarkerRef.current = null;
+      searchMarkerRef.current?.remove();
+      searchMarkerRef.current = null;
       archivedDaIdsRef.current = new Set();
       archivedOverrideDaIdsRef.current = new Set();
       applySelectionRef.current = null;

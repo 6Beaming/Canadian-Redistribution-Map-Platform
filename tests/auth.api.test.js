@@ -3,6 +3,7 @@ import http from "node:http";
 import { afterEach, test } from "@jest/globals";
 
 import app from "../server/app.js";
+import { setGoogleGeocodingTestDouble } from "../server/lib/googleGeocoding.js";
 import { setSupabaseTestDoubles } from "../server/lib/supabase.js";
 
 const publicUser = {
@@ -49,6 +50,7 @@ const incompletePublicProfile = {
 };
 
 afterEach(() => {
+  setGoogleGeocodingTestDouble(null);
   setSupabaseTestDoubles(null);
 });
 
@@ -514,6 +516,7 @@ test("POST /api/auth/profile completes commissioner onboarding", async () => {
 });
 
 test("POST /api/auth/profile/phone-otp completes public onboarding", async () => {
+  const geocodeRequests = [];
   const phoneLookups = [];
   const phoneVerifications = [];
   const upserts = [];
@@ -527,6 +530,14 @@ test("POST /api/auth/profile/phone-otp completes public onboarding", async () =>
     province: "ON"
   };
 
+  setGoogleGeocodingTestDouble(async (requestDetails) => {
+    geocodeRequests.push(requestDetails);
+
+    return {
+      latitude: 45.4236,
+      longitude: -75.7009
+    };
+  });
   setSupabaseTestDoubles({
     findSupabaseProfileByPhone: async (phone) => {
       phoneLookups.push(phone);
@@ -569,22 +580,26 @@ test("POST /api/auth/profile/phone-otp completes public onboarding", async () =>
       token: "123456"
     }
   ]);
-  assert.deepEqual(upserts, [
-    {
-      accessToken: "pending-access-token",
-      profile: {
-        email: publicUser.email,
-        first_name: "Ada",
-        id: publicUser.id,
-        invited_by: null,
-        last_name: "Lovelace",
-        phone: "4165550100",
-        postal_code: "K1A 0B1",
-        province: "ON",
-        role: "public_user"
-      }
-    }
+  assert.deepEqual(geocodeRequests, [
+    { postalCode: "K1A 0B1", province: "ON" }
   ]);
+  assert.equal(upserts.length, 1);
+  assert.equal(upserts[0].accessToken, "pending-access-token");
+  const { postal_geocoded_at: geocodedAt, ...savedProfile } = upserts[0].profile;
+  assert.deepEqual(savedProfile, {
+    email: publicUser.email,
+    first_name: "Ada",
+    id: publicUser.id,
+    invited_by: null,
+    last_name: "Lovelace",
+    phone: "4165550100",
+    postal_code: "K1A 0B1",
+    postal_latitude: 45.4236,
+    postal_longitude: -75.7009,
+    province: "ON",
+    role: "public_user"
+  });
+  assert.ok(Date.parse(geocodedAt));
   assert.match(response.setCookie, /crmp_access_token=pending-access-token/);
 });
 
@@ -635,6 +650,81 @@ test("GET /api/auth/me returns the current authenticated user", async () => {
   assert.equal(response.status, 200);
   assert.equal(response.body.user.email, publicUser.email);
   assert.equal(response.body.user.profileComplete, true);
+});
+
+test("GET /api/auth/me geocodes and stores a missing postal map center", async () => {
+  const geocodeRequests = [];
+  const profileUpdates = [];
+
+  setGoogleGeocodingTestDouble(async (requestDetails) => {
+    geocodeRequests.push(requestDetails);
+
+    return {
+      latitude: 45.4236,
+      longitude: -75.7009
+    };
+  });
+  setSupabaseTestDoubles({
+    getSupabaseClient: () => authenticatedSupabaseDouble(),
+    getSupabaseProfile: async () => completePublicProfile,
+    updateSupabaseProfile: async (accessToken, userId, updates) => {
+      profileUpdates.push({ accessToken, updates, userId });
+
+      return {
+        ...completePublicProfile,
+        ...updates
+      };
+    }
+  });
+
+  const response = await request("GET", "/api/auth/me", {
+    cookie: sessionCookies()
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(geocodeRequests, [
+    { postalCode: "K1A 0B1", province: "ON" }
+  ]);
+  assert.deepEqual(response.body.user.mapCenter, {
+    latitude: 45.4236,
+    longitude: -75.7009
+  });
+  assert.equal(profileUpdates.length, 1);
+  assert.equal(profileUpdates[0].accessToken, "access-token");
+  assert.equal(profileUpdates[0].userId, publicUser.id);
+  assert.equal(profileUpdates[0].updates.postal_latitude, 45.4236);
+  assert.equal(profileUpdates[0].updates.postal_longitude, -75.7009);
+  assert.ok(Date.parse(profileUpdates[0].updates.postal_geocoded_at));
+});
+
+test("GET /api/auth/me reuses a saved postal map center", async () => {
+  let geocodeRequestCount = 0;
+  const profile = {
+    ...completePublicProfile,
+    postal_geocoded_at: "2026-07-20T12:00:00.000Z",
+    postal_latitude: 45.4236,
+    postal_longitude: -75.7009
+  };
+
+  setGoogleGeocodingTestDouble(async () => {
+    geocodeRequestCount += 1;
+    return null;
+  });
+  setSupabaseTestDoubles({
+    getSupabaseClient: () => authenticatedSupabaseDouble(),
+    getSupabaseProfile: async () => profile
+  });
+
+  const response = await request("GET", "/api/auth/me", {
+    cookie: sessionCookies()
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(geocodeRequestCount, 0);
+  assert.deepEqual(response.body.user.mapCenter, {
+    latitude: 45.4236,
+    longitude: -75.7009
+  });
 });
 
 test("PATCH /api/auth/me updates public profile when the phone is unchanged", async () => {
@@ -786,7 +876,8 @@ test("PATCH /api/auth/me updates commissioner profile fields", async () => {
   const response = await request("PATCH", "/api/auth/me", {
     body: {
       firstName: "Amazing",
-      lastName: "Grace"
+      lastName: "Grace",
+      province: "BC"
     },
     cookie: sessionCookies()
   });
@@ -794,16 +885,45 @@ test("PATCH /api/auth/me updates commissioner profile fields", async () => {
   assert.equal(response.status, 200);
   assert.equal(response.body.message, "Profile information updated.");
   assert.equal(response.body.user.name, "Amazing Grace");
+  assert.equal(response.body.user.province, "BC");
   assert.deepEqual(profileUpdates, [
     {
       accessToken: "access-token",
       userId: commissionerUser.id,
       updates: {
         first_name: "Amazing",
-        last_name: "Grace"
+        last_name: "Grace",
+        province: "BC"
       }
     }
   ]);
+});
+
+test("PATCH /api/auth/me rejects an invalid commissioner province", async () => {
+  let updateCount = 0;
+
+  setSupabaseTestDoubles({
+    getSupabaseClient: () =>
+      authenticatedSupabaseDouble({ user: commissionerUser }),
+    getSupabaseProfile: async () => commissionerProfile,
+    updateSupabaseProfile: async () => {
+      updateCount += 1;
+      return commissionerProfile;
+    }
+  });
+
+  const response = await request("PATCH", "/api/auth/me", {
+    body: {
+      firstName: "Amazing",
+      lastName: "Grace",
+      province: "XX"
+    },
+    cookie: sessionCookies()
+  });
+
+  assert.equal(response.status, 400);
+  assert.equal(response.body.error, "Select a valid province or territory.");
+  assert.equal(updateCount, 0);
 });
 
 test("POST /api/auth/me/phone-otp saves the pending phone after OTP verification", async () => {

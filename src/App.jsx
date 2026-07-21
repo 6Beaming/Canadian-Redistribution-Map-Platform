@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
 import Header from "./pages/Header.jsx";
@@ -57,15 +58,24 @@ function RequirePublicUser() {
 }
 
 function App() {
+  const [mapSearchTarget, setMapSearchTarget] = useState(null);
+
+  function handlePlaceSelect(place) {
+    setMapSearchTarget({
+      ...place,
+      requestId: Date.now(),
+    });
+  }
+
   return (
     <AuthProvider>
-      <Header />
+      <Header onPlaceSelect={handlePlaceSelect} />
       <RouteLoadingOverlay />
 
       <Routes>
         <Route element={<RequirePublicUser />}>
-          <Route path="/" element={<UserHome />} />
-          <Route path="/users" element={<UserHome />} />
+          <Route path="/" element={<UserHome mapSearchTarget={mapSearchTarget} />} />
+          <Route path="/users" element={<UserHome mapSearchTarget={mapSearchTarget} />} />
           <Route path="/users/profile" element={<UserProfile />} />
           <Route path="/submissions" element={<MySubmissions />} />
           <Route
@@ -80,7 +90,7 @@ function App() {
         <Route path="/reset-password" element={<PasswordRecoveryPage />} />
 
         <Route element={<RequireCommissioner />}>
-          <Route path="/dashboard" element={<DashboardHome />} />
+          <Route path="/dashboard" element={<DashboardHome mapSearchTarget={mapSearchTarget} />} />
           <Route path="/dashboard/graphs" element={<DashboardGraphs />} />
           <Route
             path="/dashboard/submissionsTable"

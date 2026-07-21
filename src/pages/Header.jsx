@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { ArrowLeft, ClipboardList, Search, UserRound } from "lucide-react";
+import { ArrowLeft, ClipboardList, UserRound } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { PlaceSearch } from "@/components/non_prebuilt/PlaceSearch.jsx";
 import { ProfileControl } from "@/components/non_prebuilt/ProfileControl.jsx";
 import { useAuth } from "../contexts/AuthContext.jsx";
 
@@ -41,7 +42,7 @@ function getBackRoute(pathname, isCommissioner) {
   return null;
 }
 
-export default function Header() {
+export default function Header({ onPlaceSelect }) {
   const navigate = useNavigate();
   const location = useLocation();
   const pathname = location.pathname;
@@ -127,16 +128,7 @@ export default function Header() {
 
       {showSearch ? (
         <div className={`header__search-slot${isCommissionerSurface ? " header__search-slot--commissioner" : ""}`}>
-          <Search
-            aria-hidden="true"
-            className="pointer-events-none absolute left-4 h-4 w-4 text-[#607086]"
-          />
-          <input
-            type="search"
-            aria-label="Search by address or postal code"
-            className="header__search-input h-10 w-full rounded-full border border-[#c9d8eb] bg-white py-2 pl-11 pr-4 text-[#17324d] shadow-[0_2px_8px_rgba(23,50,77,0.06)] outline-none transition-[border-color,box-shadow] placeholder:text-[#7a8797] focus:border-[#1a73e8] focus:shadow-[0_0_0_3px_rgba(26,115,232,0.14)]"
-            placeholder="Search by address or postal code..."
-          />
+          <PlaceSearch onPlaceSelect={onPlaceSelect} />
         </div>
       ) : null}
 

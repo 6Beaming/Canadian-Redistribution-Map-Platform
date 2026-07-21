@@ -39,8 +39,8 @@ This project is built using the following technologies:
    ```bash
    npm install
    ```
-2. Download the current root `.env` file from the project Google Drive shared folder and place it in the repository root. The file is Git-ignored and is the only local environment file used by this project. It contains `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `SIGNUP_EMAIL_REDIRECT_URL`, `PASSWORD_RESET_REDIRECT_URL`, and `VITE_GOOGLE_MAPS_API_KEY`.
-   Do not commit the downloaded file or create a `.env.local` override. Each teammate must use the shared project configuration or obtain a replacement Google key with `localhost` and `127.0.0.1` referrer access enabled in Google Cloud Console.
+2. Download the current root `.env` file from the project Google Drive shared folder and place it in the repository root. The file is Git-ignored and is the only local environment file used by this project. It contains `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `SIGNUP_EMAIL_REDIRECT_URL`, `PASSWORD_RESET_REDIRECT_URL`, `VITE_GOOGLE_MAPS_API_KEY`, and `GOOGLE_MAPS_SERVER_API_KEY`.
+   Do not commit the downloaded file or create a `.env.local` override. Each teammate must use the shared project configuration or obtain a replacement Google key with `localhost` and `127.0.0.1` referrer access enabled in Google Cloud Console. `GOOGLE_MAPS_SERVER_API_KEY` is a separate server-only key restricted to the Geocoding API; never expose it through a `VITE_*` variable.
 3. Start the React frontend and Express backend:
    ```bash
    npm run dev

@@ -31,6 +31,7 @@ import { DEFAULT_ROLLOUT_CATEGORY_ID } from "@/lib/map/rolloutPlan.js";
 import { MAP_INTERACTION_MODE } from "@/lib/map/interactionMode.js";
 import { mapApi } from "@/services/mapApi.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
+import { useAuth } from "@/contexts/AuthContext.jsx";
 import "@/styles/map.css";
 
 function createInitialObjectionWorkflow(overrides = {}) {
@@ -44,7 +45,8 @@ function createInitialObjectionWorkflow(overrides = {}) {
   };
 }
 
-export default function UserHome() {
+export default function UserHome({ mapSearchTarget = null }) {
+  const { sessionStatus, user } = useAuth();
   const [status, setStatus] = useState("Loading map...");
   const [selection, setSelection] = useState(null);
   const [rolloutHoverSelection, setRolloutHoverSelection] = useState(null);
@@ -64,6 +66,22 @@ export default function UserHome() {
   const metadataIndexCacheRef = useRef(new Map());
   const counterProposalDragFrameRef = useRef(0);
   const pendingCounterProposalDragRef = useRef(null);
+  const profileMapTarget = useMemo(() => {
+    const latitude = Number(user?.mapCenter?.latitude);
+    const longitude = Number(user?.mapCenter?.longitude);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return null;
+    }
+
+    return {
+      label: "your postal code",
+      location: [longitude, latitude],
+      showMarker: false,
+      zoom: 12,
+    };
+  }, [user?.mapCenter?.latitude, user?.mapCenter?.longitude]);
+  const effectiveMapSearchTarget = mapSearchTarget || profileMapTarget;
 
   useEffect(() => {
     let isMounted = true;
@@ -405,7 +423,11 @@ export default function UserHome() {
       return;
     }
 
-    setSelection({ type: "da", dguid });
+    setSelection((current) =>
+      current?.type === "da" && String(current.dguid) === String(dguid)
+        ? null
+        : { type: "da", dguid },
+    );
   }, [
     counterProposalWorkflow.firstDguid,
     counterProposalWorkflow.step,
@@ -418,7 +440,11 @@ export default function UserHome() {
   ]);
 
   const handleFedSelect = useCallback((fedNum, fedName) => {
-    setSelection({ type: "fed", fedNum, fedName });
+    setSelection((current) =>
+      current?.type === "fed" && String(current.fedNum) === String(fedNum)
+        ? null
+        : { type: "fed", fedNum, fedName },
+    );
     setRolloutHoverSelection(null);
     setIsRolloutOpen(false);
   }, []);
@@ -495,6 +521,8 @@ export default function UserHome() {
   const handleObjectionBackStep = useCallback(() => {
     if (objectionWorkflow.step === 2) {
       setSelection(null);
+    } else if (objectionWorkflow.step === 3 && objectionWorkflow.firstDguid) {
+      setSelection({ type: "da", dguid: objectionWorkflow.firstDguid });
     }
 
     setObjectionWorkflow((current) => {
@@ -520,7 +548,7 @@ export default function UserHome() {
         boundaryGeoJson: current.boundaryGeoJson,
       });
     });
-  }, [objectionWorkflow.step]);
+  }, [objectionWorkflow.firstDguid, objectionWorkflow.step]);
 
   const handleObjectionConfirmReview = useCallback(() => {
     setObjectionWorkflow((current) => {
@@ -538,6 +566,11 @@ export default function UserHome() {
   const handleCounterProposalBackStep = useCallback(() => {
     if (counterProposalWorkflow.step === 2) {
       setSelection(null);
+    } else if (
+      counterProposalWorkflow.step === 3
+      && counterProposalWorkflow.firstDguid
+    ) {
+      setSelection({ type: "da", dguid: counterProposalWorkflow.firstDguid });
     }
 
     setCounterProposalWorkflow((current) => {
@@ -567,7 +600,7 @@ export default function UserHome() {
 
       return current;
     });
-  }, [counterProposalWorkflow.step]);
+  }, [counterProposalWorkflow.firstDguid, counterProposalWorkflow.step]);
 
   const handleCounterProposalConfirmEdit = useCallback(() => {
     setCounterProposalWorkflow((current) => {
@@ -893,6 +926,9 @@ export default function UserHome() {
               />
               <MapCanvas
                 isFullscreen={isFullscreen}
+                mapSearchTarget={effectiveMapSearchTarget}
+                recenterTarget={sessionStatus === "signed-out" ? null : undefined}
+                postalAreaTarget={profileMapTarget}
                 selection={selection}
                 externalHoverSelection={rolloutHoverSelection}
                 objectionPreview={objectionPreview}
