@@ -27,8 +27,8 @@ test("province map views use bounds suitable for fitting small provinces", () =>
 test("Yukon uses a closer camera so it occupies most of the wide map", () => {
   const province = getProvinceMapView("YT");
 
-  assert.deepEqual(province.mapTarget.location, [-131.8, 62.4]);
-  assert.equal(province.mapTarget.zoom, 5.3);
+  assert.deepEqual(province.mapTarget.location, [-138.8, 62.3]);
+  assert.equal(province.mapTarget.zoom, 5.4);
   assert.equal(province.mapTarget.viewport, undefined);
   assert.equal(province.mapTarget.showMarker, false);
 });
