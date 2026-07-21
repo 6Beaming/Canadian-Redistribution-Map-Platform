@@ -39,6 +39,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --chown=node:node server ./server
 COPY --chown=node:node src/data/map ./src/data/map
+COPY --chown=node:node src/lib/map ./src/lib/map
 COPY --from=build --chown=node:node /app/dist ./dist
 
 USER node
