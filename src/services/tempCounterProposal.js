@@ -1,4 +1,3 @@
-import temporaryCounterProposalData from "@/data/map/temp.json" with { type: "json" };
 import {
   buildCounterProposalCache,
   previewCounterProposalHandleMove,
@@ -11,6 +10,10 @@ import {
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
 import { getAllComments } from "@/services/commentsApi.js";
 import { mapApi } from "@/services/mapApi.js";
+import {
+  getCounterProposal,
+  getCounterProposals,
+} from "@/services/submissionsApi.js";
 
 const EMPTY_FEATURE_COLLECTION = Object.freeze({ type: "FeatureCollection", features: [] });
 const metadataByFedPromise = new Map();
@@ -142,8 +145,54 @@ async function hydrateComment(submission, profilesByDguid) {
   };
 }
 
-async function hydrateTemporaryCounterProposal(submission, profilesByDguid) {
-  const normalized = normalizeSubmission(submission, "temporary-counter-proposal");
+function hasPersistedRevisionGeometry(revision) {
+  return Boolean(
+    revision?.original_geometry?.features?.length
+    && revision?.proposed_geometry?.features?.length,
+  );
+}
+
+function hydrateFromPersistedRevision(submission, revision) {
+  const firstDguid = String(revision.primary_dguid || submission.dguid || "");
+  const secondDguid = String(revision.secondary_dguid || submission.neighboring_dguid || "");
+  const originalGeometry = cloneFeatureCollection(revision.original_geometry);
+  const proposedGeometry = cloneFeatureCollection(revision.proposed_geometry);
+  const originalIndex = buildDaObjectionIndex(originalGeometry);
+  const proposedIndex = buildDaObjectionIndex(proposedGeometry);
+
+  return {
+    ...normalizeSubmission(submission, "supabase"),
+    revision,
+    geometry: {
+      originalFeatureCollection: originalGeometry,
+      proposedFeatureCollection: proposedGeometry,
+      originalBoundaryGeoJson: getSharedBoundaryFeatureCollection(
+        originalIndex,
+        firstDguid,
+        secondDguid,
+      ),
+      originalOuterBoundaryGeoJson: getPairOuterBoundaryFeatureCollection(
+        originalIndex,
+        [firstDguid, secondDguid],
+      ),
+      boundaryGeoJson: cloneFeatureCollection(
+        revision.shared_boundary
+        ?? getSharedBoundaryFeatureCollection(proposedIndex, firstDguid, secondDguid),
+      ),
+      outerBoundaryGeoJson: cloneFeatureCollection(
+        revision.outer_boundary
+        ?? getPairOuterBoundaryFeatureCollection(proposedIndex, [firstDguid, secondDguid]),
+      ),
+      impacts: null,
+      baselineRevision: revision.baseline_revision ?? null,
+      validationReport: revision.validation_report ?? null,
+    },
+  };
+}
+
+/** Replay legacy fixture-style geometry_edit operations when no revision exists. */
+async function hydrateFromGeometryEdit(submission, profilesByDguid) {
+  const normalized = normalizeSubmission(submission, submission.source ?? "supabase");
   const index = await getPairIndex(normalized, profilesByDguid);
 
   if (!index) {
@@ -195,6 +244,39 @@ async function hydrateTemporaryCounterProposal(submission, profilesByDguid) {
   };
 }
 
+async function hydratePersistedCounterProposal(submission, profilesByDguid) {
+  let record = submission;
+
+  if (!hasPersistedRevisionGeometry(record.revision)) {
+    try {
+      const detailed = await getCounterProposal(record.id);
+      if (detailed) {
+        record = {
+          ...record,
+          ...detailed,
+          revision: detailed.revision ?? record.revision ?? null,
+        };
+      }
+    } catch (error) {
+      console.warn("Unable to load counter-proposal revision detail.", error);
+    }
+  }
+
+  if (hasPersistedRevisionGeometry(record.revision)) {
+    return hydrateFromPersistedRevision(record, record.revision);
+  }
+
+  if (record.geometry_edit?.operations?.length) {
+    return hydrateFromGeometryEdit(record, profilesByDguid);
+  }
+
+  return {
+    ...normalizeSubmission(record, "supabase"),
+    geometry: null,
+    geometryError: "No persisted counter-proposal geometry is available for this submission.",
+  };
+}
+
 function isRelatedToDguid(submission, dguid) {
   const targetDguid = String(dguid ?? "");
   return (
@@ -204,14 +286,8 @@ function isRelatedToDguid(submission, dguid) {
 }
 
 /**
- * Returns the dashboard's three submission collections for one selected DA.
- * Supabase remains authoritative for comments and objections. Counter-proposal
- * records are a deliberately temporary local fixture until their write API is
- * implemented.
- */
-/**
- * Transitional Dashboard read: combines live feedback/objections with local
- * Counter-Proposal fixtures until a dedicated Counter-Proposal API exists.
+ * Dashboard DA cards: live feedback/objections from /api/comments plus
+ * persisted counter-proposals from /api/submissions/counter-proposals.
  */
 export async function getDashboardSubmissionCollections(dguid, profilesByDguid) {
   if (!dguid) {
@@ -219,69 +295,76 @@ export async function getDashboardSubmissionCollections(dguid, profilesByDguid) 
   }
 
   const profiles = await getProfilesByDguid(profilesByDguid);
-  const submissions = await getAllComments();
-  const relatedSubmissions = submissions.filter((submission) => isRelatedToDguid(submission, dguid));
-  const comments = relatedSubmissions
+  const [liveSubmissions, counterProposalRows] = await Promise.all([
+    getAllComments().catch(() => []),
+    getCounterProposals().catch(() => []),
+  ]);
+
+  const relatedLive = (Array.isArray(liveSubmissions) ? liveSubmissions : [])
+    .filter((submission) => isRelatedToDguid(submission, dguid));
+  const comments = relatedLive
     .filter((submission) => normalizeSubmissionType(submission.type) === "feedback")
     .map((submission) => normalizeSubmission(submission, "supabase"));
-  const objectionRows = relatedSubmissions.filter(
+  const objectionRows = relatedLive.filter(
     (submission) => normalizeSubmissionType(submission.type) === "objection",
   );
-  const counterProposalRows = temporaryCounterProposalData.submissions.filter((submission) =>
-    isRelatedToDguid(submission, dguid),
-  );
+  const relatedCounterProposals = (Array.isArray(counterProposalRows) ? counterProposalRows : [])
+    .filter((submission) => isRelatedToDguid(submission, dguid));
 
   const [objections, counterProposals] = await Promise.all([
     Promise.all(objectionRows.map((submission) => hydrateObjection(submission, profiles))),
     Promise.all(
-      counterProposalRows.map((submission) => hydrateTemporaryCounterProposal(submission, profiles)),
+      relatedCounterProposals.map((submission) =>
+        hydratePersistedCounterProposal(submission, profiles),
+      ),
     ),
   ]);
 
   return { comments, objections, counterProposals };
 }
 
-/** Local fixture lookup with browser-side geometry hydration for one review page. */
+/** Load one counter-proposal with persisted revision geometry for review. */
 export async function getTemporaryCounterProposalById(id, profilesByDguid) {
-  const submission = temporaryCounterProposalData.submissions.find(
-    (entry) => entry.id === id,
-  );
-
-  if (!submission) {
+  try {
+    const submission = await getCounterProposal(id);
+    if (!submission) return null;
+    const profiles = await getProfilesByDguid(profilesByDguid);
+    return hydratePersistedCounterProposal(submission, profiles);
+  } catch {
     return null;
   }
-
-  const profiles = await getProfilesByDguid(profilesByDguid);
-  return hydrateTemporaryCounterProposal(submission, profiles);
 }
 
 /**
- * Local fixture read used by the Commissioner submissions table. This method
- * deliberately returns the lightweight submission envelope only; table pages
- * must not hydrate or validate geometry.
+ * List-safe counter-proposal rows for Workspace / submissions table.
+ * Includes revision metadata but does not hydrate map GeoJSON.
  */
-/** List-safe fixture rows; deliberately excludes hydrated GeoJSON. */
-export function getTemporaryCounterProposalSubmissions() {
-  return temporaryCounterProposalData.submissions.map((submission) => ({
-    ...submission,
-    profile: submission.profile ? { ...submission.profile } : null,
-    geometry_edit: submission.geometry_edit
-      ? structuredClone(submission.geometry_edit)
-      : null,
-  }));
+export async function getTemporaryCounterProposalSubmissions() {
+  try {
+    const submissions = await getCounterProposals();
+    return (Array.isArray(submissions) ? submissions : []).map((submission) => ({
+      ...submission,
+      type: normalizeSubmissionType(submission.type),
+      profile: submission.profile ? { ...submission.profile } : null,
+      authorEmail: submission.authorEmail ?? submission.profile?.email ?? null,
+      source: "supabase",
+    }));
+  } catch (error) {
+    console.warn("Persisted counter-proposals are unavailable.", error);
+    return [];
+  }
 }
 
 /**
- * Hydrates one live objection or temporary Counter-Proposal for review.
- * Live objections currently reconstruct geometry from canonical map metadata;
- * replace this with immutable submission snapshots when the write API exists.
+ * Hydrates one live objection or persisted Counter-Proposal for review.
+ * Counter-proposals prefer immutable revision snapshots from Supabase.
  */
 export async function hydrateWorkspaceSubmission(submission, profilesByDguid) {
   const profiles = await getProfilesByDguid(profilesByDguid);
   const type = normalizeSubmissionType(submission?.type);
 
   if (type === "counter-proposal") {
-    return hydrateTemporaryCounterProposal(submission, profiles);
+    return hydratePersistedCounterProposal(submission, profiles);
   }
 
   if (type === "objection") {
@@ -291,6 +374,6 @@ export async function hydrateWorkspaceSubmission(submission, profilesByDguid) {
   return hydrateComment(submission, profiles);
 }
 
-export function getTemporaryCounterProposalDefinitions() {
+export async function getTemporaryCounterProposalDefinitions() {
   return getTemporaryCounterProposalSubmissions();
 }

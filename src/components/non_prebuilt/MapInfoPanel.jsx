@@ -631,6 +631,7 @@ export function MapInfoPanel({
   counterProposalWorkflow,
   onCounterProposalBackStep,
   onCounterProposalConfirmEdit,
+  onCounterProposalSubmitSuccess,
   onRolloutHoverChange,
   onRolloutSelect,
 }) {
@@ -958,6 +959,7 @@ export function MapInfoPanel({
                 geometryIndex={objectionGeometryIndex}
                 onBackStep={onCounterProposalBackStep}
                 onConfirmEdit={onCounterProposalConfirmEdit}
+                onSubmitSuccess={onCounterProposalSubmitSuccess}
                 profilesByDguid={profilesByDguid}
                 workflow={counterProposalWorkflow}
               />

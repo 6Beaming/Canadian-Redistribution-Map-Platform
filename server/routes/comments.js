@@ -1,8 +1,11 @@
 import { Router } from "express";
 import {
+  getSupabaseAdminDataClient,
   getSupabaseClient,
   getSupabaseProfileEmailsAsAdmin,
 } from "../lib/supabase.js";
+import { getProfileForDguid } from "../lib/map/mapAssetAuthority.js";
+import { enrichSubmissionsWithDaMetadata } from "../lib/map/submissionPresentation.js";
 import { requirePublicUser } from "../middleware/requireAuth.js";
 
 const router = Router();
@@ -63,15 +66,16 @@ router.get("/count", async (req, res) => {
 
 // Get all submissions for the Commissioner submissions table.
 router.get("/", requireCommissioner, async (req, res) => {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseAdminDataClient();
 
   const { data, error } = await supabase
     .from("submissions")
-    .select("*, dissemination_areas!submissions_dguid_fkey(community_name)")
+    .select("*")
     .order("created_at", { ascending: false });
 
   if (error) return res.status(500).json({ error: error.message });
 
+  const enrichedSubmissions = await enrichSubmissionsWithDaMetadata(data ?? []);
 
   //AI generated code to merge and get profiles as well
   //Right now used as a stop gap since problem with schema
@@ -87,7 +91,7 @@ router.get("/", requireCommissioner, async (req, res) => {
   }
 
   // Merge profiles into submissions
-  const result = data.map(submission => ({
+  const result = enrichedSubmissions.map(submission => ({
     ...submission,
     profile: profiles.find(
       profile => profile.id === submission.user_id
@@ -100,7 +104,7 @@ router.get("/", requireCommissioner, async (req, res) => {
 // Public-only self read. The URL id is checked against the verified session to
 // prevent a signed-in user from enumerating another user's submissions.
 router.get("/:user_id", requirePublicUser, async (req, res) => {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseAdminDataClient();
   const { user_id } = req.params;
 
   if (user_id !== req.user.id) {
@@ -109,37 +113,82 @@ router.get("/:user_id", requirePublicUser, async (req, res) => {
 
   const { data, error } = await supabase
     .from("submissions")
-    .select("*, dissemination_areas!submissions_dguid_fkey(community_name)")
+    .select("*")
     .eq("user_id", user_id)
     .order("created_at", { ascending: false });
 
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+
+  try {
+    const enrichedSubmissions = await enrichSubmissionsWithDaMetadata(data ?? []);
+    return res.json(enrichedSubmissions);
+  } catch (enrichmentError) {
+    console.error("Unable to enrich submissions with map metadata:", enrichmentError);
+    return res.json(
+      (data ?? []).map((submission) => ({
+        ...submission,
+        dissemination_areas: {
+          community_name: submission.dissemination_areas?.community_name ?? "Unknown",
+        },
+      })),
+    );
+  }
 });
 
 // Public-only submission write. The author is derived from the verified
 // session; geometry-specific validation remains a dedicated follow-up API.
 router.post("/", requirePublicUser, async (req, res) => {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseAdminDataClient();
   const { proposal_id, comment, fed_num, dguid, title, neighboring_dguid, type } = req.body;
   const user_id = req.user.id;
+  const normalizedType = String(type ?? "feedback").trim().toLowerCase();
+  const primaryDguid = String(dguid ?? "").trim() || null;
+  const secondaryDguid = String(neighboring_dguid ?? "").trim() || null;
+  const normalizedTitle = String(title ?? "").trim();
+  const normalizedComment = String(comment ?? "").trim();
 
-  const dguids = [dguid, neighboring_dguid].filter(Boolean);
+  if (!["feedback", "objection"].includes(normalizedType)) {
+    return res.status(400).json({
+      error: "Only feedback and objection submissions are supported on this route.",
+    });
+  }
 
-  //add to dissemination area backend if doesnt already exist
-  const { error: daError } = await supabase
-    .from("dissemination_areas")
-    .upsert(
-      dguids.map((id) => ({
-        dguid: id
-      })),
-      {
-        onConflict: "dguid"
+  if (!normalizedTitle) {
+    return res.status(400).json({ error: "Title is required." });
+  }
+
+  if (!normalizedComment) {
+    return res.status(400).json({ error: "Comment is required." });
+  }
+
+  if (!primaryDguid) {
+    return res.status(400).json({ error: "A dissemination area selection is required." });
+  }
+
+  try {
+    const primaryProfile = await getProfileForDguid(primaryDguid);
+    if (!primaryProfile) {
+      return res.status(400).json({ error: `Unknown or unavailable DA: ${primaryDguid}.` });
+    }
+
+    if (normalizedType === "objection") {
+      if (!secondaryDguid) {
+        return res.status(400).json({ error: "An objection requires a neighbouring DA." });
       }
-    );
 
-  if (daError) {
-    return res.status(500).json({ error: daError.message });
+      if (primaryDguid === secondaryDguid) {
+        return res.status(400).json({ error: "An objection must target two distinct DAs." });
+      }
+
+      const secondaryProfile = await getProfileForDguid(secondaryDguid);
+      if (!secondaryProfile) {
+        return res.status(400).json({ error: `Unknown or unavailable DA: ${secondaryDguid}.` });
+      }
+    }
+  } catch (validationError) {
+    return res.status(500).json({
+      error: validationError.message || "Unable to validate the selected dissemination area.",
+    });
   }
 
   // Verify proposal exists
@@ -155,29 +204,35 @@ router.post("/", requirePublicUser, async (req, res) => {
     }
   }
 
+  const resolvedFedNum =
+    String(fed_num ?? "").trim()
+    || (await getProfileForDguid(primaryDguid))?.fed_num
+    || null;
+
   const { data, error } = await supabase
     .from("submissions")
     .insert([{
-      proposal_id,
+      proposal_id: proposal_id || null,
       user_id,
-      comment,
-      fed_num,
-      dguid,
-      neighboring_dguid,
-      title: title || "Feedback",
-      type,
-      status: "pending"
+      comment: normalizedComment,
+      fed_num: resolvedFedNum,
+      dguid: primaryDguid,
+      neighboring_dguid: normalizedType === "objection" ? secondaryDguid : null,
+      title: normalizedTitle,
+      type: normalizedType,
+      status: "pending",
     }])
-    .select();
+    .select()
+    .single();
 
   if (error) return res.status(500).json({ error: error.message });
-  res.status(201).json(data[0]);
+  res.status(201).json(data);
 });
 
 // Public-only owned-submission delete. A Commissioner uses Workspace/Archive
 // APIs instead and cannot mutate public submissions through this route.
 router.delete("/:commentId", requirePublicUser, async (req, res) => {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseAdminDataClient();
   const { commentId } = req.params;
 
   const { error } = await supabase

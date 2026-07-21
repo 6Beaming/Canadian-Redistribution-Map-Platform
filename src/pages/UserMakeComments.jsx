@@ -80,8 +80,8 @@ export default function UserMakeComments({ proposalId, fedNum, dguid, daName, ha
       });
     } catch (error) {
       console.error("Failed to submit comment:", error);
-      toast.error("Failed to submit comment.", {
-        duration: 1000,
+      toast.error(error.message || "Failed to submit comment.", {
+        duration: 2500,
       });
     }
   }

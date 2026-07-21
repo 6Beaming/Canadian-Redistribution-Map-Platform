@@ -38,6 +38,38 @@ const statusMessages = {
 
 const clickableStatuses = new Set(["rejected"]);
 
+function normalizeSubmissionType(type) {
+  const normalized = String(type ?? "feedback").trim().toLowerCase();
+
+  if (normalized === "counter_proposal") {
+    return "counter-proposal";
+  }
+
+  if (normalized === "comment") {
+    return "feedback";
+  }
+
+  return normalized;
+}
+
+function formatSubmissionType(type) {
+  const normalized = normalizeSubmissionType(type);
+
+  if (normalized === "counter-proposal") {
+    return "Counter-Proposal";
+  }
+
+  if (normalized === "objection") {
+    return "Objection";
+  }
+
+  if (normalized === "feedback") {
+    return "Feedback";
+  }
+
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
 function normalizeSubmissionStatus(status) {
   const normalized = String(status ?? "pending").trim().toLowerCase().replaceAll(" ", "_");
 
@@ -115,6 +147,7 @@ export default function MySubmissions() {
   const [sorting, setSorting] = useState([{ id: "submittedAt", desc: true }]);
   const [hoveredRowId, setHoveredRowId] = useState(null);
   const [submissions, setSubmissions] = useState([]);
+  const [loadError, setLoadError] = useState("");
   const { sessionStatus, user } = useAuth();
 
   useEffect(() => {
@@ -131,13 +164,14 @@ export default function MySubmissions() {
       }
 
       try {
+        setLoadError("");
         const data = await getCommentsUser(user.id);
 
         setSubmissions(
           data.map((submission) => ({
             id: submission.id,
             submittedAt: submission.created_at,
-            type: submission.type,
+            type: formatSubmissionType(submission.type),
             title: submission.title,
             community_name: submission.dissemination_areas?.community_name ?? "Unknown",
             status: normalizeSubmissionStatus(submission.status),
@@ -146,6 +180,7 @@ export default function MySubmissions() {
         );
       } catch (err) {
         console.error(err);
+        setLoadError(err.message || "Unable to load your submissions.");
       }
     }
 
@@ -170,6 +205,11 @@ export default function MySubmissions() {
   return (
     <div className="px-[clamp(0.5rem,2vw,1.5rem)] py-[clamp(1rem,3vw,1.5rem)]">
       <div className="submissions-page__content flex flex-col gap-4">
+        {loadError ? (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {loadError}
+          </p>
+        ) : null}
         <div className="submissions-table-shell rounded-lg border border-gray-200 shadow-sm">
             <Table className="min-w-[60rem]">
               <TableHeader className="bg-gray-50">

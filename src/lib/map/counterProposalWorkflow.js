@@ -603,6 +603,18 @@ function normalizeCounterProposalSourceFeatures(features) {
  * have no interior overlap, and still cover exactly that original area.  The
  * final equality check catches both illegal cuts (gaps) and folded overlaps.
  */
+export function validateCounterProposalTopology(originalFeatures, currentFeatures) {
+  const topologyValid = hasValidCounterProposalTopology(originalFeatures, currentFeatures);
+
+  return {
+    valid: topologyValid,
+    checks: {
+      featureCount: Array.isArray(currentFeatures) && currentFeatures.length === 2,
+      topology: topologyValid,
+    },
+  };
+}
+
 function hasValidCounterProposalTopology(originalFeatures, currentFeatures) {
   try {
     if (!Array.isArray(originalFeatures) || !Array.isArray(currentFeatures) || currentFeatures.length !== 2) {

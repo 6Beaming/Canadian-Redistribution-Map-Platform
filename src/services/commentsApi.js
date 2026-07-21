@@ -18,7 +18,12 @@
 
 
 function handleResponse(res){
-	if (!res.ok) { return res.text().then(text => { throw new Error(`${text} (status: ${res.status})`)}); }
+	if (!res.ok) {
+    return res.json().catch(() => ({})).then((body) => {
+      const message = body?.error || `Request failed (${res.status})`;
+      throw new Error(message);
+    });
+  }
 	return res.json();
 }
 
