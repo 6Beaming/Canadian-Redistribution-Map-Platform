@@ -67,6 +67,10 @@ function App() {
     });
   }
 
+  function handleMapSearchClear() {
+    setMapSearchTarget(null);
+  }
+
   return (
     <AuthProvider>
       <Header onPlaceSelect={handlePlaceSelect} />
@@ -74,8 +78,24 @@ function App() {
 
       <Routes>
         <Route element={<RequirePublicUser />}>
-          <Route path="/" element={<UserHome mapSearchTarget={mapSearchTarget} />} />
-          <Route path="/users" element={<UserHome mapSearchTarget={mapSearchTarget} />} />
+          <Route
+            path="/"
+            element={(
+              <UserHome
+                mapSearchTarget={mapSearchTarget}
+                onClearMapSearchTarget={handleMapSearchClear}
+              />
+            )}
+          />
+          <Route
+            path="/users"
+            element={(
+              <UserHome
+                mapSearchTarget={mapSearchTarget}
+                onClearMapSearchTarget={handleMapSearchClear}
+              />
+            )}
+          />
           <Route path="/users/profile" element={<UserProfile />} />
           <Route path="/submissions" element={<MySubmissions />} />
           <Route

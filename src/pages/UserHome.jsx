@@ -45,7 +45,7 @@ function createInitialObjectionWorkflow(overrides = {}) {
   };
 }
 
-export default function UserHome({ mapSearchTarget = null }) {
+export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarget }) {
   const { sessionStatus, user } = useAuth();
   const [status, setStatus] = useState("Loading map...");
   const [selection, setSelection] = useState(null);
@@ -929,6 +929,7 @@ export default function UserHome({ mapSearchTarget = null }) {
                 mapSearchTarget={effectiveMapSearchTarget}
                 recenterTarget={sessionStatus === "signed-out" ? null : undefined}
                 postalAreaTarget={profileMapTarget}
+                onPostalAreaActivate={onClearMapSearchTarget}
                 selection={selection}
                 externalHoverSelection={rolloutHoverSelection}
                 objectionPreview={objectionPreview}

@@ -578,6 +578,7 @@ export function MapCanvas({
   onCounterProposalHandleSelect,
   onDaSelect,
   onFedSelect,
+  onPostalAreaActivate,
   onStatusChange,
   onToggleFullscreen,
   rolloutEnabled = false,
@@ -616,6 +617,8 @@ export function MapCanvas({
   const postalAreaButtonRef = useRef(null);
   const postalAreaControlRef = useRef(null);
   const postalAreaTargetRef = useRef(postalAreaTarget);
+  const onPostalAreaActivateRef = useRef(onPostalAreaActivate);
+  const skipNextPostalTargetSyncRef = useRef(false);
   const onToggleFullscreenRef = useRef(onToggleFullscreen);
   const onDaSelectRef = useRef(onDaSelect);
   const onFedSelectRef = useRef(onFedSelect);
@@ -666,6 +669,7 @@ export function MapCanvas({
   onCounterProposalDragEndRef.current = onCounterProposalDragEnd;
   onDaSelectRef.current = onDaSelect;
   onFedSelectRef.current = onFedSelect;
+  onPostalAreaActivateRef.current = onPostalAreaActivate;
   onStatusChangeRef.current = onStatusChange;
   recenterTargetRef.current = recenterTarget;
   postalAreaTargetRef.current = postalAreaTarget;
@@ -875,6 +879,10 @@ export function MapCanvas({
           return;
         }
 
+        skipNextPostalTargetSyncRef.current = true;
+        onPostalAreaActivateRef.current?.();
+        searchMarkerRef.current?.remove();
+        searchMarkerRef.current = null;
         map.flyTo({
           center: coordinates,
           zoom: Number.isFinite(target?.zoom) ? target.zoom : 12,
@@ -918,6 +926,18 @@ export function MapCanvas({
     const map = mapRef.current;
     const coordinates = getMapTargetCoordinates(mapSearchTarget);
     const viewport = getMapTargetViewport(mapSearchTarget);
+
+    if (skipNextPostalTargetSyncRef.current) {
+      // Clearing the app-level Places result exposes the postal target again.
+      // The postal button already started that exact camera move, so avoid a
+      // second transition that could retain the searched location's zoom.
+      const matchesPostalTarget = mapSearchTarget === postalAreaTargetRef.current;
+      skipNextPostalTargetSyncRef.current = false;
+
+      if (matchesPostalTarget) {
+        return;
+      }
+    }
 
     if (!map || !isMapReadyRef.current || (!coordinates && !viewport)) {
       return;
