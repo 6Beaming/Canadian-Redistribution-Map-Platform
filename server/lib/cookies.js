@@ -25,12 +25,39 @@ function cookieSameSite() {
   return ["strict", "lax", "none"].includes(value) ? value : "lax";
 }
 
+function usesSecureCookies() {
+  const configured = String(process.env.COOKIE_SECURE || "")
+    .trim()
+    .toLowerCase();
+
+  if (configured === "true") {
+    return true;
+  }
+
+  if (configured === "false") {
+    return false;
+  }
+
+  // Docker development is served from plain HTTP localhost. Browsers reject
+  // Secure cookies there, while deployed origins remain secure by default.
+  try {
+    const hostname = new URL(process.env.CLIENT_ORIGIN || "").hostname;
+    if (["localhost", "127.0.0.1", "::1"].includes(hostname)) {
+      return false;
+    }
+  } catch {
+    // Fall through to the safe production default for malformed/missing URLs.
+  }
+
+  return process.env.NODE_ENV === "production";
+}
+
 function baseCookieOptions() {
   return {
     httpOnly: true,
     path: "/",
     sameSite: cookieSameSite(),
-    secure: process.env.NODE_ENV === "production"
+    secure: usesSecureCookies()
   };
 }
 

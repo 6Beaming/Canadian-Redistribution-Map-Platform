@@ -46,6 +46,31 @@ This project is built using the following technologies:
    npm run dev
    ```
 
+## Docker
+
+The production container builds the Vite client and serves it together with the
+Express API on port `3000`. It also includes the checked-in local map assets
+used by the map API.
+
+1. Download the current project `.env` from the shared Google Drive folder and
+   place it in the repository root. Do not commit it. The file must include the
+   Supabase and Google Maps variables described in `.env.example`.
+2. Build and start the service:
+   ```bash
+   docker compose up --build
+   ```
+3. Open `http://localhost:3000`. Health can be checked at
+   `http://localhost:3000/api/health`.
+
+For a deployed origin, set `DOCKER_CLIENT_ORIGIN` and the three
+`DOCKER_*_REDIRECT_URL` values before starting Compose. Public `VITE_*` values
+are compiled into the browser bundle, so rebuild the image whenever any of
+those values change. Server-only values such as `SUPABASE_SERVICE_ROLE_KEY`
+remain runtime environment variables and must never be embedded in a client
+build or committed to Git. Compose automatically allows non-Secure cookies for
+its HTTP `localhost` origin; for a deployed HTTPS origin, explicitly set
+`DOCKER_COOKIE_SECURE=true`.
+
 ## Map Data Notes
 
 - Canonical DA metadata shards live in `src/data/map/metadata/`.

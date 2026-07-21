@@ -1,0 +1,35 @@
+services:
+  crmp:
+    build:
+      context: .
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
+        VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY}
+        VITE_GOOGLE_MAP_TILES_LANGUAGE: ${VITE_GOOGLE_MAP_TILES_LANGUAGE:-en-CA}
+        VITE_GOOGLE_MAP_TILES_REGION: ${VITE_GOOGLE_MAP_TILES_REGION:-CA}
+    image: crmp:local
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # The container serves the SPA and API at one origin.
+      CLIENT_ORIGIN: ${DOCKER_CLIENT_ORIGIN:-http://localhost:3000}
+      SIGNUP_EMAIL_REDIRECT_URL: ${DOCKER_SIGNUP_EMAIL_REDIRECT_URL:-http://localhost:3000/sign-in}
+      COMMISSIONER_INVITE_REDIRECT_URL: ${DOCKER_COMMISSIONER_INVITE_REDIRECT_URL:-http://localhost:3000/accept-invite}
+      PASSWORD_RESET_REDIRECT_URL: ${DOCKER_PASSWORD_RESET_REDIRECT_URL:-http://localhost:3000/reset-password}
+      COOKIE_SECURE: ${DOCKER_COOKIE_SECURE:-}
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3

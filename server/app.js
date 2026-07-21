@@ -1,5 +1,7 @@
 import cors from "cors";
 import express from "express";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { mountMapApiService } from "./map-api-service/index.js";
 import authRouter from "./routes/auth.js";
 import commentsRouter from "./routes/comments.js";
@@ -9,6 +11,9 @@ import { requireAuth } from "./middleware/requireAuth.js";
 
 
 const app = express();
+const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
+const distDirectory = path.resolve(currentDirectory, "../dist");
+const isProduction = process.env.NODE_ENV === "production";
 
 const allowedOrigins = (process.env.CLIENT_ORIGIN || "http://localhost:5173")
   .split(",")
@@ -44,7 +49,21 @@ app.use("/api/workspace", workspaceRouter);
 
 mountMapApiService(app);
 
-app.use((_req, res) => {
+// Docker production serves the Vite SPA and API from one same-origin service.
+// Development continues to use Vite's dev server and its /api proxy instead.
+if (isProduction) {
+  app.use(express.static(distDirectory, {
+    index: false,
+    maxAge: "1h"
+  }));
+}
+
+app.use((request, res) => {
+  if (isProduction && request.method === "GET" && !request.path.startsWith("/api/")) {
+    res.sendFile(path.join(distDirectory, "index.html"));
+    return;
+  }
+
   res.status(404).json({ error: "Route not found." });
 });
 

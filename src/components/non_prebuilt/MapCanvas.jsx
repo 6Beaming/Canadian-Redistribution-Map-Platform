@@ -656,6 +656,7 @@ export function MapCanvas({
   const isMapReadyRef = useRef(false);
   const [mapReadyTick, setMapReadyTick] = useState(0);
   const [boundariesVisible, setBoundariesVisible] = useState(true);
+  const [isPostalAreaMarkerVisible, setIsPostalAreaMarkerVisible] = useState(true);
   const [totalSubmissions, setTotalSubmissions] = useState(0);
   const totalSubmissionsRef = useRef(0);
 
@@ -680,6 +681,35 @@ export function MapCanvas({
     ? buildSubmissionHeatmapFillExpression(heatmap.countsByDguid, totalSubmissionsRef.current)
     : null;
   interactionModeRef.current = interactionMode;
+
+  function clearPostalAreaMarker() {
+    setIsPostalAreaMarkerVisible(false);
+    postalAreaMarkerRef.current?.remove();
+    postalAreaMarkerRef.current = null;
+  }
+
+  function focusPostalArea() {
+    const map = mapRef.current;
+    const target = postalAreaTargetRef.current;
+    const coordinates = getMapTargetCoordinates(target);
+
+    if (!map || !coordinates) {
+      return false;
+    }
+
+    setIsPostalAreaMarkerVisible(true);
+    skipNextPostalTargetSyncRef.current = true;
+    onPostalAreaActivateRef.current?.();
+    searchMarkerRef.current?.remove();
+    searchMarkerRef.current = null;
+    map.flyTo({
+      center: coordinates,
+      zoom: Number.isFinite(target?.zoom) ? target.zoom : 12,
+      duration: 700,
+    });
+    onStatusChangeRef.current?.("Map moved to your postal area.");
+    return true;
+  }
 
   useEffect(() => {
     async function fetchTotalSubmissions() {
@@ -852,7 +882,7 @@ export function MapCanvas({
     const coordinates = getMapTargetCoordinates(postalAreaTarget);
     const available = Boolean(coordinates);
 
-    if (available) {
+    if (available && isPostalAreaMarkerVisible) {
       if (!postalAreaMarkerRef.current) {
         const marker = new maplibregl.Marker({ color: "#1a73e8" });
         const markerElement = marker.getElement();
@@ -871,25 +901,7 @@ export function MapCanvas({
     }
 
     if (available && !postalAreaControlRef.current) {
-      const control = createPostalAreaControl(postalAreaButtonRef, () => {
-        const target = postalAreaTargetRef.current;
-        const coordinates = getMapTargetCoordinates(target);
-
-        if (!coordinates) {
-          return;
-        }
-
-        skipNextPostalTargetSyncRef.current = true;
-        onPostalAreaActivateRef.current?.();
-        searchMarkerRef.current?.remove();
-        searchMarkerRef.current = null;
-        map.flyTo({
-          center: coordinates,
-          zoom: Number.isFinite(target?.zoom) ? target.zoom : 12,
-          duration: 700,
-        });
-        onStatusChangeRef.current?.("Map moved to your postal area.");
-      });
+      const control = createPostalAreaControl(postalAreaButtonRef, focusPostalArea);
 
       map.addControl(control, "top-right");
       postalAreaControlRef.current = control;
@@ -901,7 +913,7 @@ export function MapCanvas({
       postalAreaControlRef.current = null;
       postalAreaButtonRef.current = null;
     }
-  }, [mapReadyTick, postalAreaTarget]);
+  }, [isPostalAreaMarkerVisible, mapReadyTick, postalAreaTarget]);
 
   useEffect(() => {
     if (!hasSubmissionHeatmapData(heatmap) && heatmapEnabled) {
@@ -2381,6 +2393,13 @@ export function MapCanvas({
       if (hit?.type === "counter-proposal-handle") {
         onCounterProposalHandleSelectRef.current?.(hit.id);
         return;
+      }
+
+      // A direct map-area selection moves attention away from the user's
+      // postal presenter marker. It returns only through My Postal Area, the
+      // rollout Toggle, or a fresh map session.
+      if (hit) {
+        clearPostalAreaMarker();
       }
 
       if (
