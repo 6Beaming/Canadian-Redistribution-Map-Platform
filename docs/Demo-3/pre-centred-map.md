@@ -5,14 +5,15 @@
 The application opens the map near the signed-in user's saved area instead of
 always starting with the Canada-wide view. Public users and Commissioners use
 different profile information because their map responsibilities have different
-scales:
+scales, while anonymous users use the Canada default:
 
 | Role | Saved profile value | Initial map view |
 | --- | --- | --- |
+| Anonymous user | None | Canada default bounds, with a re-center control |
 | Public user | Postal code, represented by cached latitude and longitude | A local point at zoom level 12, with a postal-area marker and return control |
-| Commissioner | Province or territory code | A province-sized viewport or a configured regional camera, with a light-blue province highlight |
+| Commissioner | Province or territory code | A province-sized viewport or a configured regional camera, with a light-blue province highlight and re-center control |
 
-Both flows prepare the initial camera before MapLibre creates the map. This
+All three flows prepare the initial camera before MapLibre creates the map. This
 prevents the map from first displaying Canada and then visibly moving to the
 profile location one or two seconds later.
 
@@ -165,16 +166,44 @@ authentication context receives the updated profile. The next Commissioner map
 render uses the newly saved province view. The profile page's separate
 10-second confirmation protects this high-impact change before it is saved.
 
-## 5. Camera Priority
+## 5. Role-specific Re-centering Controls
+
+MapCanvas accepts an optional `recenterTarget` for the dedicated **Re-center
+map** control. The control uses the same local target that established the
+role's initial camera, so clicking it does not call Google or change profile
+data.
+
+- [`DashboardHome.jsx`](../../src/pages/DashboardHome.jsx) passes the
+  Commissioner's saved province target. Clicking the control returns to that
+  province's configured viewport or point camera. If the province is missing or
+  unsupported, it returns to the Canada default bounds.
+- [`UserHome.jsx`](../../src/pages/UserHome.jsx) enables the control only after
+  authentication has confirmed that the visitor is signed out. Anonymous users
+  return to the Canada default bounds.
+- Signed-in public users do not receive the new re-center control. Their existing
+  **My Postal Area** marker and button remain unchanged and continue returning
+  to their cached postal coordinates.
+
+For a viewport target, MapCanvas uses an animated `fitBounds()` transition. For
+a configured point target, it uses `flyTo()` with the target's original zoom.
+The Canada fallback also uses `fitBounds()`. Re-centering does not clear a
+selected DA or FED, submission state, or an active workflow.
+
+The top-right control uses a crosshair-style SVG, a light-blue background, the
+tooltip **Re-center map**, and an accessible label describing its return to the
+default position. The control is added and removed with the same MapLibre
+control lifecycle as the other map buttons.
+
+## 6. Camera Priority
 
 The Google Places search target always takes priority over a profile-derived
 starting target.
 
-| Priority | Public-user map | Commissioner map |
-| --- | --- | --- |
-| 1 | Active Places search result | Active Places search result |
-| 2 | Cached postal-area point | Saved province view |
-| 3 | Canada default bounds | Canada default bounds |
+| Priority | Anonymous map | Public-user map | Commissioner map |
+| --- | --- | --- | --- |
+| 1 | Active Places search result | Active Places search result | Active Places search result |
+| 2 | Canada default bounds | Cached postal-area point | Saved province view |
+| 3 | — | Canada default bounds | Canada default bounds |
 
 For public users, searching moves the camera but does not remove the postal-area
 marker or **My Postal Area** control. Commissioners keep the province highlight
@@ -185,18 +214,17 @@ Focused objection, Counter-Proposal, Workspace review, and archived-difference
 flows may later fit exact workflow GeoJSON. That camera movement is intentional
 and is separate from the initial profile-based centring described here.
 
-## 6. API Usage and Data Ownership
+## 7. API Usage and Data Ownership
 
-| Concern | Public user | Commissioner |
-| --- | --- | --- |
-| Durable source of truth | Supabase postal coordinates and timestamp | Supabase `province` code |
-| Initial camera lookup | Cached `mapCenter` in the auth response | Local `provinceView.js` lookup |
-| Google request on normal launch | Only when postal retry rules require it | None |
-| Google API used to create the profile view | Server-side Geocoding API | None |
-| Map indicator | Blue postal marker | Light-blue province highlight |
-| Return-to-profile control | **My Postal Area** | Not currently provided |
+| Concern | Anonymous user | Public user | Commissioner |
+| --- | --- | --- | --- |
+| Durable source of truth | None | Supabase postal coordinates and timestamp | Supabase `province` code |
+| Initial camera lookup | Built-in Canada bounds | Cached `mapCenter` in the auth response | Local `provinceView.js` lookup |
+| Google request on normal launch | None | Only when postal retry rules require it | None |
+| Google API used to create the profile view | None | Server-side Geocoding API | None |
+| Map indicator | None | Blue postal marker | Light-blue province highlight |
+| Return control | **Re-center map** to Canada | **My Postal Area** | **Re-center map** to the saved province, or Canada as a fallback |
 
 The browser Places API remains responsible only for user-entered searches. The
 Google raster tile session provides the visual basemap. Neither service is the
 source of electoral boundaries or Commissioner province assignments.
-

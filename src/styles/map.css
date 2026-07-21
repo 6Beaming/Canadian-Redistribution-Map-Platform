@@ -190,6 +190,7 @@
 
 .maplibregl-ctrl-group button.map-fullscreen-btn svg,
 .maplibregl-ctrl-group button.map-boundary-btn svg,
+.maplibregl-ctrl-group button.map-recenter-btn svg,
 .maplibregl-ctrl-group button.map-postal-area-btn svg {
   position: absolute;
   top: 50%;
@@ -212,6 +213,19 @@
   background-color: #cfe8ff;
   line-height: 0;
   cursor: pointer;
+}
+
+.maplibregl-ctrl-group button.map-recenter-btn {
+  overflow: hidden;
+  background-color: #eef5ff;
+  line-height: 0;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.maplibregl-ctrl-group button.map-recenter-btn:hover {
+  background-color: #dceaff;
+  color: #1557b0;
 }
 
 .maplibregl-ctrl-group button.map-boundary-btn[aria-pressed="false"] {

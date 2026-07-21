@@ -197,6 +197,7 @@ export default function DashboardHome({ mapSearchTarget = null }) {
               <MapCanvas
                 isFullscreen={isFullscreen}
                 mapSearchTarget={activeMapTarget}
+                recenterTarget={commissionerProvinceView?.mapTarget ?? null}
                 highlightedProvincePrUid={commissionerProvinceView?.pruid ?? null}
                 selection={selection}
                 externalHoverSelection={rolloutHoverSelection}

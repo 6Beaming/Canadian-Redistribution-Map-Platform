@@ -88,6 +88,8 @@ const BOUNDARY_OFF_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 
 
 const POSTAL_AREA_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>`;
 
+const RECENTER_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>`;
+
 const MAP_BOUNDARY_COLOR = "#243b6b";
 const TRANSPARENT_BOUNDARY_COLOR = "rgba(36, 59, 107, 0)";
 const FED_OUTLINE_HIDE_AT_ZOOM = 7;
@@ -243,6 +245,30 @@ function createPostalAreaControl(buttonRef, onActivate) {
       button.innerHTML = POSTAL_AREA_ICON;
       button.setAttribute("aria-label", "Center map on My Postal Area");
       button.title = "My Postal Area";
+      button.addEventListener("click", onActivate);
+
+      buttonRef.current = button;
+      container.appendChild(button);
+      return container;
+    },
+    onRemove() {
+      buttonRef.current = null;
+    }
+  };
+}
+
+function createRecenterControl(buttonRef, onActivate) {
+  return {
+    onAdd() {
+      const container = document.createElement("div");
+      container.className = "maplibregl-ctrl maplibregl-ctrl-group";
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "maplibregl-ctrl-icon map-recenter-btn";
+      button.innerHTML = RECENTER_ICON;
+      button.setAttribute("aria-label", "Return map to its default position");
+      button.title = "Re-center map";
       button.addEventListener("click", onActivate);
 
       buttonRef.current = button;
@@ -539,6 +565,7 @@ function buildWorkflowFocusExclusionFilter(dguids) {
 export function MapCanvas({
   isFullscreen = false,
   mapSearchTarget = null,
+  recenterTarget,
   highlightedProvincePrUid = null,
   postalAreaTarget = null,
   selection = null,
@@ -583,6 +610,9 @@ export function MapCanvas({
   const postalAreaMarkerRef = useRef(null);
   const fullscreenBtnRef = useRef(null);
   const boundaryBtnRef = useRef(null);
+  const recenterButtonRef = useRef(null);
+  const recenterControlRef = useRef(null);
+  const recenterTargetRef = useRef(recenterTarget);
   const postalAreaButtonRef = useRef(null);
   const postalAreaControlRef = useRef(null);
   const postalAreaTargetRef = useRef(postalAreaTarget);
@@ -637,6 +667,7 @@ export function MapCanvas({
   onDaSelectRef.current = onDaSelect;
   onFedSelectRef.current = onFedSelect;
   onStatusChangeRef.current = onStatusChange;
+  recenterTargetRef.current = recenterTarget;
   postalAreaTargetRef.current = postalAreaTarget;
   boundariesVisibleRef.current = boundariesVisible;
   heatmapEnabledRef.current = heatmapEnabled;
@@ -760,6 +791,52 @@ export function MapCanvas({
       setArchivedMapEnabled(false);
     }
   }, [archivedMap, mapReadyTick]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapReadyRef.current) return;
+
+    const available = recenterTarget !== undefined;
+
+    if (available && !recenterControlRef.current) {
+      const control = createRecenterControl(recenterButtonRef, () => {
+        const target = recenterTargetRef.current;
+        const coordinates = getMapTargetCoordinates(target);
+        const viewport = getMapTargetViewport(target);
+
+        if (viewport) {
+          map.fitBounds(viewport, {
+            ...getMapTargetFitBoundsOptions(target),
+            duration: 700,
+          });
+        } else if (coordinates) {
+          map.flyTo({
+            center: coordinates,
+            zoom: Number.isFinite(target?.zoom) ? target.zoom : 14,
+            duration: 700,
+          });
+        } else {
+          map.fitBounds(CANADA_DEFAULT_VIEW_BOUNDS, {
+            padding: 12,
+            duration: 700,
+          });
+        }
+
+        const destination = target?.label || "the Canada default view";
+        onStatusChangeRef.current?.(`Map returned to ${destination}.`);
+      });
+
+      map.addControl(control, "top-right");
+      recenterControlRef.current = control;
+      return;
+    }
+
+    if (!available && recenterControlRef.current) {
+      map.removeControl(recenterControlRef.current);
+      recenterControlRef.current = null;
+      recenterButtonRef.current = null;
+    }
+  }, [mapReadyTick, recenterTarget]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -2540,6 +2617,8 @@ export function MapCanvas({
       heatmapButtonRef.current = null;
       archivedMapControlRef.current = null;
       archivedMapButtonRef.current = null;
+      recenterControlRef.current = null;
+      recenterButtonRef.current = null;
       postalAreaControlRef.current = null;
       postalAreaButtonRef.current = null;
       postalAreaMarkerRef.current?.remove();

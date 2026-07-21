@@ -46,7 +46,7 @@ function createInitialObjectionWorkflow(overrides = {}) {
 }
 
 export default function UserHome({ mapSearchTarget = null }) {
-  const { user } = useAuth();
+  const { sessionStatus, user } = useAuth();
   const [status, setStatus] = useState("Loading map...");
   const [selection, setSelection] = useState(null);
   const [rolloutHoverSelection, setRolloutHoverSelection] = useState(null);
@@ -927,6 +927,7 @@ export default function UserHome({ mapSearchTarget = null }) {
               <MapCanvas
                 isFullscreen={isFullscreen}
                 mapSearchTarget={effectiveMapSearchTarget}
+                recenterTarget={sessionStatus === "signed-out" ? null : undefined}
                 postalAreaTarget={profileMapTarget}
                 selection={selection}
                 externalHoverSelection={rolloutHoverSelection}
