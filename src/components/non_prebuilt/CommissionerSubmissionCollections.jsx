@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardAccent,
   CardAction,
   CardContent,
   CardDescription,
@@ -24,7 +23,7 @@ const PANEL_COLLECTION_KEYS = {
 };
 
 const STATUS_STYLES = {
-  pending: "bg-yellow-100 text-yellow-700",
+  pending: "bg-amber-100 text-amber-800",
   "archive-request": "bg-blue-100 text-blue-700",
 };
 
@@ -60,12 +59,13 @@ function WorkspaceCardButton({ submissionId }) {
   const navigate = useNavigate();
   return (
     <Button
-      className="min-w-0 px-4 py-2 text-[13px]"
+      className="h-7 min-w-0 gap-1 border-[#d8e6fb] bg-white px-2 py-1 text-[11px] shadow-none hover:scale-100 hover:border-[#b7d0f8] hover:bg-[#f5f9ff] hover:shadow-none"
       size="sm"
       variant="outline"
+      type="button"
       onClick={() => navigate(`/dashboard/workspace?focus=${encodeURIComponent(submissionId)}`)}
     >
-      <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 20 20" fill="none">
+      <svg aria-hidden="true" className="h-3 w-3" viewBox="0 0 20 20" fill="none">
         <path d="M6 14L14 6M8 6H14V12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
       Workspace
@@ -133,22 +133,29 @@ export function CommissionerSubmissionCollections({ panelView, selection, profil
             <p className="map-info-panel__empty">No Submission Found</p>
           ) : null}
           {submissions.map((submission) => (
-            <Card key={submission.id} size="sm" className="max-w-none">
-              <CardHeader>
-                <div className="flex items-start justify-between gap-3">
-                  <CardAccent className="mt-2 shrink-0" />
+            <Card
+              key={submission.id}
+              size="sm"
+              className="flex max-w-none flex-col gap-2.5 p-3 hover:-translate-y-0.5 hover:bg-[#fbfdff] hover:shadow-[0_8px_24px_rgba(26,115,232,0.1)]"
+            >
+              <CardHeader className="gap-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[submission.status] ?? STATUS_STYLES.pending}`}>
+                    {submission.status === "archive-request" ? "Archive Request" : "Pending"}
+                  </span>
                   <CardAction className="shrink-0"><WorkspaceCardButton submissionId={submission.id} /></CardAction>
                 </div>
-                <div className="space-y-1">
-                  <CardTitle>{submission.title || "Untitled submission"}</CardTitle>
-                  <CardDescription>{submission.authorEmail || "Unknown submitter"}</CardDescription>
-                </div>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[submission.status]}`}>
-                  {submission.status === "archive-request" ? "Archive Request" : "Pending"}
-                </span>
-                <p className="text-[14px] leading-6 text-[#5f6368]">{submission.comment || "No submission content."}</p>
+              <CardContent className="gap-2">
+                <div className="space-y-0.5">
+                  <CardTitle className="text-base font-semibold leading-5 text-gray-900">
+                    {submission.title || "Untitled submission"}
+                  </CardTitle>
+                  <CardDescription className="break-all text-sm leading-5 text-gray-500">
+                    {submission.authorEmail || "Unknown submitter"}
+                  </CardDescription>
+                </div>
+                <p className="text-sm leading-5 text-gray-700">{submission.comment || "No submission content."}</p>
               </CardContent>
             </Card>
           ))}
