@@ -124,6 +124,24 @@ router.post("/", requirePublicUser, async (req, res) => {
   const { proposal_id, comment, fed_num, dguid, title, neighboring_dguid, type } = req.body;
   const user_id = req.user.id;
 
+  const dguids = [dguid, neighboring_dguid].filter(Boolean);
+
+  //add to dissemination area backend if doesnt already exist
+  const { error: daError } = await supabase
+    .from("dissemination_areas")
+    .upsert(
+      dguids.map((id) => ({
+        dguid: id
+      })),
+      {
+        onConflict: "dguid"
+      }
+    );
+
+  if (daError) {
+    return res.status(500).json({ error: daError.message });
+  }
+
   // Verify proposal exists
   if (proposal_id) {
     const { data: proposal, error: proposalError } = await supabase
