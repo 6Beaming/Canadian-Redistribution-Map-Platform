@@ -6,10 +6,13 @@ import {
   WorkflowActionFooter,
   workflowActionButtonClassName,
 } from "@/components/non_prebuilt/WorkflowActionFooter.jsx";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext.jsx";
 import { getDaPanelTitle } from "@/lib/map/profileUtils.js";
+import { submitCounterProposal } from "@/services/submissionsApi.js";
+import { toast } from "sonner";
 
 const SIGN_IN_NOTICE = "Please sign in to submit your counter-proposal.";
 const balancedActionButtonClassName = `${workflowActionButtonClassName} w-[calc(50%-0.25rem)] max-w-[188px] px-2 text-[13px]`;
@@ -317,15 +320,79 @@ export default function UserMakeCounterProposal({
   profilesByDguid,
   onBackStep,
   onConfirmEdit,
+  onSubmitSuccess,
 }) {
-  const { sessionStatus, user } = useAuth();
+  const { sessionStatus } = useAuth();
   const isSignedIn = sessionStatus === "signed-in";
+  const [title, setTitle] = useState("");
   const [proposalText, setProposalText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const step = workflow?.step ?? 1;
   const cache = workflow?.cache ?? null;
   const first = getDaDisplay(profilesByDguid, workflow?.firstDguid);
   const second = getDaDisplay(profilesByDguid, workflow?.secondDguid);
   const textFieldMessage = isSignedIn ? "" : SIGN_IN_NOTICE;
+  const hasGeometryIssues = Boolean(cache?.sourceGeometryIssues?.length);
+
+  async function handleSubmitCounterProposal() {
+    if (!isSignedIn || isSubmitting) {
+      return;
+    }
+
+    if (!title.trim()) {
+      toast.error("Counter-proposal title cannot be empty.", { duration: 1500 });
+      return;
+    }
+
+    if (!proposalText.trim()) {
+      toast.error("Counter-proposal description cannot be empty.", { duration: 1500 });
+      return;
+    }
+
+    if (!workflow?.firstDguid || !workflow?.secondDguid) {
+      toast.error("Select a DA pair before submitting.", { duration: 1500 });
+      return;
+    }
+
+    if (!cache?.currentFeatureCollection?.features?.length) {
+      toast.error("Edited boundary geometry is missing.", { duration: 1500 });
+      return;
+    }
+
+    if (hasGeometryIssues) {
+      toast.error("This DA pair cannot be submitted until geometry issues are resolved.", {
+        duration: 2000,
+      });
+      return;
+    }
+
+    const fedNum = profilesByDguid.get(workflow.firstDguid)?.fed_num ?? null;
+
+    setIsSubmitting(true);
+
+    try {
+      await submitCounterProposal({
+        title: title.trim(),
+        comment: proposalText.trim(),
+        fed_num: fedNum,
+        dguid: workflow.firstDguid,
+        neighboring_dguid: workflow.secondDguid,
+        proposed_geometry: cache.currentFeatureCollection,
+      });
+
+      setTitle("");
+      setProposalText("");
+      toast.success("Counter-proposal submitted successfully.", { duration: 1500 });
+      onSubmitSuccess?.();
+    } catch (error) {
+      console.error("Failed to submit counter-proposal:", error);
+      toast.error(error.message || "Failed to submit counter-proposal.", {
+        duration: 2500,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <section className="grid min-w-0 gap-3">
@@ -391,6 +458,23 @@ export default function UserMakeCounterProposal({
           />
 
           <div className="group/comment-control grid min-w-0 gap-2">
+            <Label htmlFor="counter-proposal-title">Title</Label>
+            <Input
+              className={
+                isSignedIn
+                  ? "min-w-0 bg-white text-[#3c4043]"
+                  : "min-w-0 cursor-not-allowed bg-gray-100 text-gray-500"
+              }
+              disabled={!isSignedIn || isSubmitting}
+              id="counter-proposal-title"
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="Enter a title for your counter-proposal."
+              value={title}
+            />
+            {textFieldMessage ? <FieldHoverHint message={textFieldMessage} /> : null}
+          </div>
+
+          <div className="group/comment-control grid min-w-0 gap-2">
             <Label htmlFor="counter-proposal-content">Description for the new boundary</Label>
             <Textarea
               className={
@@ -398,7 +482,7 @@ export default function UserMakeCounterProposal({
                   ? "min-h-32 w-full bg-white text-[#3c4043]"
                   : "min-h-32 w-full cursor-not-allowed bg-gray-100 text-gray-500"
               }
-              disabled={!isSignedIn}
+              disabled={!isSignedIn || isSubmitting}
               id="counter-proposal-content"
               onChange={(event) => setProposalText(event.target.value)}
               placeholder={
@@ -425,10 +509,11 @@ export default function UserMakeCounterProposal({
 
               <Button
                 className={balancedActionButtonClassName}
-                disabled={!isSignedIn}
+                disabled={!isSignedIn || isSubmitting || hasGeometryIssues}
                 type="button"
+                onClick={handleSubmitCounterProposal}
               >
-                Submit
+                {isSubmitting ? "Submitting..." : "Submit"}
               </Button>
             </WorkflowActionFooter>
             <SignInSubmissionNotice message={textFieldMessage} />

@@ -615,6 +615,12 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
     });
   }, []);
 
+  const handleCounterProposalSubmitSuccess = useCallback(() => {
+    clearCounterProposalStorage();
+    setCounterProposalWorkflow(createInitialCounterProposalWorkflow());
+    setSelection(null);
+  }, []);
+
   const handleCounterProposalSelectHandle = useCallback((handleId) => {
     setCounterProposalWorkflow((current) => {
       if (!current.cache) {
@@ -972,6 +978,7 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
             counterProposalWorkflow={counterProposalWorkflow}
             onCounterProposalBackStep={handleCounterProposalBackStep}
             onCounterProposalConfirmEdit={handleCounterProposalConfirmEdit}
+            onCounterProposalSubmitSuccess={handleCounterProposalSubmitSuccess}
             onRolloutHoverChange={handleRolloutHoverChange}
             onRolloutSelect={handleRolloutSelect}
           />

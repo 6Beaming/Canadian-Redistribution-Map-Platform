@@ -732,7 +732,7 @@ export default function CommissionerWorkspace() {
 
           {loadError ? (
             <p className="workspace-load-notice" role="alert">
-              Live submissions are unavailable; temporary counter-proposals remain visible.
+              Live submissions are unavailable. Check your commissioner session and try again.
             </p>
           ) : null}
 

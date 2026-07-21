@@ -179,8 +179,8 @@ export default function UserMakeObjection({
       });
     } catch (error) {
       console.error("Failed to submit objection:", error);
-      toast.error("Failed to submit objection.", {
-        duration: 1000,
+      toast.error(error.message || "Failed to submit objection.", {
+        duration: 2500,
       });
     }
   }

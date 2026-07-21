@@ -90,13 +90,19 @@ function normalizeSubmission(submission, source) {
 
 /**
  * REUSED API: live comments and objections are read through the existing
- * authenticated GET /api/comments route. No new backend endpoint is needed.
+ * authenticated GET /api/comments route. Counter-proposals are loaded from the
+ * dedicated submissions API so revision geometry is available for review.
  */
 async function loadLiveSubmissions() {
   try {
     const submissions = await getAllComments();
     return Array.isArray(submissions)
-      ? submissions.map((submission) => normalizeSubmission(submission, "supabase"))
+      ? submissions
+        .filter((submission) => {
+          const type = String(submission?.type ?? "").toLowerCase().replaceAll("_", "-");
+          return type !== "counter-proposal";
+        })
+        .map((submission) => normalizeSubmission(submission, "supabase"))
       : [];
   } catch (error) {
     console.warn("Workspace live submissions are unavailable.", error);
@@ -105,24 +111,22 @@ async function loadLiveSubmissions() {
 }
 
 /**
- * LOCAL TEMP DATA: counter-proposals are read from src/data/map/temp.json via
- * tempCounterProposal. Geometry is intentionally not hydrated for list pages.
+ * Persisted counter-proposals from GET /api/submissions/counter-proposals.
+ * Geometry is intentionally not hydrated for list pages.
  */
-function loadTemporaryCounterProposals() {
-  return getTemporaryCounterProposalSubmissions().map((submission) =>
-    normalizeSubmission(submission, "temporary-counter-proposal"),
+async function loadPersistedCounterProposals() {
+  return getTemporaryCounterProposalSubmissions().then((submissions) =>
+    submissions.map((submission) => normalizeSubmission(submission, "supabase")),
   );
 }
 
 /**
- * Transitional read model: combines protected Supabase submissions with local
- * Counter-Proposal fixtures. Replace the fixture branch with a repository API
- * when Counter-Proposal persistence is available.
+ * Combines protected Supabase feedback/objections with persisted counter-proposals.
  */
 export async function getWorkspaceSubmissions({ includeArchived = true } = {}) {
   const [liveSubmissions, counterProposals] = await Promise.all([
     loadLiveSubmissions(),
-    Promise.resolve(loadTemporaryCounterProposals()),
+    loadPersistedCounterProposals(),
   ]);
   const submissions = [...liveSubmissions, ...counterProposals]
     .filter((submission) => includeArchived || submission.status !== WORKSPACE_STATUS.ARCHIVED)

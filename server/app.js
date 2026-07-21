@@ -7,6 +7,7 @@ import authRouter from "./routes/auth.js";
 import commentsRouter from "./routes/comments.js";
 import commentTagsRouter from "./routes/commentTags.js";
 import workspaceRouter from "./routes/workspace.js";
+import submissionsRouter from "./routes/submissions.js";
 import { requireAuth } from "./middleware/requireAuth.js";
 
 
@@ -46,6 +47,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/comments", requireAuth, commentsRouter);
 app.use("/api/comment-tags", commentTagsRouter);
 app.use("/api/workspace", workspaceRouter);
+app.use("/api/submissions", requireAuth, submissionsRouter);
 
 mountMapApiService(app);
 

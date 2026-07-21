@@ -23,9 +23,7 @@ export default function DashBoardSubmissionsPage() {
             submittedBy: submission.profile?.email ?? "Unknown",
             type: submission.type,
             title: submission.title,
-            community_name:
-              submission.dissemination_areas?.community_name ??
-              (submission.source === "temporary-counter-proposal" ? "Yukon" : "Unknown"),
+            community_name: submission.dissemination_areas?.community_name ?? "Unknown",
             status: normalizeCommissionerStatus(submission.status),
           }))
 
