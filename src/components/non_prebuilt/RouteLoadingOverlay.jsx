@@ -9,7 +9,8 @@ const ROUTE_LOADING_DURATION_MS = Object.freeze({
   BRIEF: 300,
   STANDARD: 500,
   EXTENDED: 1000,
-  SUBMISSION_TABLE: 1500,
+  SUBMISSIONS: 2500,
+  WORKSPACE: 2500,
   MAP_HANDOFF: 2000,
 });
 
@@ -23,6 +24,12 @@ function isWorkspaceOrArchiveMapPath(pathname) {
     || /^\/dashboard\/archivedTree\/[^/]+\/difference$/.test(pathname);
 }
 
+function isSubmissionListPath(pathname) {
+  return pathname === "/submissions"
+    || pathname.startsWith("/submissions/")
+    || pathname === "/dashboard/submissionsTable";
+}
+
 function getRouteLoadingDuration(fromPathname, toPathname) {
   // Workspace and Archived Tree use this handoff both before returning to the
   // Commissioner map and when a tree/list item opens its MapCanvas review or
@@ -34,17 +41,16 @@ function getRouteLoadingDuration(fromPathname, toPathname) {
     return ROUTE_LOADING_DURATION_MS.MAP_HANDOFF;
   }
 
-  // The submissions table itself and its handoff into a Workspace review both
-  // use the longer table-transition treatment.
-  if (toPathname === "/dashboard/submissionsTable") {
-    return ROUTE_LOADING_DURATION_MS.SUBMISSION_TABLE;
+  // Public My Submissions and Commissioner User Submissions always use the
+  // same explicit list-loading treatment.
+  if (isSubmissionListPath(toPathname)) {
+    return ROUTE_LOADING_DURATION_MS.SUBMISSIONS;
   }
 
-  if (
-    fromPathname === "/dashboard/submissionsTable"
-    && toPathname.startsWith("/dashboard/workspace")
-  ) {
-    return ROUTE_LOADING_DURATION_MS.SUBMISSION_TABLE;
+  // Entering the Workspace tree uses a separate, equally long transition. Map
+  // review/difference child routes retain the dedicated 2000 ms map handoff.
+  if (toPathname === "/dashboard/workspace") {
+    return ROUTE_LOADING_DURATION_MS.WORKSPACE;
   }
 
   return 0;

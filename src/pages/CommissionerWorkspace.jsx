@@ -273,7 +273,14 @@ function SubmissionList({ branch, submissions, isOpen, onToggle, focusId, onSubm
   const focusedSubmission = focusId
     ? submissions.find((submission) => String(submission.id) === String(focusId))
     : null;
-  const displayedSubmissions = focusedSubmission ? [focusedSubmission] : submissions;
+  // A table-driven focus should bring the selected record to the top, not
+  // replace its branch. Keep the remaining records available through Show more.
+  const displayedSubmissions = focusedSubmission
+    ? [
+      focusedSubmission,
+      ...submissions.filter((submission) => String(submission.id) !== String(focusedSubmission.id)),
+    ]
+    : submissions;
   const visibleSubmissions = showAll
     ? displayedSubmissions
     : displayedSubmissions.slice(0, VISIBLE_LIST_ITEMS);
