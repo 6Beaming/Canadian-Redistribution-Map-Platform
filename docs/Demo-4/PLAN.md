@@ -19,40 +19,9 @@ Demo 4 is complete only when:
 5. Counter-Proposal editing is local-first, smooth during dragging, and server-validated only at commit.
 6. Export, archive recovery, and Statistics data have explicit authorization and versioned contracts.
 
-## 2. Priority Model
+## 2. Target Data Architecture
 
-### Priority 1 — broken, disconnected, or non-persistent data flows
-
-These tasks must be completed before UX polish:
-
-- Objection snapshot persistence and detail replay;
-- unified submission projections and pagination;
-- Workspace comments, labels, archive requests, assignees, and votes in Supabase;
-- Counter-Proposal revision lifecycle and atomic archive snapshots;
-- Public status projection and Commissioner province authorization;
-- capability validation for all Enabled FEDs;
-- old relationship-route and RLS/authentication cleanup;
-- migration, RPC, constraint, and policy deployment verification.
-
-### Priority 2 — UI and performance improvements
-
-- progressive first-page loading and cursor pagination;
-- local-first Counter-Proposal handles, worker validation, and draft caching;
-- removal of rollout blinking and repeated feature-state writes;
-- Submission Table and Archived Tree export;
-- Workspace/Archived Tree navigation corrections;
-- remaining map, status, loading, and responsive UX issues.
-
-### Priority 3 — Statistics and small follow-up issues
-
-- Statistics Canada demographic ingestion and a DA Statistics endpoint;
-- source, year, suppression, and missing-value presentation;
-- new manual UI/UX regression fixes discovered after the data-flow refactor;
-- refresh the Demo 3 documentation only after the new contracts stabilize.
-
-## 3. Target Data Architecture
-
-### 3.1 Submission projection versus geometry detail
+### 2.1 Submission projection versus geometry detail
 
 All three submission types must use the following two-layer read model.
 
@@ -93,7 +62,7 @@ revision
   created_by, created_at
 ```
 
-### 3.2 Objection schema
+### 2.2 Objection schema
 
 Add an `objection_revisions` table, or an equivalent strongly constrained snapshot extension, containing:
 
@@ -113,7 +82,7 @@ created_at timestamptz
 
 The first Objection write must be a server transaction: validate both DGUIDs from the local map authority, verify adjacency, construct the canonical pair snapshot, and insert the submission plus revision. The browser sends DGUIDs and text but is never the persisted geometry authority.
 
-### 3.3 Counter-Proposal schema
+### 2.3 Counter-Proposal schema
 
 Keep `counter_proposal_revisions`, but add or verify:
 
@@ -125,7 +94,7 @@ Keep `counter_proposal_revisions`, but add or verify:
 
 The existing list route must select revision metadata only. A detail route selects full geometry.
 
-### 3.4 Workspace tables
+### 2.4 Workspace tables
 
 Connect the existing tables through Commissioner-only server routes:
 
@@ -138,9 +107,9 @@ Connect the existing tables through Commissioner-only server routes:
 
 Emails are display projections. Identity, assignees, votes, and authorization use profile UUIDs.
 
-## 4. Target API and Service Architecture
+## 3. Target API and Service Architecture
 
-### 4.1 Submission routes
+### 3.1 Submission routes
 
 Add a dedicated repository-backed router, preferably `server/routes/submissions.js` plus `server/lib/submissions/` domain modules:
 
@@ -165,7 +134,7 @@ Rules:
 
 The current `server/routes/comments.js` generic route can remain temporarily for feedback compatibility, but Objection writes must move to the dedicated route. `src/services/commentsApi.js` should expose separate `getPublicSubmissions`, `getCommissionerSubmissions`, `getSubmissionDetail`, and `submitObjection` methods instead of making one service represent every flow.
 
-### 4.2 Capability and province authorization
+### 3.2 Capability and province authorization
 
 Add a local-authority capability service:
 
@@ -200,7 +169,7 @@ Do not add a Yukon-only special case. If a non-Yukon Enabled FED is unavailable,
 
 Commissioner province scope must be derived from the authenticated profile and canonical `PRUID`, not from a browser parameter. Apply it to map hit testing, submissions, Workspace, Archive, heatmap, detail, and exports. Same-province cross-FED pairs remain possible; cross-province pairs are rejected.
 
-### 4.3 Workspace API
+### 3.3 Workspace API
 
 Extend `server/routes/workspace.js` with authenticated Commissioner endpoints:
 
@@ -221,7 +190,7 @@ POST   /api/workspace/archive-requests/:submissionId/votes
 
 Replace localStorage functions in `src/services/tempWorkspace.js` with `src/services/workspaceApi.js`, retaining a short compatibility facade only while components migrate.
 
-### 4.4 Archive API
+### 3.4 Archive API
 
 Keep the existing merge/revert routes, but change archive merge to accept an explicit source revision and include that revision’s immutable geometry in `submission_snapshot`. Add:
 
@@ -232,7 +201,7 @@ POST/PATCH /api/workspace/archive/restore-request   # if policy requires approva
 
 Replace permanent delete with a tombstone operation. At minimum record `deleted_at`, `deleted_by`, and `delete_reason`; ideally retain all versions and expose a recovery operation.
 
-### 4.5 Frontend services and query cache
+### 3.5 Frontend services and query cache
 
 Introduce the following structure:
 
@@ -251,9 +220,9 @@ src/lib/query/
 
 If a query library is not introduced, implement a small in-memory cache with request de-duplication, cursor keys, and explicit invalidation after writes. Do not use localStorage for shared server state.
 
-## 5. Progressive Loading and UX Plan
+## 4. Progressive Loading and UX Plan
 
-### 5.1 Tables and Workspace
+### 4.1 Tables and Workspace
 
 Replace browser-only React Table pagination with cursor pagination:
 
@@ -265,7 +234,7 @@ Replace browser-only React Table pagination with cursor pagination:
 
 The UI should render the first response immediately, prefetch the next cursor opportunistically, and show an inline branch loading indicator rather than blocking the whole page.
 
-### 5.2 Counter-Proposal local-first editing
+### 4.2 Counter-Proposal local-first editing
 
 Current `src/pages/UserHome.jsx` already loads local metadata and uses `requestAnimationFrame`; the next implementation must separate rendering from validation:
 
@@ -287,11 +256,11 @@ Likely files:
 - `src/components/non_prebuilt/MapCanvas.jsx` — source updates without full layer rebuild;
 - `src/services/counterProposalApi.js` — final upload only.
 
-### 5.3 Rollout toggle
+### 4.3 Rollout toggle
 
 `MapCanvas.jsx` currently loops through rollout areas and periodically updates `blinkHidden` feature state. Remove the interval blink. Precompute immutable Enabled/Data Blocked sets and use a single layer filter or paint expression. Toggle should update one presentation mode and necessary layer opacity/filter values. If a visual transition is desired, animate the control button with CSS rather than repeatedly repainting all FED features.
 
-## 6. Export Plan
+## 5. Export Plan
 
 Implement server-side streaming exports:
 
@@ -309,7 +278,7 @@ Likely files:
 - `src/pages/DashboardSubmissionsTable/SubmissionsTable.jsx`;
 - `src/pages/ArchivedTree.jsx`.
 
-## 7. Public Status Contract
+## 6. Public Status Contract
 
 The Public API must expose `public_status`, not raw Commissioner workflow status:
 
@@ -321,7 +290,7 @@ rejected                  -> rejected
 
 `MySubmissions.jsx` should render only this projection. Public users must not see internal Archive Tree state or be sent to Archived Tree. Commissioner views continue to receive the internal status and archive controls.
 
-## 8. Archived Tree Navigation
+## 7. Archived Tree Navigation
 
 Update:
 
@@ -332,7 +301,7 @@ Update:
 
 No deep link should fall back to the Dashboard map when the logical parent is Workspace.
 
-## 9. Demographic Statistics Plan
+## 8. Demographic Statistics Plan
 
 Use Statistics Canada’s 2021 Census Profile Web Data Service (SDMX REST) as the authoritative source:
 
@@ -358,7 +327,7 @@ server/lib/demographics/statisticsCanada.js
 src/services/demographicsApi.js
 ```
 
-## 10. Security, Migration, and Deployment Checklist
+## 9. Security, Migration, and Deployment Checklist
 
 Before enabling the new routes:
 
@@ -370,7 +339,7 @@ Before enabling the new routes:
 6. Keep service-role credentials server-only and keep `.env` out of version control.
 7. Add migration smoke tests against a disposable Supabase database or SQL Editor verification checklist.
 
-## 11. Test and Acceptance Plan
+## 10. Test and Acceptance Plan
 
 ### API and database tests
 
@@ -404,16 +373,54 @@ npm run build
 git diff --check
 ```
 
-## 12. Delivery Sequence
+## 11. Implementation Checkpoints
 
-1. Freeze and verify the Supabase schema and RLS/RPC deployment.
-2. Add Objection snapshot schema and dedicated write/detail endpoints.
-3. Introduce the unified submission projection/detail repository and cursor pagination.
-4. Migrate Public, Commissioner, Workspace, InfoPanel, and heatmap consumers.
-5. Connect Workspace collaboration tables and add server-side province/status projections.
-6. Complete Counter-Proposal revisions, archive geometry snapshots, and capability checks for all Enabled FEDs.
-7. Add Realtime or controlled invalidation and remove duplicate full-list requests.
-8. Refactor Counter-Proposal handles, worker validation, draft caching, and rollout toggle rendering.
-9. Add exports and correct Archived Tree navigation.
-10. Ingest Statistics Canada demographics and add the read-only DA Statistics API.
-11. Run the full acceptance suite, verify production migrations, and only then update Demo 3 historical documentation if required.
+Priority is intentionally embedded in these checkpoints. A later checkpoint must not be treated as complete when its prerequisite checkpoint has unresolved data-contract or authorization failures.
+
+### Checkpoint 1 — P1: Freeze the database contract and security boundary
+
+Apply and verify migrations for Objection revisions, Counter-Proposal revision metadata, Workspace tables, archive fields, constraints, indexes, grants, RPCs, and RLS policies. Remove obsolete DGUID foreign-key assumptions and repair the stale `profiles!submissions_user_id_fkey` relationship route. Confirm that service-role credentials remain server-only.
+
+**Exit criteria:** the target Supabase project has an auditable schema, each new table has an explicit browser/server access boundary, and migration smoke tests pass.
+
+### Checkpoint 2 — P1: Make all submission geometry immutable and separate list/detail reads
+
+Create `objection_revisions`, add the missing Counter-Proposal lifecycle fields, and implement transactional create/detail routes. Introduce the shared projection repository and cursor-based list endpoints so tables, Workspace, InfoPanel, and heatmap never retrieve GeoJSON. Validate all writes against the local map authority and preserve baseline revision references.
+
+**Exit criteria:** Objection and Counter-Proposal detail pages replay their submitted geometry after local assets change; no list response contains full geometry.
+
+### Checkpoint 3 — P1: Replace transitional Workspace state and enforce identity scope
+
+Replace `tempWorkspace.js` browser persistence with `workspaceApi.js` and durable comments, labels, archive requests, assignees, votes, and summaries. Add role, ownership, public-status, and Commissioner province checks to submissions, Workspace, Archive, map capability, heatmap, and export routes. Test every Enabled FED capability rather than retaining any Yukon-only behavior.
+
+**Exit criteria:** two Commissioners can observe the same Workspace state, public users see only their own projected status, and a Commissioner cannot query another province.
+
+### Checkpoint 4 — P1: Finish Counter-Proposal revision and archive integrity
+
+Complete server-validated Counter-Proposal revision creation, select an explicit source revision during merge, and atomically copy it into `archive_tree.submission_snapshot`. Add controlled invalidation or Realtime for shared writes, retain recoverable archive tombstones, and ensure archived detail/history uses immutable snapshots.
+
+**Exit criteria:** revisions, merge, revert, and recovery preserve a complete audit trail without relying on browser state.
+
+### Checkpoint 5 — P2: Deliver progressive list, Workspace, and navigation UX
+
+Move public and Commissioner tables to first-page cursor loading; request Workspace branch counts plus only the initial visible rows; make `Show more` fetch the next branch cursor. Add projection-level query caching and remove duplicate full-list requests. Correct Archived Tree and difference-page back navigation, then implement scoped CSV exports.
+
+**Exit criteria:** the first useful content appears without waiting for the full dataset, branch expansion remains functional, and exports obey the same authorization filters as the UI.
+
+### Checkpoint 6 — P2: Refactor Counter-Proposal editing and map presentation
+
+Use uniformly sampled UI handles, locked endpoints, local-first drafts, worker-based JSTS/impact validation, and final server validation only on commit. Update MapLibre source data without rebuilding layers. Replace rollout blinking/feature-state loops with stable filters or paint expressions, then complete responsive, loading, status, and remaining map UX regression fixes.
+
+**Exit criteria:** dragging is responsive on complex boundaries, invalid positions revert predictably, and the Enabled/Data Blocked toggle does not visibly blink or stall.
+
+### Checkpoint 7 — P3: Add demographics and presentation metadata
+
+Build the versioned Statistics Canada ETL and DA statistics API, then render demographic source, census year, suppression, and missing-value states in `UserViewStatistics.jsx`. Resolve smaller UI/UX regressions discovered after the P1/P2 architecture is stable.
+
+**Exit criteria:** Statistics are served from the project data store rather than per-click external calls, and every shown value is attributable to a source and vintage.
+
+### Checkpoint 8 — Release verification and documentation synchronization
+
+Run the API/database and frontend acceptance suite in Section 10, verify production migrations and policies, and refresh Demo 3 historical documentation only when the new contracts are deployed and stable.
+
+**Exit criteria:** `npm run check:server`, tests, build, and `git diff --check` pass; production configuration has been verified by the project owner.
