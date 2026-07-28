@@ -21,7 +21,7 @@ import {
   subscribeWorkspaceState,
   updateWorkspaceArchiveAssignees,
   WORKSPACE_STATUS,
-} from "@/services/tempWorkspace.js";
+} from "@/services/workspaceApi.js";
 
 const DEFAULT_LABELS = [
   { id: "constructive", name: "Constructive", color: "#1f9d62", custom: false },
@@ -93,7 +93,7 @@ function SubmissionSelector({ submissions, activeId, onSelect }) {
   );
 }
 
-function LabelEditor({ submissionId, selectedLabels, savedCatalog = [], onChange }) {
+function LabelEditor({ submissionId, selectedLabels = [], savedCatalog = [], onChange }) {
   const [isOpen, setIsOpen] = useState(false);
   const [catalog, setCatalog] = useState(() =>
     savedCatalog.length ? savedCatalog : [...DEFAULT_LABELS, ...CUSTOM_LABELS],
@@ -254,7 +254,7 @@ function CommentThread({ submissionId, comments, reviewerEmail, onChange, readOn
     event.preventDefault();
     const content = draft.trim();
     if (!content) return;
-    addWorkspaceComment(submissionId, { email: reviewerEmail, content });
+    addWorkspaceComment(submissionId, { content });
     setDraft("");
     onChange();
   }
@@ -460,6 +460,8 @@ function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, o
   );
 }
 
+
+
 export function WorkspaceReviewPanel({
   submission,
   siblingSubmissions,
@@ -467,13 +469,34 @@ export function WorkspaceReviewPanel({
   onCommitted,
   reviewerEmails: availableReviewerEmails = [],
 }) {
+
+  const EMPTY_REVIEW = {
+    comments: [],
+    labels: [],
+    labelCatalog: [],
+    archiveRequest: null,
+  };
+
   const { user } = useAuth();
   const reviewerEmail = user?.email || "commissioner@example.com";
   const reviewerEmails = [...new Set([reviewerEmail, ...availableReviewerEmails])];
-  const [review, setReview] = useState(() => getWorkspaceReviewState(submission.id));
+  const [review, setReview] = useState(EMPTY_REVIEW);
 
-  function refreshReview() {
-    setReview(getWorkspaceReviewState(submission.id));
+  async function refreshReview() {
+    try {
+      const nextReview = await getWorkspaceReviewState(submission.id);
+
+      setReview({
+        comments: nextReview.comments ?? [],
+        labels: nextReview.labels ?? [],
+        labelCatalog: nextReview.labelCatalog ?? [],
+        archiveRequest: nextReview.archiveRequest ?? [],
+      });
+    } catch (error) {
+      console.error("Unable to load workspace review:", error);
+
+      setReview(EMPTY_REVIEW);
+    }
   }
 
   useEffect(() => {

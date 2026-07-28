@@ -45,8 +45,8 @@ app.use("/api/auth", authRouter);
 // All submission routes require a verified session. commentsRouter applies the
 // role-specific public/commissioner safeguard to each individual operation.
 app.use("/api/comments", requireAuth, commentsRouter);
-app.use("/api/comment-tags", commentTagsRouter);
-app.use("/api/workspace", workspaceRouter);
+app.use("/api/comment-tags",requireAuth, commentTagsRouter);
+app.use("/api/workspace", requireAuth, workspaceRouter);
 app.use("/api/submissions", requireAuth, submissionsRouter);
 
 mountMapApiService(app);

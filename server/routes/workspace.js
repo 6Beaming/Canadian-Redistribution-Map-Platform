@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   getSupabaseAdminDataClient,
+  getSupabaseClient,
   getSupabaseProfileEmailsAsAdmin,
 } from "../lib/supabase.js";
 import { requireAuth } from "../middleware/requireAuth.js";
@@ -151,3 +152,298 @@ router.delete("/archive/branch", async (req, res) => {
 });
 
 export default router;
+
+// Add a workspace comment to a user submission
+router.post("/comments/", async (req, res) => {
+
+
+  const supabase = getSupabaseClient();
+  const user_id = req.user.id;
+  const { submissionId, content, action, is_closing } = req.body;
+
+  // Verify comment exists
+  const { data: submission, error: submissionError } = await supabase
+    .from("submissions")
+    .select("id")
+    .eq("id", submissionId)
+    .single();
+
+
+  if (submissionError || !submission) {
+    return res.status(404).json({ error: "Submission not found." });
+  }
+
+  const { data, error } = await supabase
+    .from("workspace_comments")
+    .insert([{
+      submission_id: submissionId,
+      author_id: user_id,
+      content: content,
+      action: action,
+      is_closing: is_closing
+    }])
+    .select()
+    .single();
+
+  if (error) {
+    return res.status(500).json({ error: "unable to add workspace comment" });
+  }
+
+  return res.status(201).json(data);
+});
+
+
+// Get workspace comments for a submission
+router.get("/comments/:submissionId", async (req, res) => {
+  const supabase = getSupabaseClient();
+  const { submissionId } = req.params;
+
+  const { data, error } = await supabase
+    .from("workspace_comments")
+    .select(`
+    id,
+    content,
+    action,
+    is_closing,
+    created_at,
+    author_id,
+    profiles!author_id (
+      email
+    )
+  `)
+    .eq("submission_id", submissionId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return res.status(500).json({
+      error: "Unable to get workspace comments."
+    });
+  }
+
+  const comments = data.map((comment) => ({
+    id: comment.id,
+    content: comment.content,
+    action: comment.action,
+    isClosing: comment.is_closing,
+    createdAt: comment.created_at,
+    email: comment.profiles?.email ?? "Unknown",
+  }));
+
+  return res.status(200).json(comments);
+});
+
+// Save workspace labels for a submission
+router.post("/labels/:submissionId", async (req, res) => {
+  const supabase = getSupabaseClient();
+  const { submissionId } = req.params;
+  const { labels } = req.body;
+  const user_id = req.user.id;
+
+
+  const { data: submission, error: submissionError } = await supabase
+    .from("submissions")
+    .select("id")
+    .eq("id", submissionId)
+    .single();
+
+
+  if (submissionError || !submission) {
+    return res.status(404).json({
+      error: "Submission not found."
+    });
+  }
+
+  // remove old labels
+  await supabase
+    .from("workspace_labels")
+    .delete()
+    .eq("submission_id", submissionId);
+
+
+  if (!labels || labels.length === 0) {
+    return res.status(201).json([]);
+  }
+
+
+  const rows = labels.map((label) => ({
+    submission_id: submissionId,
+    name: label.name,
+    color: label.color,
+    is_custom: label.custom,
+    updated_by: user_id,
+  }));
+
+
+  const { data, error } = await supabase
+    .from("workspace_labels")
+    .insert(rows)
+    .select();
+
+
+  if (error) {
+    return res.status(500).json({
+      error: "Unable to save workspace labels."
+    });
+  }
+
+
+  return res.status(201).json(data);
+});
+
+// Get labels for a submission
+router.get("/labels/:submissionId", async (req, res) => {
+  const supabase = getSupabaseClient();
+  const { submissionId } = req.params;
+
+
+  const { data, error } = await supabase
+    .from("workspace_labels")
+    .select("*")
+    .eq("submission_id", submissionId);
+
+
+  if (error) {
+    return res.status(500).json({
+      error: "Unable to get workspace labels."
+    });
+  }
+
+
+  const labels = data.map((label) => ({
+    id: label.label_id,
+    name: label.name,
+    color: label.color,
+    custom: label.custom
+  }));
+
+
+  return res.status(200).json(labels);
+});
+
+// Create archive request
+router.post("/archive-requests/:submissionId", async (req, res) => {
+  const supabase = getSupabaseClient();
+  const user_id = req.user.id;
+
+  const { submissionId } = req.params;
+  const { assignees } = req.body;
+
+
+  const { data: submission } = await supabase
+    .from("submissions")
+    .select("id")
+    .eq("id", submissionId)
+    .single();
+
+
+  if (!submission) {
+    return res.status(404).json({
+      error: "Submission not found."
+    });
+  }
+
+
+  const { data, error } = await supabase
+    .from("workspace_archive_requests")
+    .insert({
+      submission_id: submissionId,
+      requester_id: user_id,
+      assignee_ids: assignees,
+      votes: {
+        [user_id]: "accepted"
+      }
+    })
+    .select()
+    .single();
+
+
+  if (error) {
+    return res.status(500).json({
+      error: "Unable to create archive request."
+    });
+  }
+
+
+  return res.status(201).json(data);
+});
+
+
+
+// Get archive request
+router.get("/archive-requests/:submissionId", async (req, res) => {
+
+  const supabase = getSupabaseClient();
+  const { submissionId } = req.params;
+
+
+  const { data, error } = await supabase
+    .from("workspace_archive_requests")
+    .select(`
+      *,
+      profiles!requester_id(
+        email
+      )
+    `)
+    .eq("submission_id", submissionId)
+    .maybeSingle();
+
+
+  if (error) {
+    return res.status(404).json(null);
+  }
+
+  // No archive request exists yet
+  if (!data) {
+    return res.status(200).json(null);
+  }
+
+  return res.status(200).json({
+    requesterEmail: data.profiles?.email ?? null,
+    assignees: data.assignees ?? [],
+    votes: data.votes ?? {},
+    createdAt: data.created_at
+  });
+});
+
+// A commissioner votes for an archive request
+router.patch("/archive-requests/:submissionId/vote", async (req, res) => {
+  const supabase = getSupabaseClient();
+  const user_id = req.user.id;
+
+  const { submissionId } = req.params;
+  const { vote } = req.body;
+
+  const { data: request, error } = await supabase
+    .from("workspace_archive_requests")
+    .select("votes")
+    .eq("submission_id", submissionId)
+    .single();
+
+  if (error || !request) {
+    return res.status(404).json({
+      error: "Archive request not found."
+    });
+  }
+
+  const updatedVotes = {
+    ...(request.votes ?? {}),
+    [user_id]: vote
+  };
+
+  const { data, error: updateError } = await supabase
+    .from("workspace_archive_requests")
+    .update({
+      votes: updatedVotes
+    })
+    .eq("submission_id", submissionId)
+    .select()
+    .single();
+
+  if (updateError) {
+    return res.status(500).json({
+      error: "Unable to update vote."
+    });
+  }
+
+  return res.status(200).json(data);
+});
