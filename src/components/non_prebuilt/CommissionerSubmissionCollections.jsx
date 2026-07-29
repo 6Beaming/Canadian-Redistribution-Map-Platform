@@ -14,7 +14,7 @@ import { getDaPanelTitle, getDaPopulationDisplay } from "@/lib/map/profileUtils.
 import {
   getDashboardSubmissionsForDguid,
   subscribeWorkspaceState,
-} from "@/services/tempWorkspace.js";
+} from "@/services/workspaceApi.js";
 
 const PANEL_COLLECTION_KEYS = {
   comments: "comments",

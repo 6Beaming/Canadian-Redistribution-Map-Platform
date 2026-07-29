@@ -17,7 +17,7 @@ import {
 import {
   getWorkspaceSubmissions,
   subscribeWorkspaceState,
-} from "@/services/tempWorkspace.js";
+} from "@/services/workspaceApi.js";
 import "@/styles/workspace.css";
 
 const VISIBLE_LIST_ITEMS = 3;

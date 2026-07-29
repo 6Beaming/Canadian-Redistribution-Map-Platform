@@ -1,6 +1,6 @@
 import { buildArchiveTree } from "@/lib/archiveTree.js";
 import { hydrateWorkspaceSubmission } from "@/services/tempCounterProposal.js";
-import { getArchiveTreeRecords } from "@/services/tempWorkspace.js";
+import { getArchiveTreeRecords } from "@/services/workspaceApi";
 
 const EMPTY_FEATURE_COLLECTION = Object.freeze({ type: "FeatureCollection", features: [] });
 const ARCHIVED_MAP_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="12" r="2"/><path d="M8 5h2a4 4 0 0 1 4 4v1"/><path d="M8 19h2a4 4 0 0 0 4-4v-1"/><path d="M14 12h2"/></svg>`;

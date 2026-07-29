@@ -21,21 +21,7 @@ import {
   subscribeWorkspaceState,
   updateWorkspaceArchiveAssignees,
   WORKSPACE_STATUS,
-} from "@/services/tempWorkspace.js";
-
-const DEFAULT_LABELS = [
-  { id: "constructive", name: "Constructive", color: "#1f9d62", custom: false },
-  { id: "worth-to-achieve", name: "Worth to Achieve", color: "#2878d0", custom: false },
-  { id: "discussion-required", name: "Discussion Required", color: "#d59a00", custom: false },
-  { id: "negligible", name: "Negligible", color: "#ea7a1f", custom: false },
-  { id: "over-aggressive", name: "Over Aggressive", color: "#df3d4b", custom: false },
-];
-
-const CUSTOM_LABELS = [
-  { id: "custom-cyan", name: "", color: "#0891b2", custom: true },
-  { id: "custom-pink", name: "", color: "#db5ca4", custom: true },
-  { id: "custom-purple", name: "", color: "#805ad5", custom: true },
-];
+} from "@/services/workspaceApi.js";
 
 function formatTimestamp(value) {
   const date = new Date(value);
@@ -93,15 +79,13 @@ function SubmissionSelector({ submissions, activeId, onSelect }) {
   );
 }
 
-function LabelEditor({ submissionId, selectedLabels, savedCatalog = [], onChange }) {
+function LabelEditor({ submissionId, selectedLabels = [], savedCatalog = [], onChange }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [catalog, setCatalog] = useState(() =>
-    savedCatalog.length ? savedCatalog : [...DEFAULT_LABELS, ...CUSTOM_LABELS],
-  );
+  const [catalog, setCatalog] = useState(savedCatalog);
 
   useEffect(() => {
-    setCatalog(savedCatalog.length ? savedCatalog : [...DEFAULT_LABELS, ...CUSTOM_LABELS]);
-  }, [savedCatalog, submissionId]);
+    setCatalog(savedCatalog);
+  }, [savedCatalog]);
 
   function persist(nextLabels) {
     saveWorkspaceLabels(submissionId, nextLabels);
@@ -122,10 +106,15 @@ function LabelEditor({ submissionId, selectedLabels, savedCatalog = [], onChange
     const nextCatalog = catalog.map((label) =>
       label.id === id ? { ...label, name } : label,
     );
+
     setCatalog(nextCatalog);
-    saveWorkspaceLabelCatalog(submissionId, nextCatalog);
+
     if (selectedLabels.some((label) => label.id === id)) {
-      persist(selectedLabels.map((label) => (label.id === id ? { ...label, name } : label)));
+      persist(
+        selectedLabels.map((label) =>
+          label.id === id ? { ...label, name } : label
+        )
+      );
     }
   }
 
@@ -143,8 +132,8 @@ function LabelEditor({ submissionId, selectedLabels, savedCatalog = [], onChange
         </button>
       </div>
       <div className="workspace-labels">
-        {selectedLabels.length ? selectedLabels.map((label) => (
-          <span key={label.id} style={{ "--label-color": label.color }}>
+        {selectedLabels.length ? selectedLabels.map((label, index) => (
+          <span key={label.id ?? `${label.name}-${index}`} style={{ "--label-color": label.color }}>
             {label.name}
             <button type="button" aria-label={`Remove ${label.name}`} onClick={() => toggleLabel(label)}>
               <X aria-hidden="true" />
@@ -154,10 +143,10 @@ function LabelEditor({ submissionId, selectedLabels, savedCatalog = [], onChange
       </div>
       {isOpen ? (
         <div className="workspace-label-picker">
-          {catalog.map((label) => {
+          {catalog.map((label, index) => {
             const checked = selectedLabels.some((entry) => entry.id === label.id);
             return (
-              <div className="workspace-label-picker__row" key={label.id}>
+              <div className="workspace-label-picker__row" key={label.id ?? `${label.name}-${index}`}>
                 <button
                   type="button"
                   aria-pressed={checked}
@@ -254,7 +243,7 @@ function CommentThread({ submissionId, comments, reviewerEmail, onChange, readOn
     event.preventDefault();
     const content = draft.trim();
     if (!content) return;
-    addWorkspaceComment(submissionId, { email: reviewerEmail, content });
+    addWorkspaceComment(submissionId, { content });
     setDraft("");
     onChange();
   }
@@ -370,12 +359,24 @@ function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, o
     if (request?.assignees) setAssignees(request.assignees);
   }, [request?.assignees]);
 
-  function toggleAssignee(email, checked) {
+  async function toggleAssignee(email, checked) {
     const nextAssignees = checked
       ? [...new Set([...assignees, email])]
       : assignees.filter((entry) => entry !== email);
+
     setAssignees(nextAssignees);
-    updateWorkspaceArchiveAssignees(submission.id, reviewerEmail, nextAssignees);
+
+    try {
+      await updateWorkspaceArchiveAssignees(
+        submission.id,
+        nextAssignees
+      );
+
+      onCommitted("archive-update-assignees");
+    } catch (error) {
+      console.error(error);
+      setError(error.message);
+    }
   }
 
   async function runAction(action) {
@@ -412,7 +413,7 @@ function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, o
               <input
                 type="checkbox"
                 checked={assignees.includes(email)}
-                onChange={(event) => toggleAssignee(email, event.target.checked)}
+                onChange={(event) => void toggleAssignee(email, event.target.checked)}
               />
               {email}
             </label>
@@ -460,6 +461,8 @@ function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, o
   );
 }
 
+
+
 export function WorkspaceReviewPanel({
   submission,
   siblingSubmissions,
@@ -467,13 +470,34 @@ export function WorkspaceReviewPanel({
   onCommitted,
   reviewerEmails: availableReviewerEmails = [],
 }) {
+
+  const EMPTY_REVIEW = {
+    comments: [],
+    labels: [],
+    labelCatalog: [],
+    archiveRequest: null,
+  };
+
   const { user } = useAuth();
   const reviewerEmail = user?.email || "commissioner@example.com";
   const reviewerEmails = [...new Set([reviewerEmail, ...availableReviewerEmails])];
-  const [review, setReview] = useState(() => getWorkspaceReviewState(submission.id));
+  const [review, setReview] = useState(EMPTY_REVIEW);
 
-  function refreshReview() {
-    setReview(getWorkspaceReviewState(submission.id));
+  async function refreshReview() {
+    try {
+      const nextReview = await getWorkspaceReviewState(submission.id);
+
+      setReview({
+        comments: nextReview.comments ?? [],
+        labels: nextReview.labels ?? [],
+        labelCatalog: nextReview.labelCatalog ?? [],
+        archiveRequest: nextReview.archiveRequest ?? [],
+      });
+    } catch (error) {
+      console.error("Unable to load workspace review:", error);
+
+      setReview(EMPTY_REVIEW);
+    }
   }
 
   useEffect(() => {

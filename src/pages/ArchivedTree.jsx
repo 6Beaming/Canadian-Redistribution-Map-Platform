@@ -14,7 +14,7 @@ import {
   deleteArchiveBranch,
   getArchiveTreeRecords,
   revertArchiveBranch,
-} from "@/services/tempWorkspace.js";
+} from "@/services/workspaceApi.js";
 import "@/styles/archive-tree.css";
 
 export default function ArchivedTree() {

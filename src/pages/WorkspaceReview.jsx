@@ -10,7 +10,7 @@ import {
   getWorkspaceSubmissions,
   getWorkspaceReviewerEmails,
   normalizeWorkspaceStatus,
-} from "@/services/tempWorkspace.js";
+} from "@/services/workspaceApi";
 import "@/styles/map.css";
 import "@/styles/workspace-review.css";
 
