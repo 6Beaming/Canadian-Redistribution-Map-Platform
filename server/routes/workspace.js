@@ -323,8 +323,8 @@ router.get("/labels/:submissionId", async (req, res) => {
 // Create archive request
 router.post("/archive-requests/:submissionId", async (req, res) => {
   const supabase = getSupabaseClient();
-  const user_id = req.user.id;
 
+  const requesterId = req.user.id;
   const { submissionId } = req.params;
   const { assignees } = req.body;
 
@@ -343,14 +343,43 @@ router.post("/archive-requests/:submissionId", async (req, res) => {
   }
 
 
+  // Convert assignee emails -> profile UUIDs
+  const normalizedEmails = [
+    ...new Set(
+      (assignees ?? [])
+        .map((email) => String(email).trim())
+        .filter(Boolean)
+    )
+  ];
+
+
+  const { data: profiles, error: profileError } = await supabase
+    .from("profiles")
+    .select("id,email")
+    .in("email", normalizedEmails);
+
+
+  if (profileError) {
+    return res.status(500).json({
+      error: "Unable to resolve assignees."
+    });
+  }
+
+
+  const assigneeIds = profiles.map((profile) => profile.id);
+
+
+  const requesterEmail = req.profile.email;
+
+
   const { data, error } = await supabase
     .from("workspace_archive_requests")
     .insert({
       submission_id: submissionId,
-      requester_id: user_id,
-      assignee_ids: assignees,
+      requester_id: requesterId,
+      assignee_ids: assigneeIds,
       votes: {
-        [user_id]: "accepted"
+        [requesterEmail]: "accepted"
       }
     })
     .select()
@@ -358,6 +387,7 @@ router.post("/archive-requests/:submissionId", async (req, res) => {
 
 
   if (error) {
+    console.error(error);
     return res.status(500).json({
       error: "Unable to create archive request."
     });
@@ -380,7 +410,7 @@ router.get("/archive-requests/:submissionId", async (req, res) => {
     .from("workspace_archive_requests")
     .select(`
       *,
-      profiles!requester_id(
+      requester:profiles!requester_id(
         email
       )
     `)
@@ -389,29 +419,49 @@ router.get("/archive-requests/:submissionId", async (req, res) => {
 
 
   if (error) {
-    return res.status(404).json(null);
+    return res.status(500).json({
+      error: error.message
+    });
   }
 
-  // No archive request exists yet
+
   if (!data) {
     return res.status(200).json(null);
   }
 
+
+  // Resolve assignee UUIDs -> emails
+  const { data: assigneeProfiles } = await supabase
+    .from("profiles")
+    .select("id,email")
+    .in("id", data.assignee_ids ?? []);
+
+
   return res.status(200).json({
-    requesterEmail: data.profiles?.email ?? null,
-    assignees: data.assignees ?? [],
+    requesterEmail: data.requester?.email ?? null,
+
+    assignees: (assigneeProfiles ?? [])
+      .map((profile) => profile.email)
+      .filter(Boolean),
+
     votes: data.votes ?? {},
+
     createdAt: data.created_at
   });
 });
 
+
+
 // A commissioner votes for an archive request
 router.patch("/archive-requests/:submissionId/vote", async (req, res) => {
+
   const supabase = getSupabaseClient();
-  const user_id = req.user.id;
+
+  const userEmail = req.profile.email;
 
   const { submissionId } = req.params;
   const { vote } = req.body;
+
 
   const { data: request, error } = await supabase
     .from("workspace_archive_requests")
@@ -419,25 +469,30 @@ router.patch("/archive-requests/:submissionId/vote", async (req, res) => {
     .eq("submission_id", submissionId)
     .single();
 
+
   if (error || !request) {
     return res.status(404).json({
       error: "Archive request not found."
     });
   }
 
+
   const updatedVotes = {
     ...(request.votes ?? {}),
-    [user_id]: vote
+    [userEmail]: vote
   };
+
 
   const { data, error: updateError } = await supabase
     .from("workspace_archive_requests")
     .update({
-      votes: updatedVotes
+      votes: updatedVotes,
+      updated_at: new Date().toISOString()
     })
     .eq("submission_id", submissionId)
     .select()
     .single();
+
 
   if (updateError) {
     return res.status(500).json({
@@ -445,9 +500,154 @@ router.patch("/archive-requests/:submissionId/vote", async (req, res) => {
     });
   }
 
+
   return res.status(200).json(data);
 });
 
+
+
+// Update archive request assignees
+router.patch("/archive-requests/:submissionId/assignees", async (req, res) => {
+
+  const supabase = getSupabaseClient();
+
+  const userEmail = req.profile.email;
+
+  const { submissionId } = req.params;
+  const { assignees } = req.body;
+
+
+  const { data: request, error } = await supabase
+    .from("workspace_archive_requests")
+    .select(`
+      requester_id,
+      assignee_ids,
+      votes
+    `)
+    .eq("submission_id", submissionId)
+    .single();
+
+
+  if (error || !request) {
+    return res.status(404).json({
+      error: "Archive request not found."
+    });
+  }
+
+
+  const { data: requester } = await supabase
+    .from("profiles")
+    .select("email")
+    .eq("id", request.requester_id)
+    .single();
+
+
+  if (requester?.email !== userEmail) {
+    return res.status(403).json({
+      error: "Only the requester can update assignees."
+    });
+  }
+
+
+  // Convert emails -> UUIDs
+  const normalizedEmails = [
+    ...new Set(
+      (assignees ?? [])
+        .map((email) => String(email).trim())
+        .filter(Boolean)
+    )
+  ];
+
+
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id,email")
+    .in("email", normalizedEmails);
+
+
+  const assigneeIds = profiles.map((profile) => profile.id);
+
+  // Keep votes only from current assignees + requester
+  const updatedVotes = Object.fromEntries(
+    Object.entries(request.votes ?? {}).filter(([email]) =>
+      normalizedEmails.includes(email) ||
+      email === userEmail
+    )
+  );
+
+
+  const { data, error: updateError } = await supabase
+    .from("workspace_archive_requests")
+    .update({
+      assignee_ids: assigneeIds,
+      votes: updatedVotes,
+      updated_at: new Date().toISOString()
+    })
+    .eq("submission_id", submissionId)
+    .select()
+    .single();
+
+
+  if (updateError) {
+    return res.status(500).json({
+      error: "Unable to update archive assignees."
+    });
+  }
+
+
+  return res.status(200).json(data);
+});
+
+
+
+// Cancel archive request
+router.delete("/archive-requests/:submissionId", async (req, res) => {
+
+  const supabase = getSupabaseClient();
+
+  const userId = req.user.id;
+
+  const { submissionId } = req.params;
+
+
+  const { data: request, error } = await supabase
+    .from("workspace_archive_requests")
+    .select("requester_id")
+    .eq("submission_id", submissionId)
+    .single();
+
+
+  if (error || !request) {
+    return res.status(404).json({
+      error: "Archive request not found."
+    });
+  }
+
+
+  if (request.requester_id !== userId) {
+    return res.status(403).json({
+      error: "Only the requester can cancel this archive request."
+    });
+  }
+
+
+  const { error: deleteError } = await supabase
+    .from("workspace_archive_requests")
+    .delete()
+    .eq("submission_id", submissionId);
+
+
+  if (deleteError) {
+    return res.status(500).json({
+      error: "Unable to cancel archive request."
+    });
+  }
+
+
+  return res.status(200).json({
+    message: "Archive request cancelled."
+  });
+});
 
 // Save workspace label catalog (insert new labels + update existing labels)
 router.post("/label-catalog", async (req, res) => {

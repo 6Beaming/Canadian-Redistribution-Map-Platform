@@ -143,10 +143,10 @@ function LabelEditor({ submissionId, selectedLabels = [], savedCatalog = [], onC
       </div>
       {isOpen ? (
         <div className="workspace-label-picker">
-          {catalog.map((label , index) => {
+          {catalog.map((label, index) => {
             const checked = selectedLabels.some((entry) => entry.id === label.id);
             return (
-              <div className="workspace-label-picker__row" key={label.id  ?? `${label.name}-${index}`}>
+              <div className="workspace-label-picker__row" key={label.id ?? `${label.name}-${index}`}>
                 <button
                   type="button"
                   aria-pressed={checked}
@@ -359,12 +359,24 @@ function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, o
     if (request?.assignees) setAssignees(request.assignees);
   }, [request?.assignees]);
 
-  function toggleAssignee(email, checked) {
+  async function toggleAssignee(email, checked) {
     const nextAssignees = checked
       ? [...new Set([...assignees, email])]
       : assignees.filter((entry) => entry !== email);
+
     setAssignees(nextAssignees);
-    updateWorkspaceArchiveAssignees(submission.id, reviewerEmail, nextAssignees);
+
+    try {
+      await updateWorkspaceArchiveAssignees(
+        submission.id,
+        nextAssignees
+      );
+
+      onCommitted("archive-update-assignees");
+    } catch (error) {
+      console.error(error);
+      setError(error.message);
+    }
   }
 
   async function runAction(action) {
@@ -401,7 +413,7 @@ function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, o
               <input
                 type="checkbox"
                 checked={assignees.includes(email)}
-                onChange={(event) => toggleAssignee(email, event.target.checked)}
+                onChange={(event) => void toggleAssignee(email, event.target.checked)}
               />
               {email}
             </label>

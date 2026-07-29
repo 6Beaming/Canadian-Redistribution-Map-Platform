@@ -94,6 +94,17 @@ export async function voteArchiveRequest(submissionId, vote) {
     return handleResponse(res);
 }
 
+export async function cancelArchiveRequest(submissionId) {
+    const res = await fetch(
+        `/api/workspace/archive-requests/${submissionId}`,
+        {
+            method: "DELETE",
+            credentials: "include",
+        }
+    );
+
+    return handleResponse(res);
+}
 
 export async function getWorkspaceLabelCatalog() {
     const res = await fetch(`/api/workspace/label-catalog`, {
@@ -353,33 +364,22 @@ export async function addWorkspaceComment(submissionId, { content, is_closing = 
     return handleResponse(res);
 }
 
-/** Temporary localStorage archive-request write. Replace with durable votes and assignees. */
-export function updateWorkspaceArchiveAssignees(submissionId, requesterEmail, assignees) {
-    const normalizedAssignees = [...new Set(
-        assignees.map((email) => String(email ?? "").trim()).filter(Boolean),
-    )];
-    let updatedRequest = null;
-
-    updateWorkspaceState((state) => {
-        const request = state.archiveRequests?.[submissionId];
-        if (!request || request.requesterEmail !== requesterEmail) return state;
-
-        const votes = Object.fromEntries(
-            Object.entries(request.votes ?? {}).filter(([email]) =>
-                normalizedAssignees.includes(email) || email === requesterEmail,
-            ),
-        );
-        updatedRequest = { ...request, assignees: normalizedAssignees, votes };
-        return {
-            ...state,
-            archiveRequests: {
-                ...state.archiveRequests,
-                [submissionId]: updatedRequest,
+export async function updateWorkspaceArchiveAssignees(submissionId, assignees) {
+    const res = await fetch(
+        `/api/workspace/archive-requests/${submissionId}/assignees`,
+        {
+            method: "PATCH",
+            credentials: "include",
+            headers: {
+                "Content-Type": "application/json",
             },
-        };
-    });
+            body: JSON.stringify({
+                assignees,
+            }),
+        }
+    );
 
-    return updatedRequest;
+    return handleResponse(res);
 }
 
 async function persistLiveStatus(submission, status) {
@@ -485,30 +485,20 @@ export async function commitWorkspaceAction(submission, {
             [...new Set(assignees)]
         );
     } else if (action === "archive-vote-accept") {
-        updateWorkspaceState((state) => {
-            const request = state.archiveRequests?.[submission.id] ?? currentReview.archiveRequest;
-            return {
-                ...state,
-                archiveRequests: {
-                    ...state.archiveRequests,
-                    [submission.id]: {
-                        ...request,
-                        votes: {
-                            ...(request?.votes ?? {}),
-                            [reviewerEmail]: "accepted",
-                        },
-                    },
-                },
-            };
-        });
-    } else if (["archive-cancel", "archive-vote-reject"].includes(action)) {
-        updateWorkspaceState((state) => {
-            const archiveRequests = { ...state.archiveRequests };
-            delete archiveRequests[submission.id];
-            return { ...state, archiveRequests };
-        });
+        await voteArchiveRequest(
+            submission.id,
+            "accepted"
+        );
+    } else if (action === "archive-cancel") {
+        await cancelArchiveRequest(submission.id);
     }
 
+    else if (action === "archive-vote-reject") {
+        await voteArchiveRequest(
+            submission.id,
+            "rejected"
+        );
+    }
     if (action === "archive-merge") {
         await persistArchiveMerge(submission, {
             email: reviewerEmail,
