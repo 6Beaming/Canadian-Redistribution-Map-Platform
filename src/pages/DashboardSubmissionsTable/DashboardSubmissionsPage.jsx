@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 
 import columns, { normalizeCommissionerStatus } from "./SubmissionsColumns";
 import SubmissionsTable from "./SubmissionsTable";
-import { getCommissionerSubmissionRows } from "@/services/tempWorkspace.js";
+import { getCommissionerSubmissionRows } from "@/services/workspaceApi";
 import { useEffect, useState } from "react";
 
 export default function DashBoardSubmissionsPage() {

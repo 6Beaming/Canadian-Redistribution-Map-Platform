@@ -10,7 +10,7 @@ import { mapApi } from "@/services/mapApi.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
 import { loadSubmissionHeatmap } from "@/lib/map/heatmap.js";
 import { loadArchivedMapEffect } from "@/lib/map/archivedMapEffect.js";
-import { subscribeWorkspaceState } from "@/services/tempWorkspace.js";
+import { subscribeWorkspaceState } from "@/services/workspaceApi";
 import "@/styles/map.css";
 
 export default function DashboardHome({ mapSearchTarget = null }) {

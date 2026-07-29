@@ -447,3 +447,78 @@ router.patch("/archive-requests/:submissionId/vote", async (req, res) => {
 
   return res.status(200).json(data);
 });
+
+
+// Save workspace label catalog (insert new labels + update existing labels)
+router.post("/label-catalog", async (req, res) => {
+  const supabase = getSupabaseClient();
+  const user_id = req.user.id;
+  const { labels } = req.body;
+
+  //chat gpt generated
+  const rows = labels
+    .filter((label) => label.name?.trim())
+    .map((label) => ({
+      ...(label.id && /^[0-9a-fA-F-]{36}$/.test(label.id)
+        ? { id: label.id }
+        : {}),
+      name: label.name.trim(),
+      color: label.color,
+      is_custom: Boolean(label.custom),
+      created_by: user_id,
+    }));
+
+  if (rows.length === 0) {
+    return res.status(400).json({
+      error: "No valid labels provided.",
+    });
+  }
+
+  const { data, error } = await supabase
+    .from("workspace_label_catalog")
+    .upsert(rows, {
+      onConflict: "id",
+    })
+    .select();
+
+  if (error) {
+    console.error("Unable to save label catalog:", error);
+    return res.status(500).json({
+      error: error.message,
+    });
+  }
+
+  return res.status(200).json(
+    data.map((label) => ({
+      id: label.id,
+      name: label.name,
+      color: label.color,
+      custom: label.is_custom,
+    }))
+  );
+});
+
+// Get workspace label catalog
+router.get("/label-catalog", async (req, res) => {
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await supabase
+    .from("workspace_label_catalog")
+    .select("*")
+    .order("name");
+
+  if (error) {
+    return res.status(500).json({
+      error: "Unable to get workspace label catalog.",
+    });
+  }
+
+  const labels = data.map((label) => ({
+    id: label.id,
+    name: label.name,
+    color: label.color,
+    custom: label.is_custom,
+  }));
+
+  return res.status(200).json(labels);
+});

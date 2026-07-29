@@ -23,20 +23,6 @@ import {
   WORKSPACE_STATUS,
 } from "@/services/workspaceApi.js";
 
-const DEFAULT_LABELS = [
-  { id: "constructive", name: "Constructive", color: "#1f9d62", custom: false },
-  { id: "worth-to-achieve", name: "Worth to Achieve", color: "#2878d0", custom: false },
-  { id: "discussion-required", name: "Discussion Required", color: "#d59a00", custom: false },
-  { id: "negligible", name: "Negligible", color: "#ea7a1f", custom: false },
-  { id: "over-aggressive", name: "Over Aggressive", color: "#df3d4b", custom: false },
-];
-
-const CUSTOM_LABELS = [
-  { id: "custom-cyan", name: "", color: "#0891b2", custom: true },
-  { id: "custom-pink", name: "", color: "#db5ca4", custom: true },
-  { id: "custom-purple", name: "", color: "#805ad5", custom: true },
-];
-
 function formatTimestamp(value) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "Unknown time" : date.toLocaleString();
@@ -95,13 +81,11 @@ function SubmissionSelector({ submissions, activeId, onSelect }) {
 
 function LabelEditor({ submissionId, selectedLabels = [], savedCatalog = [], onChange }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [catalog, setCatalog] = useState(() =>
-    savedCatalog.length ? savedCatalog : [...DEFAULT_LABELS, ...CUSTOM_LABELS],
-  );
+  const [catalog, setCatalog] = useState(savedCatalog);
 
   useEffect(() => {
-    setCatalog(savedCatalog.length ? savedCatalog : [...DEFAULT_LABELS, ...CUSTOM_LABELS]);
-  }, [savedCatalog, submissionId]);
+    setCatalog(savedCatalog);
+  }, [savedCatalog]);
 
   function persist(nextLabels) {
     saveWorkspaceLabels(submissionId, nextLabels);
@@ -122,10 +106,15 @@ function LabelEditor({ submissionId, selectedLabels = [], savedCatalog = [], onC
     const nextCatalog = catalog.map((label) =>
       label.id === id ? { ...label, name } : label,
     );
+
     setCatalog(nextCatalog);
-    saveWorkspaceLabelCatalog(submissionId, nextCatalog);
+
     if (selectedLabels.some((label) => label.id === id)) {
-      persist(selectedLabels.map((label) => (label.id === id ? { ...label, name } : label)));
+      persist(
+        selectedLabels.map((label) =>
+          label.id === id ? { ...label, name } : label
+        )
+      );
     }
   }
 
@@ -143,8 +132,8 @@ function LabelEditor({ submissionId, selectedLabels = [], savedCatalog = [], onC
         </button>
       </div>
       <div className="workspace-labels">
-        {selectedLabels.length ? selectedLabels.map((label) => (
-          <span key={label.id} style={{ "--label-color": label.color }}>
+        {selectedLabels.length ? selectedLabels.map((label, index) => (
+          <span key={label.id ?? `${label.name}-${index}`} style={{ "--label-color": label.color }}>
             {label.name}
             <button type="button" aria-label={`Remove ${label.name}`} onClick={() => toggleLabel(label)}>
               <X aria-hidden="true" />
@@ -154,10 +143,10 @@ function LabelEditor({ submissionId, selectedLabels = [], savedCatalog = [], onC
       </div>
       {isOpen ? (
         <div className="workspace-label-picker">
-          {catalog.map((label) => {
+          {catalog.map((label , index) => {
             const checked = selectedLabels.some((entry) => entry.id === label.id);
             return (
-              <div className="workspace-label-picker__row" key={label.id}>
+              <div className="workspace-label-picker__row" key={label.id  ?? `${label.name}-${index}`}>
                 <button
                   type="button"
                   aria-pressed={checked}

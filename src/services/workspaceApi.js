@@ -38,7 +38,7 @@ export async function getWorkspaceLabels(submissionId) {
 }
 
 
-export async function saveWorkspaceLabelsApi(submissionId, labels) {
+export async function addWorkspaceLabels(submissionId, labels) {
     const res = await fetch(`/api/workspace/labels/${submissionId}`, {
         method: "POST",
         credentials: "include",
@@ -94,6 +94,31 @@ export async function voteArchiveRequest(submissionId, vote) {
     return handleResponse(res);
 }
 
+
+export async function getWorkspaceLabelCatalog() {
+    const res = await fetch(`/api/workspace/label-catalog`, {
+        method: "GET",
+        credentials: "include",
+    });
+
+    return handleResponse(res);
+}
+
+
+export async function updateWorkspaceLabelCatalog(labels) {
+    const res = await fetch(`/api/workspace/label-catalog`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            labels,
+        }),
+    });
+
+    return handleResponse(res);
+}
 
 export const WORKSPACE_STATUS = Object.freeze({
     PENDING: "pending",
@@ -255,21 +280,22 @@ export async function getWorkspaceSubmission(submissionId, options = {}) {
 
 /** Local-only review draft; not a shared or durable Workspace backend record. */
 export async function getWorkspaceReviewState(submissionId) {
-    const state = readWorkspaceState();
 
     const [
         comments,
         labels,
         archiveRequest,
+        labelCatalog,
     ] = await Promise.all([
         getWorkspaceComments(submissionId),
         getWorkspaceLabels(submissionId),
         getArchiveRequest(submissionId),
+        getWorkspaceLabelCatalog(),
     ]);
     return {
         comments,
         labels,
-        labelCatalog: [...(state.labelCatalogs?.[submissionId] ?? [])],
+        labelCatalog,
         archiveRequest,
     };
 }
@@ -285,7 +311,7 @@ export function subscribeWorkspaceState(listener) {
     };
 }
 
-/** Temporary localStorage label write. Replace with workspace_labels CRUD. */
+
 export async function saveWorkspaceLabels(submissionId, labels) {
     const normalizedLabels = labels.map((label) => ({
         id: String(label.id),
@@ -294,11 +320,10 @@ export async function saveWorkspaceLabels(submissionId, labels) {
         custom: Boolean(label.custom),
     }));
 
-    return saveWorkspaceLabelsApi(submissionId, normalizedLabels);
+    return addWorkspaceLabels(submissionId, normalizedLabels);
 }
 
-/** Temporary localStorage label catalog write. Replace with shared label CRUD. */
-export function saveWorkspaceLabelCatalog(submissionId, catalog) {
+export function saveWorkspaceLabelCatalog(catalog) {
     const normalizedCatalog = catalog.map((label) => ({
         id: String(label.id),
         name: String(label.name ?? ""),
@@ -306,16 +331,12 @@ export function saveWorkspaceLabelCatalog(submissionId, catalog) {
         custom: Boolean(label.custom),
     }));
 
-    updateWorkspaceState((state) => ({
-        ...state,
-        labelCatalogs: { ...state.labelCatalogs, [submissionId]: normalizedCatalog },
-    }));
-    return normalizedCatalog;
+
+    return updateWorkspaceLabelCatalog(normalizedCatalog);
 }
 
-
 export async function addWorkspaceComment(submissionId, { content, is_closing = false, action = null }) {
-    const res = await fetch(`/api/workspace/comments/`, { 
+    const res = await fetch(`/api/workspace/comments/`, {
         method: "POST",
         credentials: "include",
         headers: {

@@ -7,7 +7,7 @@ import { MAP_INTERACTION_MODE } from "@/lib/map/interactionMode.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
 import { mapApi } from "@/services/mapApi.js";
 import { hydrateWorkspaceSubmission } from "@/services/tempCounterProposal.js";
-import { getArchiveTreeRecords } from "@/services/tempWorkspace.js";
+import { getArchiveTreeRecords } from "@/services/workspaceApi";
 import "@/styles/map.css";
 import "@/styles/workspace-review.css";
 import "@/styles/archive-tree.css";
