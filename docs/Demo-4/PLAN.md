@@ -186,8 +186,8 @@ Add a dedicated repository-backed router, preferably `server/routes/submissions.
 
 ```text
 POST  /api/submissions/objections
-GET   /api/submissions/mine?cursor=&limit=&type=&status=
-GET   /api/submissions?cursor=&limit=&type=&status=&sort=&province=
+GET   /api/submissions/mine?cursor=&limit=&type=&status=&query=&createdFrom=&createdTo=
+GET   /api/submissions?cursor=&limit=&type=&status=&sort=&province=&query=&createdFrom=&createdTo=
 GET   /api/submissions/:submissionId
 GET   /api/submissions?dguid=&active=&limit=
 GET   /api/submissions/heatmap?status=pending,archive-request
@@ -222,8 +222,22 @@ SubmissionProjectionV1
 CursorPageV1
   items: SubmissionProjectionV1[]
   nextCursor: opaque string | null
-  appliedFilters, snapshotVersion
+  appliedFilters:
+    query: normalized string | null
+    createdFrom: YYYY-MM-DD | null
+    createdTo: YYYY-MM-DD | null
+    type, status, sort                 # normalized values accepted by the route
+  snapshotVersion
 ```
+
+The optional Public/Commissioner list filters are frozen as follows:
+
+- `query` is trimmed, internal whitespace is collapsed, and its maximum length is 100 Unicode code points. An empty normalized value becomes `null`. It performs a case-insensitive literal substring match over the authorized projection's `id`, `title`, `communityLabel`, `primaryDguid`, and `secondaryDguid`; wildcard characters are escaped rather than interpreted as SQL patterns.
+- `createdFrom` and `createdTo` accept `YYYY-MM-DD` only. They filter `createdAt` in UTC: `createdFrom` is inclusive at `00:00:00.000Z`, and `createdTo` includes the whole named day by using the next UTC day as an exclusive upper bound. Invalid dates or `createdFrom > createdTo` return the common `400` validation envelope.
+- Authorization/ownership/scope predicates are applied first, then all normalized filters, then the stable sort, cursor position, and limit. Filtering a page after pagination is invalid.
+- `appliedFilters` echoes the normalized values used by the query. The opaque cursor is bound to audience, authorized scope, normalized filters, sort, and snapshot version; reusing it with different inputs returns `400`.
+
+The mock, legacy compatibility, and production backend adapters implement the same normalization and contract tests. The legacy adapter may emulate filtering/cursor behavior over its already-loaded authorized array, but only the mock and backend APIs demonstrate server-side pre-pagination filtering.
 
 Checkpoint 2 owns the server-side projection query, cursor semantics, Commissioner/internal projection adapter, and `SubmissionProjectionV1` contract tests. Checkpoint 5 owns `src/lib/contracts/submissionProjection.js`, a `SubmissionProjectionDataSource` client port, mock fixtures/data source, table/cache tests, public-status projection adapter, and the eventual CP2 HTTP data-source adapter. CP5 develops tables only against the mock port; it must not read Supabase directly. Once CP2's disposable-database API suite passes, CP5 replaces the mock implementation with the authenticated HTTP adapter without changing a table component or its tests.
 
@@ -239,7 +253,7 @@ tests/submissionProjection.contract.test.js             # joint contract cases
 tests/submissionTable.mock.test.jsx                     # CP5 mock-table cases
 ```
 
-The only joint gate is a contract test that runs the same fixture page through the CP2 HTTP adapter and CP5 table data source, confirming field names, opaque cursor handling, scope filtering, no-geometry list behavior, and public/internal status separation. Contract changes require the same versioned review rule as Section 3.0.
+The only joint gate is a contract test that runs the same fixture page through the CP2 HTTP adapter and CP5 table data source, confirming field names, normalized `query`/date filters, pre-pagination filtering, `appliedFilters`, opaque cursor binding, scope filtering, no-geometry list behavior, and public/internal status separation. Contract changes require the same versioned review rule as Section 3.0.
 
 ### 3.2 Capability and province authorization
 
@@ -274,7 +288,7 @@ Use the same function in:
 
 Do not add a Yukon-only special case. If a non-Yukon Enabled FED is unavailable, report the missing manifest, metadata, or pair capability explicitly and add a FED-level smoke test.
 
-Commissioner scope must be derived from the authenticated profile and canonical `PRUID`, not from a browser parameter. Apply it to map hit testing, submissions, Workspace, Archive, heatmap, and detail. A same-province pair has one PRUID; a cross-province adjacent pair is valid and has an ordered, immutable two-PRUID scope set derived from its primary and secondary DGUIDs. A Commissioner is authorized when their PRUID belongs to that set; a Commissioner outside both scopes is denied. Checkpoint 4 owns the reusable scope guard and its delivery across those routes; Checkpoint 5 is the sole export implementer and invokes that guard. The Archive and archive-request-specific rules are defined in Section 3.4.2.
+Commissioner scope must be derived from the authenticated profile and canonical `PRUID`, not from a browser parameter. Apply it to map hit testing, submissions, Workspace, Archive, heatmap, and detail. A same-province pair has one PRUID; a cross-province adjacent pair is valid and has an ordered, immutable two-PRUID scope set derived from its primary and secondary DGUIDs. A Commissioner is authorized when their PRUID belongs to that set; a Commissioner outside both scopes is denied. Checkpoint 4 owns the reusable scope guard for its domain routes. Checkpoint 5 owns the independent export authorization described in Section 5. The Archive and archive-request-specific rules are defined in Section 3.4.2.
 
 #### 3.2.1 Counter-Proposal Enabled-FED rollout incident: diagnosis and remediation
 
@@ -310,6 +324,24 @@ POST   /api/workspace/label-catalog
 PATCH  /api/workspace/label-catalog/:labelId
 DELETE /api/workspace/label-catalog/:labelId
 ```
+
+`GET /api/workspace/submissions/summary` returns `WorkspaceSummaryV1`, a Commissioner-authorized index rather than submission detail. It derives scope from the verified profile, composes each item through the CP2 `SubmissionProjectionV1` port, and contains no GeoJSON or browser-supplied owner/scope:
+
+```text
+WorkspaceSummaryV1
+  schemaVersion, snapshotVersion
+  branches: WorkspaceBranchPageV1[]
+
+WorkspaceBranchPageV1
+  key: "{type}:{status}"
+  type: feedback | objection | counter-proposal
+  status: pending-submissions | archive-request | accepted | rejected
+  count: integer                         # total authorized rows in this branch
+  items: SubmissionProjectionV1[]        # first three rows by default
+  nextCursor: opaque string | null
+```
+
+The initial request returns the count and first three rows for the visible branches. `GET /api/workspace/submissions/summary?branch={key}&cursor={opaque}&limit=3` returns the requested branch page with the same `snapshotVersion`; `branch`, cursor, limit, profile UUID, and PRUID are never authorization inputs. CP3 owns the handler and `server/lib/workspace/summary.js`; CP5 may consume the contract through a mock or HTTP data-source adapter, but does not implement this server API.
 
 Checkpoint 3 owns the Workspace core: server summary, comments, labels, label catalog, client cache, and the removal of shared localStorage/hybrid aggregation. It consumes the Checkpoint 2 submission projection/capability APIs and the Checkpoint 4 scope guard.
 
@@ -400,7 +432,7 @@ DELETE /api/workspace/archive-requests/:requestId
 
 CP4 implementation sequence and target files:
 
-1. Add `server/lib/authorization/resourceScopeGuard.js`: resolve the target submission's immutable one-/two-PRUID scope from server data, derive the requester's PRUID from the verified profile, return a non-disclosing result for an unrelated scope, and expose the reusable guard to Workspace, Archive, heatmap, and CP5 export routes.
+1. Add `server/lib/authorization/resourceScopeGuard.js`: resolve the target submission's immutable one-/two-PRUID scope from server data, derive the requester's PRUID from the verified profile, return a non-disclosing result for an unrelated scope, and expose the reusable guard to Workspace, Archive, and heatmap routes.
 2. Add `server/lib/archiveRequests/service.js` and `repository.js`: create/read/update-assignees/cast-vote/cancel operations validate UUID identities, scope membership, request state, per-PRUID approval rules, and optimistic version/conflict behavior inside one transaction.
 3. Implement the listed `/api/workspace/archive-requests` routes in `server/routes/workspace.js`; they return `ArchiveRequestReadModelV1` and write their CP0 outbox/delivery rows atomically. No browser or CP3 service constructs request identity, votes, or allowed actions.
 4. Add `src/services/archiveRequestApi.js` as the only browser client for those routes, plus `tests/archiveRequests.api.test.js` and scope/two-PRUID/outbox cases. Remove the current Archive Request functions from `workspaceApi.js` as part of this CP4 migration.
@@ -531,7 +563,9 @@ Likely files:
 
 ## 5. Export Plan
 
-Checkpoint 5 exclusively implements all server-side streaming exports. It owns the export routes, projection selection, CSV/ZIP serialization, frontend actions, and export tests; it invokes the reusable CP4 scope guard but does not move export behavior into `workspace.js` or the Archive domain.
+Checkpoint 5 exclusively implements all server-side streaming exports, including export authorization, projection selection, CSV/ZIP serialization, frontend actions, and export tests. It does not move export behavior into `workspace.js` or the Archive domain and has no runtime dependency on CP4.
+
+Add `server/lib/export/exportAuthorization.js`. Its policy derives the authenticated user/profile and canonical PRUID from the server session, authorizes a public export only for that profile's own submissions, authorizes a Commissioner export through the queried submission/archive row's immutable one-/two-PRUID scope, and applies the same predicates to CSV and optional GeoJSON/ZIP reads. It queries the CP1 persistence contract and CP2 projection port directly; it neither imports nor delegates to a CP4 service.
 
 Implement:
 
@@ -543,6 +577,7 @@ Implement:
 Target files owned by Checkpoint 5:
 
 - new `server/routes/exports.js`;
+- new `server/lib/export/exportAuthorization.js`;
 - new `server/lib/export/csvWriter.js`;
 - new `src/services/exportApi.js`;
 - `src/pages/DashboardSubmissionsTable/SubmissionsTable.jsx`;
@@ -739,7 +774,7 @@ Implement the Archived Tree contract in Sections 3.4 and 3.4.1, and the Section 
 
 ### Checkpoint 5 — P2: Deliver progressive list, Workspace, and navigation UX
 
-Implement the public ownership/projection portions of Section 3.1, the Section 3.1.1 mock-to-HTTP submission data source, Section 3.5 query cache, Section 4.1 loading model, Section 5 exports, Section 6 public-status contract, and their Section 10 tests. Develop tables first against `SubmissionProjectionV1` mock data; once CP2 delivers the authenticated projection endpoint, switch only the data-source adapter to its real Supabase-backed HTTP result. Move public and Commissioner tables to first-page cursor loading; request Workspace branch counts plus only the initial visible rows; make `Show more` fetch the next branch cursor. Add projection-level query caching and remove duplicate full-list requests. In the same refactor, derive public ownership exclusively from the verified session and return/render only `public_status` for public list, detail, cache, and export reads. Correct Archived Tree and difference-page back navigation, then implement all CSV exports and their server routes using the reusable CP4 scope guard. Register public-table/cache invalidation mappings with CP0 but do not insert domain events.
+Implement the public ownership/projection portions of Section 3.1, the Section 3.1.1 mock-to-HTTP submission data source, Section 3.5 query cache, Section 4.1 loading model, Section 5 exports, Section 6 public-status contract, and their Section 10 tests. Develop tables first against `SubmissionProjectionV1` mock data; once CP2 delivers the authenticated projection endpoint, switch only the data-source adapter to its real Supabase-backed HTTP result. Move public and Commissioner tables to first-page cursor loading; request Workspace branch counts plus only the initial visible rows; make `Show more` fetch the next branch cursor. Add projection-level query caching and remove duplicate full-list requests. In the same refactor, derive public ownership exclusively from the verified session and return/render only `public_status` for public list, detail, cache, and export reads. Correct Archived Tree and difference-page back navigation, then implement all CSV exports and their server routes with the independent Section 5 export authorization. Register public-table/cache invalidation mappings with CP0 but do not insert domain events.
 
 **Exit criteria:** mock-table tests and the CP2 HTTP-adapter contract test pass without component changes; the Section 4.1 first-page/cursor tests and Section 6 public-status tests pass; the first useful content appears without waiting for the full dataset; public users can read/export only their own projected status; branch expansion remains functional; and every export is implemented by CP5 and obeys the same authorization filters as the UI.
 
