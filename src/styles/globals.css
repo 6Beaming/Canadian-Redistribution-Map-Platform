@@ -161,10 +161,25 @@ button:disabled {
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(239, 251, 253, 0.76);
-  backdrop-filter: blur(3px);
+  background: #effbfd;
   animation: route-loading-overlay-in 160ms ease-out both;
   pointer-events: all;
+}
+
+.route-loading-page {
+  min-height: calc(100dvh - 3.5rem);
+  display: grid;
+  place-items: center;
+  background: #effbfd;
+}
+
+.route-loading-page .route-loading-overlay__indicator button {
+  border: 0;
+  border-radius: 999px;
+  background: #1a73e8;
+  color: white;
+  padding: 0.45rem 0.8rem;
+  font-weight: 650;
 }
 
 .route-loading-overlay__indicator {

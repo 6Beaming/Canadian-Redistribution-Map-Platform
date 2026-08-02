@@ -191,7 +191,7 @@ export async function getSupabaseProfileEmailsAsAdmin(userIds = []) {
     return [];
   }
 
-  const supabase = requireSupabaseAdminClient();
+  const supabase = getSupabaseAdminDataClient();
   const { data, error } = await supabase
     .from("profiles")
     .select("id,email")

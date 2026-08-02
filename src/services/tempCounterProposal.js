@@ -14,6 +14,7 @@ import {
   getCounterProposal,
   getCounterProposals,
 } from "@/services/submissionsApi.js";
+import { calculateCounterProposalImpact } from "@/lib/map/counterProposalImpact.js";
 
 const EMPTY_FEATURE_COLLECTION = Object.freeze({ type: "FeatureCollection", features: [] });
 const metadataByFedPromise = new Map();
@@ -66,7 +67,9 @@ async function getPairIndex(submission, profilesByDguid) {
   const firstDguid = String(submission?.dguid ?? "");
   const secondDguid = String(submission?.neighboring_dguid ?? "");
   const firstFedNum = normalizeFedNum(submission?.fed_num);
-  const secondFedNum = normalizeFedNum(profilesByDguid.get(secondDguid)?.fed_num) || firstFedNum;
+  const secondFedNum = normalizeFedNum(
+    submission?.secondary_fed_num ?? profilesByDguid.get(secondDguid)?.fed_num,
+  ) || firstFedNum;
   const fedNums = [...new Set([firstFedNum, secondFedNum].filter(Boolean))];
 
   if (!firstDguid || !secondDguid || !fedNums.length) {
@@ -152,13 +155,24 @@ function hasPersistedRevisionGeometry(revision) {
   );
 }
 
-function hydrateFromPersistedRevision(submission, revision) {
+export function hydrateFromPersistedRevision(submission, revision, profilesByDguid = new Map()) {
   const firstDguid = String(revision.primary_dguid || submission.dguid || "");
   const secondDguid = String(revision.secondary_dguid || submission.neighboring_dguid || "");
   const originalGeometry = cloneFeatureCollection(revision.original_geometry);
   const proposedGeometry = cloneFeatureCollection(revision.proposed_geometry);
   const originalIndex = buildDaObjectionIndex(originalGeometry);
   const proposedIndex = buildDaObjectionIndex(proposedGeometry);
+  const persistedImpact = revision.validation_report?.impact_summary ?? null;
+  const impactSummary = persistedImpact ?? calculateCounterProposalImpact({
+    originalFeatures: originalGeometry,
+    proposedFeatures: proposedGeometry,
+    firstDguid,
+    secondDguid,
+    populationByDguid: {
+      [firstDguid]: profilesByDguid.get(firstDguid)?.population ?? submission.primary_population ?? null,
+      [secondDguid]: profilesByDguid.get(secondDguid)?.population ?? submission.secondary_population ?? null,
+    },
+  });
 
   return {
     ...normalizeSubmission(submission, "supabase"),
@@ -183,7 +197,8 @@ function hydrateFromPersistedRevision(submission, revision) {
         revision.outer_boundary
         ?? getPairOuterBoundaryFeatureCollection(proposedIndex, [firstDguid, secondDguid]),
       ),
-      impacts: null,
+      impacts: impactSummary,
+      impactsSource: persistedImpact ? "persisted" : "legacy-fallback",
       baselineRevision: revision.baseline_revision ?? null,
       validationReport: revision.validation_report ?? null,
     },
@@ -263,7 +278,7 @@ async function hydratePersistedCounterProposal(submission, profilesByDguid) {
   }
 
   if (hasPersistedRevisionGeometry(record.revision)) {
-    return hydrateFromPersistedRevision(record, record.revision);
+    return hydrateFromPersistedRevision(record, record.revision, profilesByDguid);
   }
 
   if (record.geometry_edit?.operations?.length) {
@@ -360,7 +375,18 @@ export async function getTemporaryCounterProposalSubmissions() {
  * Counter-proposals prefer immutable revision snapshots from Supabase.
  */
 export async function hydrateWorkspaceSubmission(submission, profilesByDguid) {
-  const profiles = await getProfilesByDguid(profilesByDguid);
+  const profiles = profilesByDguid instanceof Map
+    ? profilesByDguid
+    : new Map([
+      [String(submission?.dguid ?? ""), {
+        fed_num: submission?.primary_fed_num ?? submission?.fed_num ?? null,
+        population: submission?.primary_population ?? null,
+      }],
+      [String(submission?.neighboring_dguid ?? ""), {
+        fed_num: submission?.secondary_fed_num ?? submission?.primary_fed_num ?? submission?.fed_num ?? null,
+        population: submission?.secondary_population ?? null,
+      }],
+    ].filter(([dguid]) => dguid));
   const type = normalizeSubmissionType(submission?.type);
 
   if (type === "counter-proposal") {

@@ -19,14 +19,14 @@ import SignUpPage from "./pages/SignUpPage.jsx";
 import UserHome from "./pages/UserHome.jsx";
 import UserProfile from "./pages/UserProfile.jsx";
 import UserResumeSubmission from "./pages/UserResumeSubmission.jsx";
-import { RouteLoadingOverlay } from "./components/non_prebuilt/RouteLoadingOverlay.jsx";
+import { RouteLoadingPage } from "./components/non_prebuilt/RouteLoadingPage.jsx";
 import { Toaster } from "@/components/ui/sonner";
 
 function RequireCommissioner() {
   const { sessionStatus, user } = useAuth();
 
   if (sessionStatus === "checking") {
-    return null;
+    return <RouteLoadingPage label="Checking commissioner session…" />;
   }
 
   if (sessionStatus === "signed-out") {
@@ -47,7 +47,7 @@ function RequirePublicUser() {
   const { sessionStatus, user } = useAuth();
 
   if (sessionStatus === "checking") {
-    return null;
+    return <RouteLoadingPage label="Checking session…" />;
   }
 
   if (user?.role === "commissioner") {
@@ -74,8 +74,6 @@ function App() {
   return (
     <AuthProvider>
       <Header onPlaceSelect={handlePlaceSelect} />
-      <RouteLoadingOverlay />
-
       <Routes>
         <Route element={<RequirePublicUser />}>
           <Route

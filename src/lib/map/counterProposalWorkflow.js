@@ -2,12 +2,14 @@ import {
   buildDaObjectionIndex,
   getSharedBoundaryFeatureCollection,
 } from "./objectionWorkflow.js";
-import { getDaPopulationDisplay } from "./profileUtils.js";
 import "jsts/org/locationtech/jts/monkey.js";
 import GeoJSONReader from "jsts/org/locationtech/jts/io/GeoJSONReader.js";
 import IsValidOp from "jsts/org/locationtech/jts/operation/valid/IsValidOp.js";
+import { calculateCounterProposalImpact } from "./counterProposalImpact.js";
+import { buildSharedBoundaryHandles } from "./counterProposalHandles.js";
 
-const STORAGE_KEY = "counter-proposal-cache";
+const ACTIVE_DRAFT_KEY = "counter-proposal-active-draft";
+const DRAFT_KEY_PREFIX = "counter-proposal-draft:";
 const MAX_HISTORY_ENTRIES = 10;
 const EARTH_RADIUS_METERS = 6378137;
 const GEOJSON_READER = new GeoJSONReader();
@@ -46,9 +48,16 @@ function getFeatureDguid(feature) {
 }
 
 function getPopulationLookup(profilesByDguid, firstDguid, secondDguid) {
+  const readPopulation = (dguid) => {
+    const profile = profilesByDguid.get(dguid);
+    const value = profile?.population;
+    return value === null || value === undefined || !Number.isFinite(Number(value))
+      ? null
+      : Number(value);
+  };
   return {
-    [firstDguid]: Number(getDaPopulationDisplay(profilesByDguid.get(firstDguid))) || 0,
-    [secondDguid]: Number(getDaPopulationDisplay(profilesByDguid.get(secondDguid))) || 0,
+    [firstDguid]: readPopulation(firstDguid),
+    [secondDguid]: readPopulation(secondDguid),
   };
 }
 
@@ -125,102 +134,6 @@ function setCoordinateReference(
   }
 }
 
-function getSharedBoundaryEndpointKeys(boundaryGeoJson) {
-  const degreeByVertexKey = new Map();
-
-  const incrementDegree = (key) => {
-    degreeByVertexKey.set(key, (degreeByVertexKey.get(key) ?? 0) + 1);
-  };
-
-  boundaryGeoJson.features.forEach((feature) => {
-    if (feature.geometry?.type !== "LineString") {
-      return;
-    }
-
-    const coordinates = feature.geometry.coordinates;
-
-    for (let index = 0; index < coordinates.length - 1; index += 1) {
-      const startKey = coordinateKey(coordinates[index]);
-      const endKey = coordinateKey(coordinates[index + 1]);
-
-      if (startKey === endKey) {
-        continue;
-      }
-
-      incrementDegree(startKey);
-      incrementDegree(endKey);
-    }
-  });
-
-  return new Set(
-    Array.from(degreeByVertexKey.entries())
-      .filter(([, degree]) => degree === 1)
-      .map(([key]) => key),
-  );
-}
-
-function buildSharedBoundaryHandles(features, boundaryGeoJson) {
-  const sharedVertexKeys = new Set();
-  const endpointKeys = getSharedBoundaryEndpointKeys(boundaryGeoJson);
-
-  boundaryGeoJson.features.forEach((feature) => {
-    if (feature.geometry?.type !== "LineString") {
-      return;
-    }
-
-    feature.geometry.coordinates.forEach((coordinate) => {
-      sharedVertexKeys.add(coordinateKey(coordinate));
-    });
-  });
-
-  const handlesById = new Map();
-
-  features.forEach((feature) => {
-    const dguid = getFeatureDguid(feature);
-
-    visitGeometryCoordinates(feature.geometry, (entry) => {
-      const key = coordinateKey(entry.coordinate);
-
-      if (!sharedVertexKeys.has(key) || endpointKeys.has(key)) {
-        return;
-      }
-
-      if (!handlesById.has(key)) {
-        handlesById.set(key, {
-          id: key,
-          coordinate: [...entry.coordinate],
-          featureDguids: new Set(),
-          occurrences: [],
-        });
-      }
-
-      const handle = handlesById.get(key);
-      handle.featureDguids.add(dguid);
-      handle.occurrences.push({
-        featureDguid: dguid,
-        polygonIndex: entry.polygonIndex,
-        ringIndex: entry.ringIndex,
-        coordinateIndex: entry.coordinateIndex,
-      });
-    });
-  });
-
-  return Array.from(handlesById.values())
-    .map((handle) => ({
-      id: handle.id,
-      coordinate: handle.coordinate,
-      featureDguids: Array.from(handle.featureDguids),
-      occurrences: handle.occurrences,
-    }))
-    .sort((left, right) => {
-      if (left.coordinate[1] !== right.coordinate[1]) {
-        return right.coordinate[1] - left.coordinate[1];
-      }
-
-      return left.coordinate[0] - right.coordinate[0];
-    });
-}
-
 function buildHandleFeatureCollection(handles, selectedHandleId) {
   return {
     type: "FeatureCollection",
@@ -230,6 +143,8 @@ function buildHandleFeatureCollection(handles, selectedHandleId) {
         id: handle.id,
         index: index + 1,
         selected: handle.id === selectedHandleId,
+        locked: Boolean(handle.locked),
+        required: Boolean(handle.required),
       },
       geometry: {
         type: "Point",
@@ -778,88 +693,6 @@ function constrainHandleMoveCoordinate(cache, handle, nextCoordinate) {
   return best;
 }
 
-function buildImpactSummary(
-  originalFeatures,
-  currentFeatures,
-  populationByDguid,
-  firstDguid,
-  secondDguid,
-) {
-  const originalAreaByDguid = {};
-  const currentAreaByDguid = {};
-
-  originalFeatures.forEach((feature) => {
-    const dguid = getFeatureDguid(feature);
-    originalAreaByDguid[dguid] = geometryAreaMeters(feature.geometry);
-  });
-
-  currentFeatures.forEach((feature) => {
-    const dguid = getFeatureDguid(feature);
-    currentAreaByDguid[dguid] = geometryAreaMeters(feature.geometry);
-  });
-
-  const firstOriginalArea = originalAreaByDguid[firstDguid] ?? 0;
-  const secondOriginalArea = originalAreaByDguid[secondDguid] ?? 0;
-  const firstCurrentArea = currentAreaByDguid[firstDguid] ?? 0;
-  const secondCurrentArea = currentAreaByDguid[secondDguid] ?? 0;
-  const firstAreaDelta = firstCurrentArea - firstOriginalArea;
-  const secondAreaDelta = secondCurrentArea - secondOriginalArea;
-  const firstPopulation = populationByDguid[firstDguid] ?? 0;
-  const secondPopulation = populationByDguid[secondDguid] ?? 0;
-
-  let transfer = {
-    fromDguid: null,
-    toDguid: null,
-    amount: 0,
-  };
-
-  if (firstAreaDelta < 0 && firstOriginalArea > 0) {
-    transfer = {
-      fromDguid: firstDguid,
-      toDguid: secondDguid,
-      amount: (Math.abs(firstAreaDelta) / firstOriginalArea) * firstPopulation,
-    };
-  } else if (secondAreaDelta < 0 && secondOriginalArea > 0) {
-    transfer = {
-      fromDguid: secondDguid,
-      toDguid: firstDguid,
-      amount: (Math.abs(secondAreaDelta) / secondOriginalArea) * secondPopulation,
-    };
-  }
-
-  const byDguid = {
-    [firstDguid]: {
-      originalArea: firstOriginalArea,
-      currentArea: firstCurrentArea,
-      areaDelta: firstAreaDelta,
-      population: firstPopulation,
-      populationDelta:
-        transfer.fromDguid === firstDguid
-          ? -transfer.amount
-          : transfer.toDguid === firstDguid
-            ? transfer.amount
-            : 0,
-    },
-    [secondDguid]: {
-      originalArea: secondOriginalArea,
-      currentArea: secondCurrentArea,
-      areaDelta: secondAreaDelta,
-      population: secondPopulation,
-      populationDelta:
-        transfer.fromDguid === secondDguid
-          ? -transfer.amount
-          : transfer.toDguid === secondDguid
-            ? transfer.amount
-            : 0,
-    },
-  };
-
-  return {
-    byDguid,
-    transfer,
-  };
-}
-
 function rebuildCounterProposalCache(baseCache, nextCurrentFeatures, nextSelectedHandleId = null) {
   const currentFeatures = cloneValue(nextCurrentFeatures);
   const pairIndex = buildDaObjectionIndex(createFeatureCollection(currentFeatures));
@@ -882,22 +715,34 @@ function rebuildCounterProposalCache(baseCache, nextCurrentFeatures, nextSelecte
     handles,
     handleFeatureCollection: buildHandleFeatureCollection(handles, selectedHandleId),
     selectedHandleId,
-    impacts: buildImpactSummary(
-      baseCache.originalFeatures,
-      currentFeatures,
-      baseCache.populationByDguid,
-      baseCache.firstDguid,
-      baseCache.secondDguid,
-    ),
+    impacts: calculateCounterProposalImpact({
+      originalFeatures: baseCache.originalFeatures,
+      proposedFeatures: currentFeatures,
+      populationByDguid: baseCache.populationByDguid,
+      firstDguid: baseCache.firstDguid,
+      secondDguid: baseCache.secondDguid,
+    }),
   };
 }
 
-function snapshotFeatures(features) {
-  return cloneValue(features);
+function geometryFingerprint(features) {
+  const input = JSON.stringify((features ?? []).map((feature) => ({
+    dguid: getFeatureDguid(feature),
+    geometry: feature.geometry,
+  })));
+  let hash = 2166136261;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `fnv1a-${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }
 
-function canRestoreSnapshot(snapshot) {
-  return Array.isArray(snapshot) && snapshot.length >= 2;
+function applyHistoryOperation(cache, operation, direction = "forward") {
+  if (!cache || operation?.type !== "move-handle") return cache;
+  const coordinate = direction === "reverse" ? operation.from : operation.to;
+  const preview = previewCounterProposalHandleMove(cache, operation.handleId, coordinate);
+  return rebuildCounterProposalCache(preview, preview.currentFeatures, operation.handleId);
 }
 
 export function emptyCounterProposalFeatureCollection() {
@@ -924,8 +769,23 @@ export function clearCounterProposalStorage() {
   if (typeof window === "undefined") {
     return;
   }
+  const activeKey = window.localStorage.getItem(ACTIVE_DRAFT_KEY);
+  if (activeKey?.startsWith(DRAFT_KEY_PREFIX)) window.localStorage.removeItem(activeKey);
+  window.localStorage.removeItem(ACTIVE_DRAFT_KEY);
+}
 
-  window.localStorage.removeItem(STORAGE_KEY);
+export function readCounterProposalStorage() {
+  if (typeof window === "undefined") return null;
+  try {
+    const activeKey = window.localStorage.getItem(ACTIVE_DRAFT_KEY);
+    if (!activeKey?.startsWith(DRAFT_KEY_PREFIX)) return null;
+    const payload = JSON.parse(window.localStorage.getItem(activeKey) || "null");
+    if (payload?.version !== 2 || !payload?.cache) return null;
+    if (!Array.isArray(payload.cache.history) || !Array.isArray(payload.cache.future)) return null;
+    return payload;
+  } catch {
+    return null;
+  }
 }
 
 export function writeCounterProposalStorage(workflow) {
@@ -934,12 +794,12 @@ export function writeCounterProposalStorage(workflow) {
   }
 
   if (!workflow?.cache) {
-    window.localStorage.removeItem(STORAGE_KEY);
+    clearCounterProposalStorage();
     return;
   }
 
   const payload = {
-    version: 1,
+    version: 2,
     step: workflow.step,
     firstDguid: workflow.firstDguid,
     secondDguid: workflow.secondDguid,
@@ -950,17 +810,20 @@ export function writeCounterProposalStorage(workflow) {
       createdAt: workflow.cache.createdAt,
       firstDguid: workflow.cache.firstDguid,
       secondDguid: workflow.cache.secondDguid,
-      populationByDguid: workflow.cache.populationByDguid,
-      sourceGeometryRepairs: workflow.cache.sourceGeometryRepairs,
-      sourceGeometryIssues: workflow.cache.sourceGeometryIssues,
-      currentFeatures: workflow.cache.currentFeatures,
+      baselineFingerprint: workflow.cache.baselineFingerprint,
       history: workflow.cache.history,
       future: workflow.cache.future,
       selectedHandleId: workflow.cache.selectedHandleId,
     },
   };
 
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  const draftKey = `${DRAFT_KEY_PREFIX}${encodeURIComponent(payload.firstDguid)}:${encodeURIComponent(payload.secondDguid)}:${encodeURIComponent(payload.cache.baselineFingerprint)}`;
+  const previousKey = window.localStorage.getItem(ACTIVE_DRAFT_KEY);
+  window.localStorage.setItem(draftKey, JSON.stringify(payload));
+  window.localStorage.setItem(ACTIVE_DRAFT_KEY, draftKey);
+  if (previousKey?.startsWith(DRAFT_KEY_PREFIX) && previousKey !== draftKey) {
+    window.localStorage.removeItem(previousKey);
+  }
 }
 
 export function buildCounterProposalCache(
@@ -1007,6 +870,7 @@ export function buildCounterProposalCache(
     populationByDguid,
     sourceGeometryRepairs: normalization.repairs,
     sourceGeometryIssues,
+    baselineFingerprint: geometryFingerprint(originalFeatures),
     history: [],
     future: [],
   };
@@ -1015,8 +879,25 @@ export function buildCounterProposalCache(
 
   return {
     ...rebuilt,
-    history: [snapshotFeatures(rebuilt.currentFeatures)],
+    history: [],
     future: [],
+  };
+}
+
+export function restoreCounterProposalCacheFromDraft(baseCache, draft) {
+  if (!baseCache || draft?.version !== 2 || !draft.cache) return baseCache;
+  if (draft.cache.baselineFingerprint !== baseCache.baselineFingerprint) return baseCache;
+  let restored = baseCache;
+  for (const operation of draft.cache.history ?? []) {
+    restored = applyHistoryOperation(restored, operation, "forward");
+  }
+  return {
+    ...restored,
+    history: (draft.cache.history ?? []).slice(-MAX_HISTORY_ENTRIES),
+    future: (draft.cache.future ?? []).slice(0, MAX_HISTORY_ENTRIES),
+    selectedHandleId: restored.handles.some((handle) => handle.id === draft.cache.selectedHandleId)
+      ? draft.cache.selectedHandleId
+      : null,
   };
 }
 
@@ -1025,14 +906,17 @@ export function selectCounterProposalHandle(cache, handleId) {
     return cache;
   }
 
-  if (cache.selectedHandleId === handleId) {
+  const handle = cache.handles.find((entry) => entry.id === handleId || entry.legacyId === handleId);
+  const selectedHandleId = handle?.id ?? handleId;
+
+  if (cache.selectedHandleId === selectedHandleId) {
     return cache;
   }
 
   return {
     ...cache,
-    selectedHandleId: handleId,
-    handleFeatureCollection: buildHandleFeatureCollection(cache.handles, handleId),
+    selectedHandleId,
+    handleFeatureCollection: buildHandleFeatureCollection(cache.handles, selectedHandleId),
   };
 }
 
@@ -1041,9 +925,9 @@ export function previewCounterProposalHandleMove(cache, handleId, nextCoordinate
     return cache;
   }
 
-  const handle = cache.handles.find((entry) => entry.id === handleId);
+  const handle = cache.handles.find((entry) => entry.id === handleId || entry.legacyId === handleId);
 
-  if (!handle) {
+  if (!handle || handle.locked) {
     return cache;
   }
 
@@ -1063,10 +947,11 @@ export function previewCounterProposalHandleMove(cache, handleId, nextCoordinate
   );
 
   const nextHandles = cache.handles.map((entry) =>
-    entry.id === handleId
+    entry.id === handle.id
       ? {
           ...entry,
           coordinate: [...constrainedCoordinate],
+          legacyId: coordinateKey(constrainedCoordinate),
         }
       : entry,
   );
@@ -1081,15 +966,15 @@ export function previewCounterProposalHandleMove(cache, handleId, nextCoordinate
       constrainedCoordinate,
     ),
     handles: nextHandles,
-    handleFeatureCollection: buildHandleFeatureCollection(nextHandles, handleId),
-    selectedHandleId: handleId,
-    impacts: buildImpactSummary(
-      cache.originalFeatures,
-      nextCurrentFeatures,
-      cache.populationByDguid,
-      cache.firstDguid,
-      cache.secondDguid,
-    ),
+    handleFeatureCollection: buildHandleFeatureCollection(nextHandles, handle.id),
+    selectedHandleId: handle.id,
+    impacts: calculateCounterProposalImpact({
+      originalFeatures: cache.originalFeatures,
+      proposedFeatures: nextCurrentFeatures,
+      populationByDguid: cache.populationByDguid,
+      firstDguid: cache.firstDguid,
+      secondDguid: cache.secondDguid,
+    }),
   };
 }
 
@@ -1098,44 +983,40 @@ export function commitCounterProposalCacheHistory(cache, baselineSnapshot = null
     return cache;
   }
 
-  const currentSnapshot = snapshotFeatures(cache.currentFeatures);
-  const lastSnapshot = baselineSnapshot ?? cache.history[cache.history.length - 1] ?? null;
-
-  if (lastSnapshot && JSON.stringify(lastSnapshot) === JSON.stringify(currentSnapshot)) {
+  if (!baselineSnapshot || !cache.selectedHandleId) {
     return cache;
   }
 
-  const nextHistory = [...cache.history, currentSnapshot].slice(-MAX_HISTORY_ENTRIES);
+  const baselineCache = rebuildCounterProposalCache(cache, baselineSnapshot, cache.selectedHandleId);
+  const fromHandle = baselineCache.handles.find((handle) => handle.id === cache.selectedHandleId);
+  const toHandle = cache.handles.find((handle) => handle.id === cache.selectedHandleId);
+  if (!fromHandle || !toHandle || coordinatesEqual(fromHandle.coordinate, toHandle.coordinate)) return cache;
+  const operation = {
+    type: "move-handle",
+    handleId: cache.selectedHandleId,
+    from: [...fromHandle.coordinate],
+    to: [...toHandle.coordinate],
+  };
+  const rebuilt = rebuildCounterProposalCache(cache, cache.currentFeatures, cache.selectedHandleId);
 
   return {
-    ...cache,
-    history: nextHistory,
+    ...rebuilt,
+    history: [...cache.history, operation].slice(-MAX_HISTORY_ENTRIES),
     future: [],
   };
 }
 
 export function undoCounterProposalCache(cache) {
-  if (!cache || cache.history.length <= 1) {
+  if (!cache || !cache.history.length) {
     return cache;
   }
-
-  const previousSnapshot = cache.history[cache.history.length - 2];
-  const currentSnapshot = cache.history[cache.history.length - 1];
-
-  if (!canRestoreSnapshot(previousSnapshot)) {
-    return cache;
-  }
-
-  const rebuilt = rebuildCounterProposalCache(
-    cache,
-    previousSnapshot,
-    cache.selectedHandleId,
-  );
+  const operation = cache.history.at(-1);
+  const rebuilt = applyHistoryOperation(cache, operation, "reverse");
 
   return {
     ...rebuilt,
     history: cache.history.slice(0, -1),
-    future: [currentSnapshot, ...cache.future].slice(0, MAX_HISTORY_ENTRIES),
+    future: [operation, ...cache.future].slice(0, MAX_HISTORY_ENTRIES),
   };
 }
 
@@ -1144,23 +1025,12 @@ export function redoCounterProposalCache(cache) {
     return cache;
   }
 
-  const nextSnapshot = cache.future[0];
-
-  if (!canRestoreSnapshot(nextSnapshot)) {
-    return cache;
-  }
-
-  const rebuilt = rebuildCounterProposalCache(
-    cache,
-    nextSnapshot,
-    cache.selectedHandleId,
-  );
+  const operation = cache.future[0];
+  const rebuilt = applyHistoryOperation(cache, operation, "forward");
 
   return {
     ...rebuilt,
-    history: [...cache.history, snapshotFeatures(rebuilt.currentFeatures)].slice(
-      -MAX_HISTORY_ENTRIES,
-    ),
+    history: [...cache.history, operation].slice(-MAX_HISTORY_ENTRIES),
     future: cache.future.slice(1),
   };
 }

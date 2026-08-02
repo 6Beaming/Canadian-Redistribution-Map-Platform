@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext.jsx";
 import { getDaPanelTitle } from "@/lib/map/profileUtils.js";
+import { submitCounterProposalWithDraft } from "@/lib/map/counterProposalSubmit.js";
 import { submitCounterProposal } from "@/services/submissionsApi.js";
 import { toast } from "sonner";
 
@@ -371,19 +372,22 @@ export default function UserMakeCounterProposal({
     setIsSubmitting(true);
 
     try {
-      await submitCounterProposal({
-        title: title.trim(),
-        comment: proposalText.trim(),
-        fed_num: fedNum,
-        dguid: workflow.firstDguid,
-        neighboring_dguid: workflow.secondDguid,
-        proposed_geometry: cache.currentFeatureCollection,
+      await submitCounterProposalWithDraft({
+        submit: submitCounterProposal,
+        payload: {
+          title: title.trim(),
+          comment: proposalText.trim(),
+          fed_num: fedNum,
+          dguid: workflow.firstDguid,
+          neighboring_dguid: workflow.secondDguid,
+          proposed_geometry: cache.currentFeatureCollection,
+        },
+        onSuccess: onSubmitSuccess,
       });
 
       setTitle("");
       setProposalText("");
       toast.success("Counter-proposal submitted successfully.", { duration: 1500 });
-      onSubmitSuccess?.();
     } catch (error) {
       console.error("Failed to submit counter-proposal:", error);
       toast.error(error.message || "Failed to submit counter-proposal.", {

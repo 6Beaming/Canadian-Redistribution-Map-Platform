@@ -10,6 +10,7 @@ import {
 } from "@/lib/archiveTree.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
 import { mapApi } from "@/services/mapApi.js";
+import { exportArchivedTreeJson } from "@/services/exportApi.js";
 import {
   deleteArchiveBranch,
   getArchiveTreeRecords,
@@ -26,6 +27,7 @@ export default function ArchivedTree() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [reloadVersion, setReloadVersion] = useState(0);
+  const [exportState, setExportState] = useState({ pending: false, error: "" });
   const selectedId = searchParams.get("selected");
 
   useEffect(() => {
@@ -113,13 +115,28 @@ export default function ArchivedTree() {
               aria-label="Search archived submissions"
             />
           </label>
-          <button type="button" className="archive-export-button" title="Export is planned for a later milestone">
-            <Download aria-hidden="true" /> Export
+          <button
+            type="button"
+            className="archive-export-button"
+            disabled={exportState.pending}
+            onClick={async () => {
+              if (exportState.pending) return;
+              setExportState({ pending: true, error: "" });
+              try {
+                await exportArchivedTreeJson();
+                setExportState({ pending: false, error: "" });
+              } catch (exportError) {
+                setExportState({ pending: false, error: exportError.message || "Unable to export the Archived Tree." });
+              }
+            }}
+          >
+            <Download aria-hidden="true" /> {exportState.pending ? "Exporting…" : "Export JSON"}
           </button>
         </div>
       </header>
 
       {error ? <p className="archive-tree-notice" role="alert">{error}</p> : null}
+      {exportState.error ? <p className="archive-tree-notice" role="alert">{exportState.error}</p> : null}
       <div className="archive-tree-summary" aria-live="polite">
         {isLoading ? "Loading archived submissions..." : `${branchCount} branches · ${versionCount} immutable versions`}
       </div>

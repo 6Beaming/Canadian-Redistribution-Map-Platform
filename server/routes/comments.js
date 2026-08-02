@@ -6,6 +6,7 @@ import {
 } from "../lib/supabase.js";
 import { getProfileForDguid } from "../lib/map/mapAssetAuthority.js";
 import { enrichSubmissionsWithDaMetadata } from "../lib/map/submissionPresentation.js";
+import { serializeLightweightSubmission } from "../lib/submissions/submissionListQuery.js";
 import { requirePublicUser } from "../middleware/requireAuth.js";
 
 const router = Router();
@@ -67,11 +68,13 @@ router.get("/count", async (req, res) => {
 // Get all submissions for the Commissioner submissions table.
 router.get("/", requireCommissioner, async (req, res) => {
   const supabase = getSupabaseAdminDataClient();
+  const submissionId = String(req.query.submissionId ?? "").trim();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("submissions")
-    .select("*")
-    .order("created_at", { ascending: false });
+    .select("id,user_id,type,fed_num,dguid,neighboring_dguid,title,status,comment,created_at,updated_at");
+  if (submissionId) query = query.eq("id", submissionId);
+  const { data, error } = await query.order("created_at", { ascending: false });
 
   if (error) return res.status(500).json({ error: error.message });
 
@@ -91,12 +94,13 @@ router.get("/", requireCommissioner, async (req, res) => {
   }
 
   // Merge profiles into submissions
-  const result = enrichedSubmissions.map(submission => ({
-    ...submission,
-    profile: profiles.find(
-      profile => profile.id === submission.user_id
-    ) || null
-  }));
+  const result = enrichedSubmissions.map((submission) => {
+    const profile = profiles.find((entry) => entry.id === submission.user_id) || null;
+    return {
+      ...serializeLightweightSubmission(submission, profile),
+      comment: submission.comment ?? "",
+    };
+  });
 
   res.json(result);
 });

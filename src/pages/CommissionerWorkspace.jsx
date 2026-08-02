@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Archive,
   ArchiveRestore,
@@ -15,9 +15,11 @@ import {
   X,
 } from "lucide-react";
 import {
+  getWorkspaceSubmission,
   getWorkspaceSubmissions,
   subscribeWorkspaceState,
 } from "@/services/workspaceApi.js";
+import { RouteLoadingPage } from "@/components/non_prebuilt/RouteLoadingPage.jsx";
 import "@/styles/workspace.css";
 
 const VISIBLE_LIST_ITEMS = 3;
@@ -586,6 +588,7 @@ function FilterPanel({ state, onChange, onApply, onReset }) {
 
 export default function CommissionerWorkspace() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const focusId = searchParams.get("focus");
   const [workspaceSubmissions, setWorkspaceSubmissions] = useState([]);
@@ -599,19 +602,29 @@ export default function CommissionerWorkspace() {
   useEffect(() => {
     let isMounted = true;
 
-    const loadSubmissions = () => getWorkspaceSubmissions({ includeArchived: false })
-      .then((submissions) => {
-        if (isMounted) {
+    const loadSubmissions = async () => {
+      setIsLoading(true);
+      try {
+        if (focusId) {
+          const focused = await getWorkspaceSubmission(focusId, { hydrateGeometry: false });
+          if (!isMounted) return;
+          if (!focused) throw new Error("The focused submission was not found.");
+          const submissions = await getWorkspaceSubmissions({ includeArchived: false });
+          if (!isMounted) return;
+          setWorkspaceSubmissions(Array.isArray(submissions) ? submissions : [focused]);
+          setExpansion(createFocusedExpansion(focused));
+        } else {
+          const submissions = await getWorkspaceSubmissions({ includeArchived: false });
+          if (!isMounted) return;
           setWorkspaceSubmissions(Array.isArray(submissions) ? submissions : []);
-          setLoadError("");
         }
-      })
-      .catch((error) => {
+        setLoadError("");
+      } catch (error) {
         if (isMounted) setLoadError(error.message || "Submissions could not be loaded.");
-      })
-      .finally(() => {
+      } finally {
         if (isMounted) setIsLoading(false);
-      });
+      }
+    };
 
     loadSubmissions();
     const unsubscribe = subscribeWorkspaceState(loadSubmissions);
@@ -620,7 +633,7 @@ export default function CommissionerWorkspace() {
       isMounted = false;
       unsubscribe();
     };
-  }, []);
+  }, [focusId]);
 
   useEffect(() => {
     if (!focusId || !workspaceSubmissions.length) return;
@@ -693,6 +706,10 @@ export default function CommissionerWorkspace() {
     setFilterDraft(createExpansionState(true));
   }
 
+  if (isLoading) {
+    return <RouteLoadingPage label="Loading Workspace submissions…" />;
+  }
+
   return (
     <main className="commissioner-workspace workspace-page" aria-labelledby="workspace-title">
       <div className="workspace-scroll-region">
@@ -742,7 +759,6 @@ export default function CommissionerWorkspace() {
               Live submissions are unavailable. Check your commissioner session and try again.
             </p>
           ) : null}
-
           <section className="workspace-tree" aria-busy={isLoading} aria-label="Submission decision tree">
             <div className="workspace-tree__top-row">
               <RootCard
@@ -764,7 +780,13 @@ export default function CommissionerWorkspace() {
                     onToggle={(branch) => toggleCategoryBranch(definition.id, branch)}
                     focusId={focusId}
                     onSubmissionOpen={(submissionId) =>
-                      navigate(`/dashboard/workspace/${encodeURIComponent(submissionId)}`)
+                      navigate(`/dashboard/workspace/${encodeURIComponent(submissionId)}`, {
+                        state: {
+                          from: "/dashboard/workspace",
+                          focusId,
+                          workspaceFrom: location.state?.from ?? null,
+                        },
+                      })
                     }
                   />
                 ))}

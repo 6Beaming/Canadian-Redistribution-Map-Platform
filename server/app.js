@@ -7,7 +7,10 @@ import authRouter from "./routes/auth.js";
 import commentsRouter from "./routes/comments.js";
 import commentTagsRouter from "./routes/commentTags.js";
 import workspaceRouter from "./routes/workspace.js";
+import workspaceCollaborationRouter from "./routes/workspaceCollaboration.js";
 import submissionsRouter from "./routes/submissions.js";
+import submissionListsRouter from "./routes/submissionLists.js";
+import exportsRouter from "./routes/exports.js";
 import { requireAuth } from "./middleware/requireAuth.js";
 
 
@@ -46,8 +49,11 @@ app.use("/api/auth", authRouter);
 // role-specific public/commissioner safeguard to each individual operation.
 app.use("/api/comments", requireAuth, commentsRouter);
 app.use("/api/comment-tags",requireAuth, commentTagsRouter);
+app.use("/api/workspace", requireAuth, workspaceCollaborationRouter);
 app.use("/api/workspace", requireAuth, workspaceRouter);
+app.use("/api/submissions", requireAuth, submissionListsRouter);
 app.use("/api/submissions", requireAuth, submissionsRouter);
+app.use("/api/exports", requireAuth, exportsRouter);
 
 mountMapApiService(app);
 

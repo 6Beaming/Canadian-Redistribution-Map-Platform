@@ -15,10 +15,14 @@ import {
   addWorkspaceComment,
   canMergeArchiveRequest,
   commitWorkspaceAction,
+  createWorkspaceLabelCatalog,
+  deleteWorkspaceComment,
+  deleteWorkspaceLabelCatalog,
   getWorkspaceReviewState,
   saveWorkspaceLabelCatalog,
   saveWorkspaceLabels,
   subscribeWorkspaceState,
+  updateWorkspaceComment,
   updateWorkspaceArchiveAssignees,
   WORKSPACE_STATUS,
 } from "@/services/workspaceApi.js";
@@ -31,6 +35,52 @@ function formatTimestamp(value) {
 function normalizeType(value) {
   return String(value ?? "feedback").toLowerCase().replaceAll("_", "-");
 }
+
+function customPlaceholder(label, index) {
+  if (!label?.custom || label?.createdBy) return "";
+  const match = String(label.name ?? "").match(/^custom (?:label )?(cyan|pink|purple|[1-3])$/iu);
+  const slots = { cyan: 1, pink: 2, purple: 3 };
+  const slot = match ? (slots[String(match[1]).toLowerCase()] ?? Number(match[1])) : index + 1;
+  return `Customized Label ${slot}`;
+}
+
+function prepareCatalog(entries = []) {
+  return entries
+    .map((entry, index) => {
+      const placeholder = customPlaceholder(entry, index);
+      return placeholder ? { ...entry, name: "", placeholder } : { ...entry };
+    })
+    .sort((left, right) => Number(Boolean(left.custom)) - Number(Boolean(right.custom)));
+}
+
+function labelIdentity(label) {
+  return String(label?.custom
+    ? label?.id ?? ""
+    : label?.key ?? label?.catalogId ?? label?.id ?? "");
+}
+
+function reconcileLabelsInOrder(referenceLabels = [], persistedLabels = []) {
+  const persistedById = new Map(
+    persistedLabels.map((label) => [labelIdentity(label), label]),
+  );
+  const reconciled = referenceLabels
+    .map((label) => persistedById.get(labelIdentity(label)))
+    .filter(Boolean);
+  const reconciledIds = new Set(reconciled.map(labelIdentity));
+  persistedLabels.forEach((label) => {
+    if (!reconciledIds.has(labelIdentity(label))) reconciled.push(label);
+  });
+  return reconciled;
+}
+
+const EMPTY_REVIEW = Object.freeze({
+  submissionId: null,
+  comments: [],
+  labels: [],
+  labelCatalog: [],
+  archiveRequest: null,
+  collaborationWarning: "",
+});
 
 function SubmissionSelector({ submissions, activeId, onSelect }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -79,79 +129,231 @@ function SubmissionSelector({ submissions, activeId, onSelect }) {
   );
 }
 
-function LabelEditor({ submissionId, selectedLabels = [], savedCatalog = [], onChange }) {
+function LabelEditor({
+  submissionId,
+  selectedLabels = [],
+  savedCatalog = [],
+  onChange,
+  onCatalogChange,
+  unavailableMessage = "",
+}) {
   const [isOpen, setIsOpen] = useState(false);
-  const [catalog, setCatalog] = useState(savedCatalog);
+  const [catalog, setCatalog] = useState(() => prepareCatalog(savedCatalog));
+  const [optimisticSelected, setOptimisticSelected] = useState(selectedLabels);
+  const [pendingIds, setPendingIds] = useState(() => new Set());
+  const [invalidCustomIds, setInvalidCustomIds] = useState(() => new Set());
+  const [error, setError] = useState("");
+  const invalidTimersRef = useRef(new Map());
+  const draftSequenceRef = useRef(0);
+  const mutationPending = pendingIds.size > 0;
+
+  useEffect(() => () => {
+    invalidTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+    invalidTimersRef.current.clear();
+  }, []);
 
   useEffect(() => {
-    setCatalog(savedCatalog);
-  }, [savedCatalog]);
+    if (!mutationPending) setCatalog(prepareCatalog(savedCatalog));
+  }, [mutationPending, savedCatalog]);
 
-  function persist(nextLabels) {
-    saveWorkspaceLabels(submissionId, nextLabels);
-    onChange(nextLabels);
+  useEffect(() => {
+    if (!mutationPending) {
+      setOptimisticSelected((current) => reconcileLabelsInOrder(current, selectedLabels));
+    }
+  }, [mutationPending, selectedLabels]);
+
+  function clearInvalidCustomLabel(labelId) {
+    const timerId = invalidTimersRef.current.get(labelId);
+    if (timerId) window.clearTimeout(timerId);
+    invalidTimersRef.current.delete(labelId);
+    setInvalidCustomIds((current) => {
+      if (!current.has(labelId)) return current;
+      const next = new Set(current);
+      next.delete(labelId);
+      return next;
+    });
   }
 
-  function toggleLabel(label) {
-    const isSelected = selectedLabels.some((entry) => entry.id === label.id);
-    if (!isSelected && label.custom && !label.name.trim()) return;
-    persist(
+  function flagInvalidCustomLabel(labelId) {
+    const existingTimer = invalidTimersRef.current.get(labelId);
+    if (existingTimer) window.clearTimeout(existingTimer);
+    setInvalidCustomIds((current) => new Set(current).add(labelId));
+    const timerId = window.setTimeout(() => {
+      invalidTimersRef.current.delete(labelId);
+      setInvalidCustomIds((current) => {
+        const next = new Set(current);
+        next.delete(labelId);
+        return next;
+      });
+    }, 5000);
+    invalidTimersRef.current.set(labelId, timerId);
+  }
+
+  async function persist(nextLabels, pendingId) {
+    const previousLabels = optimisticSelected;
+    setOptimisticSelected(nextLabels);
+    setPendingIds((current) => new Set(current).add(pendingId));
+    setError("");
+    try {
+      const persisted = await saveWorkspaceLabels(submissionId, nextLabels);
+      const reconciled = reconcileLabelsInOrder(nextLabels, persisted);
+      setOptimisticSelected(reconciled);
+      onChange(reconciled);
+      return reconciled;
+    } catch (saveError) {
+      setOptimisticSelected(previousLabels);
+      setError(saveError.message || "Unable to update labels.");
+      return null;
+    } finally {
+      setPendingIds((current) => {
+        const next = new Set(current);
+        next.delete(pendingId);
+        return next;
+      });
+    }
+  }
+
+  async function toggleLabel(label) {
+    const labelId = labelIdentity(label);
+    if (mutationPending) return;
+    const isSelected = optimisticSelected.some((entry) => labelIdentity(entry) === labelId);
+    if (!isSelected && label.custom && !label.name.trim()) {
+      flagInvalidCustomLabel(label.id);
+      return;
+    }
+    await persist(
       isSelected
-        ? selectedLabels.filter((entry) => entry.id !== label.id)
-        : [...selectedLabels, label],
+        ? optimisticSelected.filter((entry) => identity(entry) !== labelId)
+        : [...optimisticSelected, label],
+      labelId,
     );
   }
 
-  function renameCustomLabel(id, name) {
+  function editCustomLabel(id, changes) {
+    if (Object.hasOwn(changes, "name") && String(changes.name).trim()) {
+      clearInvalidCustomLabel(id);
+    }
     const nextCatalog = catalog.map((label) =>
-      label.id === id ? { ...label, name } : label,
+      label.id === id ? { ...label, ...changes } : label,
     );
 
     setCatalog(nextCatalog);
+  }
 
-    if (selectedLabels.some((label) => label.id === id)) {
-      persist(
-        selectedLabels.map((label) =>
-          label.id === id ? { ...label, name } : label
-        )
-      );
+  async function persistCustomLabel(label) {
+    const name = label.name.trim();
+    const isDraft = String(label.id).startsWith("draft-custom-");
+    if (mutationPending) return;
+    if (!name) {
+      flagInvalidCustomLabel(label.id);
+      return;
+    }
+    setPendingIds((current) => new Set(current).add(label.id));
+    setError("");
+    try {
+      const saved = isDraft
+        ? await createWorkspaceLabelCatalog(submissionId, { name, color: label.color, custom: true })
+        : await saveWorkspaceLabelCatalog(label.id, submissionId, { name, color: label.color });
+      setCatalog((current) => prepareCatalog(current.map((entry) => entry.id === label.id ? saved : entry)));
+      await onCatalogChange?.(saved);
+    } catch (saveError) {
+      setError(saveError.message || "Unable to save the custom label.");
+      setCatalog(savedCatalog);
+    } finally {
+      setPendingIds((current) => {
+        const next = new Set(current);
+        next.delete(label.id);
+        return next;
+      });
+    }
+  }
+
+  async function createCustomLabel() {
+    if (mutationPending) return;
+    setError("");
+    draftSequenceRef.current += 1;
+    const sequence = catalog.filter((label) => label.custom).length + 1;
+    setCatalog((current) => prepareCatalog([
+      ...current,
+      {
+        id: `draft-custom-${Date.now()}-${draftSequenceRef.current}`,
+        name: "",
+        color: "#607d8b",
+        custom: true,
+        createdBy: "draft",
+        placeholder: `Customized Label ${sequence}`,
+      },
+    ]));
+  }
+
+  async function removeCustomLabel(label) {
+    if (mutationPending) return;
+    if (String(label.id).startsWith("draft-custom-")) {
+      clearInvalidCustomLabel(label.id);
+      setCatalog((current) => current.filter((entry) => entry.id !== label.id));
+      return;
+    }
+    setPendingIds((current) => new Set(current).add(label.id));
+    setError("");
+    try {
+      await deleteWorkspaceLabelCatalog(label.id, submissionId);
+      setCatalog((current) => current.filter((entry) => entry.id !== label.id));
+      await onCatalogChange?.({ deletedId: label.id });
+    } catch (saveError) {
+      setError(saveError.message || "Unable to delete the custom label.");
+    } finally {
+      setPendingIds((current) => {
+        const next = new Set(current);
+        next.delete(label.id);
+        return next;
+      });
     }
   }
 
   return (
     <section className="workspace-review-section">
       <div className="workspace-review-section__heading">
-        <div><Tag aria-hidden="true" /><strong>Shared labels</strong></div>
+        <div><Tag aria-hidden="true" /><strong>Labels</strong></div>
         <button
           type="button"
           aria-expanded={isOpen}
           aria-label={isOpen ? "Close label picker" : "Add a label"}
+          disabled={Boolean(unavailableMessage)}
           onClick={() => setIsOpen((current) => !current)}
         >
           {isOpen ? <Minus aria-hidden="true" /> : <Plus aria-hidden="true" />} Add label
         </button>
       </div>
       <div className="workspace-labels">
-        {selectedLabels.length ? selectedLabels.map((label, index) => (
+        {optimisticSelected.length ? optimisticSelected.map((label, index) => (
           <span key={label.id ?? `${label.name}-${index}`} style={{ "--label-color": label.color }}>
             {label.name}
-            <button type="button" aria-label={`Remove ${label.name}`} onClick={() => toggleLabel(label)}>
+            <button
+              type="button"
+              aria-label={`Remove ${label.name}`}
+              disabled={mutationPending}
+              onClick={() => toggleLabel(label)}
+            >
               <X aria-hidden="true" />
             </button>
           </span>
         )) : <p>No labels selected.</p>}
       </div>
+      {unavailableMessage ? (
+        <p className="workspace-decision-error" role="status">{unavailableMessage}</p>
+      ) : null}
       {isOpen ? (
         <div className="workspace-label-picker">
           {catalog.map((label, index) => {
-            const checked = selectedLabels.some((entry) => entry.id === label.id);
+            const checked = optimisticSelected.some((entry) => labelIdentity(entry) === label.id);
+            const invalidCustomLabel = invalidCustomIds.has(label.id);
             return (
               <div className="workspace-label-picker__row" key={label.id ?? `${label.name}-${index}`}>
                 <button
                   type="button"
                   aria-pressed={checked}
                   aria-label={checked ? `Remove ${label.name}` : `Add ${label.name || "custom label"}`}
-                  disabled={!checked && label.custom && !label.name.trim()}
+                  disabled={mutationPending}
                   onClick={() => toggleLabel(label)}
                 >
                   <i style={{ background: label.color }} />
@@ -159,18 +361,53 @@ function LabelEditor({ submissionId, selectedLabels = [], savedCatalog = [], onC
                 </button>
                 {label.custom ? (
                   <input
-                    aria-label={`Edit ${label.id}`}
-                    value={label.name}
-                    placeholder="Custom label"
+                  aria-label={`Edit ${label.id}`}
+                  value={label.name}
+                    className={invalidCustomLabel ? "is-invalid" : ""}
+                    placeholder={invalidCustomLabel
+                      ? "Labels cannot be empty"
+                      : label.placeholder || "Customized Label"}
                     maxLength={30}
-                    onChange={(event) => renameCustomLabel(label.id, event.target.value)}
-                  />
+                  onChange={(event) => editCustomLabel(label.id, { name: event.target.value })}
+                  onBlur={() => void persistCustomLabel(label)}
+                  disabled={mutationPending}
+                />
                 ) : <span>{label.name}</span>}
+                {label.custom ? (
+                  <input
+                    type="color"
+                    aria-label={`Change ${label.name} color`}
+                    value={/^#[0-9a-f]{6}$/iu.test(label.color) ? label.color : "#607d8b"}
+                    onChange={(event) => editCustomLabel(label.id, { color: event.target.value })}
+                    onBlur={() => void persistCustomLabel(label)}
+                    disabled={mutationPending}
+                  />
+                ) : null}
+                {label.custom && label.createdBy ? (
+                  <button
+                    type="button"
+                    aria-label={`Delete ${label.name}`}
+                    disabled={mutationPending}
+                    onClick={() => void removeCustomLabel(label)}
+                  >
+                    <X aria-hidden="true" />
+                  </button>
+                ) : null}
               </div>
             );
           })}
+          <button
+            type="button"
+            className="workspace-label-picker__create"
+            disabled={mutationPending}
+            onClick={() => void createCustomLabel()}
+          >
+            <Plus aria-hidden="true" />
+            Add custom label
+          </button>
         </div>
       ) : null}
+      {error ? <p className="workspace-decision-error" role="alert">{error}</p> : null}
     </section>
   );
 }
@@ -227,6 +464,11 @@ function MemberCommentSelector({ activeAuthor, authors, onChange }) {
 
 function CommentThread({ submissionId, comments, reviewerEmail, onChange, readOnly = false }) {
   const [draft, setDraft] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingCommentId, setPendingCommentId] = useState("");
+  const [editingCommentId, setEditingCommentId] = useState("");
+  const [editingDraft, setEditingDraft] = useState("");
+  const [error, setError] = useState("");
   const authors = [...new Set(comments.map((comment) => comment.email))];
   const [activeAuthor, setActiveAuthor] = useState("all");
   const visibleComments = useMemo(() => {
@@ -239,13 +481,56 @@ function CommentThread({ submissionId, comments, reviewerEmail, onChange, readOn
     });
   }, [activeAuthor, comments]);
 
-  function submitComment(event) {
+  async function submitComment(event) {
     event.preventDefault();
     const content = draft.trim();
-    if (!content) return;
-    addWorkspaceComment(submissionId, { content });
-    setDraft("");
-    onChange();
+    if (!content || isSubmitting) return;
+    setIsSubmitting(true);
+    setError("");
+    try {
+      await addWorkspaceComment(submissionId, { content });
+      await onChange();
+      setDraft("");
+    } catch (submitError) {
+      setError(submitError.message || "Unable to submit the comment.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function saveEditedComment(comment) {
+    const content = editingDraft.trim();
+    if (!content || pendingCommentId) return;
+    setPendingCommentId(comment.id);
+    setError("");
+    try {
+      await updateWorkspaceComment(comment.id, {
+        content,
+        action: comment.action,
+        is_closing: comment.isClosing,
+      });
+      await onChange();
+      setEditingCommentId("");
+      setEditingDraft("");
+    } catch (saveError) {
+      setError(saveError.message || "Unable to update the comment.");
+    } finally {
+      setPendingCommentId("");
+    }
+  }
+
+  async function removeComment(comment) {
+    if (pendingCommentId) return;
+    setPendingCommentId(comment.id);
+    setError("");
+    try {
+      await deleteWorkspaceComment(comment.id);
+      await onChange();
+    } catch (deleteError) {
+      setError(deleteError.message || "Unable to delete the comment.");
+    } finally {
+      setPendingCommentId("");
+    }
   }
 
   return (
@@ -266,7 +551,56 @@ function CommentThread({ submissionId, comments, reviewerEmail, onChange, readOn
               <time>{formatTimestamp(comment.createdAt)}</time>
             </header>
             {comment.action ? <p className="workspace-comment-action">{comment.action}</p> : null}
-            <p>{comment.content}</p>
+            {editingCommentId === comment.id ? (
+              <div className="workspace-comment-editor">
+                <textarea
+                  value={editingDraft}
+                  onChange={(event) => setEditingDraft(event.target.value)}
+                  rows={3}
+                  disabled={pendingCommentId === comment.id}
+                />
+                <div>
+                  <button
+                    type="button"
+                    disabled={!editingDraft.trim() || pendingCommentId === comment.id}
+                    onClick={() => void saveEditedComment(comment)}
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    disabled={pendingCommentId === comment.id}
+                    onClick={() => {
+                      setEditingCommentId("");
+                      setEditingDraft("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : <p>{comment.content}</p>}
+            {!readOnly && !comment.isClosing && comment.email === reviewerEmail && editingCommentId !== comment.id ? (
+              <div className="workspace-comment-actions">
+                <button
+                  type="button"
+                  disabled={Boolean(pendingCommentId)}
+                  onClick={() => {
+                    setEditingCommentId(comment.id);
+                    setEditingDraft(comment.content);
+                  }}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  disabled={Boolean(pendingCommentId)}
+                  onClick={() => void removeComment(comment)}
+                >
+                  {pendingCommentId === comment.id ? "Deleting…" : "Delete"}
+                </button>
+              </div>
+            ) : null}
           </article>
         )) : <p className="workspace-review-empty">No commissioner comments yet.</p>}
       </div>
@@ -280,7 +614,10 @@ function CommentThread({ submissionId, comments, reviewerEmail, onChange, readOn
             placeholder="Leave a review comment..."
             rows={3}
           />
-          <button type="submit" disabled={!draft.trim()}><Send aria-hidden="true" />Submit Comment</button>
+          <button type="submit" disabled={!draft.trim() || isSubmitting}>
+            <Send aria-hidden="true" />{isSubmitting ? "Submitting…" : "Submit Comment"}
+          </button>
+          {error ? <p className="workspace-decision-error" role="alert">{error}</p> : null}
         </form>
       )}
     </section>
@@ -317,12 +654,16 @@ function SubmissionDetails({ submission }) {
 
 function CounterProposalImpact({ submission }) {
   if (normalizeType(submission.type) !== "counter-proposal") return null;
-  const impacts = submission.geometry?.impacts?.byDguid ?? {};
+  const impactSummary = submission.geometry?.impacts ?? null;
+  const impacts = impactSummary?.byDguid ?? {};
   const dguids = [submission.dguid, submission.neighboring_dguid].filter(Boolean);
 
   return (
     <section className="workspace-review-section">
-      <div className="workspace-review-section__heading"><div><strong>Population + Area impact</strong></div></div>
+      <div className="workspace-review-section__heading"><div><strong>Estimated population + area impact</strong></div></div>
+      {impactSummary?.availability === "unavailable" ? (
+        <p className="workspace-review-empty">Unavailable: {impactSummary.reason || "impact data is incomplete."}</p>
+      ) : null}
       <div className="workspace-impact-table" role="table">
         <div role="row"><strong>DA</strong><strong>Population</strong><strong>Area (km²)</strong></div>
         {dguids.map((dguid) => {
@@ -330,9 +671,13 @@ function CounterProposalImpact({ submission }) {
           return (
             <div role="row" key={dguid}>
               <code>{String(dguid).slice(-8)}</code>
-              <span>{Number(impact.populationDelta || 0) >= 0 ? "+" : ""}{Math.round(impact.populationDelta || 0)}</span>
+              <span>{impact.populationDelta === null || impact.populationDelta === undefined
+                ? "Unavailable"
+                : `${impact.populationDelta >= 0 ? "+" : ""}${Math.round(impact.populationDelta)}`}</span>
               <span>
-                {(Number(impact.originalArea || 0) / 1_000_000).toFixed(2)} → {(Number(impact.currentArea || 0) / 1_000_000).toFixed(2)}
+                {Number.isFinite(impact.originalArea) && Number.isFinite(impact.currentArea)
+                  ? `${(impact.originalArea / 1_000_000).toFixed(2)} → ${(impact.currentArea / 1_000_000).toFixed(2)}`
+                  : "Unavailable"}
               </span>
             </div>
           );
@@ -350,6 +695,7 @@ function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, o
       : reviewerEmails,
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUpdatingAssignees, setIsUpdatingAssignees] = useState(false);
   const [error, setError] = useState("");
   const request = review.archiveRequest;
   const isRequester = request?.requesterEmail === reviewerEmail;
@@ -360,11 +706,15 @@ function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, o
   }, [request?.assignees]);
 
   async function toggleAssignee(email, checked) {
+    if (isUpdatingAssignees) return;
+    const previousAssignees = assignees;
     const nextAssignees = checked
       ? [...new Set([...assignees, email])]
       : assignees.filter((entry) => entry !== email);
 
     setAssignees(nextAssignees);
+    setIsUpdatingAssignees(true);
+    setError("");
 
     try {
       await updateWorkspaceArchiveAssignees(
@@ -372,10 +722,12 @@ function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, o
         nextAssignees
       );
 
-      onCommitted("archive-update-assignees");
     } catch (error) {
       console.error(error);
       setError(error.message);
+      setAssignees(previousAssignees);
+    } finally {
+      setIsUpdatingAssignees(false);
     }
   }
 
@@ -413,6 +765,7 @@ function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, o
               <input
                 type="checkbox"
                 checked={assignees.includes(email)}
+                disabled={isUpdatingAssignees}
                 onChange={(event) => void toggleAssignee(email, event.target.checked)}
               />
               {email}
@@ -471,39 +824,78 @@ export function WorkspaceReviewPanel({
   reviewerEmails: availableReviewerEmails = [],
 }) {
 
-  const EMPTY_REVIEW = {
-    comments: [],
-    labels: [],
-    labelCatalog: [],
-    archiveRequest: null,
-  };
-
   const { user } = useAuth();
   const reviewerEmail = user?.email || "commissioner@example.com";
   const reviewerEmails = [...new Set([reviewerEmail, ...availableReviewerEmails])];
   const [review, setReview] = useState(EMPTY_REVIEW);
+  const [reviewError, setReviewError] = useState("");
+  const refreshSequence = useRef(0);
 
   async function refreshReview() {
+    const sequence = refreshSequence.current + 1;
+    refreshSequence.current = sequence;
     try {
       const nextReview = await getWorkspaceReviewState(submission.id);
-
+      if (refreshSequence.current !== sequence) return;
       setReview({
+        submissionId: submission.id,
         comments: nextReview.comments ?? [],
         labels: nextReview.labels ?? [],
         labelCatalog: nextReview.labelCatalog ?? [],
-        archiveRequest: nextReview.archiveRequest ?? [],
+        archiveRequest: nextReview.archiveRequest ?? null,
+        collaborationWarning: nextReview.collaborationWarning ?? "",
       });
+      setReviewError("");
     } catch (error) {
       console.error("Unable to load workspace review:", error);
-
-      setReview(EMPTY_REVIEW);
+      if (refreshSequence.current === sequence) {
+        setReviewError(error.message || "Unable to refresh Workspace collaboration.");
+      }
     }
   }
 
   useEffect(() => {
+    setReviewError("");
     refreshReview();
-    return subscribeWorkspaceState(refreshReview);
+    const unsubscribe = subscribeWorkspaceState(refreshReview);
+    return () => {
+      refreshSequence.current += 1;
+      unsubscribe();
+    };
   }, [submission.id]);
+
+  const activeReview = String(review.submissionId) === String(submission.id)
+    ? review
+    : EMPTY_REVIEW;
+
+  function updateActiveLabels(labels) {
+    setReview((current) => String(current.submissionId) === String(submission.id)
+      ? { ...current, labels }
+      : current);
+  }
+
+  function updateActiveCatalog(change) {
+    setReview((current) => {
+      if (String(current.submissionId) !== String(submission.id)) return current;
+      if (change?.deletedId) {
+        return {
+          ...current,
+          labels: current.labels.filter((label) => labelIdentity(label) !== String(change.deletedId)),
+          labelCatalog: current.labelCatalog.filter((label) => label.id !== change.deletedId),
+        };
+      }
+      const exists = current.labelCatalog.some((label) => label.id === change?.id);
+      return {
+        ...current,
+        labels: current.labels.map((label) => labelIdentity(label) === change?.id
+          ? { ...label, name: change.name, color: change.color }
+          : label),
+        labelCatalog: exists
+          ? current.labelCatalog.map((label) => label.id === change.id ? change : label)
+          : [...current.labelCatalog, change],
+      };
+    });
+  }
 
   return (
     <aside className="map-info-panel workspace-review-panel" aria-label="Submission workspace review">
@@ -513,15 +905,24 @@ export function WorkspaceReviewPanel({
         onSelect={onSubmissionSelect}
       />
       <div className="workspace-review-panel__scroll">
+        {reviewError ? (
+          <div className="workspace-decision-error" role="alert">
+            <span>{reviewError}</span>
+            <button type="button" onClick={() => void refreshReview()}>Retry</button>
+          </div>
+        ) : null}
         <LabelEditor
+          key={submission.id}
           submissionId={submission.id}
-          selectedLabels={review.labels}
-          savedCatalog={review.labelCatalog}
-          onChange={(labels) => setReview((current) => ({ ...current, labels }))}
+          selectedLabels={activeReview.labels}
+          savedCatalog={activeReview.labelCatalog}
+          onChange={updateActiveLabels}
+          onCatalogChange={updateActiveCatalog}
+          unavailableMessage={activeReview.collaborationWarning}
         />
         <CommentThread
           submissionId={submission.id}
-          comments={review.comments}
+          comments={activeReview.comments}
           reviewerEmail={reviewerEmail}
           onChange={refreshReview}
           readOnly={submission.status !== WORKSPACE_STATUS.PENDING}
@@ -530,7 +931,7 @@ export function WorkspaceReviewPanel({
         <CounterProposalImpact submission={submission} />
         <DecisionControls
           submission={submission}
-          review={review}
+          review={activeReview}
           reviewerEmail={reviewerEmail}
           reviewerEmails={reviewerEmails}
           onCommitted={onCommitted}

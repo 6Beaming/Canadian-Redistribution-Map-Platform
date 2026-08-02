@@ -2,12 +2,18 @@ import {
   getDaPanelTitle,
   getDaPopulationDisplay
 } from "@/lib/map/profileUtils.js";
+import {
+  formatDemographicValue,
+  getDemographicStatusLabel,
+} from "@/lib/demographics/demographicsPresentation.js";
 import { MISSING_DA_POPULATION, MVP_FED_NUM } from "@/lib/map/constants.js";
 import {
   getRolloutAccentColor,
   getRolloutArea,
   getRolloutCategory
 } from "@/lib/map/rolloutPlan.js";
+import { clearDaStatisticsCache, getDaStatistics } from "@/services/demographicsApi.js";
+import { useEffect, useRef, useState } from "react";
 
 const UNORGANIZED_FOOTNOTE =
   "This dissemination area lies in a census subdivision classified as Unorganized, areas outside incorporated municipalities in Yukon (Statistics Canada geography).";
@@ -46,7 +52,48 @@ function SourceLink({ source }) {
   return <span>{label}</span>;
 }
 
-function DaStatistics({ dguid, profile }) {
+function DemographicItem({ item }) {
+  const formatted = formatDemographicValue(item);
+  return (
+    <div className="map-info-panel__statistics-item">
+      <dt>{item.label}</dt>
+      <dd>
+        {formatted ?? <span className="map-info-panel__statistics-state">{getDemographicStatusLabel(item.status)}</span>}
+      </dd>
+    </div>
+  );
+}
+
+function DemographicGroups({ statistics }) {
+  if (!statistics) return null;
+  return (
+    <>
+      {statistics.availability === "unavailable" ? (
+        <p className="map-info-panel__statistics-state">
+          Statistics Canada has no publishable Census Profile values for this DA.
+        </p>
+      ) : null}
+      <div className="map-info-panel__statistics-groups">
+        {statistics.groups.map((group) => (
+          <section key={group.id} className="map-info-panel__statistics-group" aria-labelledby={`statistics-${group.id}`}>
+            <h3 id={`statistics-${group.id}`}>{group.label}</h3>
+            <dl className="map-info-panel__statistics-grid">
+              {group.items.map((item) => <DemographicItem key={item.id} item={item} />)}
+            </dl>
+          </section>
+        ))}
+      </div>
+      <footer className="map-info-panel__statistics-source">
+        <a href={statistics.dataset.sourceUrl} target="_blank" rel="noopener noreferrer">
+          Statistics Canada · 2021 Census
+        </a>
+        <span>DF_DA {statistics.dataset.version} · released {statistics.dataset.releaseDate || "2022"}</span>
+      </footer>
+    </>
+  );
+}
+
+function DaStatistics({ dguid, profile, statisticsState, onRetry }) {
   const population = getDaPopulationDisplay(profile);
   const panelTitle = getDaPanelTitle(profile);
   const fedNum = String(profile?.fed_num || MVP_FED_NUM);
@@ -129,6 +176,17 @@ function DaStatistics({ dguid, profile }) {
         {panelTitle.unorganized ? (
           <p className="map-info-panel__footnote">{UNORGANIZED_FOOTNOTE}</p>
         ) : null}
+
+        {statisticsState.loading ? (
+          <p className="map-info-panel__statistics-state" role="status">Loading statistics…</p>
+        ) : null}
+        {statisticsState.error ? (
+          <div className="map-info-panel__statistics-state map-info-panel__statistics-state--error" role="alert">
+            <p>{statisticsState.error}</p>
+            <button type="button" onClick={onRetry}>Retry statistics</button>
+          </div>
+        ) : null}
+        <DemographicGroups statistics={statisticsState.data} />
       </div>
     </>
   );
@@ -179,6 +237,39 @@ function FedStatistics({ fedNum, fedName }) {
 }
 
 export default function UserViewStatistics({ selection, profilesByDguid }) {
+  const dguid = selection?.type === "da" ? String(selection.dguid ?? "") : "";
+  const [retryVersion, setRetryVersion] = useState(0);
+  const [statisticsState, setStatisticsState] = useState({ data: null, loading: false, error: "" });
+  const requestSequence = useRef(0);
+
+  useEffect(() => {
+    const sequence = requestSequence.current + 1;
+    requestSequence.current = sequence;
+    if (!dguid) {
+      setStatisticsState({ data: null, loading: false, error: "" });
+      return undefined;
+    }
+    const controller = new AbortController();
+    setStatisticsState((current) => ({ ...current, loading: true, error: "" }));
+    getDaStatistics(dguid, { signal: controller.signal, force: retryVersion > 0 })
+      .then((data) => {
+        if (requestSequence.current === sequence) {
+          setStatisticsState({ data, loading: false, error: "" });
+        }
+      })
+      .catch((error) => {
+        if (error.name !== "AbortError" && requestSequence.current === sequence) {
+          setStatisticsState((current) => ({ ...current, loading: false, error: error.message }));
+        }
+      });
+    return () => controller.abort();
+  }, [dguid, retryVersion]);
+
+  const retry = () => {
+    clearDaStatisticsCache(dguid);
+    setRetryVersion((current) => current + 1);
+  };
+
   if (!selection?.type) {
     return (
       <section className="map-info-panel__body min-w-0 text-left">
@@ -194,6 +285,8 @@ export default function UserViewStatistics({ selection, profilesByDguid }) {
       <DaStatistics
         dguid={selection.dguid}
         profile={profilesByDguid.get(selection.dguid)}
+        statisticsState={statisticsState}
+        onRetry={retry}
       />
     );
   }

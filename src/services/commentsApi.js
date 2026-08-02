@@ -69,6 +69,20 @@ export async function getAllComments(){
     return handleResponse(res);
 }
 
+// Exact, geometry-free review-content read for one Workspace submission.
+export async function getSubmissionReviewContent(submissionId){
+    const params = new URLSearchParams({ submissionId: String(submissionId ?? "") });
+    const res = await fetch(
+        `/api/comments/?${params.toString()}`,
+        {
+            method:"GET",
+            credentials:"include",
+        }
+    );
+    const rows = await handleResponse(res);
+    return Array.isArray(rows) ? rows[0] ?? null : null;
+}
+
 
 // Get all comments for a user_id
 export async function getCommentsUser(user_id){

@@ -5,7 +5,6 @@ import { mapApi } from "@/services/mapApi.js";
 import {
   CANADA_BOUNDS,
   DA_HOVER_COLOR,
-  DATA_BLOCKED_FILL_COLOR,
   DEFAULT_DA_RENDER_MAX_ZOOM,
   DEFAULT_DA_RENDER_MIN_ZOOM,
   DEFAULT_DA_SOURCE_LAYER,
@@ -49,12 +48,11 @@ import {
   labelScreenScale
 } from "@/lib/map/labelLayout.js";
 import {
-  getAllRolloutAreas,
   getRolloutAreas,
-  getRolloutColor,
   isDataBlockedFed,
   isEnabledFed,
 } from "@/lib/map/rolloutPlan.js";
+import { filterHandleFeatureCollectionForViewport } from "@/lib/map/counterProposalHandles.js";
 import {
   canInteractWithDa,
   canInteractWithFed,
@@ -320,43 +318,14 @@ const ENABLED_FED_NUMS = getRolloutAreas("enabled").map((area) => String(area.fe
 const BLOCKED_FED_NUMS = getRolloutAreas("data-blocked").map((area) =>
   String(area.fedNum),
 );
-const FED_ROLLOUT_FILL_EXPRESSION = buildRolloutFedMembershipExpression(
-  ENABLED_FED_NUMS,
-  ENABLED_FILL_COLOR,
-  buildRolloutFedMembershipExpression(BLOCKED_FED_NUMS, DATA_BLOCKED_FILL_COLOR, "#ffffff"),
-);
-
-function buildBlockedDaFillExpression() {
-  return buildRolloutFedMembershipExpression(
-    BLOCKED_FED_NUMS,
-    DATA_BLOCKED_FILL_COLOR,
-    ENABLED_FILL_COLOR,
-  );
+function rolloutSelectionFillExpression(categoryId) {
+  const selectedFedNums = categoryId === "data-blocked"
+    ? BLOCKED_FED_NUMS
+    : ENABLED_FED_NUMS;
+  return buildRolloutFedMembershipExpression(selectedFedNums, ENABLED_FILL_COLOR, "#ffffff");
 }
 
-const BLOCKED_DA_FILL_EXPRESSION = buildBlockedDaFillExpression();
-
-function buildBlinkCategoryDaExpression(categoryId, hiddenValue, visibleValue) {
-  if (categoryId === "enabled") {
-    return buildRolloutFedMembershipExpression(
-      ENABLED_FED_NUMS,
-      hiddenValue,
-      visibleValue,
-    );
-  }
-
-  if (categoryId === "data-blocked") {
-    return buildRolloutFedMembershipExpression(
-      BLOCKED_FED_NUMS,
-      hiddenValue,
-      visibleValue,
-    );
-  }
-
-  return visibleValue;
-}
-
-function fedFillPaint(showRollout, showBoundaries = true) {
+function fedFillPaint(showRollout, rolloutCategoryId = null, showBoundaries = true) {
   const fillColor = showRollout
     ? [
       "case",
@@ -364,7 +333,7 @@ function fedFillPaint(showRollout, showBoundaries = true) {
       SELECTED_COLOR,
       ["boolean", ["feature-state", "hover"], false],
       HOVER_COLOR,
-      FED_ROLLOUT_FILL_EXPRESSION,
+      rolloutSelectionFillExpression(rolloutCategoryId),
     ]
     : [
       "case",
@@ -382,8 +351,6 @@ function fedFillPaint(showRollout, showBoundaries = true) {
       0.85,
       ["boolean", ["feature-state", "hover"], false],
       0.75,
-      ["boolean", ["feature-state", "blinkHidden"], false],
-      0.22,
       0.68,
     ]
     : [
@@ -437,7 +404,6 @@ function fedOutlinePaint(showBoundaries = true) {
 function daFillPaint(
   showRollout,
   rolloutCategoryId = null,
-  blinkHidden = false,
   showBoundaries = true,
   heatmapEnabled = false,
   heatmapFillExpression = null,
@@ -449,7 +415,7 @@ function daFillPaint(
       SELECTED_COLOR,
       ["boolean", ["feature-state", "hover"], false],
       DA_HOVER_COLOR,
-      BLOCKED_DA_FILL_EXPRESSION,
+      rolloutSelectionFillExpression(rolloutCategoryId),
     ]
     : heatmapEnabled
       ? [
@@ -474,11 +440,7 @@ function daFillPaint(
       0.85,
       ["boolean", ["feature-state", "hover"], false],
       0.72,
-      buildBlinkCategoryDaExpression(
-        rolloutCategoryId,
-        blinkHidden ? 0.18 : 0.58,
-        0.58,
-      ),
+      0.58,
     ]
     : heatmapEnabled
       ? [
@@ -614,6 +576,7 @@ export function MapCanvas({
   const recenterButtonRef = useRef(null);
   const recenterControlRef = useRef(null);
   const recenterTargetRef = useRef(recenterTarget);
+  const rolloutCategoryIdRef = useRef(rolloutCategoryId);
   const postalAreaButtonRef = useRef(null);
   const postalAreaControlRef = useRef(null);
   const postalAreaTargetRef = useRef(postalAreaTarget);
@@ -645,7 +608,6 @@ export function MapCanvas({
   const applyCounterProposalPreviewRef = useRef(null);
   const applyWorkflowFocusRef = useRef(null);
   const applyInteractionModeRef = useRef(null);
-  const blinkIntervalRef = useRef(null);
   const counterProposalPreviewRef = useRef(counterProposalPreview);
   const onCounterProposalHandleSelectRef = useRef(onCounterProposalHandleSelect);
   const onCounterProposalDragStartRef = useRef(onCounterProposalDragStart);
@@ -673,6 +635,7 @@ export function MapCanvas({
   onPostalAreaActivateRef.current = onPostalAreaActivate;
   onStatusChangeRef.current = onStatusChange;
   recenterTargetRef.current = recenterTarget;
+  rolloutCategoryIdRef.current = rolloutCategoryId;
   postalAreaTargetRef.current = postalAreaTarget;
   boundariesVisibleRef.current = boundariesVisible;
   heatmapEnabledRef.current = heatmapEnabled;
@@ -1062,8 +1025,8 @@ export function MapCanvas({
       return;
     }
 
-    applyPresentationModeRef.current(rolloutEnabled);
-  }, [mapReadyTick, rolloutEnabled]);
+    applyPresentationModeRef.current(rolloutEnabled, rolloutCategoryId);
+  }, [mapReadyTick, rolloutCategoryId, rolloutEnabled]);
 
   useEffect(() => {
     if (!isMapReadyRef.current || !applyBoundaryVisibilityRef.current) {
@@ -1087,125 +1050,23 @@ export function MapCanvas({
   }, [archivedMap, archivedMapEnabled, mapReadyTick]);
 
   useEffect(() => {
-    const setFedState = setFedStateRef.current;
-
-    if (!setFedState || !isMapReadyRef.current) {
+    if (!isMapReadyRef.current) {
       return undefined;
     }
-
-    const safeSetFedState = (fedNum, state) => {
-      try {
-        setFedState(fedNum, state);
-      } catch {
-        return;
-      }
-    };
-
-    if (blinkIntervalRef.current) {
-      window.clearInterval(blinkIntervalRef.current);
-      blinkIntervalRef.current = null;
+    if (mapRef.current?.getLayer("da-fill")) {
+      mapRef.current.setPaintProperty(
+        "da-fill",
+        "fill-opacity",
+        daFillPaint(
+          rolloutEnabled,
+          rolloutCategoryId,
+          boundariesVisibleRef.current,
+          heatmapEnabledRef.current,
+          heatmapFillExpressionRef.current,
+        )["fill-opacity"],
+      );
     }
-
-    const allAreas = getAllRolloutAreas();
-
-    allAreas.forEach((area) => {
-      safeSetFedState(area.fedNum, {
-        rolloutVisible: true,
-        rolloutColor: getRolloutColor(area.categoryId),
-        blinkHidden: false
-      });
-    });
-
-    if (!rolloutEnabled) {
-      if (mapRef.current?.getLayer("da-fill")) {
-        mapRef.current.setPaintProperty(
-          "da-fill",
-          "fill-opacity",
-          daFillPaint(
-            false,
-            rolloutCategoryId,
-            false,
-            boundariesVisibleRef.current,
-            heatmapEnabledRef.current,
-            heatmapFillExpressionRef.current,
-          )["fill-opacity"],
-        );
-      }
-      return undefined;
-    }
-
-    const activeAreas = rolloutCategoryId ? getRolloutAreas(rolloutCategoryId) : [];
-
-    if (!activeAreas.length) {
-      if (mapRef.current?.getLayer("da-fill")) {
-        mapRef.current.setPaintProperty(
-          "da-fill",
-          "fill-opacity",
-          daFillPaint(
-            true,
-            rolloutCategoryId,
-            false,
-            boundariesVisibleRef.current,
-            heatmapEnabledRef.current,
-            heatmapFillExpressionRef.current,
-          )["fill-opacity"],
-        );
-      }
-      return undefined;
-    }
-
-    let isHidden = false;
-    blinkIntervalRef.current = window.setInterval(() => {
-      isHidden = !isHidden;
-      activeAreas.forEach((area) => {
-        safeSetFedState(area.fedNum, {
-          blinkHidden: isHidden
-        });
-      });
-
-      if (mapRef.current?.getLayer("da-fill")) {
-        mapRef.current.setPaintProperty(
-          "da-fill",
-          "fill-opacity",
-          daFillPaint(
-            true,
-            rolloutCategoryId,
-            isHidden,
-            boundariesVisibleRef.current,
-            heatmapEnabledRef.current,
-            heatmapFillExpressionRef.current,
-          )["fill-opacity"],
-        );
-      }
-    }, 520);
-
-    return () => {
-      if (blinkIntervalRef.current) {
-        window.clearInterval(blinkIntervalRef.current);
-        blinkIntervalRef.current = null;
-      }
-
-      activeAreas.forEach((area) => {
-        safeSetFedState(area.fedNum, {
-          blinkHidden: false
-        });
-      });
-
-      if (mapRef.current?.getLayer("da-fill")) {
-        mapRef.current.setPaintProperty(
-          "da-fill",
-          "fill-opacity",
-          daFillPaint(
-            rolloutEnabled,
-            rolloutCategoryId,
-            false,
-            boundariesVisibleRef.current,
-            heatmapEnabledRef.current,
-            heatmapFillExpressionRef.current,
-          )["fill-opacity"],
-        );
-      }
-    };
+    return undefined;
   }, [mapReadyTick, rolloutCategoryId, rolloutEnabled]);
 
   useEffect(() => {
@@ -1396,7 +1257,7 @@ export function MapCanvas({
         id: "fed-fill",
         type: "fill",
         source: "fed-2023",
-        paint: fedFillPaint(rolloutEnabled, boundariesVisibleRef.current)
+        paint: fedFillPaint(rolloutEnabled, rolloutCategoryId, boundariesVisibleRef.current)
       };
       if (useVectorTiles) {
         layer["source-layer"] = FED_SOURCE_LAYER;
@@ -1451,7 +1312,6 @@ export function MapCanvas({
         paint: daFillPaint(
           rolloutEnabled,
           rolloutCategoryId,
-          false,
           boundariesVisibleRef.current,
           heatmapEnabledRef.current,
           heatmapFillExpressionRef.current,
@@ -1623,7 +1483,7 @@ export function MapCanvas({
       };
     }
 
-    function setPresentationMode(showRollout) {
+    function setPresentationMode(showRollout, categoryId = rolloutCategoryIdRef.current) {
       if (map.getLayer("province-highlight")) {
         map.setLayoutProperty(
           "province-highlight",
@@ -1636,17 +1496,17 @@ export function MapCanvas({
         map.setPaintProperty(
           "fed-fill",
           "fill-color",
-          fedFillPaint(showRollout, boundariesVisibleRef.current)["fill-color"],
+          fedFillPaint(showRollout, categoryId, boundariesVisibleRef.current)["fill-color"],
         );
         map.setPaintProperty(
           "fed-fill",
           "fill-outline-color",
-          fedFillPaint(showRollout, boundariesVisibleRef.current)["fill-outline-color"],
+          fedFillPaint(showRollout, categoryId, boundariesVisibleRef.current)["fill-outline-color"],
         );
         map.setPaintProperty(
           "fed-fill",
           "fill-opacity",
-          fedFillPaint(showRollout, boundariesVisibleRef.current)["fill-opacity"],
+          fedFillPaint(showRollout, categoryId, boundariesVisibleRef.current)["fill-opacity"],
         );
       }
 
@@ -1656,8 +1516,7 @@ export function MapCanvas({
           "fill-color",
           daFillPaint(
             showRollout,
-            rolloutCategoryId,
-            false,
+            categoryId,
             boundariesVisibleRef.current,
             heatmapEnabledRef.current,
             heatmapFillExpressionRef.current,
@@ -1668,8 +1527,7 @@ export function MapCanvas({
           "fill-opacity",
           daFillPaint(
             showRollout,
-            rolloutCategoryId,
-            false,
+            categoryId,
             boundariesVisibleRef.current,
             heatmapEnabledRef.current,
             heatmapFillExpressionRef.current,
@@ -1680,8 +1538,7 @@ export function MapCanvas({
           "fill-outline-color",
           daFillPaint(
             showRollout,
-            rolloutCategoryId,
-            false,
+            categoryId,
             boundariesVisibleRef.current,
             heatmapEnabledRef.current,
             heatmapFillExpressionRef.current,
@@ -1725,7 +1582,6 @@ export function MapCanvas({
       const nextPaint = daFillPaint(
         rolloutEnabled,
         rolloutCategoryId,
-        false,
         boundariesVisibleRef.current,
         enabled,
         heatmapFillExpressionRef.current,
@@ -1978,12 +1834,16 @@ export function MapCanvas({
         paint: {
           "circle-radius": [
             "case",
+            ["boolean", ["get", "locked"], false],
+            5,
             ["boolean", ["get", "selected"], false],
             8,
             6,
           ],
           "circle-color": [
             "case",
+            ["boolean", ["get", "locked"], false],
+            "#d1d5db",
             ["boolean", ["get", "selected"], false],
             "#1a73e8",
             "#ffffff",
@@ -1996,6 +1856,34 @@ export function MapCanvas({
           ],
           "circle-stroke-color": "#1a73e8",
           "circle-opacity": 0.98,
+        },
+      });
+
+      map.addSource("counter-proposal-drag-overlay", {
+        type: "geojson",
+        data: EMPTY_COUNTER_PROPOSAL_FEATURES,
+      });
+      map.addLayer({
+        id: "counter-proposal-drag-overlay-line",
+        type: "line",
+        source: "counter-proposal-drag-overlay",
+        filter: ["==", ["geometry-type"], "LineString"],
+        paint: {
+          "line-color": "#1a73e8",
+          "line-width": 4,
+          "line-dasharray": [1.5, 1.5],
+        },
+      });
+      map.addLayer({
+        id: "counter-proposal-drag-overlay-point",
+        type: "circle",
+        source: "counter-proposal-drag-overlay",
+        filter: ["==", ["geometry-type"], "Point"],
+        paint: {
+          "circle-radius": 8,
+          "circle-color": "#1a73e8",
+          "circle-stroke-width": 3,
+          "circle-stroke-color": "#ffffff",
         },
       });
     }
@@ -2121,6 +2009,8 @@ export function MapCanvas({
           return {
             type: "counter-proposal-handle",
             id: String(handleId),
+            locked: Boolean(handleFeatures[0]?.properties?.locked),
+            coordinate: handleFeatures[0]?.geometry?.coordinates ?? null,
           };
         }
       }
@@ -2314,7 +2204,12 @@ export function MapCanvas({
 
       if (handleSource && typeof handleSource.setData === "function") {
         handleSource.setData(
-          nextPreview?.handleFeatureCollection ?? EMPTY_COUNTER_PROPOSAL_FEATURES,
+          nextPreview?.handleFeatureCollection
+            ? filterHandleFeatureCollectionForViewport(
+                nextPreview.handleFeatureCollection,
+                (coordinate) => map.project(coordinate),
+              )
+            : EMPTY_COUNTER_PROPOSAL_FEATURES,
         );
       }
 
@@ -2434,6 +2329,28 @@ export function MapCanvas({
         moved: true,
       };
       map.getCanvas().style.cursor = "grabbing";
+      const overlaySource = map.getSource("counter-proposal-drag-overlay");
+      if (overlaySource && typeof overlaySource.setData === "function") {
+        overlaySource.setData({
+          type: "FeatureCollection",
+          features: [
+            {
+              type: "Feature",
+              properties: { kind: "segment" },
+              geometry: {
+                type: "LineString",
+                coordinates: [counterProposalDragRef.current.startCoordinate, nextCoordinate],
+              },
+            },
+            {
+              type: "Feature",
+              properties: { kind: "handle" },
+              geometry: { type: "Point", coordinates: nextCoordinate },
+            },
+          ],
+        });
+      }
+      counterProposalDragRef.current.lastCoordinate = nextCoordinate;
       onCounterProposalDragMoveRef.current?.(
         counterProposalDragRef.current.id,
         nextCoordinate,
@@ -2448,7 +2365,7 @@ export function MapCanvas({
       const hit = pickMapTarget(event.point);
 
       if (hit?.type === "counter-proposal-handle") {
-        map.getCanvas().style.cursor = "grab";
+        map.getCanvas().style.cursor = hit.locked ? "not-allowed" : "grab";
         setInternalHover(null);
         return;
       }
@@ -2492,13 +2409,15 @@ export function MapCanvas({
     const onMouseDown = (event) => {
       const hit = pickMapTarget(event.point);
 
-      if (hit?.type !== "counter-proposal-handle") {
+      if (hit?.type !== "counter-proposal-handle" || hit.locked) {
         return;
       }
 
       counterProposalDragRef.current = {
         id: hit.id,
         moved: false,
+        startCoordinate: hit.coordinate,
+        lastCoordinate: hit.coordinate,
       };
       map.dragPan.disable();
       map.getCanvas().style.cursor = "grabbing";
@@ -2517,8 +2436,10 @@ export function MapCanvas({
         event.clientY - canvasRect.top,
       ];
       const lngLat = map.unproject(projectedPoint);
-
-      pushCounterProposalDragMove([lngLat.lng, lngLat.lat]);
+      const coordinate = [Number(lngLat.lng), Number(lngLat.lat)];
+      if (!coordinate.every(Number.isFinite)) return;
+      if (coordinate[0] < -180 || coordinate[0] > 180 || coordinate[1] < -90 || coordinate[1] > 90) return;
+      pushCounterProposalDragMove(coordinate);
     };
 
     const onMouseUp = () => {
@@ -2526,18 +2447,32 @@ export function MapCanvas({
         return;
       }
 
-      const { moved } = counterProposalDragRef.current;
+      const { id, lastCoordinate, moved } = counterProposalDragRef.current;
       counterProposalDragRef.current = null;
       map.dragPan.enable();
       map.getCanvas().style.cursor = "";
-      onCounterProposalDragEndRef.current?.();
+      const overlaySource = map.getSource("counter-proposal-drag-overlay");
+      if (overlaySource && typeof overlaySource.setData === "function") {
+        overlaySource.setData(EMPTY_COUNTER_PROPOSAL_FEATURES);
+      }
+      onCounterProposalDragEndRef.current?.(id, lastCoordinate);
 
       if (moved) {
         skipNextClickRef.current = true;
       }
     };
 
-    const onZoom = () => syncDaOutlineVisibility();
+    const onZoom = () => {
+      syncDaOutlineVisibility();
+      const preview = counterProposalPreviewRef.current;
+      const handleSource = map.getSource("counter-proposal-handles");
+      if (preview?.editable && handleSource && typeof handleSource.setData === "function") {
+        handleSource.setData(filterHandleFeatureCollectionForViewport(
+          preview.handleFeatureCollection,
+          (coordinate) => map.project(coordinate),
+        ));
+      }
+    };
 
     map.on("click", onClick);
     map.on("mousedown", onMouseDown);
@@ -2643,10 +2578,6 @@ export function MapCanvas({
       attributionCollapseObserver?.disconnect();
       labelResizeObserver?.disconnect();
       isMapReadyRef.current = false;
-      if (blinkIntervalRef.current) {
-        window.clearInterval(blinkIntervalRef.current);
-        blinkIntervalRef.current = null;
-      }
       setFedStateRef.current = null;
       applyPresentationModeRef.current = null;
       applyBoundaryVisibilityRef.current = null;

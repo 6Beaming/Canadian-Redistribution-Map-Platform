@@ -14,12 +14,25 @@ const AUTH_PATHS = new Set([
   "/sign-up"
 ]);
 
-function getBackRoute(pathname, isCommissioner) {
+function getBackRoute(location, isCommissioner) {
+  const { pathname, state } = location;
   if (pathname.startsWith("/dashboard/archivedTree/") && pathname.endsWith("/difference")) {
     return "/dashboard/archivedTree";
   }
 
   if (pathname.startsWith("/dashboard/workspace/")) {
+    return "/dashboard/workspace";
+  }
+
+  if (pathname === "/dashboard/workspace") {
+    return state?.from === "/dashboard/submissionsTable" ? state.from : "/dashboard";
+  }
+
+  if (pathname === "/dashboard/graphs") {
+    return "/dashboard/submissionsTable";
+  }
+
+  if (pathname === "/dashboard/archivedTree") {
     return "/dashboard/workspace";
   }
 
@@ -54,7 +67,7 @@ export default function Header({ onPlaceSelect }) {
   }
 
   const isCommissioner = user?.role === "commissioner";
-  const backRoute = getBackRoute(pathname, isCommissioner);
+  const backRoute = getBackRoute(location, isCommissioner);
   const isCommissionerSurface =
     pathname === "/dashboard" || pathname.startsWith("/dashboard/");
   const isWorkspaceReview = pathname.startsWith("/dashboard/workspace/");
@@ -70,6 +83,14 @@ export default function Header({ onPlaceSelect }) {
     (!isCommissionerSurface || pathname === "/dashboard") &&
     !isPublicProfilePage &&
     !isPublicSubmissionsPage;
+
+  function navigateBack() {
+    if (isWorkspaceReview && location.state?.workspaceFrom) {
+      navigate(backRoute, { state: { from: location.state.workspaceFrom } });
+      return;
+    }
+    navigate(backRoute);
+  }
 
   async function handleSignOut() {
     if (sessionStatus !== "signed-in") {
@@ -96,10 +117,10 @@ export default function Header({ onPlaceSelect }) {
             variant="outline"
             size="sm"
             className="header__nav-button"
-            onClick={() => navigate(backRoute)}
+            onClick={navigateBack}
           >
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            <span>{isWorkspaceReview ? "Back to Workspace" : isArchivedDifference ? "Back to Archived Tree" : "Back to Map"}</span>
+            <span>{isWorkspaceReview ? "Back to Workspace" : isArchivedDifference ? "Back to Archived Tree" : backRoute === "/dashboard/workspace" ? "Back to Workspace" : backRoute === "/dashboard/submissionsTable" ? "Back to User Submissions" : "Back to Map"}</span>
           </Button>
         ) : backRoute && (isPublicProfilePage || pathname === "/submissions") ? (
           <Button
@@ -107,7 +128,7 @@ export default function Header({ onPlaceSelect }) {
             variant="outline"
             size="sm"
             className="header__nav-button"
-            onClick={() => navigate(backRoute)}
+            onClick={navigateBack}
           >
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             <span>Back to Map</span>
@@ -119,7 +140,7 @@ export default function Header({ onPlaceSelect }) {
             size="icon"
             className="h-10 w-10 rounded-full bg-white"
             aria-label="Go back"
-            onClick={() => navigate(backRoute)}
+            onClick={navigateBack}
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>

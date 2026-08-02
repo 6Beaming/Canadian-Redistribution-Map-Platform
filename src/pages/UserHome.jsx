@@ -13,15 +13,14 @@ import {
 import {
   buildCounterProposalCache,
   clearCounterProposalStorage,
-  commitCounterProposalCacheHistory,
   createInitialCounterProposalWorkflow,
   emptyCounterProposalFeatureCollection,
-  previewCounterProposalHandleMove,
-  redoCounterProposalCache,
+  readCounterProposalStorage,
+  restoreCounterProposalCacheFromDraft,
   selectCounterProposalHandle,
-  undoCounterProposalCache,
   writeCounterProposalStorage,
 } from "@/lib/map/counterProposalWorkflow.js";
+import { createCounterProposalWorkerClient } from "@/services/counterProposalWorkerClient.js";
 import {
   getMetadataGeojsonPathsForFed,
   getFallbackDaAssetManifest,
@@ -32,6 +31,7 @@ import { MAP_INTERACTION_MODE } from "@/lib/map/interactionMode.js";
 import { mapApi } from "@/services/mapApi.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
 import { useAuth } from "@/contexts/AuthContext.jsx";
+import { RouteLoadingPage } from "@/components/non_prebuilt/RouteLoadingPage.jsx";
 import "@/styles/map.css";
 
 function createInitialObjectionWorkflow(overrides = {}) {
@@ -63,9 +63,17 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
   const [panelView, setPanelView] = useState(getDefaultPanelView("user"));
   const [isRolloutOpen, setIsRolloutOpen] = useState(false);
   const [rolloutCategoryId, setRolloutCategoryId] = useState(DEFAULT_ROLLOUT_CATEGORY_ID);
+  const [initialLoad, setInitialLoad] = useState({ ready: false, error: "" });
   const metadataIndexCacheRef = useRef(new Map());
-  const counterProposalDragFrameRef = useRef(0);
   const pendingCounterProposalDragRef = useRef(null);
+  const counterProposalDragTimerRef = useRef(0);
+  const counterProposalWorkerRef = useRef(null);
+  const counterProposalWorkerInitRef = useRef(Promise.resolve());
+  const counterProposalCacheRef = useRef(null);
+  const counterProposalDraggingRef = useRef(false);
+  const counterProposalPreviewVersionRef = useRef(0);
+  const counterProposalDraftRef = useRef(readCounterProposalStorage());
+  const counterProposalDraftPendingRef = useRef(Boolean(counterProposalDraftRef.current));
   const profileMapTarget = useMemo(() => {
     const latitude = Number(user?.mapCenter?.latitude);
     const longitude = Number(user?.mapCenter?.longitude);
@@ -99,10 +107,12 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
         const { index } = buildProfileIndex(payload);
         setAssetManifest(normalizedManifest);
         setProfilesByDguid(index);
+        setInitialLoad({ ready: true, error: "" });
       })
       .catch((error) => {
         if (isMounted) {
           setStatus(`Error: ${error.message}`);
+          setInitialLoad({ ready: false, error: error.message || "Unable to load map data." });
         }
       });
 
@@ -125,34 +135,31 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
   }, []);
 
   useEffect(() => {
-    clearCounterProposalStorage();
-
-    function handleBeforeUnload() {
-      clearCounterProposalStorage();
+    if (counterProposalDraftPendingRef.current) return;
+    if (counterProposalWorkflow.dragBaselineSnapshot) {
+      return;
     }
+    const timer = window.setTimeout(() => writeCounterProposalStorage(counterProposalWorkflow), 300);
+    return () => window.clearTimeout(timer);
+  }, [counterProposalWorkflow]);
 
-    window.addEventListener("beforeunload", handleBeforeUnload);
+  counterProposalCacheRef.current = counterProposalWorkflow.cache;
 
+  useEffect(() => {
+    const client = createCounterProposalWorkerClient();
+    counterProposalWorkerRef.current = client;
     return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      clearCounterProposalStorage();
+      if (counterProposalDragTimerRef.current) window.clearTimeout(counterProposalDragTimerRef.current);
+      client?.terminate();
+      counterProposalWorkerRef.current = null;
     };
   }, []);
 
   useEffect(() => {
-    if (counterProposalWorkflow.dragBaselineSnapshot) {
-      return;
-    }
-
-    writeCounterProposalStorage(counterProposalWorkflow);
-  }, [counterProposalWorkflow]);
-
-  useEffect(() => () => {
-    if (counterProposalDragFrameRef.current) {
-      window.cancelAnimationFrame(counterProposalDragFrameRef.current);
-      counterProposalDragFrameRef.current = 0;
-    }
-  }, []);
+    const client = counterProposalWorkerRef.current;
+    if (!client || !counterProposalWorkflow.cache || counterProposalDraggingRef.current) return;
+    counterProposalWorkerInitRef.current = client.init(counterProposalWorkflow.cache).catch(() => undefined);
+  }, [counterProposalWorkflow.cache]);
 
   useEffect(() => {
     if (!isFullscreen) {
@@ -249,6 +256,54 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
     },
     [ensureMetadataIndexForFed],
   );
+
+  useEffect(() => {
+    const draft = counterProposalDraftRef.current;
+    if (!draft || !initialLoad.ready || !profilesByDguid.size) return undefined;
+    let cancelled = false;
+    const firstDguid = String(draft.firstDguid ?? "");
+    const secondDguid = String(draft.secondDguid ?? "");
+    const firstFed = getFedNumForDguid(firstDguid);
+    const secondFed = getFedNumForDguid(secondDguid);
+
+    ensureMetadataIndexForFeds([firstFed, secondFed]).then((index) => {
+      if (cancelled || !index || !areDaNeighbours(index, firstDguid, secondDguid)) {
+        throw new Error("The saved Counter-Proposal baseline is no longer available.");
+      }
+      const baseCache = buildCounterProposalCache(index, profilesByDguid, firstDguid, secondDguid);
+      const cache = restoreCounterProposalCacheFromDraft(baseCache, draft);
+      if (cache === baseCache && draft.cache?.history?.length) {
+        throw new Error("The saved Counter-Proposal baseline has changed.");
+      }
+      setObjectionGeometryIndex(index);
+      setPanelView("counter-proposal");
+      setSelection({ type: "da", dguid: secondDguid });
+      setCounterProposalWorkflow(createInitialCounterProposalWorkflow({
+        step: Math.max(3, Math.min(4, Number(draft.step) || 3)),
+        firstDguid,
+        secondDguid,
+        previewMode: draft.previewMode === "original" ? "original" : "proposal",
+        cache,
+      }));
+    }).catch((error) => {
+      if (!cancelled) {
+        clearCounterProposalStorage();
+        setStatus(`Saved Counter-Proposal was discarded: ${error.message}`);
+      }
+    }).finally(() => {
+      if (!cancelled) {
+        counterProposalDraftPendingRef.current = false;
+        counterProposalDraftRef.current = null;
+      }
+    });
+
+    return () => { cancelled = true; };
+  }, [
+    ensureMetadataIndexForFeds,
+    getFedNumForDguid,
+    initialLoad.ready,
+    profilesByDguid,
+  ]);
 
   useEffect(() => {
     if (panelView !== "objection" && panelView !== "counter-proposal") {
@@ -616,10 +671,20 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
   }, []);
 
   const handleCounterProposalSubmitSuccess = useCallback(() => {
-    clearCounterProposalStorage();
     setCounterProposalWorkflow(createInitialCounterProposalWorkflow());
     setSelection(null);
   }, []);
+
+  const handlePostalAreaActivate = useCallback(() => {
+    // A postal-code center is not a DA selection. Clear the previous DA so the
+    // InfoPanel immediately returns to its neutral Statistics state instead
+    // of presenting stale details for the area the user just left.
+    onClearMapSearchTarget?.();
+    setSelection(null);
+    setPanelView(getDefaultPanelView("user"));
+    setRolloutHoverSelection(null);
+    setIsRolloutOpen(false);
+  }, [onClearMapSearchTarget]);
 
   const handleCounterProposalSelectHandle = useCallback((handleId) => {
     setCounterProposalWorkflow((current) => {
@@ -641,11 +706,21 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
       }
 
       const nextCache = selectCounterProposalHandle(current.cache, handleId);
+      counterProposalDraggingRef.current = true;
+      counterProposalPreviewVersionRef.current += 1;
+      counterProposalCacheRef.current = nextCache;
+      const client = counterProposalWorkerRef.current;
+      counterProposalWorkerInitRef.current = client
+        ? client.init(nextCache).catch(() => undefined)
+        : Promise.resolve();
 
       return {
         ...current,
         cache: nextCache,
         dragBaselineSnapshot: nextCache.currentFeatures,
+        dragPreviewImpacts: null,
+        dragValidating: false,
+        error: "",
       };
     });
   }, []);
@@ -656,99 +731,114 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
       nextCoordinate,
     };
 
-    if (counterProposalDragFrameRef.current) {
+    if (counterProposalDragTimerRef.current) {
       return;
     }
 
-    counterProposalDragFrameRef.current = window.requestAnimationFrame(() => {
-      counterProposalDragFrameRef.current = 0;
+    counterProposalDragTimerRef.current = window.setTimeout(async () => {
+      counterProposalDragTimerRef.current = 0;
       const pending = pendingCounterProposalDragRef.current;
-      pendingCounterProposalDragRef.current = null;
-
-      if (!pending) {
-        return;
-      }
-
-      startTransition(() => {
-        setCounterProposalWorkflow((current) => {
-          if (!current.cache) {
-            return current;
-          }
-
-          return {
-            ...current,
-            cache: previewCounterProposalHandleMove(
-              current.cache,
-              pending.handleId,
-              pending.nextCoordinate,
-            ),
-          };
-        });
-      });
-    });
-  }, []);
-
-  const handleCounterProposalDragEnd = useCallback(() => {
-    startTransition(() => {
-      setCounterProposalWorkflow((current) => {
-        if (!current.cache) {
-          return current;
+      if (!pending || !counterProposalWorkerRef.current) return;
+      try {
+        const previewVersion = ++counterProposalPreviewVersionRef.current;
+        await counterProposalWorkerInitRef.current;
+        const result = await counterProposalWorkerRef.current.preview(
+          pending.handleId,
+          pending.nextCoordinate,
+        );
+        if (
+          !counterProposalDraggingRef.current
+          || previewVersion !== counterProposalPreviewVersionRef.current
+          || result?.type !== "PREVIEW_RESULT"
+        ) {
+          return;
         }
-
-        let nextCache = current.cache;
-        const pending = pendingCounterProposalDragRef.current;
-
-        if (counterProposalDragFrameRef.current) {
-          window.cancelAnimationFrame(counterProposalDragFrameRef.current);
-          counterProposalDragFrameRef.current = 0;
-        }
-
-        pendingCounterProposalDragRef.current = null;
-
-        if (pending) {
-          nextCache = previewCounterProposalHandleMove(
-            nextCache,
-            pending.handleId,
-            pending.nextCoordinate,
-          );
-        }
-
-        return {
+        startTransition(() => setCounterProposalWorkflow((current) => ({
           ...current,
-          cache: commitCounterProposalCacheHistory(
-            nextCache,
-            current.dragBaselineSnapshot,
-          ),
-          dragBaselineSnapshot: null,
-        };
-      });
-    });
+          dragPreviewImpacts: result.impacts,
+        })));
+      } catch {
+        // Preview failure is non-fatal; commit remains worker-only and restores the baseline on failure.
+      }
+    }, 150);
   }, []);
 
-  const handleCounterProposalUndo = useCallback(() => {
-    setCounterProposalWorkflow((current) => {
-      if (!current.cache) {
-        return current;
+  const handleCounterProposalDragEnd = useCallback(async (handleId, finalCoordinate) => {
+    if (counterProposalDragTimerRef.current) {
+      window.clearTimeout(counterProposalDragTimerRef.current);
+      counterProposalDragTimerRef.current = 0;
+    }
+    pendingCounterProposalDragRef.current = null;
+    counterProposalPreviewVersionRef.current += 1;
+    setCounterProposalWorkflow((current) => ({ ...current, dragValidating: true }));
+    try {
+      await counterProposalWorkerInitRef.current;
+      const result = counterProposalWorkerRef.current
+        ? await counterProposalWorkerRef.current.commit(handleId, finalCoordinate)
+        : null;
+      if (result?.type !== "COMMIT_RESULT" || !result.cache) {
+        throw new Error("Worker commit unavailable.");
       }
-
-      return {
+      counterProposalCacheRef.current = result.cache;
+      startTransition(() => setCounterProposalWorkflow((current) => ({
         ...current,
-        cache: undoCounterProposalCache(current.cache),
-      };
-    });
+        cache: result.cache,
+        dragBaselineSnapshot: null,
+        dragPreviewImpacts: null,
+        dragValidating: false,
+        error: "",
+      })));
+    } catch (error) {
+      const baselineCache = counterProposalCacheRef.current;
+      setCounterProposalWorkflow((current) => ({
+        ...current,
+        cache: baselineCache,
+        dragBaselineSnapshot: null,
+        dragPreviewImpacts: null,
+        dragValidating: false,
+        error: `The boundary move was not committed: ${error.message}`,
+      }));
+    } finally {
+      counterProposalDraggingRef.current = false;
+    }
   }, []);
 
-  const handleCounterProposalRedo = useCallback(() => {
-    setCounterProposalWorkflow((current) => {
-      if (!current.cache) {
-        return current;
+  const handleCounterProposalUndo = useCallback(async () => {
+    const currentCache = counterProposalCacheRef.current;
+    if (!currentCache) return;
+    try {
+      await counterProposalWorkerRef.current?.init(currentCache);
+      const result = await counterProposalWorkerRef.current?.undo();
+      if (result?.type !== "COMMIT_RESULT" || !result.cache) {
+        throw new Error("Worker undo unavailable.");
       }
-
-      return {
+      counterProposalCacheRef.current = result.cache;
+      setCounterProposalWorkflow((current) => ({ ...current, cache: result.cache, error: "" }));
+    } catch (error) {
+      setCounterProposalWorkflow((current) => ({
         ...current,
-        cache: redoCounterProposalCache(current.cache),
-      };
-    });
+        error: `Undo was not applied: ${error.message}`,
+      }));
+    }
+  }, []);
+
+  const handleCounterProposalRedo = useCallback(async () => {
+    const currentCache = counterProposalCacheRef.current;
+    if (!currentCache) return;
+    try {
+      await counterProposalWorkerRef.current?.init(currentCache);
+      const result = await counterProposalWorkerRef.current?.redo();
+      if (result?.type !== "COMMIT_RESULT" || !result.cache) {
+        throw new Error("Worker redo unavailable.");
+      }
+      counterProposalCacheRef.current = result.cache;
+      setCounterProposalWorkflow((current) => ({ ...current, cache: result.cache, error: "" }));
+    } catch (error) {
+      setCounterProposalWorkflow((current) => ({
+        ...current,
+        error: `Redo was not applied: ${error.message}`,
+      }));
+    }
   }, []);
 
   useEffect(() => {
@@ -876,7 +966,32 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
       selectedHandleId: counterProposalWorkflow.cache.selectedHandleId,
       editable: showHandles,
     };
-  }, [counterProposalWorkflow, panelView]);
+  }, [
+    counterProposalWorkflow.cache?.currentFeatureCollection,
+    counterProposalWorkflow.cache?.handleFeatureCollection,
+    counterProposalWorkflow.cache?.originalFeatures,
+    counterProposalWorkflow.cache?.pairIndex,
+    counterProposalWorkflow.cache?.selectedHandleId,
+    counterProposalWorkflow.cache?.sharedBoundaryGeoJson,
+    counterProposalWorkflow.firstDguid,
+    counterProposalWorkflow.previewMode,
+    counterProposalWorkflow.secondDguid,
+    counterProposalWorkflow.step,
+    panelView,
+  ]);
+
+  const counterProposalPanelWorkflow = useMemo(() => {
+    if (!counterProposalWorkflow.dragPreviewImpacts || !counterProposalWorkflow.cache) {
+      return counterProposalWorkflow;
+    }
+    return {
+      ...counterProposalWorkflow,
+      cache: {
+        ...counterProposalWorkflow.cache,
+        impacts: counterProposalWorkflow.dragPreviewImpacts,
+      },
+    };
+  }, [counterProposalWorkflow]);
 
   const interactionMode = useMemo(() => {
     if (panelView === "objection") {
@@ -909,6 +1024,10 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
     return [];
   }, [counterProposalWorkflow.firstDguid, counterProposalWorkflow.secondDguid, counterProposalWorkflow.step, objectionWorkflow.firstDguid, objectionWorkflow.secondDguid, objectionWorkflow.step, panelView]);
 
+  if (!initialLoad.ready) {
+    return <RouteLoadingPage label="Loading public map…" error={initialLoad.error} />;
+  }
+
   return (
     <div className="map-page">
       <div className="map-workspace map-workspace--single-column">
@@ -935,7 +1054,7 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
                 mapSearchTarget={effectiveMapSearchTarget}
                 recenterTarget={sessionStatus === "signed-out" ? null : undefined}
                 postalAreaTarget={profileMapTarget}
-                onPostalAreaActivate={onClearMapSearchTarget}
+                onPostalAreaActivate={handlePostalAreaActivate}
                 selection={selection}
                 externalHoverSelection={rolloutHoverSelection}
                 objectionPreview={objectionPreview}
@@ -975,7 +1094,7 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
             objectionWorkflow={objectionWorkflow}
             onObjectionBackStep={handleObjectionBackStep}
             onObjectionConfirmReview={handleObjectionConfirmReview}
-            counterProposalWorkflow={counterProposalWorkflow}
+            counterProposalWorkflow={counterProposalPanelWorkflow}
             onCounterProposalBackStep={handleCounterProposalBackStep}
             onCounterProposalConfirmEdit={handleCounterProposalConfirmEdit}
             onCounterProposalSubmitSuccess={handleCounterProposalSubmitSuccess}
