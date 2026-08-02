@@ -1,11 +1,12 @@
-import { getAllComments } from "@/services/commentsApi.js";
 import {
-    getTemporaryCounterProposalSubmissions,
     hydrateWorkspaceSubmission,
 } from "@/services/tempCounterProposal.js";
+import {
+    getCommissionerSubmissionTableRows,
+    getSubmissionTableRowById,
+} from "@/services/submissionListsApi.js";
 
-const STORAGE_KEY = "crmp.workspace.v1";
-const WORKSPACE_EVENT = "crmp:workspace-change";
+const REALTIME_INVALIDATION_EVENT = "crmp:realtime-invalidation";
 
 
 function handleResponse(res) {
@@ -40,7 +41,7 @@ export async function getWorkspaceLabels(submissionId) {
 
 export async function addWorkspaceLabels(submissionId, labels) {
     const res = await fetch(`/api/workspace/labels/${submissionId}`, {
-        method: "POST",
+        method: "PUT",
         credentials: "include",
         headers: {
             "Content-Type": "application/json",
@@ -116,16 +117,14 @@ export async function getWorkspaceLabelCatalog() {
 }
 
 
-export async function updateWorkspaceLabelCatalog(labels) {
-    const res = await fetch(`/api/workspace/label-catalog`, {
-        method: "POST",
+export async function updateWorkspaceLabelCatalog(labelId, changes) {
+    const res = await fetch(`/api/workspace/label-catalog/${encodeURIComponent(labelId)}`, {
+        method: "PATCH",
         credentials: "include",
         headers: {
             "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-            labels,
-        }),
+        body: JSON.stringify(changes),
     });
 
     return handleResponse(res);
@@ -138,48 +137,6 @@ export const WORKSPACE_STATUS = Object.freeze({
     REJECTED: "rejected",
     ARCHIVED: "archived",
 });
-
-function emptyWorkspaceState() {
-    return {
-        version: 1,
-        submissions: {},
-        comments: {},
-        labels: {},
-        labelCatalogs: {},
-        archiveRequests: {},
-    };
-}
-
-function canUseStorage() {
-    return typeof window !== "undefined" && Boolean(window.localStorage);
-}
-
-function readWorkspaceState() {
-    if (!canUseStorage()) return emptyWorkspaceState();
-
-    try {
-        const parsed = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "null");
-        return parsed && parsed.version === 1
-            ? { ...emptyWorkspaceState(), ...parsed }
-            : emptyWorkspaceState();
-    } catch {
-        return emptyWorkspaceState();
-    }
-}
-
-function writeWorkspaceState(nextState) {
-    if (canUseStorage()) {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
-        window.dispatchEvent(new CustomEvent(WORKSPACE_EVENT, { detail: nextState }));
-    }
-
-    return nextState;
-}
-
-function updateWorkspaceState(updater) {
-    const current = readWorkspaceState();
-    return writeWorkspaceState(updater(current));
-}
 
 export function normalizeWorkspaceStatus(value) {
     const status = String(value ?? WORKSPACE_STATUS.PENDING)
@@ -199,17 +156,32 @@ export function normalizeWorkspaceStatus(value) {
 }
 
 function normalizeSubmission(submission, source) {
-    const localOverride = readWorkspaceState().submissions?.[submission.id] ?? {};
-
     return {
         ...submission,
-        ...localOverride,
         source,
-        status: normalizeWorkspaceStatus(localOverride.status ?? submission.status),
+        status: normalizeWorkspaceStatus(submission.status),
         authorEmail:
-            submission.profile?.email ?? submission.authorEmail ?? localOverride.authorEmail ?? "Unknown",
+            submission.profile?.email ?? submission.authorEmail ?? "Unknown",
         profile: submission.profile ?? (submission.authorEmail ? { email: submission.authorEmail } : null),
     };
+}
+
+export async function createWorkspaceLabelCatalog(label) {
+    const res = await fetch("/api/workspace/label-catalog", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(label),
+    });
+    return handleResponse(res);
+}
+
+export async function deleteWorkspaceLabelCatalog(labelId) {
+    const res = await fetch(`/api/workspace/label-catalog/${encodeURIComponent(labelId)}`, {
+        method: "DELETE",
+        credentials: "include",
+    });
+    return handleResponse(res);
 }
 
 /**
@@ -217,42 +189,10 @@ function normalizeSubmission(submission, source) {
  * authenticated GET /api/comments route. Counter-proposals are loaded from the
  * dedicated submissions API so revision geometry is available for review.
  */
-async function loadLiveSubmissions() {
-    try {
-        const submissions = await getAllComments();
-        return Array.isArray(submissions)
-            ? submissions
-                .filter((submission) => {
-                    const type = String(submission?.type ?? "").toLowerCase().replaceAll("_", "-");
-                    return type !== "counter-proposal";
-                })
-                .map((submission) => normalizeSubmission(submission, "supabase"))
-            : [];
-    } catch (error) {
-        console.warn("Workspace live submissions are unavailable.", error);
-        return [];
-    }
-}
-
-/**
- * Persisted counter-proposals from GET /api/submissions/counter-proposals.
- * Geometry is intentionally not hydrated for list pages.
- */
-async function loadPersistedCounterProposals() {
-    return getTemporaryCounterProposalSubmissions().then((submissions) =>
-        submissions.map((submission) => normalizeSubmission(submission, "supabase")),
-    );
-}
-
-/**
- * Combines protected Supabase feedback/objections with persisted counter-proposals.
- */
 export async function getWorkspaceSubmissions({ includeArchived = true } = {}) {
-    const [liveSubmissions, counterProposals] = await Promise.all([
-        loadLiveSubmissions(),
-        loadPersistedCounterProposals(),
-    ]);
-    const submissions = [...liveSubmissions, ...counterProposals]
+    const { items } = await getCommissionerSubmissionTableRows();
+    const submissions = items
+        .map((submission) => normalizeSubmission(submission, "supabase"))
         .filter((submission) => includeArchived || submission.status !== WORKSPACE_STATUS.ARCHIVED)
         .sort((left, right) => new Date(right.created_at) - new Date(left.created_at));
 
@@ -282,8 +222,8 @@ export async function getWorkspaceReviewerEmails() {
 }
 
 export async function getWorkspaceSubmission(submissionId, options = {}) {
-    const submissions = await getWorkspaceSubmissions({ includeArchived: true });
-    const submission = submissions.find((entry) => String(entry.id) === String(submissionId));
+    const row = await getSubmissionTableRowById(submissionId);
+    const submission = row ? normalizeSubmission(row, "supabase") : null;
 
     if (!submission || options.hydrateGeometry === false) return submission ?? null;
     return hydrateWorkspaceSubmission(submission, options.profilesByDguid);
@@ -291,6 +231,14 @@ export async function getWorkspaceSubmission(submissionId, options = {}) {
 
 /** Local-only review draft; not a shared or durable Workspace backend record. */
 export async function getWorkspaceReviewState(submissionId) {
+    let collaborationWarning = "";
+    const tolerateMissingLabelMigration = (promise) => promise.catch((error) => {
+        if (/workspace label migration is not installed/i.test(error.message)) {
+            collaborationWarning = error.message;
+            return [];
+        }
+        throw error;
+    });
 
     const [
         comments,
@@ -299,26 +247,38 @@ export async function getWorkspaceReviewState(submissionId) {
         labelCatalog,
     ] = await Promise.all([
         getWorkspaceComments(submissionId),
-        getWorkspaceLabels(submissionId),
-        getArchiveRequest(submissionId),
-        getWorkspaceLabelCatalog(),
+        tolerateMissingLabelMigration(getWorkspaceLabels(submissionId)),
+        // Archive Request is CP4-owned. CP5 collaboration remains usable when
+        // that optional service is not mounted or is temporarily unavailable.
+        getArchiveRequest(submissionId).catch(() => null),
+        tolerateMissingLabelMigration(getWorkspaceLabelCatalog()),
     ]);
     return {
         comments,
         labels,
         labelCatalog,
         archiveRequest,
+        collaborationWarning,
     };
 }
 
 export function subscribeWorkspaceState(listener) {
     if (typeof window === "undefined") return () => { };
-    const handleChange = () => listener(readWorkspaceState());
-    window.addEventListener(WORKSPACE_EVENT, handleChange);
-    window.addEventListener("storage", handleChange);
+    const handleFocus = () => listener();
+    const handleVisibility = () => {
+        if (document.visibilityState === "visible") listener();
+    };
+    const handleInvalidation = (event) => {
+        const resource = event?.detail?.resource;
+        if (!resource || String(resource).startsWith("workspace")) listener();
+    };
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener(REALTIME_INVALIDATION_EVENT, handleInvalidation);
     return () => {
-        window.removeEventListener(WORKSPACE_EVENT, handleChange);
-        window.removeEventListener("storage", handleChange);
+        window.removeEventListener("focus", handleFocus);
+        document.removeEventListener("visibilitychange", handleVisibility);
+        window.removeEventListener(REALTIME_INVALIDATION_EVENT, handleInvalidation);
     };
 }
 
@@ -326,6 +286,7 @@ export function subscribeWorkspaceState(listener) {
 export async function saveWorkspaceLabels(submissionId, labels) {
     const normalizedLabels = labels.map((label) => ({
         id: String(label.id),
+        catalogId: String(label.catalogId ?? label.id),
         name: String(label.name).trim(),
         color: String(label.color),
         custom: Boolean(label.custom),
@@ -334,16 +295,11 @@ export async function saveWorkspaceLabels(submissionId, labels) {
     return addWorkspaceLabels(submissionId, normalizedLabels);
 }
 
-export function saveWorkspaceLabelCatalog(catalog) {
-    const normalizedCatalog = catalog.map((label) => ({
-        id: String(label.id),
-        name: String(label.name ?? ""),
-        color: String(label.color),
-        custom: Boolean(label.custom),
-    }));
-
-
-    return updateWorkspaceLabelCatalog(normalizedCatalog);
+export async function saveWorkspaceLabelCatalog(labelId, changes) {
+    return updateWorkspaceLabelCatalog(labelId, {
+        ...(Object.hasOwn(changes, "name") ? { name: String(changes.name ?? "").trim() } : {}),
+        ...(Object.hasOwn(changes, "color") ? { color: String(changes.color ?? "").trim() } : {}),
+    });
 }
 
 export async function addWorkspaceComment(submissionId, { content, is_closing = false, action = null }) {
@@ -361,6 +317,32 @@ export async function addWorkspaceComment(submissionId, { content, is_closing = 
         }),
     });
 
+    return handleResponse(res);
+}
+
+export async function updateWorkspaceComment(commentId, updates) {
+    const res = await fetch(`/api/workspace/comments/${encodeURIComponent(commentId)}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+    });
+    return handleResponse(res);
+}
+
+export async function deleteWorkspaceComment(commentId) {
+    const res = await fetch(`/api/workspace/comments/${encodeURIComponent(commentId)}`, {
+        method: "DELETE",
+        credentials: "include",
+    });
+    return handleResponse(res);
+}
+
+export async function deleteWorkspaceLabel(labelId) {
+    const res = await fetch(`/api/workspace/labels/${encodeURIComponent(labelId)}`, {
+        method: "DELETE",
+        credentials: "include",
+    });
     return handleResponse(res);
 }
 
@@ -383,7 +365,9 @@ export async function updateWorkspaceArchiveAssignees(submissionId, assignees) {
 }
 
 async function persistLiveStatus(submission, status) {
-    if (submission?.source !== "supabase") return;
+    if (submission?.source !== "supabase") {
+        throw new Error("Only persisted submissions can change Workspace status.");
+    }
 
     // HARD API: this temporary authenticated PATCH is implemented by
     // server/routes/workspace.js and should move into a durable domain service.
@@ -394,10 +378,7 @@ async function persistLiveStatus(submission, status) {
         body: JSON.stringify({ status }),
     });
 
-    if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.error || "Unable to update submission status.");
-    }
+    return handleResponse(response);
 }
 
 /**
@@ -406,19 +387,8 @@ async function persistLiveStatus(submission, status) {
  */
 export async function setWorkspaceSubmissionStatus(submission, status) {
     const normalizedStatus = normalizeWorkspaceStatus(status);
-    await persistLiveStatus(submission, normalizedStatus);
-    updateWorkspaceState((state) => ({
-        ...state,
-        submissions: {
-            ...state.submissions,
-            [submission.id]: {
-                ...(state.submissions?.[submission.id] ?? {}),
-                status: normalizedStatus,
-                updated_at: new Date().toISOString(),
-            },
-        },
-    }));
-    return normalizedStatus;
+    const persisted = await persistLiveStatus(submission, normalizedStatus);
+    return normalizeWorkspaceStatus(persisted?.status ?? normalizedStatus);
 }
 
 async function persistArchiveMerge(submission, closingComment) {
@@ -468,7 +438,6 @@ export async function commitWorkspaceAction(submission, {
     if (!normalizedMessage) throw new Error("A commit message is required.");
 
     const reviewerEmail = String(email || "commissioner@example.com");
-    const currentReview = getWorkspaceReviewState(submission.id);
     let nextStatus = submission.status;
 
     if (action === "accept" || action === "accept-again") nextStatus = WORKSPACE_STATUS.ACCEPTED;
@@ -507,46 +476,15 @@ export async function commitWorkspaceAction(submission, {
         });
     }
 
-    if (action === "archive-merge") {
-        updateWorkspaceState((state) => ({
-            ...state,
-            submissions: {
-                ...state.submissions,
-                [submission.id]: {
-                    ...(state.submissions?.[submission.id] ?? {}),
-                    status: WORKSPACE_STATUS.ARCHIVED,
-                    updated_at: new Date().toISOString(),
-                },
-            },
-        }));
-    } else {
+    if (action !== "archive-merge") {
         await setWorkspaceSubmissionStatus(submission, nextStatus);
     }
-    addWorkspaceComment(submission.id, {
+    await addWorkspaceComment(submission.id, {
         content: normalizedMessage,
         action: actionDescription(action, reviewerEmail),
         is_closing: true,
     });
-
-    if (action === "archive-merge") {
-        updateWorkspaceState((state) => {
-            const comments = { ...state.comments };
-            const labels = { ...state.labels };
-            const archiveRequests = { ...state.archiveRequests };
-            delete comments[submission.id];
-            delete labels[submission.id];
-            delete archiveRequests[submission.id];
-
-            return {
-                ...state,
-                comments,
-                labels,
-                archiveRequests,
-            };
-        });
-    }
-
-    return { status: nextStatus, review: getWorkspaceReviewState(submission.id) };
+    return { status: nextStatus, review: await getWorkspaceReviewState(submission.id) };
 }
 
 export function canMergeArchiveRequest(request) {

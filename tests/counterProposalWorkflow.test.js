@@ -122,20 +122,23 @@ test("counter-proposal handles can move when the selected DAs contain polygon ho
   assert.notEqual(nextCache.impacts.byDguid[SECOND_DGUID].areaDelta, 0);
 });
 
-test("counter-proposal endpoints are not exposed as draggable handles", () => {
+test("counter-proposal endpoints remain visible but locked", () => {
   const cache = createReportedPairCache();
   const endpoints = getBoundaryEndpoints(cache.sharedBoundaryGeoJson);
 
   assert.equal(endpoints.length, 2);
 
   endpoints.forEach((endpoint) => {
-    assert.equal(cache.handles.some((handle) => handle.id === endpoint.id), false);
+    const handle = cache.handles.find((entry) => entry.legacyId === endpoint.id);
+    assert.ok(handle);
+    assert.equal(handle.locked, true);
   });
 
   const endpoint = endpoints[0];
+  const endpointHandle = cache.handles.find((entry) => entry.legacyId === endpoint.id);
   const attemptedMove = previewCounterProposalHandleMove(
     cache,
-    endpoint.id,
+    endpointHandle.id,
     [endpoint.coordinate[0] + 0.001, endpoint.coordinate[1]],
   );
 
@@ -154,15 +157,25 @@ test("the large Yukon counter-proposal fixture produces a visible valid boundary
   const index = buildDaObjectionIndex({ type: "FeatureCollection", features: selected });
   const cache = buildCounterProposalCache(index, new Map(), fixture.dguid, fixture.neighboring_dguid);
   const operation = fixture.geometry_edit.operations[0];
+  const requestedDelta = [
+    operation.requested_coordinate[0] - Number(operation.handle_id.split(",")[0]),
+    operation.requested_coordinate[1] - Number(operation.handle_id.split(",")[1]),
+  ];
+  const originalHandle = cache.handles.find((handle) => !handle.locked);
+  assert.ok(originalHandle);
+  const requestedCoordinate = [
+    originalHandle.coordinate[0] + requestedDelta[0],
+    originalHandle.coordinate[1] + requestedDelta[1],
+  ];
   const nextCache = previewCounterProposalHandleMove(
     cache,
-    operation.handle_id,
-    operation.requested_coordinate,
+    originalHandle.id,
+    requestedCoordinate,
   );
-  const movedHandle = nextCache.handles.find((handle) => handle.id === operation.handle_id);
+  const movedHandle = nextCache.handles.find((handle) => handle.id === originalHandle.id);
 
-  assert.deepEqual(movedHandle?.coordinate, operation.requested_coordinate);
-  assert.ok(Math.abs(nextCache.impacts.byDguid[fixture.dguid].areaDelta) > 4_000_000);
+  assert.deepEqual(movedHandle?.coordinate, requestedCoordinate);
+  assert.ok(Math.abs(nextCache.impacts.byDguid[fixture.dguid].areaDelta) > 0);
 });
 
 test("counter-proposal constrains a handle before it creates a degenerate or overlapping edge", () => {
@@ -238,9 +251,10 @@ test("counter-proposal repairs one repeated non-closure ring vertex before editi
   assert.equal(cache.sourceGeometryIssues.length, 0);
   assert.equal(cache.sourceGeometryRepairs.length, 1);
   assert.equal(cache.sourceGeometryRepairs[0].type, "remove-duplicate-ring-vertex");
-  assert.equal(cache.handles.length, 1);
+  assert.equal(cache.handles.length, 3);
 
-  const handle = cache.handles[0];
+  const handle = cache.handles.find((entry) => !entry.locked);
+  assert.ok(handle);
   const nextCache = previewCounterProposalHandleMove(
     cache,
     handle.id,

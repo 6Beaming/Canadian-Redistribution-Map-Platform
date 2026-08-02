@@ -18,25 +18,19 @@ import { Button } from "@/components/ui/button";
 import { ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
-import { getCommentsUser } from "@/services/commentsApi";
+import { getMySubmissionTableRows } from "@/services/submissionListsApi";
+import { RouteLoadingPage } from "@/components/non_prebuilt/RouteLoadingPage.jsx";
+import { normalizePublicSubmissionStatus } from "@/lib/submissions/publicStatus.js";
 
 const statusStyles = {
-  accepted: "bg-green-100 px-3 py-1 text-green-700",
+  processed: "bg-green-100 px-3 py-1 text-green-700",
   pending: "bg-yellow-100 px-3 py-1 text-yellow-700",
-  "archive-request": "bg-blue-100 px-3 py-1 text-blue-700",
-  rejected: "bg-red-100 px-3 py-1 text-red-700",
-  archived: "bg-purple-100 px-3 py-1 text-purple-700",
 };
 
 const statusMessages = {
-  accepted: "The commissioners have accepted your submission. We appreciate your contribution!",
-  pending: "Your submission has been received and is waiting for review.",
-  "archive-request": "The commissioners are evaluating whether this submission should be archived.",
-  rejected: "Sorry, your submission was rejected. Click to resubmit.",
-  archived: "This submission has been committed to the archive tree.",
+  processed: "Your submission has been processed. Thank you for your contribution.",
+  pending: "We have informed the commissioners, please allow some time for them to review your submission.",
 };
-
-const clickableStatuses = new Set(["rejected"]);
 
 function normalizeSubmissionType(type) {
   const normalized = String(type ?? "feedback").trim().toLowerCase();
@@ -68,16 +62,6 @@ function formatSubmissionType(type) {
   }
 
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-}
-
-function normalizeSubmissionStatus(status) {
-  const normalized = String(status ?? "pending").trim().toLowerCase().replaceAll(" ", "_");
-
-  if (["accepted", "approved", "addressed"].includes(normalized)) return "accepted";
-  if (normalized === "rejected") return "rejected";
-  if (["archive_request", "archive_requested"].includes(normalized)) return "archive-request";
-  if (["archived", "achived", "archive"].includes(normalized)) return "archived";
-  return "pending";
 }
 
 const columns = [
@@ -148,6 +132,7 @@ export default function MySubmissions() {
   const [hoveredRowId, setHoveredRowId] = useState(null);
   const [submissions, setSubmissions] = useState([]);
   const [loadError, setLoadError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const { sessionStatus, user } = useAuth();
 
   useEffect(() => {
@@ -164,8 +149,9 @@ export default function MySubmissions() {
       }
 
       try {
+        setIsLoading(true);
         setLoadError("");
-        const data = await getCommentsUser(user.id);
+        const { items: data } = await getMySubmissionTableRows();
 
         setSubmissions(
           data.map((submission) => ({
@@ -174,13 +160,15 @@ export default function MySubmissions() {
             type: formatSubmissionType(submission.type),
             title: submission.title,
             community_name: submission.dissemination_areas?.community_name ?? "Unknown",
-            status: normalizeSubmissionStatus(submission.status),
+            status: normalizePublicSubmissionStatus(submission.status),
           }))
 
         );
       } catch (err) {
         console.error(err);
         setLoadError(err.message || "Unable to load your submissions.");
+      } finally {
+        setIsLoading(false);
       }
     }
 
@@ -201,6 +189,8 @@ export default function MySubmissions() {
   if (sessionStatus !== "signed-in") {
     return null;
   }
+
+  if (isLoading) return <RouteLoadingPage label="Loading your submissions…" />;
 
   return (
     <div className="px-[clamp(0.5rem,2vw,1.5rem)] py-[clamp(1rem,3vw,1.5rem)]">
@@ -226,21 +216,14 @@ export default function MySubmissions() {
               <TableBody>
                 {table.getRowModel().rows.length ? (
                   table.getRowModel().rows.map((row) => {
-                    const isClickable = clickableStatuses.has(row.original.status);
                     const statusMessage = statusMessages[row.original.status];
 
                     return (
                       <Fragment key={row.id}>
                         <TableRow
-                          className={`h-14 transition-colors hover:bg-gray-50 ${isClickable ? "cursor-pointer" : "cursor-default"
-                            }`}
+                          className="h-14 cursor-default transition-colors hover:bg-gray-50"
                           onMouseEnter={() => setHoveredRowId(row.id)}
                           onMouseLeave={() => setHoveredRowId((current) => (current === row.id ? null : current))}
-                          onClick={
-                            isClickable
-                              ? () => navigate(`/submissions/${row.original.id}`)
-                              : undefined
-                          }
                         >
                           {row.getVisibleCells().map((cell) => (
                             <TableCell key={cell.id} className="px-3 py-3 text-[15px]">

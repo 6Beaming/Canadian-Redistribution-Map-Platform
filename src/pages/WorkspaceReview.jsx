@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
 import { WorkspaceReviewPanel } from "@/components/non_prebuilt/WorkspaceReviewPanel.jsx";
 import { MAP_INTERACTION_MODE } from "@/lib/map/interactionMode.js";
-import { buildProfileIndex } from "@/lib/map/profileUtils.js";
-import { mapApi } from "@/services/mapApi.js";
 import {
-  getWorkspaceSubmission,
   getWorkspaceSubmissions,
   getWorkspaceReviewerEmails,
   normalizeWorkspaceStatus,
 } from "@/services/workspaceApi";
+import { getSubmissionTableRowById } from "@/services/submissionListsApi.js";
+import { getSubmissionReviewContent } from "@/services/commentsApi.js";
+import { hydrateWorkspaceSubmission } from "@/services/tempCounterProposal.js";
 import "@/styles/map.css";
 import "@/styles/workspace-review.css";
 
@@ -25,9 +25,9 @@ function branchKey(submission) {
 export default function WorkspaceReview() {
   const { submissionId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [submission, setSubmission] = useState(null);
   const [allSubmissions, setAllSubmissions] = useState([]);
-  const [profilesByDguid, setProfilesByDguid] = useState(new Map());
   const [reviewerEmails, setReviewerEmails] = useState([]);
   const [comparisonView, setComparisonView] = useState("proposed");
   const [status, setStatus] = useState("Loading submission workspace...");
@@ -38,21 +38,34 @@ export default function WorkspaceReview() {
     async function load() {
       try {
         setError("");
-        const profilePayload = await mapApi.getDaProfiles();
-        const { index } = buildProfileIndex(profilePayload);
-        const [active, submissions, reviewers] = await Promise.all([
-          getWorkspaceSubmission(submissionId, { profilesByDguid: index }),
-          getWorkspaceSubmissions({ includeArchived: false }),
-          getWorkspaceReviewerEmails().catch(() => []),
-        ]);
-        if (!active) throw new Error("Submission not found in the active workspace.");
+        setStatus("Loading submission…");
+        const activeRow = await getSubmissionTableRowById(submissionId);
+        if (!activeRow) throw new Error("Submission not found in the active workspace.");
         if (isMounted) {
-          setProfilesByDguid(index);
-          setSubmission(active);
+          setSubmission({ ...activeRow, source: "supabase", geometry: null });
+          setAllSubmissions([activeRow]);
+          setComparisonView("proposed");
+          setStatus("Loading map detail…");
+        }
+        const reviewersPromise = getWorkspaceReviewerEmails().catch(() => []);
+        const contentPromise = normalizeType(activeRow.type) === "counter-proposal"
+          ? Promise.resolve(null)
+          : getSubmissionReviewContent(activeRow.id).catch(() => null);
+        const [reviewContent, hydrated] = await Promise.all([
+          contentPromise,
+          hydrateWorkspaceSubmission({ ...activeRow, source: "supabase" }),
+        ]);
+        if (isMounted) {
+          setSubmission({ ...hydrated, comment: reviewContent?.comment ?? hydrated.comment ?? "" });
+          setStatus("Submission map ready.");
+        }
+        const [submissions, reviewers] = await Promise.all([
+          getWorkspaceSubmissions({ includeArchived: false }),
+          reviewersPromise,
+        ]);
+        if (isMounted) {
           setAllSubmissions(submissions);
           setReviewerEmails(reviewers);
-          setComparisonView("proposed");
-          setStatus("Submission workspace ready.");
         }
       } catch (loadError) {
         if (isMounted) setError(loadError.message);
@@ -122,31 +135,53 @@ export default function WorkspaceReview() {
       (entry) => entry.id !== submission.id,
     );
     if (next) {
-      navigate(`/dashboard/workspace/${encodeURIComponent(next.id)}`);
+      navigate(`/dashboard/workspace/${encodeURIComponent(next.id)}`, { state: location.state });
     } else {
-      navigate(`/dashboard/workspace?focus=${encodeURIComponent(submission.id)}`);
+      navigate(`/dashboard/workspace?focus=${encodeURIComponent(submission.id)}`, {
+        state: { from: location.state?.workspaceFrom ?? null },
+      });
     }
   }
 
   if (error) {
     return <main className="workspace-review-error"><h1>Workspace unavailable</h1><p>{error}</p></main>;
   }
-  if (!submission) return null;
+  if (!submission) {
+    return (
+      <main className="workspace-review-page">
+        <div className="workspace-review-layout">
+          <section className="workspace-review-map" aria-busy="true">
+            <div className="route-loading-overlay__indicator" role="status">
+              <span className="route-loading-overlay__spinner" aria-hidden="true" />
+              <span>Loading submission…</span>
+            </div>
+          </section>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="workspace-review-page">
       <div className="workspace-review-layout">
         <section className="workspace-review-map" aria-label="Read-only submission map">
           <div className="sr-only" aria-live="polite">{status}</div>
-          <MapCanvas
-            selection={null}
-            objectionPreview={mapPresentation.objectionPreview}
-            counterProposalPreview={mapPresentation.counterProposalPreview}
-            focusGeoJson={mapFocusGeoJson}
-            workflowFocusDguids={focusDguids}
-            interactionMode={MAP_INTERACTION_MODE.COUNTER_REVIEW}
-            onStatusChange={setStatus}
-          />
+          {submission.geometry ? (
+            <MapCanvas
+              selection={null}
+              objectionPreview={mapPresentation.objectionPreview}
+              counterProposalPreview={mapPresentation.counterProposalPreview}
+              focusGeoJson={mapFocusGeoJson}
+              workflowFocusDguids={focusDguids}
+              interactionMode={MAP_INTERACTION_MODE.COUNTER_REVIEW}
+              onStatusChange={setStatus}
+            />
+          ) : (
+            <div className="route-loading-overlay__indicator" role="status">
+              <span className="route-loading-overlay__spinner" aria-hidden="true" />
+              <span>Loading map detail…</span>
+            </div>
+          )}
           {normalizeType(submission.type) === "counter-proposal" ? (
             <div className="workspace-comparison-toggle" role="group" aria-label="Boundary comparison">
               <button type="button" className={comparisonView === "proposed" ? "is-active" : ""} onClick={() => setComparisonView("proposed")}>Proposed</button>
@@ -158,10 +193,11 @@ export default function WorkspaceReview() {
           key={submission.id}
           submission={submission}
           siblingSubmissions={siblingSubmissions}
-          onSubmissionSelect={(id) => navigate(`/dashboard/workspace/${encodeURIComponent(id)}`)}
+          onSubmissionSelect={(id) => navigate(`/dashboard/workspace/${encodeURIComponent(id)}`, {
+            state: location.state,
+          })}
           onCommitted={advanceAfterCommit}
           reviewerEmails={reviewerEmails}
-          profilesByDguid={profilesByDguid}
         />
       </div>
     </main>

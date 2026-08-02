@@ -1,12 +1,25 @@
-import { BarChart3, UserCheck } from "lucide-react";
+import { BarChart3, Download, UserCheck } from "lucide-react";
 import { SubmissionsGraph } from "@/components/non_prebuilt/submissionsGraph";
 import { Card, CardAccent, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { getTotalComments } from "@/services/commentsApi";
+import { exportCommissionerSubmissionsCsv } from "@/services/exportApi.js";
 
 export default function DashboardGraphs() {
 
   const [totalSubmissions, setTotalSubmissions] = useState(0);
+  const [exportState, setExportState] = useState({ pending: false, error: "" });
+
+  async function exportCsv() {
+    if (exportState.pending) return;
+    setExportState({ pending: true, error: "" });
+    try {
+      await exportCommissionerSubmissionsCsv();
+      setExportState({ pending: false, error: "" });
+    } catch (error) {
+      setExportState({ pending: false, error: error.message || "Unable to export submissions." });
+    }
+  }
 
   useEffect(() => {
     async function fetchTotalSubmissions() {
@@ -39,6 +52,18 @@ export default function DashboardGraphs() {
                   Review submission volume, support trends, and objection activity in one dedicated analytics space without colliding with the map workspace.
                 </p>
               </div>
+            </div>
+            <div className="flex flex-col items-start gap-2 lg:items-end">
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-full bg-[#1a73e8] px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-wait disabled:opacity-60"
+                disabled={exportState.pending}
+                onClick={() => void exportCsv()}
+              >
+                <Download className="h-4 w-4" />
+                {exportState.pending ? "Preparing CSV…" : "Export CSV"}
+              </button>
+              {exportState.error ? <p className="text-sm text-red-700" role="alert">{exportState.error}</p> : null}
             </div>
           </div>
         </section>

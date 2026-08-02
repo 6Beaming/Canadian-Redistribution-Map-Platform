@@ -16,7 +16,7 @@ export function CounterProposalMapToolbar({
   }
 
   const previewMode = workflow.previewMode === "original" ? "original" : "proposal";
-  const canUndo = (workflow.cache.history?.length ?? 0) > 1;
+  const canUndo = (workflow.cache.history?.length ?? 0) > 0;
   const canRedo = (workflow.cache.future?.length ?? 0) > 0;
 
   return (
@@ -26,6 +26,11 @@ export function CounterProposalMapToolbar({
         className="pointer-events-auto flex items-center gap-1.5 rounded-[18px] border border-[#d7e6fb] bg-white/95 p-1.5 shadow-[0_10px_30px_rgba(23,50,77,0.18)] backdrop-blur-sm"
         role="toolbar"
       >
+        {workflow.dragValidating ? (
+          <span className="px-2 text-xs font-semibold text-[#1a73e8]" role="status">
+            Validating…
+          </span>
+        ) : null}
         <Button
           aria-keyshortcuts="Control+Z"
           aria-label="Undo boundary change"

@@ -170,6 +170,8 @@ test("prepareCounterProposalSubmission validates adjacent Yukon fixture pair geo
   assert.equal(prepared.revision.secondary_dguid, SECOND_DGUID);
   assert.equal(prepared.revision.proposed_geometry.features.length, 2);
   assert.equal(prepared.revision.validation_report.valid, true);
+  assert.equal(prepared.revision.validation_report.impact_summary.version, 1);
+  assert.equal(prepared.revision.validation_report.impact_summary.availability, "available");
 });
 
 test("counter-proposal writes require authentication", async () => {
@@ -228,4 +230,5 @@ test("a public user can submit a validated counter-proposal", async () => {
   assert.equal(response.body.type, "counter_proposal");
   assert.equal(response.body.revision.revision_number, 1);
   assert.equal(response.body.revision.primary_dguid, FIRST_DGUID);
+  assert.equal(response.body.revision.validation_report.impact_summary.version, 1);
 });

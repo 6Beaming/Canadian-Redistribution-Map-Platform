@@ -5,6 +5,7 @@ __pycache__/
 data/external/statcan/*.csv
 data/external/statcan/*.CSV
 data/external/statcan/csd_cache/
+data/external/statcan/demographics_cache/
 data/external/statcan/colab_outputs/
 .tmp/
 src/data/map/render/da_boundaries_available.geojson

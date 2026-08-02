@@ -12,6 +12,7 @@ import {
   MapAssetValidationError,
   normalizeFedNum,
 } from "./mapAssetAuthority.js";
+import { calculateCounterProposalImpact } from "../../../src/lib/map/counterProposalImpact.js";
 
 export { MapAssetValidationError };
 
@@ -147,6 +148,16 @@ export async function prepareCounterProposalSubmission(body = {}) {
     proposedIndex,
     [firstDguid, secondDguid],
   );
+  const impactSummary = calculateCounterProposalImpact({
+    originalFeatures: baselineCache.originalFeatures,
+    proposedFeatures,
+    firstDguid,
+    secondDguid,
+    populationByDguid: Object.fromEntries([
+      [firstDguid, profilesByDguid.get(firstDguid)?.population ?? null],
+      [secondDguid, profilesByDguid.get(secondDguid)?.population ?? null],
+    ]),
+  });
 
   return {
     submission: {
@@ -169,7 +180,11 @@ export async function prepareCounterProposalSubmission(body = {}) {
       shared_boundary: sharedBoundary,
       outer_boundary: outerBoundary,
       baseline_revision: baselineRevision,
-      validation_report: validationReport,
+      validation_report: {
+        ...validationReport,
+        impact_summary: impactSummary,
+        baseline_revision: baselineRevision,
+      },
     },
   };
 }

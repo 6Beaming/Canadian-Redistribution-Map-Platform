@@ -11,6 +11,7 @@ import { buildProfileIndex } from "@/lib/map/profileUtils.js";
 import { loadSubmissionHeatmap } from "@/lib/map/heatmap.js";
 import { loadArchivedMapEffect } from "@/lib/map/archivedMapEffect.js";
 import { subscribeWorkspaceState } from "@/services/workspaceApi";
+import { RouteLoadingPage } from "@/components/non_prebuilt/RouteLoadingPage.jsx";
 import "@/styles/map.css";
 
 export default function DashboardHome({ mapSearchTarget = null }) {
@@ -26,6 +27,7 @@ export default function DashboardHome({ mapSearchTarget = null }) {
   const [rolloutCategoryId, setRolloutCategoryId] = useState(DEFAULT_ROLLOUT_CATEGORY_ID);
   const [heatmap, setHeatmap] = useState(null);
   const [archivedMap, setArchivedMap] = useState(null);
+  const [initialLoad, setInitialLoad] = useState({ ready: false, error: "" });
   const initialArchivedMapEnabled = searchParams.get("archivedMap") === "1";
   const commissionerProvinceView = useMemo(
     () => getProvinceMapView(user?.province),
@@ -86,10 +88,12 @@ export default function DashboardHome({ mapSearchTarget = null }) {
 
         const { index } = buildProfileIndex(payload);
         setProfilesByDguid(index);
+        setInitialLoad({ ready: true, error: "" });
       })
       .catch((error) => {
         if (isMounted) {
           setStatus(`Error: ${error.message}`);
+          setInitialLoad({ ready: false, error: error.message || "Unable to load commissioner map." });
         }
       });
 
@@ -176,6 +180,10 @@ export default function DashboardHome({ mapSearchTarget = null }) {
     setRolloutHoverSelection(null);
     setIsRolloutOpen(false);
   }, []);
+
+  if (!initialLoad.ready) {
+    return <RouteLoadingPage label="Loading commissioner map…" error={initialLoad.error} />;
+  }
 
   return (
     <div className="map-page">

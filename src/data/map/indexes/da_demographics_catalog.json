@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "censusYear": 2021,
+  "dataflow": "DF_DA",
+  "etlVersion": 1,
+  "groups": [
+    { "id": "population", "label": "Population" },
+    { "id": "age", "label": "Age" },
+    { "id": "housing", "label": "Housing" },
+    { "id": "household", "label": "Households and families" },
+    { "id": "income", "label": "Income" },
+    { "id": "education", "label": "Education" },
+    { "id": "labour", "label": "Labour" },
+    { "id": "commuting", "label": "Commuting" },
+    { "id": "language", "label": "Knowledge of official languages" }
+  ],
+  "indicators": [
+    { "id": "population", "group": "population", "label": "Population", "sourceCharacteristicId": "1", "genderCode": "1", "statisticCode": "1", "unit": "persons", "decimals": 0, "universe": "Population, 2021", "displayOrder": 1 },
+    { "id": "populationDensity", "group": "population", "label": "Population density", "sourceCharacteristicId": "6", "genderCode": "1", "statisticCode": "1", "unit": "persons/km²", "decimals": 1, "universe": "Population per square kilometre", "displayOrder": 2 },
+    { "id": "privateDwellings", "group": "population", "label": "Total private dwellings", "sourceCharacteristicId": "4", "genderCode": "1", "statisticCode": "1", "unit": "dwellings", "decimals": 0, "universe": "All private dwellings", "displayOrder": 3 },
+    { "id": "occupiedPrivateDwellings", "group": "population", "label": "Private dwellings occupied by usual residents", "sourceCharacteristicId": "5", "genderCode": "1", "statisticCode": "1", "unit": "dwellings", "decimals": 0, "universe": "Private dwellings occupied by usual residents", "displayOrder": 4 },
+
+    { "id": "age0To14Count", "group": "age", "label": "Age 0 to 14", "sourceCharacteristicId": "9", "genderCode": "1", "statisticCode": "1", "unit": "persons", "decimals": 0, "universe": "Total population by age", "displayOrder": 10 },
+    { "id": "age0To14Share", "group": "age", "label": "Age 0 to 14 share", "sourceCharacteristicId": "9", "genderCode": "1", "statisticCode": "4", "unit": "%", "decimals": 1, "universe": "Total population by age", "displayOrder": 11 },
+    { "id": "age15To64Count", "group": "age", "label": "Age 15 to 64", "sourceCharacteristicId": "13", "genderCode": "1", "statisticCode": "1", "unit": "persons", "decimals": 0, "universe": "Total population by age", "displayOrder": 12 },
+    { "id": "age15To64Share", "group": "age", "label": "Age 15 to 64 share", "sourceCharacteristicId": "13", "genderCode": "1", "statisticCode": "4", "unit": "%", "decimals": 1, "universe": "Total population by age", "displayOrder": 13 },
+    { "id": "age65PlusCount", "group": "age", "label": "Age 65 and over", "sourceCharacteristicId": "24", "genderCode": "1", "statisticCode": "1", "unit": "persons", "decimals": 0, "universe": "Total population by age", "displayOrder": 14 },
+    { "id": "age65PlusShare", "group": "age", "label": "Age 65 and over share", "sourceCharacteristicId": "24", "genderCode": "1", "statisticCode": "4", "unit": "%", "decimals": 1, "universe": "Total population by age", "displayOrder": 15 },
+    { "id": "medianAge", "group": "age", "label": "Median age", "sourceCharacteristicId": "40", "genderCode": "1", "statisticCode": "1", "unit": "years", "decimals": 1, "universe": "Total population", "displayOrder": 16 },
+
+    { "id": "singleDetachedShare", "group": "housing", "label": "Single-detached house share", "sourceCharacteristicId": "42", "genderCode": "1", "statisticCode": "4", "unit": "%", "decimals": 1, "universe": "Occupied private dwellings by structural type", "displayOrder": 20 },
+    { "id": "averageHouseholdSize", "group": "household", "label": "Average household size", "sourceCharacteristicId": "57", "genderCode": "1", "statisticCode": "1", "unit": "persons", "decimals": 1, "universe": "Persons in private households", "displayOrder": 30 },
+    { "id": "averageCensusFamilySize", "group": "household", "label": "Average census-family size", "sourceCharacteristicId": "76", "genderCode": "1", "statisticCode": "1", "unit": "persons", "decimals": 1, "universe": "Persons in census families", "displayOrder": 31 },
+    { "id": "onePersonHouseholdShare", "group": "household", "label": "One-person household share", "sourceCharacteristicId": "110", "genderCode": "1", "statisticCode": "4", "unit": "%", "decimals": 1, "universe": "Private households by household size", "displayOrder": 32 },
+    { "id": "medianAfterTaxHouseholdIncome", "group": "income", "label": "Median after-tax household income (2020)", "sourceCharacteristicId": "244", "genderCode": "1", "statisticCode": "1", "unit": "$", "decimals": 0, "universe": "Private households with income in 2020", "displayOrder": 40 },
+
+    { "id": "noCertificateShare", "group": "education", "label": "No certificate, diploma or degree", "sourceCharacteristicId": "2015", "genderCode": "1", "statisticCode": "4", "unit": "%", "decimals": 1, "universe": "Population aged 25 to 64 years in private households, 25% sample", "displayOrder": 50 },
+    { "id": "secondaryDiplomaShare", "group": "education", "label": "High school diploma or equivalency", "sourceCharacteristicId": "2016", "genderCode": "1", "statisticCode": "4", "unit": "%", "decimals": 1, "universe": "Population aged 25 to 64 years in private households, 25% sample", "displayOrder": 51 },
+    { "id": "bachelorsOrHigherShare", "group": "education", "label": "Bachelor's degree or higher", "sourceCharacteristicId": "2024", "genderCode": "1", "statisticCode": "4", "unit": "%", "decimals": 1, "universe": "Population aged 25 to 64 years in private households, 25% sample", "displayOrder": 52 },
+
+    { "id": "participationRate", "group": "labour", "label": "Participation rate", "sourceCharacteristicId": "2228", "genderCode": "1", "statisticCode": "4", "unit": "%", "decimals": 1, "universe": "Population aged 15 years and over in private households, 25% sample", "displayOrder": 60 },
+    { "id": "employmentRate", "group": "labour", "label": "Employment rate", "sourceCharacteristicId": "2229", "genderCode": "1", "statisticCode": "4", "unit": "%", "decimals": 1, "universe": "Population aged 15 years and over in private households, 25% sample", "displayOrder": 61 },
+    { "id": "unemploymentRate", "group": "labour", "label": "Unemployment rate", "sourceCharacteristicId": "2230", "genderCode": "1", "statisticCode": "4", "unit": "%", "decimals": 1, "universe": "Labour force aged 15 years and over in private households, 25% sample", "displayOrder": 62 },
+
+    { "id": "commuteDriverShare", "group": "commuting", "label": "Car, truck or van — driver", "sourceCharacteristicId": "2605", "genderCode": "1", "statisticCode": "4", "unit": "%", "decimals": 1, "universe": "Main mode of commuting for employed labour force with a usual place of work, 25% sample", "displayOrder": 70 },
+    { "id": "commuteTransitShare", "group": "commuting", "label": "Public transit", "sourceCharacteristicId": "2607", "genderCode": "1", "statisticCode": "4", "unit": "%", "decimals": 1, "universe": "Main mode of commuting for employed labour force with a usual place of work, 25% sample", "displayOrder": 71 },
+    { "id": "commuteWalkShare", "group": "commuting", "label": "Walked", "sourceCharacteristicId": "2608", "genderCode": "1", "statisticCode": "4", "unit": "%", "decimals": 1, "universe": "Main mode of commuting for employed labour force with a usual place of work, 25% sample", "displayOrder": 72 },
+    { "id": "commuteBicycleShare", "group": "commuting", "label": "Bicycle", "sourceCharacteristicId": "2609", "genderCode": "1", "statisticCode": "4", "unit": "%", "decimals": 1, "universe": "Main mode of commuting for employed labour force with a usual place of work, 25% sample", "displayOrder": 73 },
+
+    { "id": "officialLanguageEnglishOnlyShare", "group": "language", "label": "English only", "sourceCharacteristicId": "384", "genderCode": "1", "statisticCode": "4", "unit": "%", "decimals": 1, "universe": "Knowledge of official languages for population excluding institutional residents", "displayOrder": 80 },
+    { "id": "officialLanguageFrenchOnlyShare", "group": "language", "label": "French only", "sourceCharacteristicId": "385", "genderCode": "1", "statisticCode": "4", "unit": "%", "decimals": 1, "universe": "Knowledge of official languages for population excluding institutional residents", "displayOrder": 81 },
+    { "id": "officialLanguageBothShare", "group": "language", "label": "English and French", "sourceCharacteristicId": "386", "genderCode": "1", "statisticCode": "4", "unit": "%", "decimals": 1, "universe": "Knowledge of official languages for population excluding institutional residents", "displayOrder": 82 },
+    { "id": "officialLanguageNeitherShare", "group": "language", "label": "Neither English nor French", "sourceCharacteristicId": "387", "genderCode": "1", "statisticCode": "4", "unit": "%", "decimals": 1, "universe": "Knowledge of official languages for population excluding institutional residents", "displayOrder": 83 }
+  ]
+}

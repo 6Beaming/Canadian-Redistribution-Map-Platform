@@ -30,7 +30,7 @@ This index records the plan clarifications and responsibility allocation adopted
 | Enabled-DA Counter-Proposal/Yukon incident diagnosis and exhaustive remediation | Section 3.2.1; Checkpoints 1 and 2 |
 | Durable Workspace status P1 and optional Workspace Summary table/API P3 | Section 3.3; Checkpoint 3 |
 | Reliable comments, labels, label catalog, and removal of browser-authoritative Workspace state | Sections 3.5, 4.1, and 10; Checkpoint 5 |
-| Independent CP4 scope/archive/vote/outbox schema, sealed archive source, first-commit province model, and P1/P2 split | Sections 2.5, 3.4, 3.4.1, and 3.4.2; Checkpoints 0 and 4 |
+| Independent CP4 scope/archive/vote/outbox schema, sealed archive source, first-commit province model, and P1/P2 split | Sections 2.5, 3.4, 3.4.1, and 3.4.2; Checkpoint 4 (consumed one-way by CP0 under Section 3.6.1) |
 | Focus-first Workspace reads, target-only detail hydration, loading, and source-aware navigation | Sections 3.5, 4.1, and 7; Checkpoint 5 |
 | Commissioner CSV, Archived Tree JSON, and Public Pending/Received presentation | Sections 5 and 6; Checkpoint 5 |
 | CP1/CP2/CP4 P1 change classification, backend test additions, frontend tests, and reproducible manual acceptance | Section 10 supplemental checklists; Checkpoints 1, 2, and 4 |
@@ -47,7 +47,7 @@ The CP3 audit concerns are now demonstrated user-visible defects, not theoretica
 - a comment added on a slow connection can disappear because the client does not await the durable write;
 - after Commissioner B commits `accepted`, Commissioner A can remain in the Rejected branch because `crmp.workspace.v1` overrides the newer server value.
 
-The corrective contract and acceptance cases are indexed at `PLAN.md` Sections 4.1 and 10 and Checkpoint 5. Default custom catalog labels are standardized as `Custom Label 1`, `Custom Label 2`, and `Custom Label 3`. CP0 owns WebSocket transport, while CP5 owns authoritative HTTP reconciliation and its mutation-specific event/outbox integration.
+The corrective contract and acceptance cases are indexed at `PLAN.md` Sections 4.1 and 10 and Checkpoint 5. Default custom catalog labels are standardized as `Custom Label 1`, `Custom Label 2`, and `Custom Label 3`. CP5 owns committed CRUD and authoritative HTTP reconciliation; CP0 separately owns the transactional event adapters, outbox/delivery integration, and WebSocket transport after its named dependencies are available.
 
 The Workspace Summary table/API is now an optional CP3 Priority 3 deliverable and never blocks durable status acceptance. If it is not delivered, Workspace tables and branches continue to use the geometry-free direct select, including exact-ID-first focused entry. See `PLAN.md` Sections 3.1.1, 3.3, and 4.1 and Checkpoint 3. The three-workflow physical table split remains discarded; see Section 2.4.
 
@@ -61,10 +61,10 @@ The Workspace Summary table/API is now an optional CP3 Priority 3 deliverable an
 ### 2026-08-02 CP3 and CP0 priority refinement
 
 - CP3 now contains only durable Workspace status as Priority 1 and the optional Workspace Summary table/API as Priority 3. The moved comment/label/catalog, browser-authority, scope, and realtime findings are absent from CP3 in `PLAN.md` and remain recorded in this report's behavioral verification and ownership history. See `PLAN.md` Section 3.3 and Checkpoint 3.
-- CP0 Priority 1 is all Workspace operations plus Commissioner Table CRUD effects. Runtime/status adapters that can be developed now are ordered before dependency-blocked table, branch, collaboration, and Archive Request slices. Production acceptance of every slice also requires CP4's P1 durable event store; each additional domain dependency is named. See Sections 2.5 and 3.6.1 and Checkpoint 0.
-- CP0 Priority 1 now has change-specific backend/integration tests, frontend tests, a CRUD matrix, and reproducible two-browser/manual examples. See Section 10, “Checkpoint 0 Priority 1 realtime supplemental checklist.”
-- CP0 Priority 2 is only a dependency register for Public lists, InfoPanel/heatmap, Archived Tree, optional Summary, exports, committed impact, and statistics; it has no dedicated acceptance checklist. See Section 3.6.2.
-- The remaining dependency direction is explicit: CP1 and CP2 share only their frozen submission contract; CP0 consumes named completed domain requirements; CP3 and CP4 are standalone. CP5–CP8 retain only the dependencies stated in their own plans. See Sections 3.0 and 3.6 and Section 11.
+- CP0 Priority 1 now enumerates the currently implementable runtime/status slices first, followed by Commissioner Table CRUD effects and every Workspace read/CRUD/state slice with its exact named dependency. See `PLAN.md` Sections 3.6.1 and 11, Checkpoint 0.
+- CP0 Priority 1 has backend/integration tests, frontend tests, a resource-by-resource CRUD matrix, and reproducible two-browser/manual examples covering Commissioner Table effects, Workspace list/branch refresh, status, comments, labels, label catalog, and Archive Requests. See `PLAN.md` Section 10, “Checkpoint 0 Priority 1 realtime supplemental checklist” and “Priority 1 CRUD and realtime acceptance matrix.”
+- CP0 Priority 2 is only a dependency register for Public lists, InfoPanel/heatmap, Archived Tree, optional Summary, exports, committed impact, and statistics; it has no dedicated acceptance checklist. See `PLAN.md` Section 3.6.2 and Checkpoint 0.
+- CP1 and CP2 are the only mutually coupled checkpoints, through their frozen minimum submission contract. CP0 is the only one-way integration consumer and names every dependency it consumes. CP3 and CP4 are standalone; CP5–CP8 retain their own stated boundaries. See `PLAN.md` Sections 3.0, 3.6, and 11.
 
 ### 2026-08-02 CP1/CP2 requirements refactor
 

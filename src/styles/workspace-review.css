@@ -244,7 +244,7 @@
 .workspace-label-picker__row {
   display: grid;
   min-width: 0;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 0.5rem;
   border-radius: 0.4rem;
@@ -286,6 +286,35 @@
   min-width: 0;
   color: #38556d;
   font-size: 0.72rem;
+}
+
+.workspace-label-picker__row input[type="color"] {
+  width: 2rem;
+  height: 1.6rem;
+  padding: 0.12rem;
+  cursor: pointer;
+}
+
+.workspace-label-picker__create {
+  display: inline-flex;
+  width: 100%;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+  border: 1px dashed #9eb7cc;
+  border-radius: 0.45rem;
+  background: #f8fbff;
+  color: #1769c7;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.workspace-label-picker__create svg {
+  width: 0.8rem;
+  height: 0.8rem;
 }
 
 .workspace-label-picker__row input {
@@ -391,6 +420,52 @@
 .workspace-comment-thread .workspace-comment-action {
   color: #1769c7;
   font-weight: 700;
+}
+
+.workspace-comment-actions,
+.workspace-comment-editor > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+}
+
+.workspace-comment-actions button,
+.workspace-comment-editor button {
+  border: 1px solid #bfd0de;
+  border-radius: 0.35rem;
+  background: #fff;
+  padding: 0.25rem 0.5rem;
+  color: #38556d;
+  font-size: 0.65rem;
+  cursor: pointer;
+}
+
+.workspace-comment-editor {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+}
+
+.workspace-comment-editor textarea {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+  border: 1px solid #cbd8e5;
+  border-radius: 0.45rem;
+  padding: 0.5rem;
+  color: #17324d;
+  font: inherit;
+  font-size: 0.72rem;
+}
+
+.workspace-comment-actions button:disabled,
+.workspace-comment-editor button:disabled,
+.workspace-label-picker button:disabled,
+.workspace-label-picker input:disabled,
+.workspace-labels button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .workspace-comment-form {

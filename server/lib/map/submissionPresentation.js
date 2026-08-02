@@ -24,6 +24,7 @@ export async function enrichSubmissionsWithDaMetadata(submissions = []) {
 
   return submissions.map((submission) => {
     const profile = index.get(String(submission?.dguid ?? "").trim());
+    const secondaryProfile = index.get(String(submission?.neighboring_dguid ?? "").trim());
     const communityName =
       getDaDisplayLabel(profile)
       ?? submission?.dissemination_areas?.community_name
@@ -35,6 +36,10 @@ export async function enrichSubmissionsWithDaMetadata(submissions = []) {
       dissemination_areas: {
         community_name: communityName,
       },
+      primary_fed_num: profile?.fed_num ?? submission.fed_num ?? null,
+      secondary_fed_num: secondaryProfile?.fed_num ?? profile?.fed_num ?? submission.fed_num ?? null,
+      primary_population: profile?.population ?? null,
+      secondary_population: secondaryProfile?.population ?? null,
     };
   });
 }

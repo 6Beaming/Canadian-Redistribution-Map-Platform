@@ -63,7 +63,9 @@ function WorkspaceCardButton({ submissionId }) {
       size="sm"
       variant="outline"
       type="button"
-      onClick={() => navigate(`/dashboard/workspace?focus=${encodeURIComponent(submissionId)}`)}
+      onClick={() => navigate(`/dashboard/workspace?focus=${encodeURIComponent(submissionId)}`, {
+        state: { from: "/dashboard" },
+      })}
     >
       <svg aria-hidden="true" className="h-3 w-3" viewBox="0 0 20 20" fill="none">
         <path d="M6 14L14 6M8 6H14V12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
