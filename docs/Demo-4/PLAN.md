@@ -255,45 +255,35 @@ Under the Section 3.0 parallel contract, Checkpoint 1 provides the clean, secure
 3. **Checkpoint 1 — remove database rollout blockers.** Audit live submission/revision constraints, defaults, foreign keys, triggers, views, RPCs, policies, and grants for Yukon/`60001`, obsolete metadata relations, or discarded schema dependencies. Replace confirmed blockers with rollback-tested migrations that accept every locally Enabled DA while retaining server validation.
 4. **Checkpoint 2 — prove every Enabled DA.** Exhaustively verify that every DA contained in Enabled FED assets has a canonical profile, correct FED mapping, a matching metadata feature, and a consistent adjacency entry. Validate every declared adjacent pair through the capability domain. Run representative authenticated database writes for every Enabled FED plus cross-FED/cross-province and edge cases, rather than creating a production-like row for every pair. Negative cases cover stale/missing manifest data, missing DA features, disabled FEDs, unknown/non-adjacent pairs, and mismatched browser FED values. Record the exhaustive DA/pair result and deployed manifest version/hash.
 
-### 3.3 Workspace API
+### 3.3 Workspace status API and optional summary projection
 
-The Workspace continues to use authenticated Commissioner endpoints for status, comments, labels, and the label catalog:
+Checkpoint 3 P1 contains only authenticated, durable non-archive Workspace status behavior:
 
 ```text
-PATCH  /api/workspace/submissions/:submissionId/status  # non-archive accepted/rejected transitions only
-GET    /api/workspace/comments/:submissionId
-POST   /api/workspace/comments
-PATCH  /api/workspace/comments/:commentId
-DELETE /api/workspace/comments/:commentId
-GET    /api/workspace/labels/:submissionId
-PUT    /api/workspace/labels/:submissionId
-DELETE /api/workspace/labels/:labelId
-GET    /api/workspace/label-catalog
-POST   /api/workspace/label-catalog
-PATCH  /api/workspace/label-catalog/:labelId
-DELETE /api/workspace/label-catalog/:labelId
+GET    /api/workspace/submissions/:submissionId/status
+PATCH  /api/workspace/submissions/:submissionId/status
+       { status: accepted | rejected, expectedVersion? }
 ```
 
-There is no required Workspace Summary API, `WorkspaceSummaryV1`, branch cursor, or submission write/detail projection dependency. Workspace list and branch statistics reuse the lightweight submission selects. A direct Workspace entry loads the complete lightweight array; a `?focus=<submissionId>` entry first performs the exact-ID lightweight select, renders that branch immediately, and then refreshes counts and branch rows from the background full lightweight request.
+The server derives the actor from the verified Commissioner session, validates the permitted transition, persists it in the authoritative database, and returns the committed status/version. A clean browser session and a hard refresh must reproduce that committed status. Invalid, stale, unauthenticated, and unsupported archive-state transitions fail without a partial write or success response.
 
-Checkpoint 3 retains the durable Workspace tables and the existing authenticated base handlers/status behavior. Following behavioral verification, Checkpoint 5 owns the remaining reliable comments/labels/label-catalog CRUD completion and the removal of browser-authoritative Workspace state. In particular, CP5 must correct `id`/`is_custom` label serialization, persist custom-label edits, await and report mutations, remove `crmp.workspace.v1` submission overrides and browser-event synchronization, and refetch authoritative server state after writes, focus/visibility changes, and CP0 invalidation events. CP0 still owns the WebSocket transport; CP4 still owns Archive Request and province-scope behavior.
+**Priority 3 — optional Workspace Summary API plus table.** If time permits, add a geometry-free `workspace_submission_summaries` table (or equivalently constrained table with the same contract) containing `submission_id`, `type`, `status`, `title`, `primary_dguid`, `secondary_dguid`, `branch_key`, `created_at`, `updated_at`, and `source_version`, plus:
 
-The three seeded custom catalog slots are `Custom Label 1`, `Custom Label 2`, and `Custom Label 3`. Their colors remain independently editable. Initialization/migration is idempotent and must not overwrite a Commissioner-renamed value.
+```text
+GET /api/workspace/summary?submissionId=&branch=&cursor=&limit=
+```
 
-Workspace decision actions must not report success while their required comment/label write is still unawaited. A failed mutation leaves the UI on the authoritative server result and displays an actionable error. Full transactional decision orchestration may use an existing server transaction/RPC when available; it must not be simulated by a localStorage mirror.
+`WorkspaceSummaryV1` returns only summary rows and normalized pagination/filter metadata; it never contains GeoJSON, comments, labels, Archive Request contents, profile-private data, or browser-authoritative state. Its backfill/update process is idempotent, status updates change the summary row in the same transaction or through a provably ordered refresh, and stale summaries are detected by `source_version`. This P3 projection is optional and never replaces the P1 status source of truth or blocks Checkpoint 3 acceptance.
 
 Target files:
 
 ```text
-server/routes/workspace.js                     # composition and frozen registration order only
-server/routes/workspaceStatus.js               # CP3 durable status/base reads
-server/routes/workspaceCollaboration.js        # CP5 comments/labels/catalog CRUD
-server/lib/submissions/lightweightSubmissionSelect.js # CP5 direct select reused by Workspace/export
-src/services/workspaceApi.js                    # CP5 removes localStorage authority and awaits writes
-src/pages/CommissionerWorkspace.jsx             # CP5 focus-first/background-full loading
-src/components/non_prebuilt/WorkspaceReviewPanel.jsx
-tests/workspace.api.test.js
-tests/workspace.realtime.test.js
+server/routes/workspace.js                     # composition and route registration
+server/routes/workspaceStatus.js               # P1 durable status reads/transitions
+server/lib/workspace/workspaceSummary.js       # optional P3 projection service
+src/services/workspaceStatusApi.js              # P1 status client
+tests/workspaceStatus.api.test.js
+tests/workspaceSummary.api.test.js              # only when P3 is delivered
 ```
 
 ### 3.4 CP4 independent scope, Archive Request, and Archived Tree service
@@ -303,10 +293,10 @@ Checkpoint 4 owns its complete database, authorization, API, client, and test bo
 Its P1 schema contains an immutable primary/secondary PRUID eligibility relation (`submission_scope_pruids` or an Archive-domain equivalent), `archive_source_revisions`, `workspace_archive_requests`, normalized UUID-keyed votes/state transitions, optimistic claim/version fields, `realtime_outbox`, and `realtime_scope_deliveries`. The optional P2 schema adds or refactors `archive_tree` source linkage, immutable copied snapshots, branch/version/latest flags, and recovery audit fields.
 
 1. **Priority 1 — Commissioner province scope refactor.** Build the reusable server-side scope guard, immutable one-/two-PRUID eligibility relation, first-commit claim, same-province operating context, cross-province warning projection, and non-disclosing unrelated-province denial defined in Section 3.4.2.
-2. **Priority 1 — complete Archive Request state machine.** Build the UUID identity model, same-province requester/assignee/vote rules, transactional state transitions and optimistic conflicts, CP4-owned sealed archive source, authenticated API/client read model, and all required CP0 outbox/event reports and tests defined in Section 3.4.2.
+2. **Priority 1 — complete Archive Request state machine.** Build the UUID identity model, same-province requester/assignee/vote rules, transactional state transitions and optimistic conflicts, CP4-owned sealed archive source, authenticated API/client read model, and all required transactional outbox/event records and tests defined in Section 3.4.2.
 3. **Priority 2 — Archived Tree archive/delete refactor.** Starting from the existing minimum runnable skeleton, build the CP4-owned backend/routes/schema for archive merge, immutable branch versions, revert/latest, recoverable tombstone/restore, and audit history defined in Section 3.4.1. This bullet is optional as a whole. If deferred, incomplete controls/routes must not be exposed and the existing supported tree behavior must remain stable. Any portion delivered must be completed end-to-end and covered by tests; it must not be left in a runtime-error or half-migrated state. Exact performance and non-safety workflow refinements are best effort and need only be reasonable.
 
-Priority 1 is mandatory, including CP0 realtime reporting and the acceptance tests for every P1 mutation. Priority 2 must never regress the rest of the application; if any P2 mutation is shipped, its corresponding API, persistence, authorization, failure behavior, and CP0 test matrix row are mandatory for that shipped portion.
+Priority 1 is mandatory, including transactional event/delivery records and the acceptance tests for every P1 mutation. Priority 2 must never regress the rest of the application; if any P2 mutation is shipped, its corresponding API, persistence, authorization, failure behavior, and domain-event tests are mandatory for that shipped portion.
 
 #### 3.4.1 Priority 2 — Archived Tree snapshot and version contract
 
@@ -334,7 +324,7 @@ existing authoritative submission/detail persistence
 
 `archive_tree.submission_snapshot` contains the submission projection plus a copied `source_revision` object with `id`, `revision_number`, `primary_dguid`, `secondary_dguid`, immutable `scope_pruids`, `baseline_revision`, `original_geometry`, `proposed_geometry`, `shared_boundary`, `outer_boundary`, `validation_report`, `created_by`, and `created_at`. Archived Tree detail/history reads this copied snapshot only; it never rehydrates geometry from the current map asset or live submission.
 
-Archive branch versions are independent historical records: a merge inserts a new row and changes the latest marker without overwriting an older snapshot; revert moves only the latest marker and records actor/time; tombstone retains every version and source record with reason/actor/time; restore records its actor/time. Each shipped mutation atomically updates the archive state and writes its CP0 event. A skipped P2 capability is hidden/disabled rather than routed to an unfinished handler.
+Archive branch versions are independent historical records: a merge inserts a new row and changes the latest marker without overwriting an older snapshot; revert moves only the latest marker and records actor/time; tombstone retains every version and source record with reason/actor/time; restore records its actor/time. Each shipped mutation atomically updates the archive state and writes its domain event record. A skipped P2 capability is hidden/disabled rather than routed to an unfinished handler.
 
 #### 3.4.2 Priority 1 — province isolation and Archive Request state machine
 
@@ -369,8 +359,8 @@ CP4 implementation sequence and target files:
 1. Add the CP4 scope/archive/vote/outbox migrations plus rollback and disposable-database verification.
 2. Add `server/lib/authorization/resourceScopeGuard.js` to derive eligibility, operating scope, cross-province warning data, and non-disclosing denials from server authority.
 3. Add `server/lib/archiveRequests/service.js` and `repository.js` for source sealing, claim/version locking, UUID validation, assignee/vote invariants, legal transitions, idempotency, conflicts, and atomic P1 outbox writes.
-4. Implement the Archive Request routes in a CP4 router mounted by `server/routes/workspace.js`; no CP3 service or browser code constructs identity, scope, state, or allowed actions.
-5. Add `src/services/archiveRequestApi.js` and the red cross-province warning to the existing request/Workspace UI. Add API/database tests for both eligible provinces racing the same resource, unrelated-province denial, same-province membership, every state transition, rollback/no-event, and CP0 delivery only to the operating province.
+4. Implement the Archive Request routes in a dedicated router mounted by `server/routes/workspace.js`; no external service or browser code constructs identity, scope, state, or allowed actions.
+5. Add `src/services/archiveRequestApi.js` and the red cross-province warning to the existing request/Workspace UI. Add API/database tests for both eligible provinces racing the same resource, unrelated-province denial, same-province membership, every state transition, rollback/no-event, and delivery rows only for the operating province.
 6. If Priority 2 is selected, implement Section 3.4.1 in complete vertical slices and add tests for every delivered merge/revert/tombstone/restore behavior.
 
 ### 3.5 Frontend services and data access
@@ -426,20 +416,20 @@ Use a versioned envelope:
 }
 ```
 
-Ownership and implementation workflow are deliberately split:
+Checkpoint 0 consumes already-committed domain state and depends on the domain requirements listed in Sections 3.6.1–3.6.2. Its implementation workflow is:
 
-1. **Checkpoint 4** independently migrates the Section 2.5 outbox/delivery tables, server-only grants, indexes, retention, and recovery queries as mandatory P1 work; it does not implement a WebSocket server.
-2. **Checkpoint 0** implements the shared runtime only: `server/realtime/gateway.js` for session/origin/scope-validated upgrades, `server/realtime/dispatcher.js` for claim/dispatch/replay, `server/realtime/eventContract.js` for envelope validation, `src/lib/realtime/realtimeClient.js` for reconnect/dedup/resync, `src/lib/realtime/realtimeInvalidation.js` for query invalidation, and `tests/realtime/*.test.js` for the reusable two-browser harness and matrix.
-3. Durable Workspace status, Archive Request/Archive, and collaboration mutations write their allocated deliveries and invalidation mappings. Submission persistence/write behavior is not coupled to this event-store implementation. No participating domain handler calls the gateway directly.
-4. Each domain PR first passes its unit/API tests with the shared event contract, then adds its CRUD row to the CP0 matrix. For a CP4 cross-province workflow, the harness opens two sessions in the operating province, one session in the other eligible province, and one unrelated session; it verifies convergence for the operating province and non-delivery to both non-operating sessions. The other eligible province is tested separately for authorized HTTP read and deterministic first-commit conflict behavior.
-5. A multi-instance deployment uses the durable outbox/delivery source (and an approved broker/notification fan-out) rather than an in-process emitter. A dispatcher marks a delivery dispatched only after handing it to that transport; a client acknowledgement is not required for correctness because replay/resync remains authoritative.
+1. Consume the CP4-owned Section 2.5 outbox/delivery tables, grants, indexes, retention, and recovery queries; do not create or redefine that schema.
+2. Implement `server/realtime/gateway.js` for session/origin/scope-validated upgrades, `server/realtime/dispatcher.js` for claim/dispatch/replay, `server/realtime/eventContract.js` for envelope validation, `src/lib/realtime/realtimeClient.js` for reconnect/dedup/resync, `src/lib/realtime/realtimeInvalidation.js` for query invalidation, and `tests/realtime/*.test.js` for the reusable browser harness and matrix.
+3. Integrate a domain mutation only after its named durable CRUD/state requirement and authorized HTTP refetch route are available. Consume a domain-owned mutation-to-event write where the domain already provides one; otherwise CP0 adds a narrow transactional event adapter without changing the frozen domain API. CP0 then adds the event-to-invalidation mapping, dispatcher/consumer coverage, and matrix row. No domain handler calls the gateway directly.
+4. For a cross-province Archive Request, open two sessions in the operating province, one in the other eligible province, and one unrelated session; verify convergence for the operating province and non-delivery to both non-operating sessions. Test the other eligible province separately through authorized HTTP refresh and deterministic first-commit conflict behavior.
+5. In a multi-instance deployment, use the durable outbox/delivery source and approved broker/notification fan-out rather than an in-process emitter. Mark a delivery dispatched only after handing it to that transport; client acknowledgement is not required for correctness because replay/resync remains authoritative.
 
-The gateway itself remains generic. It never contains a mutation-specific switch statement, performs a Supabase schema migration, or writes a domain record; mutation-specific event mapping stays with the owning checkpoint.
+The gateway itself remains generic. It never performs a domain migration or writes a domain record. CP0 owns its event-to-invalidation registry after the corresponding dependency is available.
 
 Required server behavior:
 
 1. Broadcast only after the database transaction commits and the authorized HTTP response can be reproduced.
-2. Validate and dispatch every event type registered by a domain checkpoint; the owning domain checkpoint is responsible for atomically creating that event with its mutation.
+2. Validate and dispatch every registered event type; a committed domain event/delivery record must already exist before CP0 dispatches it.
 3. Send heartbeat ping/pong frames, expire dead connections, bound per-connection subscriptions and outbound buffers, and apply connection/rate limits.
 4. Support multiple server instances through the database outbox/CDC source; do not rely on an in-process event emitter as the only publisher.
 5. Preserve ordering per aggregate where possible and require idempotent clients because delivery is at-least-once.
@@ -452,6 +442,38 @@ Required client behavior:
 3. Treat events as invalidation signals rather than authoritative records, deduplicate event IDs, and refetch only affected lightweight lists, branch statistics, detail records, heatmap counts, or archive branches.
 4. Reconcile optimistic writes with the committed version and roll back the optimistic view on HTTP failure.
 5. Never persist shared Workspace or authorization state in localStorage. Local storage remains limited to explicitly local drafts and non-authoritative UI preferences.
+
+#### 3.6.1 Checkpoint 0 Priority 1: Workspace and Commissioner Table realtime
+
+Priority 1 covers every durable Workspace operation and every create/read/update/delete effect that changes the Commissioner Submission Table. Events are invalidation signals: the browser refetches the authorized HTTP source and never treats an event payload as a complete row, comment, label, request, profile, or geometry record.
+
+**Common production dependency:** every Priority 1 slice depends on CP4 Priority 1 delivering the Section 2.5 `realtime_outbox` / `realtime_scope_deliveries` migrations, grants, indexes, retention, and recovery queries. CP0 may implement the generic runtime and ready domain adapters now against an exact repository-contract fixture, but neither the runtime nor a domain slice is production-accepted until the same tests pass against that CP4-owned durable store.
+
+Implement and report the currently available slices first:
+
+1. **Generic transport, replay, and client convergence — available for development now; no domain dependency beyond the common CP4 production store above.** Implement authenticated same-origin WebSocket upgrade, server-derived channels, heartbeat, bounded buffers, durable dispatch/replay, event validation, deduplication, resource-version ordering, reconnect/backoff, `resync-required`, logout teardown, and targeted HTTP refetch against synthetic contract events.
+2. **Workspace submission-status read/update — domain behavior is available now; dependency: CP3 Priority 1 plus the common CP4 production store.** Add the CP0 transactional event adapter around the committed `accepted`/`rejected` transition, then invalidate the exact Workspace row, affected branch counts, and matching Commissioner Table row. Create/delete are not fabricated for this status subresource; invalid/stale transitions commit nothing and emit nothing.
+
+Report the following Priority 1 slices after their named domain requirements are available:
+
+3. **Commissioner Table submission CRUD projection — depends on CP2 Priority 1 submission writes and CP5's geometry-free Commissioner direct-select requirement.** Create: a committed Feedback/Objection/Counter-Proposal becomes eligible for the scoped table. Read: initial load and every invalidation refetch the authorized lightweight list with current filters. Update: status or other allowlisted projection fields refetch and move the row into/out of the active filter result. Delete/tombstone: a supported committed deletion removes the row; an unsupported delete is explicitly rejected and emits no event. No event or refetch selects GeoJSON/revision snapshots.
+4. **Workspace list/branch data pull — depends on CP5's geometry-free Workspace select, focus-first entry, background full refresh, and authoritative HTTP reconciliation requirements.** Submission create/update/delete and status changes invalidate only affected rows, branch membership, `Show More`, and branch statistics; they do not remount an already-rendered focused row or start a duplicate full aggregation.
+5. **Workspace comments CRUD — depends on CP5's reliable comment CRUD requirement.** Create, read-after-invalidation, update, and delete converge in every open authorized review panel. A failed/rolled-back write emits nothing, does not clear a draft as committed, and never transports comment text in the event.
+6. **Workspace labels CRUD — depends on CP5's reliable label CRUD requirement.** Add/create, read-after-invalidation, replace/update, and remove-one/remove-all refresh the selected submission and branch statistics without duplicating stable label IDs after hard refresh.
+7. **Workspace label-catalog CRUD — depends on CP5's reliable label-catalog and custom-slot persistence requirement.** Create, list/read, rename/recolor, and permitted delete refresh every same-province label picker; event payloads carry IDs/versions only and never overwrite a newer server catalog with defaults.
+8. **Workspace Archive Request CRUD/state — depends on CP4 Priority 1 province scope and complete Archive Request state-machine requirements.** Create/claim, scoped read-after-invalidation, assignee/vote/state update, and cancel/tombstone converge only for clients in `operating_pruid`. The other eligible province and unrelated provinces receive no event metadata; conflicts and rolled-back transitions emit nothing.
+
+#### 3.6.2 Checkpoint 0 Priority 2: remaining realtime surfaces
+
+Priority 2 has no dedicated acceptance checklist in Demo 4. Implement only after the listed dependency is complete:
+
+- **Public My Submissions/status refresh:** depends on CP2 Priority 1 committed submissions and CP5's Public direct-select plus Pending/Received presentation requirements.
+- **Map InfoPanel and heatmap count refresh:** depends on CP2's optional Priority 2 heatmap endpoint and the map consumer that registers lightweight invalidation.
+- **Archived Tree merge/revert/tombstone/restore refresh:** depends on every CP4 Priority 2 Archived Tree slice actually delivered.
+- **Workspace Summary projection refresh:** depends on CP3 Priority 3 `workspace_submission_summaries` and `WorkspaceSummaryV1` being delivered.
+- **Commissioner CSV and Archived Tree JSON freshness hints:** depends on CP5's two export requirements; realtime never streams an export body.
+- **Counter-Proposal committed-impact/review refresh:** depends on CP6's final validated commit and persisted Commissioner review-impact requirements; live collaborative draft editing remains explicitly out of scope.
+- **Demographic/statistics refresh:** depends on CP7's versioned local statistics dataset/API and its source-version contract.
 
 ## 4. Progressive Loading and UX Plan
 
@@ -643,22 +665,148 @@ Before enabling the new routes:
 - Realtime create/update/delete events invalidate only affected lightweight lists, branch statistics, details, heatmap counts, and archive branches.
 - Connection state, reconnect, optimistic reconciliation, logout teardown, and forced resync are visible and deterministic.
 
-### CRUD and realtime acceptance matrix
+### Priority 1 change-classification gate for Checkpoints 1, 2, and 4
 
-Checkpoint 0 owns a living integration matrix for every required durable Demo 4 domain resource and every optional CP4 P2 slice actually shipped. Each applicable cell verifies HTTP authorization, committed database state, the initiator response, delivery to a second authorized WebSocket client in the operating scope, targeted cache invalidation/refetch, and non-delivery to non-operating or unauthorized clients.
+Every P1 pull request for Checkpoint 1, 2, or 4 declares itself `backend-only`, `frontend-visible`, or `both` and appends a checkpoint-specific acceptance record. A backend-only PR is not accepted with only the pre-existing generic regression commands: it must add or materially extend an automated test that fails against the pre-change behavior and passes after the change. A frontend-visible PR must include those backend tests plus component/integration tests and the manual behavior script applicable below.
+
+The acceptance record contains the changed behavior, new/updated test files and commands, fixtures/accounts/resource IDs, expected HTTP/database/UI results, rollback or failure case, and attached output. Frontend-visible evidence includes the viewport/browser, screenshot or recording, relevant network response/status, and confirmation after hard refresh. If a nominally backend-only change alters an API response, route availability, authorization result, loading state, warning, enabled action, or rendered data, it is classified as `both`.
+
+#### Checkpoint 1 P1 supplemental checklist
+
+**Backend-only automated tests required for every affected migration/security change:**
+
+- [ ] Add a catalogue test that compares the live/frozen fixture against the reviewed `keep`, `migrate`, `export-then-drop`, and `drop` manifest and fails for every unclassified object.
+- [ ] Apply migrations to an empty disposable database and to a production-data copy; assert the same final allowlisted tables, views, RPCs, triggers, policies, grants, constraints, and indexes.
+- [ ] For each destructive migration, prove the target has no unresolved code/database dependant, verify the backup/export checksum, assert the object is absent afterward, and execute the documented rollback/restore rehearsal.
+- [ ] Add deterministic backfill/quarantine tests for valid, orphaned, unknown-owner, invalid-DGUID/FED, and missing-snapshot legacy rows; a migration must never invent an owner, geometry, or authority value.
+- [ ] Add anonymous, authenticated owner, cross-owner, Commissioner, and service-role RLS/grant probes for every retained minimum submission object and RPC.
+- [ ] Run the frozen repository integration suite against the migrated schema: create/read one Objection snapshot and one Counter-Proposal detail, then verify required geometry, baseline, validation, owner, and timestamps survive a clean reconnect.
+- [ ] Add a regression test for every removed Yukon/`60001`, old metadata, stale view/RPC, or obsolete foreign-key restriction; a non-Yukon record must persist and the removed legacy path must be absent rather than silently used.
+
+Checkpoint 1 intends no new UI. Therefore any visible difference is either an integration effect that requires the following frontend regression tests/manual smoke or an unintended regression:
+
+- [ ] Automated browser smoke covers successful login, submission create, owner detail reload, cross-owner denial, and absence of generic `500` responses after the production-copy migration.
+- [ ] Manual example: sign in as Public User A, submit an Objection for Manitoba pair `2021S051246040028` + `2021S051246070200`, open its detail, and hard-refresh; the same submission and geometry render without an error page.
+- [ ] Manual example: sign in as Public User B and directly open User A's returned submission URL/ID; no title, comment, geometry, owner email, or snapshot is displayed, and the network response is the documented non-disclosing `403`/`404`.
+- [ ] Manual example: submit a non-Yukon Counter-Proposal for British Columbia pair `2021S051259090059` + `2021S051259090060`; the request commits, owner detail reopens after sign-out/sign-in, and no Yukon/`60001` value appears in the response or stored FED fields.
+
+#### Checkpoint 2 P1 supplemental checklist
+
+**Backend/domain/API automated tests required for every affected change:**
+
+- [ ] Objection create asserts one transaction writes the submission plus `original_geometry`, `shared_boundary`, `outer_boundary`, baseline, validation report, and author; forced failure of either insert rolls back both.
+- [ ] Objection detail is instrumented so any metadata/profile loader invocation fails the test. After replacing or removing the source map fixture, detail still returns a structure-equivalent persisted snapshot.
+- [ ] Owner, cross-owner, malformed-ID, unknown/non-adjacent pair, missing-feature, stale-manifest, disabled-FED, mismatched browser-FED, and corrupted-geometry cases return the documented result and never persist a partial row.
+- [ ] The exhaustive authority test iterates every DA in every Enabled FED asset and every declared adjacent pair, checking profile, FED, metadata feature, adjacency symmetry, and capability result; aggregate counts and manifest version/hash are saved as test output.
+- [ ] Authenticated Counter-Proposal integration writes cover every Enabled FED plus at least one cross-FED pair and the cross-province Manitoba/Saskatchewan pair `2021S051246050041` + `2021S051247010151`.
+- [ ] A missing requested asset produces `available: false` with a specific reason and no `POST`; no test or runtime path substitutes `fed_60001.geojson` or the first manifest asset.
+- [ ] Counter-Proposal detail reopens the persisted original/proposed geometry, boundaries, baseline, and validation result without an implicit revision or resubmission.
+
+**Frontend automated tests required whenever capability, submission, detail, or error behavior is visible:**
+
+- [ ] A valid non-Yukon pair enables Objection/Counter-Proposal actions and reaches the correct form; an unavailable pair disables the action and renders the server reason.
+- [ ] Successful Objection submission navigates to/reopens a detail map built from the persisted snapshot; hard refresh retains the same highlighted DAs and shared boundary.
+- [ ] Successful non-Yukon Counter-Proposal submission shows a committed result and can reopen its proposed geometry; validation failure preserves the draft and displays the actionable error.
+- [ ] Loading, disabled, failure, and retry states are covered without a Yukon-specific branch or silent fallback.
+
+Use the following checked-in valid pairs as reproducible manual samples; automated coverage remains exhaustive rather than limited to these samples:
+
+| Province/sample | FED | Primary DGUID | Secondary DGUID |
+| --- | --- | --- | --- |
+| Newfoundland and Labrador | `10001` | `2021S051210010504` | `2021S051210010505` |
+| Prince Edward Island | `11001` | `2021S051211010043` | `2021S051211010044` |
+| Manitoba | `46001` | `2021S051246040028` | `2021S051246070200` |
+| Saskatchewan | `47001` | `2021S051247120079` | `2021S051247120145` |
+| Alberta | `48001` | `2021S051248061727` | `2021S051248062674` |
+| British Columbia | `59001` | `2021S051259090059` | `2021S051259090060` |
+| Yukon control | `60001` | `2021S051260010118` | `2021S051260010304` |
+| Manitoba/Saskatchewan cross-province | `46001` / `47012` | `2021S051246050041` | `2021S051247010151` |
+
+**Manual behavior acceptance:**
+
+- [ ] Objection snapshot example: in a disposable test map-data copy, sign in as a Public User, select Manitoba pair `2021S051246040028` + `2021S051246070200`, submit an Objection, record the returned ID and visible geometry, then replace that pair's source metadata with a deliberately changed fixture and restart. Reopen the ID and hard-refresh; the submitted geometry remains unchanged and the detail API returns the stored snapshot.
+- [ ] Non-Yukon Counter-Proposal example: select British Columbia pair `2021S051259090059` + `2021S051259090060`, open Make Counter-Proposal, move the shared boundary, submit, sign out/in, and reopen the returned ID. The action is enabled, the response FED is `59001`, and the proposed geometry matches the committed edit.
+- [ ] Coverage smoke: repeat capability/open-form/submit for at least one sample in NL, PE, MB, SK, AB, BC, and the Yukon control; attach the seven results. The exhaustive automated audit, not this manual sample, proves every Enabled DA.
+- [ ] Fail-closed example: point a disposable manifest entry at a missing metadata fixture and select its DA. The UI displays the specific unavailable reason, the submission button remains disabled, the network log contains no submission `POST`, and no Yukon asset appears.
+
+#### Checkpoint 4 P1 supplemental checklist
+
+**Backend/database/API/domain-event automated tests required for every affected change:**
+
+- [ ] Fresh/upgrade/rollback migration tests cover the eligibility, archive-source, Archive Request, UUID vote/state, claim/version, outbox, and delivery objects plus their constraints, indexes, grants, and retained data.
+- [ ] Scope-guard tests cover a same-province resource, both eligible sides of a cross-province resource, and an unrelated province, deriving every PRUID from the authenticated server profile rather than request input.
+- [ ] Archive Request transition-table tests cover create, read, assignee replacement, vote, approve, reject, cancel, terminal-state rejection, idempotent replay, invalid-vote removal, and stale `expectedVersion` conflicts. If `consumed` is not exposed without Priority 2, no P1 control or route may claim that transition succeeded.
+- [ ] Identity tests reject email-as-authority, inactive/non-Commissioner profiles, assignees/voters outside `operating_pruid`, browser-supplied requester/voter IDs, and duplicate `(request_id, voter_id)` rows.
+- [ ] A real concurrent transaction test races Manitoba and Saskatchewan Commissioners on `2021S051246050041` + `2021S051247010151`; exactly one claim commits and the loser receives `409 RESOURCE_ALREADY_CLAIMED` or `409 STALE_RESOURCE_VERSION`.
+- [ ] Forced failures at source seal, request mutation, vote/state update, and outbox insertion roll back the whole transaction and emit no delivery.
+- [ ] Event-record tests assert one logical event plus delivery rows only for `operating_pruid`; duplicate commands remain idempotent and a rolled-back mutation writes no event or delivery.
+- [ ] Cancel/reject releases the operation-scoped claim atomically; a later operation against the new canonical version can be claimed by either eligible province.
+
+**Frontend automated tests required for every visible scope/Archive Request change:**
+
+- [ ] The cross-province resource renders red canonical copy: `You are processing a boundary between {Province A} and {Province B}.`; a same-province resource renders no warning.
+- [ ] Assignee/voter controls contain only active Commissioners from `operating_pruid`, and `allowedActions` hides or disables illegal transitions in each state.
+- [ ] A stale or losing action renders a conflict message, discards no committed server data, refetches the authoritative request, and does not report success.
+- [ ] Loading, empty, unauthorized/non-disclosing, mutation-failure, retry, and hard-refresh states preserve server authority and never reconstruct membership from localStorage.
+
+**Manual behavior acceptance:**
+
+- [ ] Same-province example: using two seeded Manitoba Commissioner accounts, open Manitoba pair `2021S051246040028` + `2021S051246070200`. Confirm there is no red cross-province warning; create a request, assign the second Manitoba Commissioner, vote, and approve/reject according to the displayed actions. Hard-refresh both browsers and confirm the same UUID-backed request state.
+- [ ] Cross-province first-commit example: open `2021S051246050041` + `2021S051247010151` simultaneously as a Manitoba Commissioner and a Saskatchewan Commissioner. Both see the red `Manitoba`/`Saskatchewan` warning. Submit the operation from both browsers together; exactly one succeeds, the other shows an explicit conflict and refetches, and neither Workspace imports the other province's members.
+- [ ] Stale-tab example: open the same request in two tabs for one operating-province Commissioner. Change assignees in tab A, then submit a vote or assignee change from stale tab B. Tab B receives `409`, shows the conflict, refetches A's committed version, and never displays a false success toast.
+- [ ] Unrelated-province example: sign in with a seeded Commissioner whose PRUID is neither `46` nor `47`, then attempt the cross-province request URL/API directly. The UI reveals no request/member/vote metadata and the network response is the documented non-disclosing `403`/`404`.
+
+#### Checkpoint 0 Priority 1 realtime supplemental checklist
+
+The generic runtime and ready adapters can be developed immediately with exact synthetic contract events. Production acceptance additionally requires the CP4 Priority 1 durable event store and the same test suite against it. A domain slice remains explicitly `blocked by CP{n}: {named requirement}` until every dependency in Section 3.6.1 is delivered; it cannot be reported as passed from mocks alone. Once available, every Priority 1 slice must append the applicable evidence below.
+
+**Automated backend/integration tests required for every available Priority 1 slice:**
+
+- [ ] The WebSocket upgrade rejects unauthenticated, expired, wrong-origin, role-mismatched, and browser-supplied-scope attempts; channel membership is derived from the verified server profile, and logout/profile-scope change closes the connection.
+- [ ] Synthetic-event tests cover durable dispatch after commit, no dispatch on rollback, event-schema rejection, at-least-once duplicate delivery, out-of-order resource versions, bounded buffers/rate limits, heartbeat expiry, reconnect replay, replay-retention expiry, and `resync-required` full refetch.
+- [ ] Multi-instance tests prove that a committed outbox/delivery row is observable from a different server process; an in-process emitter is not the only delivery path.
+- [ ] Event payload tests allow only resource/event IDs, type, scope key, version/sequence, and invalidation hints. They reject GeoJSON/snapshots, comment bodies, label text, private profiles, assignee lists, vote contents, and export bodies.
+- [ ] Workspace status tests use two authorized Commissioners: one committed transition invalidates exactly the affected row, branch membership/counts, and Commissioner Table row; invalid, stale, unauthorized, and rolled-back transitions emit nothing.
+- [ ] Commissioner Table CRUD tests, after CP2 P1 and the CP5 direct-select are available, prove that create appears under the correct current filters, read/refetch preserves normalized filters, projection update moves or refreshes the row, supported delete/tombstone removes it, and unsupported delete is rejected with no event. Query traces must prove that neither initial load nor refetch selects GeoJSON/revision snapshots.
+- [ ] Workspace list/branch tests, after the CP5 loading requirement is available, invalidate only the affected row, branch, `Show More`, and statistics; a focused row is not remounted and no duplicate full aggregation starts.
+- [ ] Comment CRUD tests, after CP5 comment CRUD is available, cover create, authorized read-after-invalidation, update, delete, rollback, and retry in two open clients without transporting the comment body in an event.
+- [ ] Label CRUD tests, after CP5 label CRUD is available, cover add/create, read-after-invalidation, replace/update, remove one, remove all, stable-ID deduplication, hard refresh, rollback, and retry.
+- [ ] Label-catalog CRUD tests, after CP5 catalog CRUD is available, cover create, list/read, rename, recolor, permitted delete, server persistence of custom slots, rollback, and same-province picker invalidation.
+- [ ] Archive Request tests, after CP4 P1 is available, cover create/claim, scoped read-after-invalidation, assignee replacement, vote, state update, cancel/tombstone, conflict, and rollback. Deliveries exist only for `operating_pruid`; the other eligible province and every unrelated province receive no event metadata.
+- [ ] Every slice covers reconnect during a mutation, duplicate/reordered delivery, focus/visibility reconciliation, authorized HTTP refetch failure/retry, and eventual convergence without localStorage acting as authority.
+
+**Frontend automated tests required for every visible Priority 1 slice:**
+
+- [ ] A shared connection exposes non-blocking `live`, `reconnecting`, and `offline` states, reconnects without remounting the page, and tears down on logout.
+- [ ] A Commissioner Table row appears, changes, moves into/out of an active filter, or disappears only after authoritative geometry-free refetch; existing table styles, hover behavior, and pagination remain unchanged.
+- [ ] Workspace status, row/branch counts, `Show More`, and statistics converge in a second browser without a full-page reload or replacement of an already-rendered focused row.
+- [ ] Comments, assigned labels, and catalog create/update/delete converge between two open Commissioner browsers, survive hard refresh, and never duplicate or revert from browser defaults.
+- [ ] Archive Request controls converge only inside the operating province; a losing/stale action shows the conflict and refetches rather than displaying false success.
+- [ ] An event never directly renders protected data. Loading, refetch failure, retry, replay, and `resync-required` states retain the last safe UI and disclose no cross-scope metadata.
+
+**Browser manual acceptance examples:**
+
+- [ ] Available-now runtime example: open two authenticated same-province Commissioner browsers against the synthetic test resource, disconnect browser B, commit two ordered invalidations from A, reconnect B, and record replay or `resync-required` plus authoritative convergence. Repeat one rolled-back write and confirm that B receives nothing.
+- [ ] Workspace-status example, after CP3 P1: open the same submission in two seeded Manitoba Commissioner browsers. In A, change `accepted` to `rejected`; without refreshing B, confirm that B's Workspace row/branch counts and matching Commissioner Table row converge. Hard-refresh both, then submit a stale version from B and confirm `409`, no false success, and no extra event.
+- [ ] Commissioner Table example, after CP2 P1 and CP5 direct-select: submit a British Columbia Counter-Proposal for `2021S051259090059` + `2021S051259090060`; in a Commissioner browser with matching type/status/date filters, confirm that the row appears. Change its status so it leaves the filter, then restore it. If deletion is supported, delete/tombstone it and confirm removal; otherwise confirm explicit rejection and no row/event change. Preserve a network trace proving that all list/refetch responses omit GeoJSON and revision snapshots.
+- [ ] Workspace collaboration example, after CP5 CRUD: open one submission in two same-province Commissioner browsers. In A, create/edit/delete a comment, add/remove one label, and rename/recolor then delete a permitted custom catalog label. Confirm each operation in B without refresh, hard-refresh both, and verify stable IDs, no duplicate labels, and persisted custom text/colors.
+- [ ] Archive Request example, after CP4 P1: use `2021S051246050041` + `2021S051247010151`, claim it first from a Manitoba Commissioner, and create/update/cancel the request. A second Manitoba Commissioner converges live; a Saskatchewan Commissioner receives no event or request metadata and learns canonical state only through an independently authorized action/refetch.
+- [ ] Filter/delete/reconnect example: keep an active Commissioner Table filter in browser B, take B offline, and perform a committed create/update/delete sequence in A. On reconnect, B replays or resyncs to the same filtered result with no duplicate row; repeat with an unsupported or rolled-back delete and confirm no visible change.
+
+### Priority 1 CRUD and realtime acceptance matrix
+
+Checkpoint 0 owns a living integration matrix only for the Priority 1 Workspace and Commissioner Table resources in Section 3.6.1. Each applicable cell verifies HTTP authorization, committed database state, the initiator response, delivery to a second authorized WebSocket client in the operating scope, targeted cache invalidation/refetch, and non-delivery to non-operating or unauthorized clients. Section 3.6.2 is a dependency register, not an additional acceptance checklist.
 
 | Resource | Create | Read | Update | Delete/recover | Required realtime effect |
 | --- | --- | --- | --- | --- | --- |
-| Feedback / Objection / Counter-Proposal submissions | submit | owner projection; scoped Commissioner projection/detail | allowed lifecycle/status/revision operations | owner delete where policy permits; otherwise explicit rejection/tombstone | owner projection, province Workspace/table, InfoPanel, and heatmap invalidate |
-| Objection / Counter-Proposal revisions | create atomically | authorized immutable detail | reject in-place mutation; create a new revision | reject physical delete except controlled retention policy | affected detail/version history and archive source choices invalidate |
+| Feedback / Objection / Counter-Proposal submissions | submit | scoped Commissioner projection/detail | allowlisted projection/status operations | supported delete/tombstone; otherwise explicit rejection | province Workspace and Commissioner Table invalidate |
 | Workspace comments | `POST` | `GET` | `PATCH` by authorized policy | `DELETE` by authorized policy | open review panels and branch statistics invalidate |
 | Workspace labels | `PUT`/add | `GET` | replace/update | remove one/all under policy | open review panels, branches, and branch statistics invalidate |
 | Workspace label catalog | create | list | rename/recolor | delete only when policy permits | all same-province Workspace label pickers invalidate |
 | Workspace archive requests (CP4 P1) | create/first claim | eligible read; province-local workflow read | same-province assignees, UUID-keyed votes, state transitions/version conflicts | cancel/tombstone under state policy | operating-province request panel, submission status, branch statistics, and assignee clients invalidate; other eligible province receives no live event |
-| Submission Workspace status | status transition | scoped lightweight list/detail | subsequent valid transition | archive cleanup/tombstone semantics | Workspace branches, tables, public list, InfoPanel, and heatmap invalidate |
-| Archive tree (only shipped CP4 P2 slices) | merge | scoped tree/detail/history | revert/latest and restore | tombstone and recovery | operating-province archive branches, source Workspace rows, map effect, and exports invalidate |
+| Submission Workspace status | status transition | scoped lightweight list/detail | subsequent valid transition | unsupported delete is explicit | Workspace branches and Commissioner Table invalidate |
 
-Read-only capability, heatmap, statistics, and export endpoints do not invent CRUD operations; they are included as authorized refetch targets after source mutations. Immutable resources explicitly test that unsupported update/delete calls are rejected rather than silently mutating history.
+Read-only capability, Public lists, InfoPanel/heatmap, Archived Tree, exports, committed impact, and demographic/statistics refreshes remain Priority 2 dependencies in Section 3.6.2. They do not enlarge this Priority 1 matrix.
 
 Existing regression commands remain required:
 
@@ -671,15 +819,22 @@ git diff --check
 
 ## 11. Implementation Checkpoints
 
-Priority is intentionally embedded in Checkpoints 1-8. Checkpoints 1 and 2 form a self-contained submission workstream and may develop in parallel under the Section 3.0 frozen contract. Checkpoint 2 may run against repository doubles, but its database-backed acceptance requires the clean Checkpoint 1 migration. Their P2 work never blocks either P1 exit criterion. Other checkpoint dependencies are defined only within their own sections.
+Priority is intentionally embedded in Checkpoints 1-8. Checkpoints 1 and 2 form a self-contained submission workstream and may develop in parallel under the Section 3.0 frozen contract. Checkpoint 2 may run against repository doubles, but its database-backed acceptance requires the clean Checkpoint 1 migration. Their P2 work never blocks either P1 exit criterion. Checkpoints 3 and 4 are standalone workstreams. All one-way dependencies consumed by Checkpoint 0 are declared only in Sections 3.6.1–3.6.2 and Checkpoint 0; Checkpoints 5–8 retain the dependencies stated in their own checkpoints.
 
-### Checkpoint 0 — P0: Cross-cutting CRUD and WebSocket acceptance gate
+### Checkpoint 0 — P1 Workspace/Commissioner Table realtime; P2 remaining realtime
 
-Own the generic realtime platform and its standing acceptance gate, as specified in Sections 2.5 and 3.6. Consume—do not create—the Checkpoint 4 outbox/delivery migration and P1 Archive Request/scope event mappings. Implement the authenticated WebSocket gateway, durable dispatcher/replay path, server-derived user/role/PRUID channels, shared client reconnect/deduplication/resync behavior, event-envelope validation, invalidation registry, and reusable disposable-database/two-browser CRUD matrix. Do not add domain tables, policies, grants, RPCs, or mutation-specific outbox inserts.
+Implement the generic authenticated WebSocket/dispatcher/replay/client platform in Sections 2.5 and 3.6, then deliver Priority 1 in the following report order:
 
-Checkpoint 0 is a standing release gate rather than a prerequisite claim that all domain implementations already exist. CP4 provides the shared event-store schema; participating Workspace/archive domain checkpoints add their atomic outbox/delivery writes, matrix rows, and invalidation mappings. CP4 Priority 1 realtime reporting and tests are mandatory. CP4 Priority 2 is optional, but every P2 mutation actually shipped must have a complete CP0 row. CP0 remains open while an applicable participating CRUD cell is missing, while a registered mutation can commit without its domain event, while a replay/resync path fails, or while HTTP and WebSocket authorization differ.
+1. **Priority 1, available for development now — generic runtime.** Complete the synthetic-event gateway, replay/resync, reconnect/deduplication, server-derived channel, logout teardown, invalidation/refetch, and multi-browser harness against the frozen event-store contract. Production acceptance depends on CP4 Priority 1 delivering the Section 2.5 durable outbox/delivery store.
+2. **Priority 1, domain behavior available now and reported next — Workspace status read/update.** CP3 Priority 1 durable status is present. Add the CP0 transactional event adapter, register committed status invalidation, and refresh the exact Workspace branch/counts and Commissioner Table row; invalid/stale writes emit nothing. Production acceptance also depends on the CP4 Priority 1 event store.
+3. **Priority 1, report after submission/table dependencies — Commissioner Table submission CRUD projection.** Depends on CP2 Priority 1 committed submission writes and CP5's geometry-free Commissioner direct-select. Create appears, read/refetch respects current filters, update moves/refreshes the row, and supported delete/tombstone removes it; unsupported deletion remains an explicit no-event rejection.
+4. **Priority 1, report after Workspace data dependency — Workspace list/branch reads.** Depends on CP5's lightweight/focus-first/background-full Workspace loading and authoritative reconciliation. Invalidate only affected rows, branch membership, `Show More`, and statistics.
+5. **Priority 1, report after collaboration dependencies — comments, labels, and label catalog CRUD.** Depends respectively on CP5's reliable comment, label, and label-catalog CRUD requirements. Cover create/read-after-invalidation/update/delete for each resource without transporting private record bodies in events.
+6. **Priority 1, report after Archive Request dependency — Archive Request CRUD/state.** Depends on CP4 Priority 1 scope and complete Archive Request state machine. Cover create/claim, scoped read-after-invalidation, assignee/vote/state updates, and cancel/tombstone only inside `operating_pruid`.
 
-**Exit criteria:** the generic gateway/dispatcher/client/harness pass independently against synthetic contract events; every implemented domain mutation writes one logical replayable event and only its workflow-authorized deliveries in the same transaction; two authorized clients in the operating scope converge without manual refresh; reconnect/resync converges to the HTTP source of truth; a CP4 cross-province event reaches only the acting `operating_pruid`; and public, cross-owner, cross-role, non-operating-province, and unrelated-province clients receive neither unauthorized records nor event metadata.
+**Priority 2:** the remaining realtime surfaces and their only required documentation are the dependency bullets in Section 3.6.2: Public My Submissions/status (CP2 P1 + CP5), InfoPanel/heatmap (CP2 P2), Archived Tree (CP4 P2), optional Workspace Summary (CP3 P3), exports (CP5), committed Counter-Proposal impact/review (CP6), and demographics/statistics (CP7). Priority 2 has no dedicated CP0 acceptance checklist.
+
+**Exit criteria:** the generic runtime first passes synthetic contract tests and then the same suite against the CP4-owned durable store; every available Priority 1 slice passes the Section 10 CP0 automated checklist and its applicable browser manual example; blocked slices are explicitly reported with the exact dependency above and are run immediately after that requirement is delivered. For every completed slice, the initiator and second authorized operating-scope browser converge through authorized HTTP refetch, reconnect/resync converges without manual repair, rolled-back writes emit nothing, table/Workspace refetches remain geometry-free, and unauthorized/non-operating clients receive no event metadata.
 
 ### Checkpoint 1 — P1: Clean and secure the production database with minimum submission persistence
 
@@ -692,7 +847,7 @@ Checkpoint 1 implements Sections 2.2–2.3, the persistence half of Section 3.0,
 
 **Priority 2:** after P1 passes, optionally improve non-critical indexes/query plans, automate schema-drift reports, enrich migration diagnostics, normalize surviving non-submission legacy objects, repair compatibility relationships not used by the P1 flows, and add broader repository fixtures or common error/route documentation. P2 must not retain an otherwise obsolete object, expand the minimum P1 schema, or block production cleanup and security acceptance. The three-workflow physical table split is discarded rather than scheduled.
 
-**Exit criteria:** a reviewed keep/migrate/drop manifest accounts for every live database object; obsolete objects are removed by rollback-tested migrations; only the minimum active submission persistence and independently owned active-domain objects remain; every retained CP1 object has a proven access boundary; fresh and production-copy migrations pass; and the Objection/Counter-Proposal repository integration tests can persist and read their required records without Yukon-only or legacy metadata constraints.
+**Exit criteria:** a reviewed keep/migrate/drop manifest accounts for every live database object; obsolete objects are removed by rollback-tested migrations; only the minimum active submission persistence and independently owned active-domain objects remain; every retained CP1 object has a proven access boundary; fresh and production-copy migrations pass; and the Objection/Counter-Proposal repository integration tests can persist and read their required records without Yukon-only or legacy metadata constraints. Every P1 PR also passes the Section 10 change-classification gate and CP1 supplemental checklist; any route/UI-visible migration effect includes the listed browser tests and completed manual smoke record.
 
 ### Checkpoint 2 — P1: Persist Objection snapshots and enable Counter-Proposals for every Enabled DA
 
@@ -704,22 +859,23 @@ Checkpoint 2 implements the behavior half of Section 3.0 and the P1 routes and a
 
 **Priority 2:** after P1 passes, optionally add the heatmap endpoint, richer detail projections, generalized error envelopes, expanded service-file decomposition, legacy comments/Feedback adapters, compatibility cleanup, performance tuning, additional revision-history metadata, or an explicit future resubmission lifecycle. P2 cannot change the persisted P1 snapshot, restore a Yukon fallback, or block exhaustive Enabled-DA acceptance.
 
-**Exit criteria:** an Objection continues to return its submitted GeoJSON after its original local assets are changed or removed; no Objection detail path reconstructs geometry from stored IDs; every Enabled DA and declared adjacent pair passes the capability audit; representative writes succeed for every Enabled FED without a Yukon fallback; unavailable/corrupt authority fails closed with a specific reason; and the authenticated route/repository suite passes against the clean Checkpoint 1 schema.
+**Exit criteria:** an Objection continues to return its submitted GeoJSON after its original local assets are changed or removed; no Objection detail path reconstructs geometry from stored IDs; every Enabled DA and declared adjacent pair passes the capability audit; representative writes succeed for every Enabled FED without a Yukon fallback; unavailable/corrupt authority fails closed with a specific reason; and the authenticated route/repository suite passes against the clean Checkpoint 1 schema. Every P1 PR also passes the Section 10 change-classification gate and CP2 backend checklist; every capability/submission/detail/error change visible in the browser passes the frontend checklist and the documented Objection, non-Yukon, coverage, and fail-closed manual examples.
 
 
-### Checkpoint 3 — P1: Establish durable Workspace status and authenticated base APIs
+### Checkpoint 3 — P1 durable Workspace status; optional P3 Workspace Summary
 
-Implement the Section 3.3 durable base: authenticated Workspace route registration, Supabase-backed non-archive submission status transitions, and the initial server reads/writes over the existing Workspace tables. Status transitions persist independently of a browser session and insert their CP0 outbox/delivery rows atomically. This checkpoint does not define a Workspace Summary API or table-facing projection/cache protocol.
+1. **Priority 1 — durable status.** Implement the Section 3.3 authenticated status read/transition routes. Permitted non-archive transitions persist independently of a browser session, return a committed version, reject invalid or stale transitions without partial state, and reproduce the database result after hard refresh or a clean sign-in.
+2. **Priority 3 — Workspace Summary API plus table.** Optionally implement `workspace_submission_summaries`, its idempotent backfill/update path, `WorkspaceSummaryV1`, and `GET /api/workspace/summary` exactly as defined in Section 3.3. It remains geometry-free and cannot replace or block the P1 status source of truth.
 
-**Exit criteria:** authenticated base routes are registered; permitted non-archive Workspace status transitions are durable and reject invalid transitions; reads reproduce the committed status in a clean browser session; and every CP3-owned status mutation creates its required outbox/delivery rows. CP4's province scope guard and CP5's CRUD/browser-authority work have their own exit criteria.
+**Exit criteria:** the Priority 1 authenticated routes are registered; valid non-archive Workspace status transitions are durable, versioned, and reproducible in a clean browser session; invalid, stale, unauthenticated, and unsupported archive-state transitions fail without a partial write or false success. Priority 3 is excluded from CP3 completion when deferred; if delivered, its table/API must be internally consistent, geometry-free, and tested without changing P1 status behavior.
 
 ### Checkpoint 4 — P1 scope/request integrity; optional P2 Archived Tree refactor
 
 1. **Priority 1 — province scope.** Independently create the CP4 scope schema/migration, reusable guard, immutable eligible province set, same-province `operating_pruid`, first-commit claim/version conflicts, unrelated-province denial, and red cross-province UI warning in Section 3.4.2.
-2. **Priority 1 — Archive Request.** Independently create the Archive Request/vote/outbox schema/migrations, CP4-sealed `sourceRevisionId`, UUID identity model, same-province assignee/vote rules, complete state machine, authenticated routes/client read model, and atomic P1 realtime events/tests in Sections 2.5, 3.4, and 3.4.2.
-3. **Priority 2 — Archived Tree.** Optionally deliver Section 3.4.1 archive merge/version/revert/tombstone/restore as complete tested vertical slices over the existing minimum runnable skeleton. Do not expose unfinished behavior, regress the current application, physically delete history, or leave a partial migration/route. Performance and non-safety workflow refinements are best effort; every portion actually delivered must be behaviorally sound and tested, including its CP0 matrix row.
+2. **Priority 1 — Archive Request.** Independently create the Archive Request/vote/outbox schema/migrations, CP4-sealed `sourceRevisionId`, UUID identity model, same-province assignee/vote rules, complete state machine, authenticated routes/client read model, and atomic P1 event/delivery records and tests in Sections 2.5, 3.4, and 3.4.2.
+3. **Priority 2 — Archived Tree.** Optionally deliver Section 3.4.1 archive merge/version/revert/tombstone/restore as complete tested vertical slices over the existing minimum runnable skeleton. Do not expose unfinished behavior, regress the current application, physically delete history, or leave a partial migration/route. Performance and non-safety workflow refinements are best effort; every portion actually delivered must be behaviorally sound and tested, including its domain-event record.
 
-**Exit criteria:** both mandatory P1 bullets pass their Section 10 API/database/frontend tests: either canonical province can attempt a cross-province operation, the first committed claim wins, the loser receives an explicit conflict, request membership and live reports remain in the acting province, no second-province approval is required, unrelated provinces cannot discover or mutate the resource, UUID/state/version rules are atomic, and every committed P1 mutation writes exactly its operating-province CP0 delivery. P2 does not block CP4 acceptance when cleanly deferred; if any P2 slice is delivered, that slice must preserve immutable snapshots and audit/recovery behavior and pass its applicable API, failure, and realtime tests.
+**Exit criteria:** both mandatory P1 bullets pass their Section 10 API/database/frontend tests: either canonical province can attempt a cross-province operation, the first committed claim wins, the loser receives an explicit conflict, request membership and event deliveries remain in the acting province, no second-province approval is required, unrelated provinces cannot discover or mutate the resource, UUID/state/version rules are atomic, and every committed P1 mutation writes exactly its operating-province delivery rows. Every P1 PR also passes the Section 10 change-classification gate and CP4 backend checklist; every visible scope/request change passes the frontend checklist and all four documented manual scenarios. P2 does not block CP4 acceptance when cleanly deferred; if any P2 slice is delivered, that slice must preserve immutable snapshots and audit/recovery behavior and pass its applicable API, failure, and domain-event tests.
 
 ### Checkpoint 5 — P2: Deliver progressive list, Workspace, and navigation UX
 
