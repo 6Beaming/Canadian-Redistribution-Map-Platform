@@ -8,7 +8,7 @@ This document is an implementation plan, not a claim that the work is complete. 
 
 ## 1. Current Baseline and Definition of Done
 
-The audited Supabase project contained 70 `submissions`, 6 `counter_proposal_revisions`, and 1 `archive_tree` record. `workspace_comments`, `workspace_labels`, and `workspace_archive_requests` existed but contained no records, which confirms that Workspace collaboration is still browser-local. The audit did not inspect PostgreSQL system catalogs, so migration history, constraints, RPC grants, and RLS policies must be verified separately by the project owner.
+The 2026-07-21 Supabase audit contained 70 `submissions`, 6 `counter_proposal_revisions`, and 1 `archive_tree` record. A later read-only audit on 2026-08-02 found durable Workspace rows, but behavioral verification still reproduced two source-of-truth failures: comments can disappear immediately on a slow write, and labels/custom-label catalog values can duplicate or reset after a hard refresh because server identifiers are serialized incorrectly and mutations are not awaited. A two-Commissioner test also proved that `crmp.workspace.v1` can keep one browser in `rejected` after another Commissioner commits `accepted`. These verified defects are Checkpoint 5 work under Sections 3.3 and 4.1. The audit did not inspect every PostgreSQL system catalog, so migration history, constraints, RPC grants, and RLS policies must still be verified separately by the project owner.
 
 Demo 4 is complete only when:
 
@@ -32,7 +32,6 @@ All three submission types must use the following two-layer read model.
 id
 type
 status
-public_status
 title
 created_at
 updated_at
@@ -45,6 +44,8 @@ latest_revision_number
 ```
 
 The projection must not contain `original_geometry`, `proposed_geometry`, `shared_boundary`, or any other large GeoJSON value.
+
+This list projection is an API response shape, not a PostgreSQL projection table, materialized view, or Checkpoint 2 repository abstraction. Checkpoint 5 implements it with an explicit Supabase `.select(...)` column list and normal server-side role/ownership checks. Checkpoint 2 does not build a Projection Table, cursor adapter, or table-facing read model.
 
 **Detail snapshot** (one record at a time, authorized):
 
@@ -110,6 +111,8 @@ Connect the existing tables through Commissioner-only server routes:
 
 Emails are display projections. Identity, assignees, votes, and authorization use profile UUIDs.
 
+**Optional P3 normalization:** physically splitting the legacy `comments`/`submissions` persistence into three workflow-specific Feedback, Objection, and Counter-Proposal tables is optional, not a Demo 4 prerequisite. The P1/P2 implementation may retain one typed `submissions` table plus the immutable Objection and Counter-Proposal revision tables. No CP1, CP2, CP3, or CP5 exit criterion depends on completing that physical split.
+
 ### 2.5 Realtime event and delivery state
 
 Realtime is a consistency layer over committed Supabase state, not a second source of truth. Add a transactional outbox table, or an equivalent PostgreSQL change-data-capture mechanism with the same guarantees, for all Demo 4 durable domain mutations:
@@ -138,7 +141,7 @@ realtime_scope_deliveries
 
 Checkpoint 1 owns these migrations, constraints, indexes, retention, and server-only grants. A domain mutation inserts one logical `realtime_outbox` event and one delivery row per PRUID in its immutable scope set in the same database transaction. Rolled-back writes emit no event. The same event ID is therefore delivered once to each authorized scope while preserving a resumable per-scope sequence. Events contain identifiers, versions, scope, and cache/projection hints only; comments, profile details, full submission bodies, and GeoJSON are fetched afterward through the normal authorized HTTP read endpoint.
 
-Checkpoint 0 owns dispatch, WebSocket transport, replay/resync, and the CRUD/realtime acceptance matrix; it does not own a domain migration or insert events for a domain write. Checkpoints 2, 3, and 4 own their respective transactional event insertion; Checkpoint 5 owns public-table/cache invalidation consumers. Delivery is at-least-once. Consumers deduplicate by event ID, ignore older resource versions, and refetch the authoritative projection. A reconnect replays retained deliveries for the connection's derived PRUID or sends `resync-required`, after which the client invalidates and refetches scoped queries.
+Checkpoint 0 owns dispatch, WebSocket transport, replay/resync, and the CRUD/realtime acceptance matrix; it does not own a domain migration or invent a domain event. Checkpoints 2, 3, 4, and 5 define and transactionally insert events for the mutations allocated to them; Checkpoint 5 also owns table/Workspace invalidation consumers. Delivery is at-least-once. Consumers deduplicate by event ID, ignore older resource versions, and refetch the authoritative HTTP result. A reconnect replays retained deliveries for the connection's derived PRUID or sends `resync-required`, after which the client invalidates and refetches scoped queries.
 
 ## 3. Target API and Service Architecture
 
@@ -157,7 +160,6 @@ Persistence schema owned by Checkpoint 1
 Domain ports consumed by Checkpoint 2
   SubmissionRepository.createObjection(input, actor)
   SubmissionRepository.createCounterProposal(input, actor)
-  SubmissionRepository.listProjection(query, scope)
   SubmissionRepository.getDetail(submissionId, scope)
   MapAuthority.getCapability(primaryDguid, secondaryDguid?)
   MapAuthority.prepareObjection(input)
@@ -168,10 +170,10 @@ HTTP contract owned by Checkpoint 2
   POST /api/submissions/counter-proposals
   GET  /api/submissions/:submissionId
   GET  /api/map/capabilities
-  shared cursor/projection/error envelopes for the remaining Section 3.1 routes
+  shared detail/capability/error envelopes
 ```
 
-The contract fixes canonical primary/secondary DGUID and FED fields, ordered immutable `scope_pruids`, revision and outbox transaction boundaries, list-versus-detail projection rules, authorization inputs, and standard validation/conflict/not-found response shapes. The browser never supplies an authoritative owner, PRUID scope, revision, or derived FED.
+The contract fixes canonical primary/secondary DGUID and FED fields, ordered immutable `scope_pruids`, revision and outbox transaction boundaries, authorized detail behavior, authorization inputs, and standard validation/conflict/not-found response shapes. The browser never supplies an authoritative owner, PRUID scope, revision, or derived FED. Checkpoint 5's direct-select table reads are intentionally outside this CP1/CP2 interface freeze.
 
 Parallel ownership is strict:
 
@@ -182,78 +184,50 @@ Each workstream may use its own branch and test doubles. The only synchronizatio
 
 ### 3.1 Submission routes
 
-Add a dedicated repository-backed router, preferably `server/routes/submissions.js` plus `server/lib/submissions/` domain modules:
+Keep one public URL namespace but split implementation ownership into ordered subrouters. CP5's static/list router is registered before CP2's parameterized detail/write router:
 
 ```text
+CP5: server/routes/submissionLists.js
+GET   /api/submissions/mine?query=&createdFrom=&createdTo=&type=&status=&sort=
+GET   /api/submissions?submissionId=&dguid=&active=&query=&createdFrom=&createdTo=&type=&status=&sort=
+
+CP2: server/routes/submissions.js
 POST  /api/submissions/objections
-GET   /api/submissions/mine?cursor=&limit=&type=&status=&query=&createdFrom=&createdTo=
-GET   /api/submissions?cursor=&limit=&type=&status=&sort=&province=&query=&createdFrom=&createdTo=
-GET   /api/submissions/:submissionId
-GET   /api/submissions?dguid=&active=&limit=
+POST  /api/submissions/counter-proposals
 GET   /api/submissions/heatmap?status=pending,archive-request
-GET   /api/submissions/export.csv
+GET   /api/submissions/:submissionId
 ```
 
 Rules:
 
 - Public list/detail routes derive `user_id` from the verified session.
 - Commissioner routes require Commissioner role and server-side membership in the resource's canonical PRUID scope set.
-- The list endpoint returns only projection fields.
+- The list endpoints use an explicit direct-select allowlist and return no geometry or revision snapshot fields.
 - Detail endpoints return geometry only after role/ownership checks.
 - `GET /api/submissions/heatmap` returns only `countsByDguid`.
-- Export uses the same role, identity, province, and filter rules.
+- The optional exact `submissionId` filter reuses the same lightweight row shape for Workspace focus-first navigation; it is not an authorization input.
+- Export routes live under `/api/exports` and use the same role, identity, province, and visibility rules.
 
-Checkpoint 5 implements the public ownership and `public_status` projection contract while replacing table queries and client loading. The server derives the public owner from the verified session, returns only the public projection for `/mine`, public detail, and public export, and never accepts a browser-supplied owner ID as an authorization input.
+Checkpoint 5 owns these lightweight list handlers while replacing table and Workspace list-loading queries. The server derives the public owner from the verified session and never accepts a browser-supplied owner ID as an authorization input. Public status display is the frontend rule in Section 6; this simplified scope does not require a separate database projection or `public_status` column.
 
 The current `server/routes/comments.js` generic route can remain temporarily for feedback compatibility, but Objection writes must move to the dedicated route. `src/services/commentsApi.js` should expose separate `getPublicSubmissions`, `getCommissionerSubmissions`, `getSubmissionDetail`, and `submitObjection` methods instead of making one service represent every flow.
 
-#### 3.1.1 Checkpoint 2/5 parallel submission projection contract
+#### 3.1.1 Checkpoint 5 direct-select list contract
 
-Checkpoint 2 and Checkpoint 5 freeze `SubmissionProjectionV1` before either starts table work. It is the only row shape a table, Workspace summary, or cache may receive; it never contains GeoJSON or a browser-supplied owner/scope.
+Checkpoint 5 implements list reads with a small explicit Supabase `.select(...)` allowlist. It does not create a Projection Table, materialized view, mock/backend source switch, cursor envelope, or CP2-owned table adapter. The HTTP response contains `items` plus normalized `appliedFilters`; the CP5 client service unwraps `items` into the ordinary array expected by the unchanged React Table components.
 
-```text
-SubmissionProjectionV1
-  id, type, title, createdAt, updatedAt
-  primaryDguid, secondaryDguid, primaryFed, secondaryFed
-  scopePruids[], latestRevisionNumber, communityLabel
-  commissionerStatus?                 # only after Commissioner authorization
-  publicStatus?                       # only after CP5 public projection authorization
-
-CursorPageV1
-  items: SubmissionProjectionV1[]
-  nextCursor: opaque string | null
-  appliedFilters:
-    query: normalized string | null
-    createdFrom: YYYY-MM-DD | null
-    createdTo: YYYY-MM-DD | null
-    type, status, sort                 # normalized values accepted by the route
-  snapshotVersion
-```
-
-The optional Public/Commissioner list filters are frozen as follows:
-
-- `query` is trimmed, internal whitespace is collapsed, and its maximum length is 100 Unicode code points. An empty normalized value becomes `null`. It performs a case-insensitive literal substring match over the authorized projection's `id`, `title`, `communityLabel`, `primaryDguid`, and `secondaryDguid`; wildcard characters are escaped rather than interpreted as SQL patterns.
-- `createdFrom` and `createdTo` accept `YYYY-MM-DD` only. They filter `createdAt` in UTC: `createdFrom` is inclusive at `00:00:00.000Z`, and `createdTo` includes the whole named day by using the next UTC day as an exclusive upper bound. Invalid dates or `createdFrom > createdTo` return the common `400` validation envelope.
-- Authorization/ownership/scope predicates are applied first, then all normalized filters, then the stable sort, cursor position, and limit. Filtering a page after pagination is invalid.
-- `appliedFilters` echoes the normalized values used by the query. The opaque cursor is bound to audience, authorized scope, normalized filters, sort, and snapshot version; reusing it with different inputs returns `400`.
-
-The mock, legacy compatibility, and production backend adapters implement the same normalization and contract tests. The legacy adapter may emulate filtering/cursor behavior over its already-loaded authorized array, but only the mock and backend APIs demonstrate server-side pre-pagination filtering.
-
-Checkpoint 2 owns the server-side projection query, cursor semantics, Commissioner/internal projection adapter, and `SubmissionProjectionV1` contract tests. Checkpoint 5 owns `src/lib/contracts/submissionProjection.js`, a `SubmissionProjectionDataSource` client port, mock fixtures/data source, table/cache tests, public-status projection adapter, and the eventual CP2 HTTP data-source adapter. CP5 develops tables only against the mock port; it must not read Supabase directly. Once CP2's disposable-database API suite passes, CP5 replaces the mock implementation with the authenticated HTTP adapter without changing a table component or its tests.
-
-Target files and handoff sequence:
+The minimum selected database fields are:
 
 ```text
-src/lib/contracts/submissionProjection.js              # jointly frozen shape
-src/services/submissionProjectionDataSource.js         # CP5 client port
-src/services/mockSubmissionProjectionDataSource.js     # CP5 fixtures/tests
-server/lib/submissions/projection.js                    # CP2 query/projection adapter
-server/routes/submissions.js                            # CP2 cursor/detail endpoints
-tests/submissionProjection.contract.test.js             # joint contract cases
-tests/submissionTable.mock.test.jsx                     # CP5 mock-table cases
+id, user_id, type, fed_num, dguid, neighboring_dguid,
+title, status, created_at, updated_at
 ```
 
-The only joint gate is a contract test that runs the same fixture page through the CP2 HTTP adapter and CP5 table data source, confirming field names, normalized `query`/date filters, pre-pagination filtering, `appliedFilters`, opaque cursor binding, scope filtering, no-geometry list behavior, and public/internal status separation. Contract changes require the same versioned review rule as Section 3.0.
+The server may add only the display values already required by the current UI, such as a batched `profile.email` and `dissemination_areas.community_name`. It must never select or serialize `geometry`, `original_geometry`, `proposed_geometry`, full revisions, private comments, shared boundaries, outer boundaries, or validation reports for a list request. Counter-Proposals come from the same `submissions` select and are not fetched again through the revision-detail route.
+
+The optional list filters remain normalized consistently: `query` is trimmed, internal whitespace is collapsed, and limited to 100 Unicode code points; `createdFrom` and `createdTo` accept `YYYY-MM-DD` and use UTC day boundaries; type/status/sort values are allowlisted. Authorization and owner predicates run before filtering and before any present or future pagination. `appliedFilters` echoes the normalized values actually used. These filters are conveniences for the direct select, not a cursor protocol, and the current client continues to paginate `items` locally.
+
+Checkpoint 2 has no deliverable or acceptance gate in this subsection. Its immutable write/detail work can proceed independently. Checkpoint 5 tests the direct-select field allowlist, owner/role behavior, exact-ID filter, response size, stable sort, absence of GeoJSON, and compatibility with the unchanged Public and Commissioner table components.
 
 ### 3.2 Capability and province authorization
 
@@ -298,7 +272,7 @@ The observed symptom is that a Public User can submit a Counter-Proposal for Yuk
 - the client nevertheless starts with a Yukon-only fallback manifest when `/api/map/assets/manifests/da_asset_manifest.json` cannot be loaded. In addition, `getMetadataGeojsonPathsForFed` currently returns the first manifest asset when the requested FED is absent. In a Yukon-first fallback (or a stale/incomplete manifest), that silently substitutes `fed_60001.geojson` for another FED instead of producing a diagnosable unavailable state. This is a confirmed Yukon-only failure path;
 - the checked-in migrations do not constitute an inspectable baseline definition for every pre-existing `submissions` constraint, trigger, view, RPC, and policy. The current target database has only Yukon Counter-Proposal rows, which proves the production symptom but cannot prove or rule out an untracked Yukon-only database restriction. It must therefore be inspected before declaring the rollout fixed.
 
-Under the Section 3.0 parallel contract, Checkpoint 1 performs the deployment/database audit and provides the fail-closed persistence contract while Checkpoint 2 implements the canonical capability/write path against contract doubles. After the migration/API integration gate, Checkpoint 2 owns the all-Enabled-FED capability/write acceptance suite; Checkpoint 3 only consumes that capability contract. The responsibilities are:
+Under the Section 3.0 parallel contract, Checkpoint 1 performs the deployment/database audit and provides the fail-closed persistence contract while Checkpoint 2 implements the canonical capability/write path against contract doubles. After the migration/API integration gate, Checkpoint 2 owns the all-Enabled-FED capability/write acceptance suite. Workspace status/base behavior does not implement or redefine this capability contract. The responsibilities are:
 
 1. **Checkpoint 2 — fail closed on map authority.** Remove the Yukon-only operational fallback. If the canonical manifest, requested FED entry, or declared metadata asset is unavailable, return an explicit `available: false` capability reason and disable the Public User flow; never substitute another FED's metadata. Treat the fallback manifest only as an offline-development fixture that cannot enable editing/submission in a deployed build.
 2. **Checkpoint 2 — make the local authority the sole geographic source.** Resolve both DGUIDs to their FED/PRUID from the local profile index; load only manifest-declared local metadata for those FEDs; derive the submitted `fed_num`, ordered `scope_pruids`, and baseline revision on the server; and reject a browser `fed_num` or scope mismatch. The client must consume the same server capability result for Step 1/2 gating instead of making a separate best-effort metadata decision.
@@ -307,10 +281,9 @@ Under the Section 3.0 parallel contract, Checkpoint 1 performs the deployment/da
 
 ### 3.3 Workspace API
 
-Extend `server/routes/workspace.js` with authenticated Commissioner endpoints:
+The Workspace continues to use authenticated Commissioner endpoints for status, comments, labels, and the label catalog:
 
 ```text
-GET    /api/workspace/submissions/summary
 PATCH  /api/workspace/submissions/:submissionId/status  # non-archive accepted/rejected transitions only
 GET    /api/workspace/comments/:submissionId
 POST   /api/workspace/comments
@@ -325,36 +298,23 @@ PATCH  /api/workspace/label-catalog/:labelId
 DELETE /api/workspace/label-catalog/:labelId
 ```
 
-`GET /api/workspace/submissions/summary` returns `WorkspaceSummaryV1`, a Commissioner-authorized index rather than submission detail. It derives scope from the verified profile, composes each item through the CP2 `SubmissionProjectionV1` port, and contains no GeoJSON or browser-supplied owner/scope:
+There is no required Workspace Summary API, `WorkspaceSummaryV1`, branch cursor, or CP2 projection dependency. Workspace list and branch statistics reuse Checkpoint 5's lightweight submission selects. A direct Workspace entry loads the complete lightweight array; a `?focus=<submissionId>` entry first performs the exact-ID lightweight select, renders that branch immediately, and then refreshes counts and branch rows from the background full lightweight request.
 
-```text
-WorkspaceSummaryV1
-  schemaVersion, snapshotVersion
-  branches: WorkspaceBranchPageV1[]
+Checkpoint 3 retains the durable Workspace tables and the existing authenticated base handlers/status behavior. Following behavioral verification, Checkpoint 5 owns the remaining reliable comments/labels/label-catalog CRUD completion and the removal of browser-authoritative Workspace state. In particular, CP5 must correct `id`/`is_custom` label serialization, persist custom-label edits, await and report mutations, remove `crmp.workspace.v1` submission overrides and browser-event synchronization, and refetch authoritative server state after writes, focus/visibility changes, and CP0 invalidation events. CP0 still owns the WebSocket transport; CP4 still owns Archive Request and province-scope behavior.
 
-WorkspaceBranchPageV1
-  key: "{type}:{status}"
-  type: feedback | objection | counter-proposal
-  status: pending-submissions | archive-request | accepted | rejected
-  count: integer                         # total authorized rows in this branch
-  items: SubmissionProjectionV1[]        # first three rows by default
-  nextCursor: opaque string | null
-```
+The three seeded custom catalog slots are `Custom Label 1`, `Custom Label 2`, and `Custom Label 3`. Their colors remain independently editable. Initialization/migration is idempotent and must not overwrite a Commissioner-renamed value.
 
-The initial request returns the count and first three rows for the visible branches. `GET /api/workspace/submissions/summary?branch={key}&cursor={opaque}&limit=3` returns the requested branch page with the same `snapshotVersion`; `branch`, cursor, limit, profile UUID, and PRUID are never authorization inputs. CP3 owns the handler and `server/lib/workspace/summary.js`; CP5 may consume the contract through a mock or HTTP data-source adapter, but does not implement this server API.
-
-Checkpoint 3 owns the Workspace core: server summary, comments, labels, label catalog, client cache, and the removal of shared localStorage/hybrid aggregation. It consumes the Checkpoint 2 submission projection/capability APIs and the Checkpoint 4 scope guard.
-
-Replace the current localStorage/hybrid functions in `src/services/workspaceApi.js` with `workspaceApi.js` HTTP/cache methods. Delete `crmp.workspace.v1`, browser `storage`/custom-event synchronization, temporary submission overrides, and client-side heatmap aggregation once equivalent server projections exist. The only permitted compatibility facade maps legacy component calls onto the durable API and contains no shared state.
+Workspace decision actions must not report success while their required comment/label write is still unawaited. A failed mutation leaves the UI on the authoritative server result and displays an actionable error. Full transactional decision orchestration may use an existing server transaction/RPC when available; it must not be simulated by a localStorage mirror.
 
 Target files:
 
 ```text
-server/routes/workspace.js                     # CP3 summary/comments/labels/catalog handlers
-server/lib/workspace/summary.js                 # CP3 projection composition from CP2 port
-src/services/workspaceApi.js                    # CP3 durable HTTP/cache client only
-src/lib/query/workspaceCache.js                 # CP3 cache + CP0 invalidation registration
-src/pages/CommissionerWorkspace.jsx             # CP3 summary/cache consumption
+server/routes/workspace.js                     # composition and frozen registration order only
+server/routes/workspaceStatus.js               # CP3 durable status/base reads
+server/routes/workspaceCollaboration.js        # CP5 comments/labels/catalog CRUD
+server/lib/submissions/lightweightSubmissionSelect.js # CP5 direct select reused by Workspace/export
+src/services/workspaceApi.js                    # CP5 removes localStorage authority and awaits writes
+src/pages/CommissionerWorkspace.jsx             # CP5 focus-first/background-full loading
 src/components/non_prebuilt/WorkspaceReviewPanel.jsx
 tests/workspace.api.test.js
 tests/workspace.realtime.test.js
@@ -406,7 +366,7 @@ For a recovery policy requiring peer approval, `POST/PATCH /api/workspace/archiv
 
 Checkpoint 4 also owns Commissioner scope isolation. The server resolves `profile.province` to canonical `PRUID` once from the verified session and uses that value in every authorization predicate; the browser must not provide an authoritative province, scope, profile UUID, assignee UUID, or vote identity.
 
-The scope applies to Commissioner map hit testing, submissions list/detail/mutations, Workspace summaries/comments/labels, archive requests, Archive Tree list/detail/merge/revert/tombstone/restore, and heatmap. Every resource has an immutable `scope_pruids` set derived from its canonical primary and secondary DGUID/FED records. A Commissioner may read or perform ordinary Workspace actions when their PRUID is a member of that set; the same cross-province resource is therefore visible in both participating province scopes. A Commissioner outside the entire set receives a non-disclosing `404` or `403` according to the route policy and never sees event metadata. The server creates one logical outbox event and fans it out to every authorized scope channel with the same event ID.
+The scope applies to Commissioner map hit testing, submissions list/detail/mutations, Workspace list/comments/labels, archive requests, Archive Tree list/detail/merge/revert/tombstone/restore, and heatmap. Every resource has an immutable `scope_pruids` set derived from its canonical primary and secondary DGUID/FED records. A Commissioner may read or perform ordinary Workspace actions when their PRUID is a member of that set; the same cross-province resource is therefore visible in both participating province scopes. A Commissioner outside the entire set receives a non-disclosing `404` or `403` according to the route policy and never sees event metadata. The server creates one logical outbox event and fans it out to every authorized scope channel with the same event ID.
 
 Archive requests use profile UUIDs end-to-end:
 
@@ -437,28 +397,26 @@ CP4 implementation sequence and target files:
 3. Implement the listed `/api/workspace/archive-requests` routes in `server/routes/workspace.js`; they return `ArchiveRequestReadModelV1` and write their CP0 outbox/delivery rows atomically. No browser or CP3 service constructs request identity, votes, or allowed actions.
 4. Add `src/services/archiveRequestApi.js` as the only browser client for those routes, plus `tests/archiveRequests.api.test.js` and scope/two-PRUID/outbox cases. Remove the current Archive Request functions from `workspaceApi.js` as part of this CP4 migration.
 
-### 3.5 Frontend services and query cache
+### 3.5 Frontend services and data access
 
 Introduce the following structure:
 
 ```text
 src/services/
-  submissionsApi.js       # list/detail/create/export projection APIs
+  submissionListsApi.js   # CP5 geometry-free table/focus reads
+  submissionsApi.js       # CP2 detail/create APIs
   objectionApi.js         # objection write/detail snapshot APIs
   counterProposalApi.js   # durable CP lifecycle and detail geometry
-  workspaceApi.js         # CP3 comments/labels/summary only
+  workspaceApi.js         # CP5 authoritative Workspace CRUD and reads
   archiveRequestApi.js    # CP4 Archive Request API client only
   archiveApi.js            # archive list, merge, revert
   mapCapabilitiesApi.js   # DA/FED capability and one-/two-PRUID scope
-src/lib/query/
-  submissionCache.js       # keyed request cache and invalidation
-  workspaceCache.js        # summary/detail cache
 src/lib/realtime/
   realtimeClient.js        # authenticated WebSocket, reconnect, deduplication
   realtimeInvalidation.js  # event-to-query-key invalidation rules
 ```
 
-If a query library is not introduced, implement a small in-memory cache with request de-duplication, cursor keys, and explicit invalidation after writes. Do not use localStorage for shared server state.
+CP5 may keep component-lifetime request de-duplication, but it does not introduce a new projection cache, cursor store, or browser-persisted Workspace store. HTTP state is authoritative. A successful Workspace mutation is awaited and then reconciled with the relevant authorized HTTP read; a failed mutation remains visibly failed and must not be represented as committed. `localStorage` is reserved for explicitly local drafts and non-authoritative UI preferences.
 
 ### 3.6 Authenticated WebSocket realtime gateway
 
@@ -487,7 +445,7 @@ Use a versioned envelope:
   "aggregateId": "submission-uuid",
   "resourceVersion": "timestamp-or-version",
   "scope": { "kind": "provinces", "pruids": ["24", "35"] },
-  "invalidate": ["workspace:summary", "workspace:submission:submission-uuid"],
+  "invalidate": ["workspace:list", "workspace:submission:submission-uuid"],
   "committedAt": "ISO-8601"
 }
 ```
@@ -496,7 +454,7 @@ Ownership and implementation workflow are deliberately split:
 
 1. **Checkpoint 1** migrates the Section 2.5 outbox/delivery tables, server-only grants, indexes, retention, and recovery queries; it does not implement a WebSocket server.
 2. **Checkpoint 0** implements the shared runtime only: `server/realtime/gateway.js` for session/origin/scope-validated upgrades, `server/realtime/dispatcher.js` for claim/dispatch/replay, `server/realtime/eventContract.js` for envelope validation, `src/lib/realtime/realtimeClient.js` for reconnect/dedup/resync, `src/lib/realtime/realtimeInvalidation.js` for query invalidation, and `tests/realtime/*.test.js` for the reusable two-browser harness and matrix.
-3. **Checkpoint 2** writes submission/revision scope deliveries in its create transaction; **Checkpoint 3** writes Workspace comment/label/catalog/summary-status deliveries; **Checkpoint 4** writes Archive Request/Archive deliveries. No domain handler calls the gateway directly. **Checkpoint 5** registers the public-table/cache invalidation mapping and owns no domain event insertion.
+3. **Checkpoint 2** writes submission/revision scope deliveries in its create transaction; **Checkpoint 3** writes durable Workspace status-transition deliveries; **Checkpoint 4** writes Archive Request/Archive deliveries; **Checkpoint 5** writes comment/label/catalog deliveries for the mutations it completes and registers table/Workspace invalidation mappings. No domain handler calls the gateway directly.
 4. Each domain PR first passes its unit/API tests with the shared event contract, then adds its CRUD row to the CP0 matrix. The CP0 harness opens two authorized sessions plus an out-of-scope session, performs the HTTP mutation, verifies exactly one logical event and one delivery per authorized scope, forces duplicate/reconnect/resync paths, and confirms the refetched HTTP projection converges without leaking data.
 5. A multi-instance deployment uses the durable outbox/delivery source (and an approved broker/notification fan-out) rather than an in-process emitter. A dispatcher marks a delivery dispatched only after handing it to that transport; a client acknowledgement is not required for correctness because replay/resync remains authoritative.
 
@@ -515,7 +473,7 @@ Required client behavior:
 
 1. Keep one shared connection per signed-in browser session and close it immediately on logout or role/profile-scope changes.
 2. Reconnect with capped exponential backoff and jitter; surface a non-blocking `live/reconnecting/offline` state.
-3. Treat events as invalidation signals rather than authoritative records, deduplicate event IDs, and refetch only affected cursor pages, summaries, detail records, heatmap counts, or archive branches.
+3. Treat events as invalidation signals rather than authoritative records, deduplicate event IDs, and refetch only affected lightweight lists, branch statistics, detail records, heatmap counts, or archive branches.
 4. Reconcile optimistic writes with the committed version and roll back the optimistic view on HTTP failure.
 5. Never persist shared Workspace or authorization state in localStorage. Local storage remains limited to explicitly local drafts and non-authoritative UI preferences.
 
@@ -523,17 +481,25 @@ Required client behavior:
 
 ### 4.1 Tables and Workspace
 
-Replace browser-only React Table pagination with cursor pagination:
+Keep the existing TanStack client-side pagination and table presentation. Public My Submissions and Commissioner User Submissions each make one authorized lightweight request using the Section 3.1.1 explicit column select, receive an ordinary array, and paginate it in the browser. Filtering is applied before any future pagination. No table request may select revision rows or a GeoJSON/snapshot field.
 
-- Public My Submissions requests the first 10 rows from `/api/submissions/mine`;
-- Commissioner User Submissions requests the first 10 rows from the scoped Commissioner endpoint;
-- Workspace requests branch/status counts and the first three rows for visible branches;
-- `Show more` requests the next cursor for that branch;
-- detail navigation requests one submission snapshot and does not refetch every submission.
+Workspace has two read modes over the same lightweight select:
 
-The UI should render the first response immediately, prefetch the next cursor opportunistically, and show an inline branch loading indicator rather than blocking the whole page.
+1. **Normal Workspace entry:** when no submission ID is supplied, fetch the complete authorized lightweight array, derive every branch and its technical statistics, and show a spinner in the Workspace header while this request is pending. Do not replace the whole route with a loading page.
+2. **Focused Workspace entry:** when a Submission Table or Map Info Panel supplies `?focus=<submissionId>`, run the exact-ID lightweight select first. Render that one branch and row as soon as it returns. Start one background full lightweight request afterward; when it completes, update `Show More` for the focused branch and the technical statistics for every branch without remounting the already-rendered focused row.
 
-Checkpoint 5 also moves public ownership and status presentation into this query/loading path: `MySubmissions` uses only the authenticated `/api/submissions/mine` cursor API, receives only `public_status`, and invalidates/refetches its owned pages after a relevant mutation. It must never request another profile's submissions, cache raw Commissioner workflow status for public rendering, or infer public state from Archive Tree records.
+Opening a Workspace map/detail child must not call the full Workspace aggregator. Fetch the exact lightweight row first. For a Counter-Proposal, use the existing ID-specific revision-detail route once; for Feedback/Objection during pre-CP2 development, hydrate only the target DGUID(s) from their one or two manifest-declared FED metadata shards. The server may enrich the lightweight row with the target primary/secondary FED lookup so the browser never downloads the full DA profile index merely to locate one target. When CP2's immutable detail route is available, only the geometry provider behind the service changes. The Workspace shell renders immediately, while only the map/content area shows a local spinner until its required detail geometry and map assets are ready.
+
+The current detail chain violates this contract: `WorkspaceReview.jsx` loads the full DA profile index and calls `getWorkspaceSubmissions()` both directly and again through `getWorkspaceSubmission()`. Local measurement returned about 15.9 MB for the profile index and showed that this request alone can consume roughly nine seconds; the duplicate aggregations also read Counter-Proposal revisions with geometry. CP5 removes the duplicate full-list calls and narrows profile/geometry hydration to the selected record. This is a call-graph and select-list optimization, not a new API protocol.
+
+For My Submissions, ownership comes only from the authenticated `/api/submissions/mine` server predicate. The browser applies the Section 6 Pending/Received presentation mapping to the returned raw status; it does not accept an owner ID from the URL or infer state from Archived Tree records.
+
+All normal application loading transitions must be readiness-driven:
+
+- My Submissions, User Submissions, Dashboard, Public User Home, and Workspace map-detail routes replace the translucent fixed-duration overlay with an opaque loading page that remains until the route's required data is ready;
+- the timer values in `RouteLoadingOverlay.jsx` are not acceptance signals and must be removed from these routes;
+- Workspace root is the exception described above: focused entry renders immediately and background work is local; full entry uses a Workspace-header spinner rather than a route-level loading page;
+- errors and empty results terminate loading explicitly and render their own state instead of leaving a timer or spinner running indefinitely.
 
 ### 4.2 Counter-Proposal local-first editing
 
@@ -563,16 +529,16 @@ Likely files:
 
 ## 5. Export Plan
 
-Checkpoint 5 exclusively implements all server-side streaming exports, including export authorization, projection selection, CSV/ZIP serialization, frontend actions, and export tests. It does not move export behavior into `workspace.js` or the Archive domain and has no runtime dependency on CP4.
+Checkpoint 5 exclusively implements the two required exports, including authorization, selection, serialization, frontend actions, and tests. It does not put export behavior in `workspace.js` or import a CP4 domain service. It reads the existing persistence contract directly under its own server-side authorization.
 
-Add `server/lib/export/exportAuthorization.js`. Its policy derives the authenticated user/profile and canonical PRUID from the server session, authorizes a public export only for that profile's own submissions, authorizes a Commissioner export through the queried submission/archive row's immutable one-/two-PRUID scope, and applies the same predicates to CSV and optional GeoJSON/ZIP reads. It queries the CP1 persistence contract and CP2 projection port directly; it neither imports nor delegates to a CP4 service.
+Add `server/lib/export/exportAuthorization.js`. Its policy derives the authenticated Commissioner profile and canonical PRUID from the server session. Commissioner Submission CSV applies the same visibility predicate and lightweight column allowlist as User Submissions. Archived Tree JSON applies the same one-/two-PRUID visibility rule as an authorized archive read and may include the complete immutable archive snapshots because it is an explicit detail export. Neither endpoint accepts an authoritative profile, owner, or province from the browser.
 
 Implement:
 
-- Submission Table export: filtered Commissioner projection CSV;
-- Public export: own-submissions projection only;
-- Archived Tree export: branch/version/status/DGUID/audit metadata CSV;
-- optional explicit GeoJSON/ZIP export: separate endpoint, explicit confirmation, role and province checks.
+- `GET /api/exports/submissions.csv`: all Commissioner-visible submission rows as a fixed, escaped CSV projection; its only UI entry is the header area of `/dashboard/graphs`, not either Submission Table;
+- `GET /api/exports/archive-tree.json`: one JSON document containing all archive branches, versions, immutable snapshots, and audit metadata visible to the Commissioner; its UI entry is the upper-right action on Archived Tree.
+
+There is no Public CSV, Archived Tree CSV, or implicit GeoJSON/ZIP export in this checkpoint. CSV output requires a stable allowlist, UTF-8 handling, RFC 4180 escaping, spreadsheet-formula protection, and no geometry. Archived JSON requires `application/json`, a stable top-level schema/version, deterministic branch/version ordering, and explicit handling for an empty tree.
 
 Target files owned by Checkpoint 5:
 
@@ -580,31 +546,34 @@ Target files owned by Checkpoint 5:
 - new `server/lib/export/exportAuthorization.js`;
 - new `server/lib/export/csvWriter.js`;
 - new `src/services/exportApi.js`;
-- `src/pages/DashboardSubmissionsTable/SubmissionsTable.jsx`;
+- `src/pages/DashboardGraphs.jsx`;
 - `src/pages/ArchivedTree.jsx`.
 
 ## 6. Public Status Contract
 
-The Public API must expose `public_status`, not raw Commissioner workflow status:
+Checkpoint 5 implements a presentation-only Public User status mapping; it does not require a database `public_status` column or a new CP2 response field:
 
 ```text
-pending + archive-request -> pending
-accepted + archived       -> accepted
-rejected                  -> rejected
+normalize(raw status) == pending  -> Pending
+every other value                  -> Received
 ```
 
-`MySubmissions.jsx` should render only this projection. Public users must not see internal Archive Tree state or be sent to Archived Tree. Commissioner views continue to receive the internal status and archive controls.
+`MySubmissions.jsx` renders only `Pending` and `Received`. `Received` reuses the current Accepted visual treatment with copy explaining that the submission was received; rejected/resubmit navigation and the Accepted, Rejected, Archived, and Archive Request labels are removed from Public UI. Commissioner views continue to render internal workflow status. This display rule is not an authorization boundary: `/api/submissions/mine` must still enforce session ownership, and no Public UI path links to Archived Tree.
 
-Checkpoint 5 implements this contract together with the Section 4.1 public query/loading refactor and the Section 5 public export path.
-
-## 7. Archived Tree Navigation
+## 7. Workspace and Archived Tree Navigation
 
 Update:
 
-- `src/pages/ArchivedTree.jsx` — default Back to Workspace button and `location.state.from` support;
+- Submission Table -> focused Workspace carries `location.state.from = /dashboard/submissionsTable`, so the Workspace header returns to User Submissions;
+- Dashboard Map Info Panel -> focused Workspace carries `location.state.from = /dashboard`, so the Workspace header returns to Dashboard;
+- direct Workspace entry has no `focus`, loads all authorized lightweight rows, and uses the normal dashboard parent;
+- Workspace map/detail child -> Workspace, preserving the focused submission context where useful;
+- Archived Tree -> Workspace, never Dashboard;
+- Archived Difference -> Archived Tree;
+- `src/pages/ArchivedTree.jsx` — fixed Back to Workspace button;
 - `src/pages/ArchivedDifference.jsx` — Back to Archived Tree;
 - `src/components/non_prebuilt/ArchivedTreePanel.jsx` — panel navigation actions;
-- `src/pages/Header.jsx` — role-aware labels and route defaults.
+- `src/pages/Header.jsx` — source-aware Workspace labels and route defaults.
 
 No deep link should fall back to the Dashboard map when the logical parent is Workspace.
 
@@ -659,9 +628,12 @@ Before enabling the new routes:
 - Archive merge rejects a missing, mismatched, unsubmitted, or out-of-scope `sourceRevisionId`, and its snapshot is a deep copy of the selected source revision.
 - Changing local map assets or the live submission after merge does not alter archived detail/history; archive branch version numbers remain independent of Counter-Proposal revision numbers.
 - Merge inserts a new immutable archive version, revert moves only `is_latest`, and tombstone/restore retain a complete audit trail and source records.
-- Public list is session-scoped and returns only `public_status`.
+- Public list is session-scoped; Public UI maps raw `pending` to Pending and every other status to Received without exposing alternate status actions.
 - Commissioner list/detail/export is scoped by membership in the submission's one- or two-PRUID `scope_pruids` set.
-- Workspace CRUD writes to Supabase tables and rejects unauthorized identity changes.
+- Workspace comments, labels, and label-catalog CRUD writes to Supabase, serializes stable IDs/custom flags, awaits failures, and rejects unauthorized identity changes.
+- A hard refresh preserves selected labels and custom catalog text, prevents duplicate label assignment, and deleting one persisted label removes only that label.
+- A slow or failed comment/catalog/label write never reports success or clears the draft as though the server committed it.
+- Browser `crmp.workspace.v1` content cannot override a newer server status; two Commissioners converge after refetch, focus/visibility reconciliation, or the relevant CP0 invalidation event.
 - Archive request requester, assignee, and vote identities are UUID-backed; non-Commissioner, out-of-scope, and stale-assignee mutations are rejected atomically. A two-PRUID archive transition requires an eligible affirmative vote from both participating PRUIDs.
 - Commissioner map, submission, Workspace, Archive, heatmap, export, and WebSocket paths allow a cross-province resource to both participating PRUIDs, deny every unrelated PRUID, and never disclose its metadata outside that scope set.
 - Archive delete is recoverable under the chosen tombstone policy.
@@ -673,16 +645,19 @@ Before enabling the new routes:
 
 ### Frontend tests
 
-- First-page table and Workspace branch render before later pages load.
-- `Show more` fetches only the next branch cursor.
+- Public and Commissioner tables preserve their current client pagination/UI while one lightweight, geometry-free response replaces the legacy aggregate.
+- Focused Workspace renders the exact-ID branch before its one background full lightweight request completes; only the focused branch's `Show More` state and all branch statistics update afterward.
+- Normal Workspace entry loads the full lightweight set with a header spinner; focused entry and map/detail child never block the entire route with a fixed-duration overlay.
+- Workspace map/detail reads one target and its required FED shard(s), and never performs two full Workspace aggregations or downloads the complete DA profile index.
 - Counter-Proposal handles have uniform density and locked endpoints.
 - Dragging remains responsive while worker validation runs.
 - Invalid geometry reverts to the last valid position.
 - Public users cannot see Archive Tree statuses or routes.
 - A Commissioner can click, hit-test, query, and export a cross-province resource only when their PRUID is one of its two canonical scopes; an unrelated province cannot discover it.
 - Toggle changes are stable and do not blink or repaint every FED repeatedly.
-- Archived Tree returns to Workspace and Difference returns to Archived Tree.
-- Realtime create/update/delete events invalidate only affected pages, summaries, details, heatmap counts, and archive branches.
+- Workspace returns to User Submissions or Dashboard according to its entry source; map/detail returns to Workspace; Archived Tree returns to Workspace; Difference returns to Archived Tree.
+- Commissioner CSV is available only from Graphs and excludes geometry; Archived Tree exports one authorized, complete, deterministically ordered JSON document.
+- Realtime create/update/delete events invalidate only affected lightweight lists, branch statistics, details, heatmap counts, and archive branches.
 - Connection state, reconnect, optimistic reconciliation, logout teardown, and forced resync are visible and deterministic.
 
 ### CRUD and realtime acceptance matrix
@@ -693,11 +668,11 @@ Checkpoint 0 owns a living integration matrix for every durable Demo 4 domain re
 | --- | --- | --- | --- | --- | --- |
 | Feedback / Objection / Counter-Proposal submissions | submit | owner projection; scoped Commissioner projection/detail | allowed lifecycle/status/revision operations | owner delete where policy permits; otherwise explicit rejection/tombstone | owner projection, province Workspace/table, InfoPanel, and heatmap invalidate |
 | Objection / Counter-Proposal revisions | create atomically | authorized immutable detail | reject in-place mutation; create a new revision | reject physical delete except controlled retention policy | affected detail/version history and archive source choices invalidate |
-| Workspace comments | `POST` | `GET` | `PATCH` by authorized policy | `DELETE` by authorized policy | open review panels and summaries invalidate |
-| Workspace labels | `PUT`/add | `GET` | replace/update | remove one/all under policy | open review panels, branches, and summaries invalidate |
+| Workspace comments | `POST` | `GET` | `PATCH` by authorized policy | `DELETE` by authorized policy | open review panels and branch statistics invalidate |
+| Workspace labels | `PUT`/add | `GET` | replace/update | remove one/all under policy | open review panels, branches, and branch statistics invalidate |
 | Workspace label catalog | create | list | rename/recolor | delete only when policy permits | all same-province Workspace label pickers invalidate |
-| Workspace archive requests | create | scoped read | assignees, UUID-keyed votes, state transitions | cancel/tombstone | request panel, submission status, summaries, and assignee clients invalidate |
-| Submission Workspace status / summary | status transition | scoped summary/list | subsequent valid transition | archive cleanup/tombstone semantics | Workspace branches, tables, public projection, InfoPanel, and heatmap invalidate |
+| Workspace archive requests | create | scoped read | assignees, UUID-keyed votes, state transitions | cancel/tombstone | request panel, submission status, branch statistics, and assignee clients invalidate |
+| Submission Workspace status | status transition | scoped lightweight list/detail | subsequent valid transition | archive cleanup/tombstone semantics | Workspace branches, tables, public list, InfoPanel, and heatmap invalidate |
 | Archive tree | merge | scoped tree/detail/history | revert/latest and restore | tombstone and recovery | archive branches, source Workspace rows, map effect, and exports invalidate |
 
 Read-only capability, heatmap, statistics, and export endpoints do not invent CRUD operations; they are included as authorized refetch targets after source mutations. Immutable resources explicitly test that unsupported update/delete calls are rejected rather than silently mutating history.
@@ -713,13 +688,13 @@ git diff --check
 
 ## 11. Implementation Checkpoints
 
-Priority is intentionally embedded in Checkpoints 1-8. A later feature checkpoint must not be treated as complete when its prerequisite checkpoint has unresolved data-contract or authorization failures. Two controlled development-parallel exceptions apply: Checkpoints 1 and 2 under the Section 3.0 frozen contract, and Checkpoints 2 and 5 under the Section 3.1.1 projection contract. Checkpoint 2 may be built against doubles but cannot be accepted until the Checkpoint 1 migration/security integration gate passes; Checkpoint 5 may build mock-backed tables but cannot accept its real-data integration until the CP2 HTTP-adapter contract test passes. Checkpoint 0 is the cross-cutting acceptance gate applied throughout that sequence.
+Priority is intentionally embedded in Checkpoints 1-8. A later feature checkpoint must not be treated as complete when its prerequisite checkpoint has unresolved data-contract or authorization failures. Checkpoints 1 and 2 may develop in parallel under the Section 3.0 frozen contract; Checkpoint 2 may run against doubles but cannot be accepted until the Checkpoint 1 migration/security integration gate passes. Checkpoint 5's direct-select list, Workspace CRUD/UX, navigation, loading, and export work does not wait for a CP2 Projection Table or Summary API. Checkpoint 0 is the cross-cutting acceptance gate applied throughout that sequence.
 
 ### Checkpoint 0 — P0: Cross-cutting CRUD and WebSocket acceptance gate
 
 Own the generic realtime platform and its standing acceptance gate, as specified in Sections 2.5 and 3.6. Consume—do not create—the Checkpoint 1 outbox/delivery migration. Implement the authenticated WebSocket gateway, durable dispatcher/replay path, server-derived user/role/PRUID channels, shared client reconnect/deduplication/resync behavior, event-envelope validation, invalidation registry, and reusable disposable-database/two-browser CRUD matrix. Do not add domain tables, policies, grants, RPCs, or mutation-specific outbox inserts.
 
-Checkpoint 0 is a standing release gate rather than a prerequisite claim that all domain implementations already exist. Checkpoints 2, 3, and 4 add their own atomic outbox/delivery writes and matrix rows as they add submission, Workspace, and Archive mutations; Checkpoint 5 adds public-table/cache invalidation rows. CP0 remains open while any applicable CRUD cell is missing, while a mutation can commit without its domain event, while a replay/resync path fails, or while HTTP and WebSocket authorization differ.
+Checkpoint 0 is a standing release gate rather than a prerequisite claim that all domain implementations already exist. Checkpoints 2, 3, 4, and 5 add their own atomic outbox/delivery writes and matrix rows for the mutations they own; CP5 also adds table/Workspace invalidation mappings. CP0 remains open while any applicable CRUD cell is missing, while a mutation can commit without its domain event, while a replay/resync path fails, or while HTTP and WebSocket authorization differ.
 
 **Exit criteria:** the generic gateway/dispatcher/client/harness pass independently against synthetic contract events; every implemented domain mutation writes one logical replayable event and one delivery per authorized PRUID in its transaction; two authorized clients converge without manual refresh; reconnect/resync converges to the HTTP source of truth; cross-province resources converge for each participating scope; and public, cross-owner, cross-role, and out-of-scope clients receive neither unauthorized records nor event metadata.
 
@@ -730,9 +705,9 @@ Implement the schema and access boundary defined in Sections 2.2–2.5 and the d
 Under Section 3.0, this checkpoint is the platform workstream. It explicitly owns the Section 3.2.1 production-schema audit and the persistence-side fail-closed contract, but it does not implement the Public User capability flow, submission business handlers, or submission route behavior.
 
 1. **Schema, migration, and backfill contract.** Create/alter the following as versioned Supabase migrations:
-   - `submissions` plus a normalized immutable `submission_scope_pruids(submission_id, pruid)` relation (or equivalent): canonical type/status constraints, owner reference, primary/secondary DGUID/FED fields, one- or two-PRUID source-scope support, timestamps, and the fields or view required to derive `public_status` without exposing internal state;
+   - `submissions` plus a normalized immutable `submission_scope_pruids(submission_id, pruid)` relation (or equivalent): canonical type/status constraints, owner reference, primary/secondary DGUID/FED fields, one- or two-PRUID source-scope support, and timestamps;
    - `objection_revisions` and `counter_proposal_revisions`: immutable snapshot foreign keys, revision numbers/status where applicable, baseline/validation metadata, author/timestamps, uniqueness constraints, and indexes required by the Sections 2.2–2.3 detail contracts;
-   - `workspace_comments`, `workspace_labels`, `workspace_label_catalog`, `workspace_archive_requests`, and a UUID-keyed archive-request vote relation: foreign keys, state/check constraints, updater/requester/assignee/voter identity fields, timestamps, and the indexes used by Workspace summary/detail reads;
+   - `workspace_comments`, `workspace_labels`, `workspace_label_catalog`, `workspace_archive_requests`, and a UUID-keyed archive-request vote relation: foreign keys, state/check constraints, updater/requester/assignee/voter identity fields, timestamps, and the indexes used by Workspace record/list reads;
    - `archive_tree`: source submission/revision linkage, immutable `submission_snapshot`, branch/version/latest markers, merge/revert/tombstone/restore audit fields, indexes, and constraints required by Sections 3.4–3.4.2;
    - `realtime_outbox` plus `realtime_scope_deliveries`, or the approved equivalent CDC schema from Section 2.5, including event ID, aggregate/version, PRUID scope, per-scope replay sequence, dispatch state, retention, and idempotency indexes.
 
@@ -740,31 +715,32 @@ Under Section 3.0, this checkpoint is the platform workstream. It explicitly own
 
 2. **RLS, grants, RPCs, and server-only data access.** For every new or altered table, document whether browser access is prohibited or allowed by a precise RLS policy. Grant archive, revision, outbox, and administrative RPCs only to the intended server role; revoke `anon`/`authenticated` execution unless a route explicitly needs direct database access. Use the service-role data client only after Express has authenticated and authorized the request; do not treat an anonymous/publishable Supabase client as a server data client. Verify that service-role credentials never reach the browser or committed configuration.
 
-3. **Interface and route-boundary definition only.** Commit the Section 3.0 contract artifact and provide repository/MapAuthority test doubles. Define the route catalogue, router registration order, common cursor/projection/conflict/validation/unauthorized/not-found envelopes, and the rule that verified `user`, `profile`, and canonical scope—not route parameters or query strings—are passed to domain services. `server/routes/submissions.js`, its real handlers, capability endpoint, and domain/repository implementation are exclusively Checkpoint 2 work. `server/routes/workspace.js` remains Checkpoint 3 work; the legacy `server/routes/comments.js` remains only a feedback compatibility adapter. Record removal of obsolete DGUID foreign-key assumptions and repair of the stale `profiles!submissions_user_id_fkey` relationship as migration/compatibility requirements, not handler edits in this checkpoint.
+3. **Interface and route-boundary definition only.** Commit the Section 3.0 contract artifact and provide repository/MapAuthority test doubles. Define the route catalogue, router registration order, common conflict/validation/unauthorized/not-found envelopes, and the rule that verified `user`, `profile`, and canonical scope—not route parameters or query strings—are passed to domain services. `server/routes/submissions.js` and its detail/write handlers are exclusively CP2; `server/routes/submissionLists.js` and its static/list handlers are exclusively CP5 and are mounted first. `server/routes/workspace.js` is composition-only, with CP3 status, CP4 archive/request, and CP5 collaboration handlers in separate modules. The legacy `server/routes/comments.js` remains only a feedback compatibility adapter. Record removal of obsolete DGUID foreign-key assumptions and repair of the stale `profiles!submissions_user_id_fkey` relationship as migration/compatibility requirements, not handler edits in this checkpoint.
 
 4. **Migration/security verification harness.** Add the disposable-Supabase (or equivalent isolated database) harness for fresh schema application, safe existing-data upgrade, expected tables/columns/indexes/constraints, RLS probes as anonymous/public user/Commissioner/service role, RPC-grant probes, rollback rehearsal, and interface-double compatibility checks. It must not claim Checkpoint 2's immutable geometry, capability, or submission route behavior has been implemented.
 
 5. **Enabled-FED Counter-Proposal platform remediation.** Execute the Section 3.2.1 Supabase audit before the migration is accepted. Export and review the live `submissions` and revision-table constraints, defaults, foreign keys, indexes, triggers, RLS policies, views, and RPCs for Yukon/`60001` literals or dependencies on legacy Supabase map metadata; replace each confirmed restriction with a versioned, rollback-tested migration rather than assuming the checked-in migrations are the full baseline. Define and test the database invariants for one- or two-PRUID scope persistence, but leave missing-manifest behavior, MapAuthority/capability behavior, and all Enabled-FED submission route tests to Checkpoint 2. Supply the disposable database and fixtures needed for the later joint integration run.
+6. **Optional P3 physical workflow split.** Only after the required contracts are stable, the team may split legacy Feedback, Objection, and Counter-Proposal comments/submissions into three physical workflow tables. This is a schema-maintenance enhancement, not an acceptance dependency; direct typed-table reads plus immutable revision tables are sufficient for Demo 4.
 
 **Exit criteria:** the Sections 2.2–2.5 and Section 9 contracts are represented by an auditable target schema; each table/RPC has an explicit browser/server access boundary; deterministic backfill and rollback/restore procedures have been rehearsed; router ownership and common response contracts are established; and the Section 10 migration/database smoke tests pass.
 
-### Checkpoint 2 — P1: Make all submission geometry immutable and separate list/detail reads
+### Checkpoint 2 — P1: Make submission geometry immutable and complete authorized detail/write behavior
 
 Under the Section 3.0 frozen contract, implement application behavior only; do not create/alter tables, policies, grants, RPCs, or migration files. Implement `server/routes/submissions.js`, submission domain/repository adapters, the MapAuthority capability endpoint, and the local-authority Objection/Counter-Proposal transaction flow. Use the Checkpoint 1 schema names, scope relation, revision/outbox transaction boundary, authorization inputs, and error/projection envelopes without redefining them.
 
-1. **Submission API behavior.** Implement the Section 3.1 Objection/Counter-Proposal create, list projection, and authorized detail handlers; preserve static route ordering; expose no GeoJSON on a list response; and use the legacy comments route only for its scoped feedback compatibility role. Implement the server-owned half of `SubmissionProjectionV1`, its cursor semantics, and its contract tests from Section 3.1.1 so CP5 can replace its mock data source without a component change. Do not implement Checkpoint 5's public ownership/public-status UI, cache, loading refactor, or export routes.
+1. **Submission API behavior.** Implement the Section 3.1 Objection/Counter-Proposal create and authorized geometry-detail handlers, preserve static route ordering, and use the legacy comments route only for its scoped feedback compatibility role. CP2 does not build a Projection Table, `SubmissionProjectionV1`, cursor protocol, Workspace Summary, table cache, loading refactor, or export route. CP5 owns the Section 3.1.1 direct-select table reads and must keep them geometry-free.
 2. **Capability and local authority.** Implement `GET /api/map/capabilities` and use the same MapAuthority in Public User Step 1/2 gating and every submission write. Resolve DGUIDs through the local profile index and manifest-declared metadata, construct one- or two-PRUID scopes, validate adjacency/topology, derive FED/baseline values server-side, and fail closed for missing or stale authority data. Remove the Yukon-only fallback behavior described in Section 3.2.1.
 3. **Transactional persistence adapter.** Implement the repository operations against the Checkpoint 1 schema so each validated create atomically writes the submission, immutable revision, `submission_scope_pruids`, and required outbox record. Until the Checkpoint 1 migration is available, run the identical domain/handler suite against the frozen repository doubles; do not introduce an alternate temporary schema.
 4. **Enabled-FED and integration tests.** Build the non-mutating capability audit and the submission test suite for every Enabled FED, including one valid cross-province adjacent pair with both canonical PRUIDs, and the missing/stale-manifest, missing-metadata, disabled-FED, unknown/non-adjacent pair, and mismatched `fed_num`/scope negatives. After Checkpoint 1 delivers its disposable-database migration, run the same authenticated route/database suite against it and resolve only contract violations through the Section 3.0 change process.
 
-**Exit criteria:** the Checkpoint 2 implementation passes its MapAuthority/domain/handler suite against contract doubles; the joint disposable-database suite passes after Checkpoint 1 migration integration; Objection and Counter-Proposal detail pages replay their submitted geometry after local assets change; no list response contains full geometry; every Enabled FED has capability coverage; and the behavior introduces no schema, policy, grant, RPC, or migration change.
+**Exit criteria:** the Checkpoint 2 implementation passes its MapAuthority/domain/handler suite against contract doubles; the joint disposable-database suite passes after Checkpoint 1 migration integration; Objection and Counter-Proposal detail pages replay their submitted geometry after local assets change; every Enabled FED has capability coverage; and the behavior introduces no schema, policy, grant, RPC, migration, Projection Table, cursor, or Workspace Summary change.
 
 
-### Checkpoint 3 — P1: Replace transitional Workspace state and complete durable Workspace APIs
+### Checkpoint 3 — P1: Establish durable Workspace status and authenticated base APIs
 
-Implement the Section 3.3 Workspace core: durable server summary, comments, labels, label catalog, Workspace cache, and migration away from localStorage/hybrid submission aggregation. Consume the Checkpoint 2 projection/capability contracts and the CP4 reusable scope guard. Register Workspace event mappings with the shared CP0 runtime and insert its own comment/label/catalog/summary-status events transactionally.
+Implement the Section 3.3 durable base: authenticated Workspace route registration, Supabase-backed non-archive submission status transitions, and the initial server reads/writes over the existing Workspace tables. Status transitions persist independently of a browser session and insert their CP0 outbox/delivery rows atomically. This checkpoint does not define a Workspace Summary API or table-facing projection/cache protocol.
 
-**Exit criteria:** the Section 3.3 summary/comments/labels/catalog CRUD contract passes with the CP4 scope guard; shared Workspace data contains no localStorage, browser-event, temporary-override, or hybrid aggregation fallback; two authorized Commissioners converge on the same permitted Workspace state through CP0 without manual refresh; and every C3 mutation creates its required outbox/delivery rows.
+**Exit criteria:** authenticated base routes are registered; permitted non-archive Workspace status transitions are durable and reject invalid transitions; reads reproduce the committed status in a clean browser session; and every CP3-owned status mutation creates its required outbox/delivery rows. CP4's province scope guard and CP5's CRUD/browser-authority work have their own exit criteria.
 
 ### Checkpoint 4 — P1: Archived Tree, Archive Request, and Commissioner scope integrity
 
@@ -774,9 +750,13 @@ Implement the Archived Tree contract in Sections 3.4 and 3.4.1, and the Section 
 
 ### Checkpoint 5 — P2: Deliver progressive list, Workspace, and navigation UX
 
-Implement the public ownership/projection portions of Section 3.1, the Section 3.1.1 mock-to-HTTP submission data source, Section 3.5 query cache, Section 4.1 loading model, Section 5 exports, Section 6 public-status contract, and their Section 10 tests. Develop tables first against `SubmissionProjectionV1` mock data; once CP2 delivers the authenticated projection endpoint, switch only the data-source adapter to its real Supabase-backed HTTP result. Move public and Commissioner tables to first-page cursor loading; request Workspace branch counts plus only the initial visible rows; make `Show more` fetch the next branch cursor. Add projection-level query caching and remove duplicate full-list requests. In the same refactor, derive public ownership exclusively from the verified session and return/render only `public_status` for public list, detail, cache, and export reads. Correct Archived Tree and difference-page back navigation, then implement all CSV exports and their server routes with the independent Section 5 export authorization. Register public-table/cache invalidation mappings with CP0 but do not insert domain events.
+Implement Sections 3.1.1, 3.3, 3.5, 4.1, 5, 6, and 7 plus their Section 10 tests. Add explicit geometry-free direct selects for Public and Commissioner tables while preserving their current client pagination and UI. Apply Public ownership on the server and the Pending/Received status mapping in `MySubmissions.jsx` only.
 
-**Exit criteria:** mock-table tests and the CP2 HTTP-adapter contract test pass without component changes; the Section 4.1 first-page/cursor tests and Section 6 public-status tests pass; the first useful content appears without waiting for the full dataset; public users can read/export only their own projected status; branch expansion remains functional; and every export is implemented by CP5 and obeys the same authorization filters as the UI.
+Complete reliable comments, labels, and label-catalog CRUD: serialize stable `id` and `is_custom`, use `Custom Label 1`, `Custom Label 2`, and `Custom Label 3` as the default custom slots, persist catalog edits, prevent duplicate assignment after refresh, delete only the selected persisted label, await every mutation, and reconcile from server state. Remove `crmp.workspace.v1` and browser-event/temporary overrides as Workspace authorities; refetch on writes and lifecycle/CP0 invalidation triggers. Add the corresponding mutation-specific CP0 outbox/delivery writes without implementing the CP0 transport.
+
+Implement focused Workspace exact-ID-first rendering, one background full lightweight refresh, normal full-entry header loading, target-only map/detail hydration, source-aware navigation, readiness-based opaque loading pages, Commissioner CSV from `/dashboard/graphs`, and complete Archived Tree JSON from its upper-right action. Do not create a Projection Table, Workspace Summary API, cursor protocol, mock source switch, or persistent query cache.
+
+**Exit criteria:** the geometry-free table response and Section 6 Public status tests pass while existing table pagination/styles remain unchanged; hard refresh preserves label selection/custom text and cannot create duplicates; one persisted label can be deleted without deleting another; slow/failed comment and catalog writes remain recoverable; browser storage cannot override a newer Commissioner status; and two authorized Commissioners converge through authoritative refetch/CP0 invalidation. Focused Workspace renders the exact row before the background list, map/detail performs no duplicate full aggregation or full-profile download, loading is readiness-driven, all return paths match Section 7, Commissioner CSV and Archived Tree JSON obey their server authorization, and every CP5-owned mutation writes its CP0 delivery rows.
 
 ### Checkpoint 6 — P2: Refactor Counter-Proposal editing and map presentation
 
