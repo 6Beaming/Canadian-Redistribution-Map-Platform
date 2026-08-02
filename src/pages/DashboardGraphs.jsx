@@ -1,14 +1,41 @@
 import { BarChart3, Download, UserCheck } from "lucide-react";
-import { SubmissionsGraph } from "@/components/non_prebuilt/submissionsGraph";
+import { useEffect, useMemo, useState } from "react";
+import { SubmissionsGraph } from "@/components/non_prebuilt/submissionsGraph.jsx";
 import { Card, CardAccent, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useEffect, useState } from "react";
-import { getTotalComments } from "@/services/commentsApi";
+import { SUBMISSION_STATUS_SERIES, buildSubmissionStatusTotals } from "@/lib/submissions/analytics.js";
 import { exportCommissionerSubmissionsCsv } from "@/services/exportApi.js";
+import { getCommissionerSubmissionTableRows } from "@/services/submissionListsApi.js";
+
+function percent(value, total) {
+  return total ? `${Math.round((value / total) * 100)}%` : "0%";
+}
 
 export default function DashboardGraphs() {
-
-  const [totalSubmissions, setTotalSubmissions] = useState(0);
+  const [submissions, setSubmissions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [exportState, setExportState] = useState({ pending: false, error: "" });
+
+  const statusTotals = useMemo(() => buildSubmissionStatusTotals(submissions), [submissions]);
+  const totalSubmissions = submissions.length;
+
+  useEffect(() => {
+    let mounted = true;
+    getCommissionerSubmissionTableRows()
+      .then(({ items }) => {
+        if (mounted) {
+          setSubmissions(items);
+          setLoadError("");
+        }
+      })
+      .catch((error) => {
+        if (mounted) setLoadError(error.message || "Unable to load submission analytics.");
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => { mounted = false; };
+  }, []);
 
   async function exportCsv() {
     if (exportState.pending) return;
@@ -21,93 +48,28 @@ export default function DashboardGraphs() {
     }
   }
 
-  useEffect(() => {
-    async function fetchTotalSubmissions() {
-      try {
-        const data = await getTotalComments();
-        setTotalSubmissions(data.totalSubmissions);
-      } catch (error) {
-        console.error("Failed to fetch total submissions:", error);
-      }
-    }
-
-    fetchTotalSubmissions();
-  }, []);
-
   return (
     <div className="min-h-[calc(100dvh-3.5rem)] overflow-y-auto bg-[linear-gradient(180deg,#f8fbff_0%,#eef5ff_100%)] px-4 py-6 md:px-6">
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
         <section className="rounded-[28px] border border-[#d7e6fb] bg-white/92 p-6 shadow-[0_18px_42px_rgba(26,115,232,0.08)] backdrop-blur">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full bg-[#e8f0fe] px-3 py-1 text-sm font-semibold text-[#1a73e8]">
-                <BarChart3 className="h-4 w-4" />
-                Commissioner Analytics
-              </div>
-              <div className="space-y-2">
-                <h1 className="text-3xl font-bold text-[#17324d] md:text-4xl">
-                  Graphs and Stats
-                </h1>
-                <p className="max-w-2xl text-sm leading-6 text-[#5f6368] md:text-base">
-                  Review submission volume, support trends, and objection activity in one dedicated analytics space without colliding with the map workspace.
-                </p>
-              </div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-[#e8f0fe] px-3 py-1 text-sm font-semibold text-[#1a73e8]"><BarChart3 className="h-4 w-4" />Commissioner Analytics</div>
+              <div className="space-y-2"><h1 className="text-3xl font-bold text-[#17324d] md:text-4xl">Graphs and Stats</h1><p className="max-w-2xl text-sm leading-6 text-[#5f6368] md:text-base">Live submission distribution and daily review volume from the Commissioner table.</p></div>
             </div>
             <div className="flex flex-col items-start gap-2 lg:items-end">
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-full bg-[#1a73e8] px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-wait disabled:opacity-60"
-                disabled={exportState.pending}
-                onClick={() => void exportCsv()}
-              >
-                <Download className="h-4 w-4" />
-                {exportState.pending ? "Preparing CSV…" : "Export CSV"}
-              </button>
+              <button type="button" className="inline-flex items-center gap-2 rounded-full bg-[#1a73e8] px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-wait disabled:opacity-60" disabled={exportState.pending} onClick={() => void exportCsv()}><Download className="h-4 w-4" />{exportState.pending ? "Preparing CSV…" : "Export CSV"}</button>
               {exportState.error ? <p className="text-sm text-red-700" role="alert">{exportState.error}</p> : null}
             </div>
           </div>
         </section>
 
+        {loadError ? <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">{loadError}</p> : null}
         <section className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-          <Card className="max-w-none">
-            <CardHeader>
-              <CardAccent />
-              <CardTitle>Total Submissions</CardTitle>
-              <CardDescription>
-                Consolidated intake across comments, objections, and counter-proposals.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="gap-3">
-              <div className="text-5xl font-bold text-[#1a73e8]">{totalSubmissions}</div>
-              <div className="inline-flex w-fit items-center gap-2 rounded-full bg-[#eef8ef] px-3 py-1 text-sm font-semibold text-[#17682b]">
-                <UserCheck className="h-4 w-4" />
-                Active review cycle
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="max-w-none">
-            <CardHeader>
-              <CardAccent />
-              <CardTitle>Support vs Oppose</CardTitle>
-              <CardDescription>
-                Current sentiment split from the latest commissioner-facing sample set.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="gap-4">
-              <div className="flex h-4 w-full overflow-hidden rounded-full bg-[#eef3fd]">
-                <div className="bg-[#56b56a]" style={{ width: "68%" }} />
-                <div className="bg-[#d23f31]" style={{ width: "32%" }} />
-              </div>
-              <div className="flex items-center justify-between text-sm font-medium text-[#5f6368]">
-                <span>Support: 68%</span>
-                <span>Oppose: 32%</span>
-              </div>
-            </CardContent>
-          </Card>
+          <Card className="max-w-none"><CardHeader><CardAccent /><CardTitle>Total Submissions</CardTitle><CardDescription>All records currently available to this Commissioner.</CardDescription></CardHeader><CardContent className="gap-3"><div className="text-5xl font-bold text-[#1a73e8]">{loading ? "—" : totalSubmissions}</div><div className="inline-flex w-fit items-center gap-2 rounded-full bg-[#eef8ef] px-3 py-1 text-sm font-semibold text-[#17682b]"><UserCheck className="h-4 w-4" />Active review cycle</div></CardContent></Card>
+          <Card className="max-w-none"><CardHeader><CardAccent /><CardTitle>Workspace Status Distribution</CardTitle><CardDescription>Five current Submission statuses, calculated from live table rows.</CardDescription></CardHeader><CardContent className="gap-4"><div className="flex h-4 w-full overflow-hidden rounded-full bg-[#eef3fd]">{SUBMISSION_STATUS_SERIES.map((series) => <div key={series.id} title={`${series.label}: ${statusTotals[series.id]}`} style={{ width: percent(statusTotals[series.id], totalSubmissions), backgroundColor: series.color }} />)}</div><div className="grid grid-cols-1 gap-2 text-sm font-medium text-[#5f6368] sm:grid-cols-2">{SUBMISSION_STATUS_SERIES.map((series) => <div className="flex items-center justify-between gap-3" key={series.id}><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: series.color }} />{series.label}</span><span>{loading ? "—" : `${statusTotals[series.id]} (${percent(statusTotals[series.id], totalSubmissions)})`}</span></div>)}</div></CardContent></Card>
         </section>
-
-        <SubmissionsGraph />
+        <SubmissionsGraph submissions={submissions} />
       </div>
     </div>
   );

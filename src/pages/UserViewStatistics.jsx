@@ -60,7 +60,6 @@ function DemographicItem({ item }) {
       <dd>
         {formatted ?? <span className="map-info-panel__statistics-state">{getDemographicStatusLabel(item.status)}</span>}
       </dd>
-      {item.note ? <p className="map-info-panel__statistics-note">{item.note}</p> : null}
     </div>
   );
 }
@@ -69,11 +68,6 @@ function DemographicGroups({ statistics }) {
   if (!statistics) return null;
   return (
     <>
-      {statistics.quality?.warning ? (
-        <p className="map-info-panel__statistics-warning" role="status">
-          {statistics.quality.warning}
-        </p>
-      ) : null}
       {statistics.availability === "unavailable" ? (
         <p className="map-info-panel__statistics-state">
           Statistics Canada has no publishable Census Profile values for this DA.

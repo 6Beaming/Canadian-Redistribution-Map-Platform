@@ -224,7 +224,7 @@ test("Workspace label replacement returns stable assignment/catalog identities",
   assert.equal(response.body[0].id, "assignment-1");
   assert.equal(response.body[0].catalogId, "catalog-1");
   assert.equal(response.body[0].custom, true);
-  assert.equal(rpcCalls[0].name, "set_workspace_labels");
+  assert.equal(rpcCalls[0].name, "set_submission_workspace_labels");
 
   const duplicate = await request("/api/workspace/labels/submission-1", {
     method: "PUT",
@@ -240,7 +240,7 @@ test("Workspace label replacement returns stable assignment/catalog identities",
   assert.equal(rpcCalls.length, 1);
 });
 
-test("Workspace label reads tolerate the pre-migration table without catalog_id", async () => {
+test("Workspace label reads do not consult the deprecated global catalog", async () => {
   const selectedColumns = [];
   const admin = {
     from(table) {
@@ -264,38 +264,34 @@ test("Workspace label reads tolerate the pre-migration table without catalog_id"
           },
         };
       }
-      assert.equal(table, "workspace_label_catalog");
-      return {
-        select(columns) { selectedColumns.push(columns); return this; },
-        async order() {
-          return {
-            data: [{ id: "catalog-1", name: "Custom Cyan", color: "#26a69a" }],
-            error: null,
-          };
-        },
-      };
+      assert.fail(`Unexpected global catalog access: ${table}`);
     },
   };
   authDoubles(commissioner, admin);
 
   const response = await request("/api/workspace/labels/submission-1");
   assert.equal(response.status, 200);
-  assert.equal(response.headers.get("x-workspace-label-schema"), "legacy-read-only");
   assert.equal(response.body[0].id, "legacy-assignment-1");
-  assert.equal(response.body[0].catalogId, "catalog-1");
+  assert.equal(response.body[0].catalogId, null);
   assert.equal(selectedColumns[0], "*");
 });
 
-test("a missing Workspace label migration is reported as service unavailable, not a raw 500", async () => {
+test("a missing local Workspace label migration is reported as service unavailable, not a raw 500", async () => {
   const admin = {
     from(table) {
-      assert.equal(table, "workspace_label_catalog");
+      if (table === "submissions") {
+        return {
+          select() { return this; }, eq() { return this; },
+          async maybeSingle() { return { data: { id: "submission-1" }, error: null }; },
+        };
+      }
+      assert.equal(table, "workspace_labels");
       return {
-        select() { return this; },
-        async order() {
+        insert() { return this; }, select() { return this; },
+        async single() {
           return {
             data: null,
-            error: { code: "42P01", message: "relation workspace_label_catalog does not exist" },
+            error: { code: "42703", message: "column workspace_labels.is_selected does not exist" },
           };
         },
       };
@@ -303,7 +299,10 @@ test("a missing Workspace label migration is reported as service unavailable, no
   };
   authDoubles(commissioner, admin);
 
-  const response = await request("/api/workspace/label-catalog");
+  const response = await request("/api/workspace/label-catalog", {
+    method: "POST",
+    body: { submissionId: "submission-1", name: "Local", color: "#607d8b", custom: true },
+  });
   assert.equal(response.status, 503);
   assert.equal(response.body.error, "Workspace label migration is not installed.");
 });
@@ -395,7 +394,7 @@ test("Workspace comments and custom catalog labels support stable authenticated 
 
   const createdCatalog = await request("/api/workspace/label-catalog", {
     method: "POST",
-    body: { name: "Custom Label 4", color: "#607d8b", custom: true },
+    body: { submissionId: "submission-1", name: "Custom Label 4", color: "#607d8b", custom: true },
   });
   assert.equal(createdCatalog.status, 201);
   assert.equal(createdCatalog.body.custom, true);
@@ -403,21 +402,50 @@ test("Workspace comments and custom catalog labels support stable authenticated 
 
   const updatedCatalog = await request(`/api/workspace/label-catalog/${createdCatalog.body.id}`, {
     method: "PATCH",
-    body: { name: "Priority Review", color: "#112233" },
+    body: { submissionId: "submission-1", name: "Priority Review", color: "#112233" },
   });
   assert.equal(updatedCatalog.status, 200);
   assert.equal(updatedCatalog.body.name, "Priority Review");
   assert.equal(updatedCatalog.body.color, "#112233");
 
-  const deletedCatalog = await request(`/api/workspace/label-catalog/${createdCatalog.body.id}`, { method: "DELETE" });
+  const deletedCatalog = await request(`/api/workspace/label-catalog/${createdCatalog.body.id}?submissionId=submission-1`, { method: "DELETE" });
   assert.equal(deletedCatalog.status, 200);
-  assert.equal(admin.state.workspace_label_catalog.length, 0);
+  assert.equal(admin.state.workspace_labels.length, 0);
 
   const removedLegacyWrite = await request("/api/workspace/labels/submission-1", {
     method: "POST",
     body: { labels: [] },
   });
   assert.equal(removedLegacyWrite.status, 404);
+});
+
+test("custom Workspace label candidates are isolated to their submission", async () => {
+  const admin = collaborationAdmin({
+    submissions: [{ id: "submission-1" }, { id: "submission-2" }],
+    workspace_labels: [
+      {
+        id: "local-1", submission_id: "submission-1", name: "Testing",
+        color: "#0891b2", is_custom: true, is_selected: false,
+        updated_by: commissioner.id, updated_at: "2026-08-02T12:00:00.000Z",
+      },
+      {
+        id: "local-2", submission_id: "submission-2", name: "Second only",
+        color: "#607d8b", is_custom: true, is_selected: false,
+        updated_by: commissioner.id, updated_at: "2026-08-02T12:01:00.000Z",
+      },
+    ],
+  });
+  authDoubles(commissioner, admin);
+
+  const first = await request("/api/workspace/label-catalog?submissionId=submission-1");
+  const second = await request("/api/workspace/label-catalog?submissionId=submission-2");
+
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+  assert.equal(first.body.some((label) => label.name === "Testing"), true);
+  assert.equal(first.body.some((label) => label.name === "Second only"), false);
+  assert.equal(second.body.some((label) => label.name === "Testing"), false);
+  assert.equal(second.body.some((label) => label.name === "Second only"), true);
 });
 
 test("Workspace collaboration endpoints reject Public users", async () => {

@@ -2,15 +2,19 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { test } from "@jest/globals";
 
-test("rollout painting is static and contains no timer or blink state", () => {
+test("rollout painting is static and highlights only the selected category", () => {
   const source = fs.readFileSync("src/components/non_prebuilt/MapCanvas.jsx", "utf8");
   assert.equal(source.includes("setInterval"), false);
   assert.equal(source.includes("blinkHidden"), false);
   assert.equal(source.includes("buildBlinkCategoryDaExpression"), false);
-  assert.match(source, /FED_ROLLOUT_FILL_EXPRESSION/);
-  assert.match(source, /BLOCKED_DA_FILL_EXPRESSION/);
+  assert.match(source, /rolloutSelectionFillExpression/);
+  assert.match(source, /categoryId === "data-blocked"/);
   assert.match(source, /ENABLED_FILL_COLOR/);
-  assert.match(source, /DATA_BLOCKED_FILL_COLOR/);
+  assert.match(source, /selectedFedNums, ENABLED_FILL_COLOR, "#ffffff"/);
+  assert.doesNotMatch(source, /DATA_BLOCKED_FILL_COLOR/);
+  assert.match(source, /const rolloutCategoryIdRef = useRef\(rolloutCategoryId\)/);
+  assert.match(source, /applyPresentationModeRef\.current\(rolloutEnabled, rolloutCategoryId\)/);
+  assert.match(source, /\[mapReadyTick, rolloutCategoryId, rolloutEnabled\]/);
 });
 
 test("drag hot path updates only the small overlay and delegates validation", () => {

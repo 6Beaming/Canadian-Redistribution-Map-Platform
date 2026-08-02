@@ -15,6 +15,21 @@ test("Workspace collaboration migration keeps label identity stable and catalog-
   assert.doesNotMatch(sql, /select target_submission_id[^\n]*requested\.name/i);
 });
 
+test("local custom-label migration retires the global catalog runtime path", () => {
+  const sql = fs.readFileSync(
+    "supabase/migrations/20260802130000_local_workspace_custom_labels.sql",
+    "utf8",
+  );
+  const router = fs.readFileSync("server/routes/workspaceCollaboration.js", "utf8");
+
+  assert.match(sql, /add column if not exists is_selected/i);
+  assert.match(sql, /set_submission_workspace_labels/i);
+  assert.match(sql, /Custom label does not belong to this submission/i);
+  assert.match(sql, /Deprecated after 20260802130000/i);
+  assert.doesNotMatch(router, /from\("workspace_label_catalog"\)/);
+  assert.match(router, /from\("workspace_labels"\)[\s\S]*\.eq\("submission_id", submissionId\)/);
+});
+
 test("Workspace browser service has no browser-authoritative shared-state storage", () => {
   const service = fs.readFileSync("src/services/workspaceApi.js", "utf8");
   const legacyRouter = fs.readFileSync("server/routes/workspace.js", "utf8");

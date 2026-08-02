@@ -5,7 +5,6 @@ import { mapApi } from "@/services/mapApi.js";
 import {
   CANADA_BOUNDS,
   DA_HOVER_COLOR,
-  DATA_BLOCKED_FILL_COLOR,
   DEFAULT_DA_RENDER_MAX_ZOOM,
   DEFAULT_DA_RENDER_MIN_ZOOM,
   DEFAULT_DA_SOURCE_LAYER,
@@ -319,23 +318,14 @@ const ENABLED_FED_NUMS = getRolloutAreas("enabled").map((area) => String(area.fe
 const BLOCKED_FED_NUMS = getRolloutAreas("data-blocked").map((area) =>
   String(area.fedNum),
 );
-const FED_ROLLOUT_FILL_EXPRESSION = buildRolloutFedMembershipExpression(
-  ENABLED_FED_NUMS,
-  ENABLED_FILL_COLOR,
-  buildRolloutFedMembershipExpression(BLOCKED_FED_NUMS, DATA_BLOCKED_FILL_COLOR, "#ffffff"),
-);
-
-function buildBlockedDaFillExpression() {
-  return buildRolloutFedMembershipExpression(
-    BLOCKED_FED_NUMS,
-    DATA_BLOCKED_FILL_COLOR,
-    ENABLED_FILL_COLOR,
-  );
+function rolloutSelectionFillExpression(categoryId) {
+  const selectedFedNums = categoryId === "data-blocked"
+    ? BLOCKED_FED_NUMS
+    : ENABLED_FED_NUMS;
+  return buildRolloutFedMembershipExpression(selectedFedNums, ENABLED_FILL_COLOR, "#ffffff");
 }
 
-const BLOCKED_DA_FILL_EXPRESSION = buildBlockedDaFillExpression();
-
-function fedFillPaint(showRollout, showBoundaries = true) {
+function fedFillPaint(showRollout, rolloutCategoryId = null, showBoundaries = true) {
   const fillColor = showRollout
     ? [
       "case",
@@ -343,7 +333,7 @@ function fedFillPaint(showRollout, showBoundaries = true) {
       SELECTED_COLOR,
       ["boolean", ["feature-state", "hover"], false],
       HOVER_COLOR,
-      FED_ROLLOUT_FILL_EXPRESSION,
+      rolloutSelectionFillExpression(rolloutCategoryId),
     ]
     : [
       "case",
@@ -413,7 +403,7 @@ function fedOutlinePaint(showBoundaries = true) {
 
 function daFillPaint(
   showRollout,
-  _rolloutCategoryId = null,
+  rolloutCategoryId = null,
   showBoundaries = true,
   heatmapEnabled = false,
   heatmapFillExpression = null,
@@ -425,7 +415,7 @@ function daFillPaint(
       SELECTED_COLOR,
       ["boolean", ["feature-state", "hover"], false],
       DA_HOVER_COLOR,
-      BLOCKED_DA_FILL_EXPRESSION,
+      rolloutSelectionFillExpression(rolloutCategoryId),
     ]
     : heatmapEnabled
       ? [
@@ -586,6 +576,7 @@ export function MapCanvas({
   const recenterButtonRef = useRef(null);
   const recenterControlRef = useRef(null);
   const recenterTargetRef = useRef(recenterTarget);
+  const rolloutCategoryIdRef = useRef(rolloutCategoryId);
   const postalAreaButtonRef = useRef(null);
   const postalAreaControlRef = useRef(null);
   const postalAreaTargetRef = useRef(postalAreaTarget);
@@ -644,6 +635,7 @@ export function MapCanvas({
   onPostalAreaActivateRef.current = onPostalAreaActivate;
   onStatusChangeRef.current = onStatusChange;
   recenterTargetRef.current = recenterTarget;
+  rolloutCategoryIdRef.current = rolloutCategoryId;
   postalAreaTargetRef.current = postalAreaTarget;
   boundariesVisibleRef.current = boundariesVisible;
   heatmapEnabledRef.current = heatmapEnabled;
@@ -1033,8 +1025,8 @@ export function MapCanvas({
       return;
     }
 
-    applyPresentationModeRef.current(rolloutEnabled);
-  }, [mapReadyTick, rolloutEnabled]);
+    applyPresentationModeRef.current(rolloutEnabled, rolloutCategoryId);
+  }, [mapReadyTick, rolloutCategoryId, rolloutEnabled]);
 
   useEffect(() => {
     if (!isMapReadyRef.current || !applyBoundaryVisibilityRef.current) {
@@ -1265,7 +1257,7 @@ export function MapCanvas({
         id: "fed-fill",
         type: "fill",
         source: "fed-2023",
-        paint: fedFillPaint(rolloutEnabled, boundariesVisibleRef.current)
+        paint: fedFillPaint(rolloutEnabled, rolloutCategoryId, boundariesVisibleRef.current)
       };
       if (useVectorTiles) {
         layer["source-layer"] = FED_SOURCE_LAYER;
@@ -1491,7 +1483,7 @@ export function MapCanvas({
       };
     }
 
-    function setPresentationMode(showRollout) {
+    function setPresentationMode(showRollout, categoryId = rolloutCategoryIdRef.current) {
       if (map.getLayer("province-highlight")) {
         map.setLayoutProperty(
           "province-highlight",
@@ -1504,17 +1496,17 @@ export function MapCanvas({
         map.setPaintProperty(
           "fed-fill",
           "fill-color",
-          fedFillPaint(showRollout, boundariesVisibleRef.current)["fill-color"],
+          fedFillPaint(showRollout, categoryId, boundariesVisibleRef.current)["fill-color"],
         );
         map.setPaintProperty(
           "fed-fill",
           "fill-outline-color",
-          fedFillPaint(showRollout, boundariesVisibleRef.current)["fill-outline-color"],
+          fedFillPaint(showRollout, categoryId, boundariesVisibleRef.current)["fill-outline-color"],
         );
         map.setPaintProperty(
           "fed-fill",
           "fill-opacity",
-          fedFillPaint(showRollout, boundariesVisibleRef.current)["fill-opacity"],
+          fedFillPaint(showRollout, categoryId, boundariesVisibleRef.current)["fill-opacity"],
         );
       }
 
@@ -1524,7 +1516,7 @@ export function MapCanvas({
           "fill-color",
           daFillPaint(
             showRollout,
-            rolloutCategoryId,
+            categoryId,
             boundariesVisibleRef.current,
             heatmapEnabledRef.current,
             heatmapFillExpressionRef.current,
@@ -1535,7 +1527,7 @@ export function MapCanvas({
           "fill-opacity",
           daFillPaint(
             showRollout,
-            rolloutCategoryId,
+            categoryId,
             boundariesVisibleRef.current,
             heatmapEnabledRef.current,
             heatmapFillExpressionRef.current,
@@ -1546,7 +1538,7 @@ export function MapCanvas({
           "fill-outline-color",
           daFillPaint(
             showRollout,
-            rolloutCategoryId,
+            categoryId,
             boundariesVisibleRef.current,
             heatmapEnabledRef.current,
             heatmapFillExpressionRef.current,

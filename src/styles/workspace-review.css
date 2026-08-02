@@ -325,6 +325,16 @@
   outline: 0;
 }
 
+.workspace-label-picker__row input.is-invalid {
+  border-color: #dc2626;
+  color: #b91c1c;
+}
+
+.workspace-label-picker__row input.is-invalid::placeholder {
+  color: #dc2626;
+  opacity: 1;
+}
+
 .workspace-member-selector {
   position: relative;
   z-index: 4;

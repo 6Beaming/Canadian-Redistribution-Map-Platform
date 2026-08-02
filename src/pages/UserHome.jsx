@@ -675,6 +675,17 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
     setSelection(null);
   }, []);
 
+  const handlePostalAreaActivate = useCallback(() => {
+    // A postal-code center is not a DA selection. Clear the previous DA so the
+    // InfoPanel immediately returns to its neutral Statistics state instead
+    // of presenting stale details for the area the user just left.
+    onClearMapSearchTarget?.();
+    setSelection(null);
+    setPanelView(getDefaultPanelView("user"));
+    setRolloutHoverSelection(null);
+    setIsRolloutOpen(false);
+  }, [onClearMapSearchTarget]);
+
   const handleCounterProposalSelectHandle = useCallback((handleId) => {
     setCounterProposalWorkflow((current) => {
       if (!current.cache) {
@@ -1043,7 +1054,7 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
                 mapSearchTarget={effectiveMapSearchTarget}
                 recenterTarget={sessionStatus === "signed-out" ? null : undefined}
                 postalAreaTarget={profileMapTarget}
-                onPostalAreaActivate={onClearMapSearchTarget}
+                onPostalAreaActivate={handlePostalAreaActivate}
                 selection={selection}
                 externalHoverSelection={rolloutHoverSelection}
                 objectionPreview={objectionPreview}

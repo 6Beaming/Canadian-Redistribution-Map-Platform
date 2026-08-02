@@ -107,8 +107,8 @@ export async function cancelArchiveRequest(submissionId) {
     return handleResponse(res);
 }
 
-export async function getWorkspaceLabelCatalog() {
-    const res = await fetch(`/api/workspace/label-catalog`, {
+export async function getWorkspaceLabelCatalog(submissionId) {
+    const res = await fetch(`/api/workspace/label-catalog?submissionId=${encodeURIComponent(submissionId)}`, {
         method: "GET",
         credentials: "include",
     });
@@ -117,14 +117,14 @@ export async function getWorkspaceLabelCatalog() {
 }
 
 
-export async function updateWorkspaceLabelCatalog(labelId, changes) {
+export async function updateWorkspaceLabelCatalog(labelId, submissionId, changes) {
     const res = await fetch(`/api/workspace/label-catalog/${encodeURIComponent(labelId)}`, {
         method: "PATCH",
         credentials: "include",
         headers: {
             "Content-Type": "application/json",
         },
-        body: JSON.stringify(changes),
+        body: JSON.stringify({ ...changes, submissionId }),
     });
 
     return handleResponse(res);
@@ -166,18 +166,18 @@ function normalizeSubmission(submission, source) {
     };
 }
 
-export async function createWorkspaceLabelCatalog(label) {
+export async function createWorkspaceLabelCatalog(submissionId, label) {
     const res = await fetch("/api/workspace/label-catalog", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(label),
+        body: JSON.stringify({ ...label, submissionId }),
     });
     return handleResponse(res);
 }
 
-export async function deleteWorkspaceLabelCatalog(labelId) {
-    const res = await fetch(`/api/workspace/label-catalog/${encodeURIComponent(labelId)}`, {
+export async function deleteWorkspaceLabelCatalog(labelId, submissionId) {
+    const res = await fetch(`/api/workspace/label-catalog/${encodeURIComponent(labelId)}?submissionId=${encodeURIComponent(submissionId)}`, {
         method: "DELETE",
         credentials: "include",
     });
@@ -251,7 +251,7 @@ export async function getWorkspaceReviewState(submissionId) {
         // Archive Request is CP4-owned. CP5 collaboration remains usable when
         // that optional service is not mounted or is temporarily unavailable.
         getArchiveRequest(submissionId).catch(() => null),
-        tolerateMissingLabelMigration(getWorkspaceLabelCatalog()),
+        tolerateMissingLabelMigration(getWorkspaceLabelCatalog(submissionId)),
     ]);
     return {
         comments,
@@ -286,7 +286,7 @@ export function subscribeWorkspaceState(listener) {
 export async function saveWorkspaceLabels(submissionId, labels) {
     const normalizedLabels = labels.map((label) => ({
         id: String(label.id),
-        catalogId: String(label.catalogId ?? label.id),
+        key: String(label.key ?? label.catalogId ?? label.id),
         name: String(label.name).trim(),
         color: String(label.color),
         custom: Boolean(label.custom),
@@ -295,8 +295,8 @@ export async function saveWorkspaceLabels(submissionId, labels) {
     return addWorkspaceLabels(submissionId, normalizedLabels);
 }
 
-export async function saveWorkspaceLabelCatalog(labelId, changes) {
-    return updateWorkspaceLabelCatalog(labelId, {
+export async function saveWorkspaceLabelCatalog(labelId, submissionId, changes) {
+    return updateWorkspaceLabelCatalog(labelId, submissionId, {
         ...(Object.hasOwn(changes, "name") ? { name: String(changes.name ?? "").trim() } : {}),
         ...(Object.hasOwn(changes, "color") ? { color: String(changes.color ?? "").trim() } : {}),
     });

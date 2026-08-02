@@ -21,13 +21,15 @@ function getBackRoute(location, isCommissioner) {
   }
 
   if (pathname.startsWith("/dashboard/workspace/")) {
-    return state?.focusId
-      ? `/dashboard/workspace?focus=${encodeURIComponent(state.focusId)}`
-      : "/dashboard/workspace";
+    return "/dashboard/workspace";
   }
 
   if (pathname === "/dashboard/workspace") {
     return state?.from === "/dashboard/submissionsTable" ? state.from : "/dashboard";
+  }
+
+  if (pathname === "/dashboard/graphs") {
+    return "/dashboard/submissionsTable";
   }
 
   if (pathname === "/dashboard/archivedTree") {

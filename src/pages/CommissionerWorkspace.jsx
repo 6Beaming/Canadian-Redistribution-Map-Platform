@@ -19,6 +19,7 @@ import {
   getWorkspaceSubmissions,
   subscribeWorkspaceState,
 } from "@/services/workspaceApi.js";
+import { RouteLoadingPage } from "@/components/non_prebuilt/RouteLoadingPage.jsx";
 import "@/styles/workspace.css";
 
 const VISIBLE_LIST_ITEMS = 3;
@@ -608,12 +609,10 @@ export default function CommissionerWorkspace() {
           const focused = await getWorkspaceSubmission(focusId, { hydrateGeometry: false });
           if (!isMounted) return;
           if (!focused) throw new Error("The focused submission was not found.");
-          setWorkspaceSubmissions([focused]);
-          setExpansion(createFocusedExpansion(focused));
-          setIsLoading(false);
           const submissions = await getWorkspaceSubmissions({ includeArchived: false });
           if (!isMounted) return;
           setWorkspaceSubmissions(Array.isArray(submissions) ? submissions : [focused]);
+          setExpansion(createFocusedExpansion(focused));
         } else {
           const submissions = await getWorkspaceSubmissions({ includeArchived: false });
           if (!isMounted) return;
@@ -707,6 +706,10 @@ export default function CommissionerWorkspace() {
     setFilterDraft(createExpansionState(true));
   }
 
+  if (isLoading) {
+    return <RouteLoadingPage label="Loading Workspace submissions…" />;
+  }
+
   return (
     <main className="commissioner-workspace workspace-page" aria-labelledby="workspace-title">
       <div className="workspace-scroll-region">
@@ -756,10 +759,6 @@ export default function CommissionerWorkspace() {
               Live submissions are unavailable. Check your commissioner session and try again.
             </p>
           ) : null}
-          {isLoading ? (
-            <p className="workspace-load-notice" role="status">Loading Workspace submissions…</p>
-          ) : null}
-
           <section className="workspace-tree" aria-busy={isLoading} aria-label="Submission decision tree">
             <div className="workspace-tree__top-row">
               <RootCard

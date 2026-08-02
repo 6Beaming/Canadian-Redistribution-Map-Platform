@@ -36,6 +36,52 @@ function normalizeType(value) {
   return String(value ?? "feedback").toLowerCase().replaceAll("_", "-");
 }
 
+function customPlaceholder(label, index) {
+  if (!label?.custom || label?.createdBy) return "";
+  const match = String(label.name ?? "").match(/^custom (?:label )?(cyan|pink|purple|[1-3])$/iu);
+  const slots = { cyan: 1, pink: 2, purple: 3 };
+  const slot = match ? (slots[String(match[1]).toLowerCase()] ?? Number(match[1])) : index + 1;
+  return `Customized Label ${slot}`;
+}
+
+function prepareCatalog(entries = []) {
+  return entries
+    .map((entry, index) => {
+      const placeholder = customPlaceholder(entry, index);
+      return placeholder ? { ...entry, name: "", placeholder } : { ...entry };
+    })
+    .sort((left, right) => Number(Boolean(left.custom)) - Number(Boolean(right.custom)));
+}
+
+function labelIdentity(label) {
+  return String(label?.custom
+    ? label?.id ?? ""
+    : label?.key ?? label?.catalogId ?? label?.id ?? "");
+}
+
+function reconcileLabelsInOrder(referenceLabels = [], persistedLabels = []) {
+  const persistedById = new Map(
+    persistedLabels.map((label) => [labelIdentity(label), label]),
+  );
+  const reconciled = referenceLabels
+    .map((label) => persistedById.get(labelIdentity(label)))
+    .filter(Boolean);
+  const reconciledIds = new Set(reconciled.map(labelIdentity));
+  persistedLabels.forEach((label) => {
+    if (!reconciledIds.has(labelIdentity(label))) reconciled.push(label);
+  });
+  return reconciled;
+}
+
+const EMPTY_REVIEW = Object.freeze({
+  submissionId: null,
+  comments: [],
+  labels: [],
+  labelCatalog: [],
+  archiveRequest: null,
+  collaborationWarning: "",
+});
+
 function SubmissionSelector({ submissions, activeId, onSelect }) {
   const [isOpen, setIsOpen] = useState(false);
   const selectorRef = useRef(null);
@@ -92,27 +138,70 @@ function LabelEditor({
   unavailableMessage = "",
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [catalog, setCatalog] = useState(savedCatalog);
+  const [catalog, setCatalog] = useState(() => prepareCatalog(savedCatalog));
+  const [optimisticSelected, setOptimisticSelected] = useState(selectedLabels);
   const [pendingIds, setPendingIds] = useState(() => new Set());
+  const [invalidCustomIds, setInvalidCustomIds] = useState(() => new Set());
   const [error, setError] = useState("");
+  const invalidTimersRef = useRef(new Map());
+  const draftSequenceRef = useRef(0);
   const mutationPending = pendingIds.size > 0;
 
-  useEffect(() => {
-    setCatalog(savedCatalog);
-  }, [savedCatalog]);
+  useEffect(() => () => {
+    invalidTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+    invalidTimersRef.current.clear();
+  }, []);
 
-  function identity(label) {
-    return String(label.catalogId ?? label.id);
+  useEffect(() => {
+    if (!mutationPending) setCatalog(prepareCatalog(savedCatalog));
+  }, [mutationPending, savedCatalog]);
+
+  useEffect(() => {
+    if (!mutationPending) {
+      setOptimisticSelected((current) => reconcileLabelsInOrder(current, selectedLabels));
+    }
+  }, [mutationPending, selectedLabels]);
+
+  function clearInvalidCustomLabel(labelId) {
+    const timerId = invalidTimersRef.current.get(labelId);
+    if (timerId) window.clearTimeout(timerId);
+    invalidTimersRef.current.delete(labelId);
+    setInvalidCustomIds((current) => {
+      if (!current.has(labelId)) return current;
+      const next = new Set(current);
+      next.delete(labelId);
+      return next;
+    });
+  }
+
+  function flagInvalidCustomLabel(labelId) {
+    const existingTimer = invalidTimersRef.current.get(labelId);
+    if (existingTimer) window.clearTimeout(existingTimer);
+    setInvalidCustomIds((current) => new Set(current).add(labelId));
+    const timerId = window.setTimeout(() => {
+      invalidTimersRef.current.delete(labelId);
+      setInvalidCustomIds((current) => {
+        const next = new Set(current);
+        next.delete(labelId);
+        return next;
+      });
+    }, 5000);
+    invalidTimersRef.current.set(labelId, timerId);
   }
 
   async function persist(nextLabels, pendingId) {
+    const previousLabels = optimisticSelected;
+    setOptimisticSelected(nextLabels);
     setPendingIds((current) => new Set(current).add(pendingId));
     setError("");
     try {
       const persisted = await saveWorkspaceLabels(submissionId, nextLabels);
-      await onChange(persisted);
-      return persisted;
+      const reconciled = reconcileLabelsInOrder(nextLabels, persisted);
+      setOptimisticSelected(reconciled);
+      onChange(reconciled);
+      return reconciled;
     } catch (saveError) {
+      setOptimisticSelected(previousLabels);
       setError(saveError.message || "Unable to update labels.");
       return null;
     } finally {
@@ -125,19 +214,25 @@ function LabelEditor({
   }
 
   async function toggleLabel(label) {
-    const labelId = identity(label);
+    const labelId = labelIdentity(label);
     if (mutationPending) return;
-    const isSelected = selectedLabels.some((entry) => identity(entry) === labelId);
-    if (!isSelected && label.custom && !label.name.trim()) return;
+    const isSelected = optimisticSelected.some((entry) => labelIdentity(entry) === labelId);
+    if (!isSelected && label.custom && !label.name.trim()) {
+      flagInvalidCustomLabel(label.id);
+      return;
+    }
     await persist(
       isSelected
-        ? selectedLabels.filter((entry) => identity(entry) !== labelId)
-        : [...selectedLabels, label],
+        ? optimisticSelected.filter((entry) => identity(entry) !== labelId)
+        : [...optimisticSelected, label],
       labelId,
     );
   }
 
   function editCustomLabel(id, changes) {
+    if (Object.hasOwn(changes, "name") && String(changes.name).trim()) {
+      clearInvalidCustomLabel(id);
+    }
     const nextCatalog = catalog.map((label) =>
       label.id === id ? { ...label, ...changes } : label,
     );
@@ -147,12 +242,19 @@ function LabelEditor({
 
   async function persistCustomLabel(label) {
     const name = label.name.trim();
-    if (!name || mutationPending) return;
+    const isDraft = String(label.id).startsWith("draft-custom-");
+    if (mutationPending) return;
+    if (!name) {
+      flagInvalidCustomLabel(label.id);
+      return;
+    }
     setPendingIds((current) => new Set(current).add(label.id));
     setError("");
     try {
-      const saved = await saveWorkspaceLabelCatalog(label.id, { name, color: label.color });
-      setCatalog((current) => current.map((entry) => entry.id === saved.id ? saved : entry));
+      const saved = isDraft
+        ? await createWorkspaceLabelCatalog(submissionId, { name, color: label.color, custom: true })
+        : await saveWorkspaceLabelCatalog(label.id, submissionId, { name, color: label.color });
+      setCatalog((current) => prepareCatalog(current.map((entry) => entry.id === label.id ? saved : entry)));
       await onCatalogChange?.(saved);
     } catch (saveError) {
       setError(saveError.message || "Unable to save the custom label.");
@@ -167,38 +269,34 @@ function LabelEditor({
   }
 
   async function createCustomLabel() {
-    const pendingId = "create-catalog-label";
     if (mutationPending) return;
-    const existingNames = new Set(catalog.map((label) => String(label.name).trim().toLowerCase()));
-    let suffix = 1;
-    while (existingNames.has(`custom label ${suffix}`)) suffix += 1;
-    setPendingIds((current) => new Set(current).add(pendingId));
     setError("");
-    try {
-      const saved = await createWorkspaceLabelCatalog({
-        name: `Custom Label ${suffix}`,
+    draftSequenceRef.current += 1;
+    const sequence = catalog.filter((label) => label.custom).length + 1;
+    setCatalog((current) => prepareCatalog([
+      ...current,
+      {
+        id: `draft-custom-${Date.now()}-${draftSequenceRef.current}`,
+        name: "",
         color: "#607d8b",
         custom: true,
-      });
-      setCatalog((current) => [...current, saved]);
-      await onCatalogChange?.(saved);
-    } catch (saveError) {
-      setError(saveError.message || "Unable to create the custom label.");
-    } finally {
-      setPendingIds((current) => {
-        const next = new Set(current);
-        next.delete(pendingId);
-        return next;
-      });
-    }
+        createdBy: "draft",
+        placeholder: `Customized Label ${sequence}`,
+      },
+    ]));
   }
 
   async function removeCustomLabel(label) {
     if (mutationPending) return;
+    if (String(label.id).startsWith("draft-custom-")) {
+      clearInvalidCustomLabel(label.id);
+      setCatalog((current) => current.filter((entry) => entry.id !== label.id));
+      return;
+    }
     setPendingIds((current) => new Set(current).add(label.id));
     setError("");
     try {
-      await deleteWorkspaceLabelCatalog(label.id);
+      await deleteWorkspaceLabelCatalog(label.id, submissionId);
       setCatalog((current) => current.filter((entry) => entry.id !== label.id));
       await onCatalogChange?.({ deletedId: label.id });
     } catch (saveError) {
@@ -215,7 +313,7 @@ function LabelEditor({
   return (
     <section className="workspace-review-section">
       <div className="workspace-review-section__heading">
-        <div><Tag aria-hidden="true" /><strong>Shared labels</strong></div>
+        <div><Tag aria-hidden="true" /><strong>Labels</strong></div>
         <button
           type="button"
           aria-expanded={isOpen}
@@ -227,7 +325,7 @@ function LabelEditor({
         </button>
       </div>
       <div className="workspace-labels">
-        {selectedLabels.length ? selectedLabels.map((label, index) => (
+        {optimisticSelected.length ? optimisticSelected.map((label, index) => (
           <span key={label.id ?? `${label.name}-${index}`} style={{ "--label-color": label.color }}>
             {label.name}
             <button
@@ -247,14 +345,15 @@ function LabelEditor({
       {isOpen ? (
         <div className="workspace-label-picker">
           {catalog.map((label, index) => {
-            const checked = selectedLabels.some((entry) => identity(entry) === label.id);
+            const checked = optimisticSelected.some((entry) => labelIdentity(entry) === label.id);
+            const invalidCustomLabel = invalidCustomIds.has(label.id);
             return (
               <div className="workspace-label-picker__row" key={label.id ?? `${label.name}-${index}`}>
                 <button
                   type="button"
                   aria-pressed={checked}
                   aria-label={checked ? `Remove ${label.name}` : `Add ${label.name || "custom label"}`}
-                  disabled={mutationPending || (!checked && label.custom && !label.name.trim())}
+                  disabled={mutationPending}
                   onClick={() => toggleLabel(label)}
                 >
                   <i style={{ background: label.color }} />
@@ -264,7 +363,10 @@ function LabelEditor({
                   <input
                   aria-label={`Edit ${label.id}`}
                   value={label.name}
-                    placeholder="Custom label"
+                    className={invalidCustomLabel ? "is-invalid" : ""}
+                    placeholder={invalidCustomLabel
+                      ? "Labels cannot be empty"
+                      : label.placeholder || "Customized Label"}
                     maxLength={30}
                   onChange={(event) => editCustomLabel(label.id, { name: event.target.value })}
                   onBlur={() => void persistCustomLabel(label)}
@@ -301,7 +403,7 @@ function LabelEditor({
             onClick={() => void createCustomLabel()}
           >
             <Plus aria-hidden="true" />
-            {pendingIds.has("create-catalog-label") ? "Creating…" : "Create custom label"}
+            Add custom label
           </button>
         </div>
       ) : null}
@@ -593,6 +695,7 @@ function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, o
       : reviewerEmails,
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUpdatingAssignees, setIsUpdatingAssignees] = useState(false);
   const [error, setError] = useState("");
   const request = review.archiveRequest;
   const isRequester = request?.requesterEmail === reviewerEmail;
@@ -603,11 +706,15 @@ function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, o
   }, [request?.assignees]);
 
   async function toggleAssignee(email, checked) {
+    if (isUpdatingAssignees) return;
+    const previousAssignees = assignees;
     const nextAssignees = checked
       ? [...new Set([...assignees, email])]
       : assignees.filter((entry) => entry !== email);
 
     setAssignees(nextAssignees);
+    setIsUpdatingAssignees(true);
+    setError("");
 
     try {
       await updateWorkspaceArchiveAssignees(
@@ -615,10 +722,12 @@ function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, o
         nextAssignees
       );
 
-      onCommitted("archive-update-assignees");
     } catch (error) {
       console.error(error);
       setError(error.message);
+      setAssignees(previousAssignees);
+    } finally {
+      setIsUpdatingAssignees(false);
     }
   }
 
@@ -656,6 +765,7 @@ function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, o
               <input
                 type="checkbox"
                 checked={assignees.includes(email)}
+                disabled={isUpdatingAssignees}
                 onChange={(event) => void toggleAssignee(email, event.target.checked)}
               />
               {email}
@@ -714,14 +824,6 @@ export function WorkspaceReviewPanel({
   reviewerEmails: availableReviewerEmails = [],
 }) {
 
-  const EMPTY_REVIEW = {
-    comments: [],
-    labels: [],
-    labelCatalog: [],
-    archiveRequest: null,
-    collaborationWarning: "",
-  };
-
   const { user } = useAuth();
   const reviewerEmail = user?.email || "commissioner@example.com";
   const reviewerEmails = [...new Set([reviewerEmail, ...availableReviewerEmails])];
@@ -736,6 +838,7 @@ export function WorkspaceReviewPanel({
       const nextReview = await getWorkspaceReviewState(submission.id);
       if (refreshSequence.current !== sequence) return;
       setReview({
+        submissionId: submission.id,
         comments: nextReview.comments ?? [],
         labels: nextReview.labels ?? [],
         labelCatalog: nextReview.labelCatalog ?? [],
@@ -752,6 +855,7 @@ export function WorkspaceReviewPanel({
   }
 
   useEffect(() => {
+    setReviewError("");
     refreshReview();
     const unsubscribe = subscribeWorkspaceState(refreshReview);
     return () => {
@@ -759,6 +863,39 @@ export function WorkspaceReviewPanel({
       unsubscribe();
     };
   }, [submission.id]);
+
+  const activeReview = String(review.submissionId) === String(submission.id)
+    ? review
+    : EMPTY_REVIEW;
+
+  function updateActiveLabels(labels) {
+    setReview((current) => String(current.submissionId) === String(submission.id)
+      ? { ...current, labels }
+      : current);
+  }
+
+  function updateActiveCatalog(change) {
+    setReview((current) => {
+      if (String(current.submissionId) !== String(submission.id)) return current;
+      if (change?.deletedId) {
+        return {
+          ...current,
+          labels: current.labels.filter((label) => labelIdentity(label) !== String(change.deletedId)),
+          labelCatalog: current.labelCatalog.filter((label) => label.id !== change.deletedId),
+        };
+      }
+      const exists = current.labelCatalog.some((label) => label.id === change?.id);
+      return {
+        ...current,
+        labels: current.labels.map((label) => labelIdentity(label) === change?.id
+          ? { ...label, name: change.name, color: change.color }
+          : label),
+        labelCatalog: exists
+          ? current.labelCatalog.map((label) => label.id === change.id ? change : label)
+          : [...current.labelCatalog, change],
+      };
+    });
+  }
 
   return (
     <aside className="map-info-panel workspace-review-panel" aria-label="Submission workspace review">
@@ -775,16 +912,17 @@ export function WorkspaceReviewPanel({
           </div>
         ) : null}
         <LabelEditor
+          key={submission.id}
           submissionId={submission.id}
-          selectedLabels={review.labels}
-          savedCatalog={review.labelCatalog}
-          onChange={refreshReview}
-          onCatalogChange={refreshReview}
-          unavailableMessage={review.collaborationWarning}
+          selectedLabels={activeReview.labels}
+          savedCatalog={activeReview.labelCatalog}
+          onChange={updateActiveLabels}
+          onCatalogChange={updateActiveCatalog}
+          unavailableMessage={activeReview.collaborationWarning}
         />
         <CommentThread
           submissionId={submission.id}
-          comments={review.comments}
+          comments={activeReview.comments}
           reviewerEmail={reviewerEmail}
           onChange={refreshReview}
           readOnly={submission.status !== WORKSPACE_STATUS.PENDING}
@@ -793,7 +931,7 @@ export function WorkspaceReviewPanel({
         <CounterProposalImpact submission={submission} />
         <DecisionControls
           submission={submission}
-          review={review}
+          review={activeReview}
           reviewerEmail={reviewerEmail}
           reviewerEmails={reviewerEmails}
           onCommitted={onCommitted}

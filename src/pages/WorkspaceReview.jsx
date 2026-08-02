@@ -11,6 +11,7 @@ import {
 import { getSubmissionTableRowById } from "@/services/submissionListsApi.js";
 import { getSubmissionReviewContent } from "@/services/commentsApi.js";
 import { hydrateWorkspaceSubmission } from "@/services/tempCounterProposal.js";
+import { RouteLoadingPage } from "@/components/non_prebuilt/RouteLoadingPage.jsx";
 import "@/styles/map.css";
 import "@/styles/workspace-review.css";
 
@@ -39,11 +40,11 @@ export default function WorkspaceReview() {
       try {
         setError("");
         setStatus("Loading submission…");
+        setSubmission(null);
+        setAllSubmissions([]);
         const activeRow = await getSubmissionTableRowById(submissionId);
         if (!activeRow) throw new Error("Submission not found in the active workspace.");
         if (isMounted) {
-          setSubmission({ ...activeRow, source: "supabase", geometry: null });
-          setAllSubmissions([activeRow]);
           setComparisonView("proposed");
           setStatus("Loading map detail…");
         }
@@ -137,7 +138,7 @@ export default function WorkspaceReview() {
     if (next) {
       navigate(`/dashboard/workspace/${encodeURIComponent(next.id)}`, { state: location.state });
     } else {
-      navigate(`/dashboard/workspace?focus=${encodeURIComponent(submission.id)}`, {
+      navigate("/dashboard/workspace", {
         state: { from: location.state?.workspaceFrom ?? null },
       });
     }
@@ -146,19 +147,8 @@ export default function WorkspaceReview() {
   if (error) {
     return <main className="workspace-review-error"><h1>Workspace unavailable</h1><p>{error}</p></main>;
   }
-  if (!submission) {
-    return (
-      <main className="workspace-review-page">
-        <div className="workspace-review-layout">
-          <section className="workspace-review-map" aria-busy="true">
-            <div className="route-loading-overlay__indicator" role="status">
-              <span className="route-loading-overlay__spinner" aria-hidden="true" />
-              <span>Loading submission…</span>
-            </div>
-          </section>
-        </div>
-      </main>
-    );
+  if (!submission || String(submission.id) !== String(submissionId)) {
+    return <RouteLoadingPage label="Loading submission workspace…" />;
   }
 
   return (
