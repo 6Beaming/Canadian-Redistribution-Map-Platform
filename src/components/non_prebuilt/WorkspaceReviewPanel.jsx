@@ -18,14 +18,16 @@ import {
   createWorkspaceLabelCatalog,
   deleteWorkspaceComment,
   deleteWorkspaceLabelCatalog,
+  getWorkspaceComments,
   getWorkspaceReviewState,
   saveWorkspaceLabelCatalog,
   saveWorkspaceLabels,
-  subscribeWorkspaceState,
+  subscribeWorkspaceReviewState,
   updateWorkspaceComment,
   updateWorkspaceArchiveAssignees,
   WORKSPACE_STATUS,
 } from "@/services/workspaceApi.js";
+import { getWorkspaceReviewInvalidationTargets } from "@/lib/realtime/workspaceRealtime.js";
 
 function formatTimestamp(value) {
   const date = new Date(value);
@@ -829,37 +831,75 @@ export function WorkspaceReviewPanel({
   const reviewerEmails = [...new Set([reviewerEmail, ...availableReviewerEmails])];
   const [review, setReview] = useState(EMPTY_REVIEW);
   const [reviewError, setReviewError] = useState("");
-  const refreshSequence = useRef(0);
+  const refreshSequence = useRef({ all: 0, comments: 0 });
 
-  async function refreshReview() {
-    const sequence = refreshSequence.current + 1;
-    refreshSequence.current = sequence;
+  async function refreshReview({ rethrow = false } = {}) {
+    const sequence = refreshSequence.current.all + 1;
+    const commentsSequence = refreshSequence.current.comments;
+    refreshSequence.current.all = sequence;
     try {
       const nextReview = await getWorkspaceReviewState(submission.id);
-      if (refreshSequence.current !== sequence) return;
-      setReview({
-        submissionId: submission.id,
-        comments: nextReview.comments ?? [],
-        labels: nextReview.labels ?? [],
-        labelCatalog: nextReview.labelCatalog ?? [],
-        archiveRequest: nextReview.archiveRequest ?? null,
-        collaborationWarning: nextReview.collaborationWarning ?? "",
+      if (refreshSequence.current.all !== sequence) return;
+      setReview((current) => {
+        const isCurrentSubmission = String(current.submissionId) === String(submission.id);
+        return {
+          submissionId: submission.id,
+          comments: refreshSequence.current.comments === commentsSequence
+            ? nextReview.comments ?? []
+            : (isCurrentSubmission ? current.comments : []),
+          labels: nextReview.labels ?? [],
+          labelCatalog: nextReview.labelCatalog ?? [],
+          archiveRequest: nextReview.archiveRequest ?? null,
+          collaborationWarning: nextReview.collaborationWarning ?? "",
+        };
       });
       setReviewError("");
     } catch (error) {
       console.error("Unable to load workspace review:", error);
-      if (refreshSequence.current === sequence) {
+      if (refreshSequence.current.all === sequence) {
         setReviewError(error.message || "Unable to refresh Workspace collaboration.");
       }
+      if (rethrow) throw error;
     }
+  }
+
+  async function refreshComments() {
+    const sequence = refreshSequence.current.comments + 1;
+    refreshSequence.current.comments = sequence;
+    try {
+      const comments = await getWorkspaceComments(submission.id);
+      if (refreshSequence.current.comments !== sequence) return;
+      setReview((current) => String(current.submissionId) === String(submission.id)
+        ? { ...current, comments: comments ?? [] }
+        : { ...EMPTY_REVIEW, submissionId: submission.id, comments: comments ?? [] });
+      setReviewError("");
+    } catch (error) {
+      if (refreshSequence.current.comments === sequence) {
+        setReviewError(error.message || "Unable to refresh Workspace comments.");
+      }
+      throw error;
+    }
+  }
+
+  async function handleReviewInvalidation({ hints, resync }) {
+    if (resync) {
+      await refreshReview({ rethrow: true });
+      return;
+    }
+    const targets = getWorkspaceReviewInvalidationTargets(hints, submission.id);
+    if (targets.includes("comments")) await refreshComments();
   }
 
   useEffect(() => {
     setReviewError("");
     refreshReview();
-    const unsubscribe = subscribeWorkspaceState(refreshReview);
+    const unsubscribe = subscribeWorkspaceReviewState(submission.id, {
+      onInvalidate: handleReviewInvalidation,
+      onRecover: refreshReview,
+    });
     return () => {
-      refreshSequence.current += 1;
+      refreshSequence.current.all += 1;
+      refreshSequence.current.comments += 1;
       unsubscribe();
     };
   }, [submission.id]);
@@ -924,7 +964,7 @@ export function WorkspaceReviewPanel({
           submissionId={submission.id}
           comments={activeReview.comments}
           reviewerEmail={reviewerEmail}
-          onChange={refreshReview}
+          onChange={refreshComments}
           readOnly={submission.status !== WORKSPACE_STATUS.PENDING}
         />
         <SubmissionDetails submission={submission} />

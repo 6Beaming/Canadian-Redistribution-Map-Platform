@@ -6,7 +6,10 @@ import {
     getSubmissionTableRowById,
 } from "@/services/submissionListsApi.js";
 import { subscribeRealtimeInvalidation } from "@/lib/realtime/realtimeInvalidation.js";
-import { WORKSPACE_LIST_INVALIDATION_KEYS } from "@/lib/realtime/workspaceRealtime.js";
+import {
+    getWorkspaceReviewInvalidationKeys,
+    WORKSPACE_LIST_INVALIDATION_KEYS,
+} from "@/lib/realtime/workspaceRealtime.js";
 
 
 function handleResponse(res) {
@@ -288,6 +291,30 @@ export function subscribeWorkspaceListState({ onInvalidate, onRecover = onInvali
     };
     const unsubscribeRealtime = subscribeRealtimeInvalidation(
         WORKSPACE_LIST_INVALIDATION_KEYS,
+        onInvalidate,
+    );
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+        window.removeEventListener("focus", handleFocus);
+        document.removeEventListener("visibilitychange", handleVisibility);
+        unsubscribeRealtime();
+    };
+}
+
+export function subscribeWorkspaceReviewState(
+    submissionId,
+    { onInvalidate, onRecover = onInvalidate },
+) {
+    if (typeof window === "undefined") return () => { };
+    const handleFocus = () => onRecover({ event: null, reason: "focus", resync: true });
+    const handleVisibility = () => {
+        if (document.visibilityState === "visible") {
+            onRecover({ event: null, reason: "visibility", resync: true });
+        }
+    };
+    const unsubscribeRealtime = subscribeRealtimeInvalidation(
+        getWorkspaceReviewInvalidationKeys(submissionId),
         onInvalidate,
     );
     window.addEventListener("focus", handleFocus);

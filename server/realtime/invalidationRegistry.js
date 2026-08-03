@@ -4,6 +4,9 @@ const INVALIDATION_RESOLVERS = Object.freeze({
     `workspace:branch:${aggregateId}`,
   ],
   "synthetic.resource": () => ["realtime:harness"],
+  "workspace.comment": ({ aggregateId }) => [
+    `workspace:comments:${aggregateId}`,
+  ],
 });
 
 export class RealtimeInvalidationRegistryError extends Error {
