@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
+import { RealtimeProvider } from "./contexts/RealtimeContext.jsx";
 import Header from "./pages/Header.jsx";
 import AcceptInvitePage from "./pages/AcceptInvitePage.jsx";
 import ArchivedTree from "./pages/ArchivedTree.jsx";
@@ -19,6 +20,7 @@ import SignUpPage from "./pages/SignUpPage.jsx";
 import UserHome from "./pages/UserHome.jsx";
 import UserProfile from "./pages/UserProfile.jsx";
 import UserResumeSubmission from "./pages/UserResumeSubmission.jsx";
+import RealtimeHarness from "./pages/RealtimeHarness.jsx";
 import { RouteLoadingPage } from "./components/non_prebuilt/RouteLoadingPage.jsx";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -73,8 +75,9 @@ function App() {
 
   return (
     <AuthProvider>
-      <Header onPlaceSelect={handlePlaceSelect} />
-      <Routes>
+      <RealtimeProvider>
+        <Header onPlaceSelect={handlePlaceSelect} />
+        <Routes>
         <Route element={<RequirePublicUser />}>
           <Route
             path="/"
@@ -119,9 +122,14 @@ function App() {
           <Route path="/dashboard/workspace/:submissionId" element={<WorkspaceReview />} />
           <Route path="/dashboard/archivedTree" element={<ArchivedTree />} />
           <Route path="/dashboard/archivedTree/:submissionId/difference" element={<ArchivedDifference />} />
+          <Route
+            path="/dashboard/realtime-harness"
+            element={import.meta.env.DEV ? <RealtimeHarness /> : <Navigate to="/dashboard" replace />}
+          />
         </Route>
-      </Routes>
-      <Toaster position="top-center" offset="80px" closeButton/>
+        </Routes>
+        <Toaster position="top-center" offset="80px" closeButton/>
+      </RealtimeProvider>
     </AuthProvider>
   );
 }

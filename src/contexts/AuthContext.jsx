@@ -36,8 +36,8 @@ export function AuthProvider({ children }) {
   }, [clearSession, markSignedIn]);
 
   const signOut = useCallback(async () => {
-    await authApi.logout();
     clearSession();
+    await authApi.logout();
   }, [clearSession]);
 
   useEffect(() => {

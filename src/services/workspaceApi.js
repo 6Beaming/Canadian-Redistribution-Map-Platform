@@ -5,8 +5,7 @@ import {
     getCommissionerSubmissionTableRows,
     getSubmissionTableRowById,
 } from "@/services/submissionListsApi.js";
-
-const REALTIME_INVALIDATION_EVENT = "crmp:realtime-invalidation";
+import { subscribeRealtimeInvalidation } from "@/lib/realtime/realtimeInvalidation.js";
 
 
 function handleResponse(res) {
@@ -268,17 +267,13 @@ export function subscribeWorkspaceState(listener) {
     const handleVisibility = () => {
         if (document.visibilityState === "visible") listener();
     };
-    const handleInvalidation = (event) => {
-        const resource = event?.detail?.resource;
-        if (!resource || String(resource).startsWith("workspace")) listener();
-    };
+    const unsubscribeRealtime = subscribeRealtimeInvalidation("workspace:*", listener);
     window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibility);
-    window.addEventListener(REALTIME_INVALIDATION_EVENT, handleInvalidation);
     return () => {
         window.removeEventListener("focus", handleFocus);
         document.removeEventListener("visibilitychange", handleVisibility);
-        window.removeEventListener(REALTIME_INVALIDATION_EVENT, handleInvalidation);
+        unsubscribeRealtime();
     };
 }
 
