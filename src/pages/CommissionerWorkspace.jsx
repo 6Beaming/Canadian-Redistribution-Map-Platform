@@ -17,8 +17,9 @@ import {
 import {
   getWorkspaceSubmission,
   getWorkspaceSubmissions,
-  subscribeWorkspaceState,
+  subscribeWorkspaceListState,
 } from "@/services/workspaceApi.js";
+import { reconcileWorkspaceSubmission } from "@/lib/realtime/workspaceRealtime.js";
 import { RouteLoadingPage } from "@/components/non_prebuilt/RouteLoadingPage.jsx";
 import "@/styles/workspace.css";
 
@@ -602,8 +603,8 @@ export default function CommissionerWorkspace() {
   useEffect(() => {
     let isMounted = true;
 
-    const loadSubmissions = async () => {
-      setIsLoading(true);
+    const loadSubmissions = async ({ showLoading = false } = {}) => {
+      if (showLoading) setIsLoading(true);
       try {
         if (focusId) {
           const focused = await getWorkspaceSubmission(focusId, { hydrateGeometry: false });
@@ -622,12 +623,38 @@ export default function CommissionerWorkspace() {
       } catch (error) {
         if (isMounted) setLoadError(error.message || "Submissions could not be loaded.");
       } finally {
-        if (isMounted) setIsLoading(false);
+        if (isMounted && showLoading) setIsLoading(false);
       }
     };
 
-    loadSubmissions();
-    const unsubscribe = subscribeWorkspaceState(loadSubmissions);
+    const refreshAffectedSubmission = async ({ event, resync }) => {
+      if (resync || !event?.aggregateId) {
+        await loadSubmissions();
+        return;
+      }
+
+      try {
+        const submission = event.operation === "delete"
+          ? null
+          : await getWorkspaceSubmission(event.aggregateId, { hydrateGeometry: false });
+        if (!isMounted) return;
+        setWorkspaceSubmissions((current) => (
+          reconcileWorkspaceSubmission(current, event, submission)
+        ));
+        setLoadError("");
+      } catch (error) {
+        if (isMounted) {
+          setLoadError(error.message || "The affected submission could not be refreshed.");
+        }
+        throw error;
+      }
+    };
+
+    loadSubmissions({ showLoading: true });
+    const unsubscribe = subscribeWorkspaceListState({
+      onInvalidate: refreshAffectedSubmission,
+      onRecover: loadSubmissions,
+    });
 
     return () => {
       isMounted = false;

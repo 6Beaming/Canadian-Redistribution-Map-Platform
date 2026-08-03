@@ -1,17 +1,24 @@
 import crypto from "node:crypto";
 import { getSupabaseAdminDataClient } from "../lib/supabase.js";
 import { validateRealtimeEvent } from "./eventContract.js";
+import { resolveRealtimeInvalidations } from "./invalidationRegistry.js";
 
 function normalizeOutboxRow(row, delivery) {
   const hints = row.projection_hints ?? {};
-  return validateRealtimeEvent({
+  const eventIdentity = {
     aggregateId: String(row.aggregate_id),
-    committedAt: row.committed_at,
     entity: hints.entity ?? row.aggregate_type,
     entityId: String(hints.entityId ?? row.aggregate_id),
-    eventId: row.id,
-    invalidate: hints.invalidate,
     operation: row.operation,
+  };
+  return validateRealtimeEvent({
+    aggregateId: eventIdentity.aggregateId,
+    committedAt: row.committed_at,
+    entity: eventIdentity.entity,
+    entityId: eventIdentity.entityId,
+    eventId: row.id,
+    invalidate: resolveRealtimeInvalidations(eventIdentity),
+    operation: eventIdentity.operation,
     resourceVersion: row.resource_version,
     schemaVersion: 1,
     scope: hints.scope ?? {
@@ -203,6 +210,47 @@ export class SyntheticRealtimeEventStore {
 
     while (this.deliveries.length > this.retentionLimit) this.deliveries.shift();
     return { committed: true, events, resource };
+  }
+
+  commitContractEvent({
+    aggregateId,
+    commit = true,
+    entity,
+    entityId,
+    operation,
+    pruid,
+    resourceVersion,
+  }) {
+    const scopePruid = String(pruid);
+    if (!commit) return { committed: false, events: [] };
+
+    const sequence = (this.sequences.get(scopePruid) ?? 0) + 1;
+    this.sequences.set(scopePruid, sequence);
+    const eventIdentity = {
+      aggregateId: String(aggregateId),
+      entity,
+      entityId: String(entityId),
+      operation,
+    };
+    const event = validateRealtimeEvent({
+      ...eventIdentity,
+      committedAt: new Date().toISOString(),
+      eventId: crypto.randomUUID(),
+      invalidate: resolveRealtimeInvalidations(eventIdentity),
+      resourceVersion,
+      schemaVersion: 1,
+      scope: { kind: "operating-province", pruids: [scopePruid] },
+      sequence,
+    });
+    this.deliveryOrdinal += 1;
+    this.deliveries.push({
+      event,
+      ordinal: this.deliveryOrdinal,
+      outboxId: event.eventId,
+      pruid: scopePruid,
+    });
+    while (this.deliveries.length > this.retentionLimit) this.deliveries.shift();
+    return { committed: true, events: [event] };
   }
 
   async readDispatchBatch({ afterCommittedAt = 0, limit = 100 } = {}) {
