@@ -7,15 +7,16 @@ import {
   getWorkspaceReviewInvalidationTargets,
 } from "../../src/lib/realtime/workspaceRealtime.js";
 
-test("Issue 104 maps comment CRUD to only the affected submission thread", () => {
+test("Issue 105 maps assigned-label CRUD to the selected submission and its branch", () => {
   const identity = {
     aggregateId: "submission-123",
-    entity: "workspace.comment",
-    entityId: "comment-456",
+    entity: "workspace.label",
+    entityId: "label-456",
   };
 
   assert.deepEqual(resolveRealtimeInvalidations(identity), [
-    "workspace:comments:submission-123",
+    "workspace:labels:submission-123",
+    "workspace:branch:submission-123",
   ]);
   assert.deepEqual(getWorkspaceReviewInvalidationKeys("submission-123"), [
     "workspace:comments:submission-123",
@@ -24,40 +25,26 @@ test("Issue 104 maps comment CRUD to only the affected submission thread", () =>
   assert.deepEqual(getWorkspaceReviewInvalidationTargets(
     resolveRealtimeInvalidations(identity),
     "submission-123",
-  ), ["comments"]);
-  assert.deepEqual(getWorkspaceReviewInvalidationTargets(
-    resolveRealtimeInvalidations(identity),
-    "submission-other",
-  ), []);
+  ), ["labels"]);
 });
 
 test.each(["create", "update", "delete"])(
-  "Issue 104 synthetic %s events carry no comment body",
+  "Issue 105 synthetic %s events keep label data behind authorized HTTP",
   (operation) => {
     const store = new SyntheticRealtimeEventStore();
     const { events } = store.commitContractEvent({
       aggregateId: "submission-123",
-      entity: "workspace.comment",
-      entityId: "comment-456",
+      entity: "workspace.label",
+      entityId: "label-456",
       operation,
       pruid: "24",
-      resourceVersion: new Date().toISOString(),
+      resourceVersion: 7,
     });
 
-    assert.deepEqual(Object.keys(events[0]).sort(), [
-      "aggregateId",
-      "committedAt",
-      "entity",
-      "entityId",
-      "eventId",
-      "invalidate",
-      "operation",
-      "resourceVersion",
-      "schemaVersion",
-      "scope",
-      "sequence",
-    ]);
-    assert.equal(events[0].entityId, "comment-456");
-    assert.equal(Object.hasOwn(events[0], "content"), false);
+    assert.equal(events[0].entityId, "label-456");
+    assert.equal(events[0].resourceVersion, 7);
+    assert.equal(Object.hasOwn(events[0], "name"), false);
+    assert.equal(Object.hasOwn(events[0], "color"), false);
+    assert.equal(Object.hasOwn(events[0], "labels"), false);
   },
 );

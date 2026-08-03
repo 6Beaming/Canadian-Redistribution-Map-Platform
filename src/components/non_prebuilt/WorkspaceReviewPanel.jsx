@@ -19,6 +19,7 @@ import {
   deleteWorkspaceComment,
   deleteWorkspaceLabelCatalog,
   getWorkspaceComments,
+  getWorkspaceLabels,
   getWorkspaceReviewState,
   saveWorkspaceLabelCatalog,
   saveWorkspaceLabels,
@@ -831,11 +832,12 @@ export function WorkspaceReviewPanel({
   const reviewerEmails = [...new Set([reviewerEmail, ...availableReviewerEmails])];
   const [review, setReview] = useState(EMPTY_REVIEW);
   const [reviewError, setReviewError] = useState("");
-  const refreshSequence = useRef({ all: 0, comments: 0 });
+  const refreshSequence = useRef({ all: 0, comments: 0, labels: 0 });
 
   async function refreshReview({ rethrow = false } = {}) {
     const sequence = refreshSequence.current.all + 1;
     const commentsSequence = refreshSequence.current.comments;
+    const labelsSequence = refreshSequence.current.labels;
     refreshSequence.current.all = sequence;
     try {
       const nextReview = await getWorkspaceReviewState(submission.id);
@@ -847,7 +849,9 @@ export function WorkspaceReviewPanel({
           comments: refreshSequence.current.comments === commentsSequence
             ? nextReview.comments ?? []
             : (isCurrentSubmission ? current.comments : []),
-          labels: nextReview.labels ?? [],
+          labels: refreshSequence.current.labels === labelsSequence
+            ? nextReview.labels ?? []
+            : (isCurrentSubmission ? current.labels : []),
           labelCatalog: nextReview.labelCatalog ?? [],
           archiveRequest: nextReview.archiveRequest ?? null,
           collaborationWarning: nextReview.collaborationWarning ?? "",
@@ -881,6 +885,24 @@ export function WorkspaceReviewPanel({
     }
   }
 
+  async function refreshLabels() {
+    const sequence = refreshSequence.current.labels + 1;
+    refreshSequence.current.labels = sequence;
+    try {
+      const labels = await getWorkspaceLabels(submission.id);
+      if (refreshSequence.current.labels !== sequence) return;
+      setReview((current) => String(current.submissionId) === String(submission.id)
+        ? { ...current, labels: labels ?? [] }
+        : { ...EMPTY_REVIEW, submissionId: submission.id, labels: labels ?? [] });
+      setReviewError("");
+    } catch (error) {
+      if (refreshSequence.current.labels === sequence) {
+        setReviewError(error.message || "Unable to refresh Workspace labels.");
+      }
+      throw error;
+    }
+  }
+
   async function handleReviewInvalidation({ hints, resync }) {
     if (resync) {
       await refreshReview({ rethrow: true });
@@ -888,6 +910,7 @@ export function WorkspaceReviewPanel({
     }
     const targets = getWorkspaceReviewInvalidationTargets(hints, submission.id);
     if (targets.includes("comments")) await refreshComments();
+    if (targets.includes("labels")) await refreshLabels();
   }
 
   useEffect(() => {
@@ -900,6 +923,7 @@ export function WorkspaceReviewPanel({
     return () => {
       refreshSequence.current.all += 1;
       refreshSequence.current.comments += 1;
+      refreshSequence.current.labels += 1;
       unsubscribe();
     };
   }, [submission.id]);

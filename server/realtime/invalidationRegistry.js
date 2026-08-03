@@ -7,6 +7,10 @@ const INVALIDATION_RESOLVERS = Object.freeze({
   "workspace.comment": ({ aggregateId }) => [
     `workspace:comments:${aggregateId}`,
   ],
+  "workspace.label": ({ aggregateId }) => [
+    `workspace:labels:${aggregateId}`,
+    `workspace:branch:${aggregateId}`,
+  ],
 });
 
 export class RealtimeInvalidationRegistryError extends Error {

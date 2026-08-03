@@ -5,6 +5,7 @@ export const WORKSPACE_LIST_INVALIDATION_KEYS = Object.freeze([
 
 const WORKSPACE_REVIEW_KEY_BUILDERS = Object.freeze({
   comments: (submissionId) => `workspace:comments:${submissionId}`,
+  labels: (submissionId) => `workspace:labels:${submissionId}`,
 });
 
 export function getWorkspaceReviewInvalidationKeys(submissionId) {
