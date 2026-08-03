@@ -836,28 +836,29 @@ export function WorkspaceReviewPanel({
   const reviewerEmails = [...new Set([reviewerEmail, ...availableReviewerEmails])];
   const [review, setReview] = useState(EMPTY_REVIEW);
   const [reviewError, setReviewError] = useState("");
-  const refreshSequence = useRef({ all: 0, comments: 0, labelCatalog: 0, labels: 0 });
+  const refreshSequence = useRef(0);
+  const targetedRefreshSequence = useRef({ comments: 0, labelCatalog: 0, labels: 0 });
 
   async function refreshReview({ rethrow = false } = {}) {
-    const sequence = refreshSequence.current.all + 1;
-    const commentsSequence = refreshSequence.current.comments;
-    const labelCatalogSequence = refreshSequence.current.labelCatalog;
-    const labelsSequence = refreshSequence.current.labels;
-    refreshSequence.current.all = sequence;
+    const sequence = refreshSequence.current + 1;
+    const commentsSequence = targetedRefreshSequence.current.comments;
+    const labelCatalogSequence = targetedRefreshSequence.current.labelCatalog;
+    const labelsSequence = targetedRefreshSequence.current.labels;
+    refreshSequence.current = sequence;
     try {
       const nextReview = await getWorkspaceReviewState(submission.id);
-      if (refreshSequence.current.all !== sequence) return;
+      if (refreshSequence.current !== sequence) return;
       setReview((current) => {
         const isCurrentSubmission = String(current.submissionId) === String(submission.id);
         return {
           submissionId: submission.id,
-          comments: refreshSequence.current.comments === commentsSequence
+          comments: targetedRefreshSequence.current.comments === commentsSequence
             ? nextReview.comments ?? []
             : (isCurrentSubmission ? current.comments : []),
-          labels: refreshSequence.current.labels === labelsSequence
+          labels: targetedRefreshSequence.current.labels === labelsSequence
             ? nextReview.labels ?? []
             : (isCurrentSubmission ? current.labels : []),
-          labelCatalog: refreshSequence.current.labelCatalog === labelCatalogSequence
+          labelCatalog: targetedRefreshSequence.current.labelCatalog === labelCatalogSequence
             ? nextReview.labelCatalog ?? []
             : (isCurrentSubmission ? current.labelCatalog : []),
           archiveRequest: nextReview.archiveRequest ?? null,
@@ -867,7 +868,7 @@ export function WorkspaceReviewPanel({
       setReviewError("");
     } catch (error) {
       console.error("Unable to load workspace review:", error);
-      if (refreshSequence.current.all === sequence) {
+      if (refreshSequence.current === sequence) {
         setReviewError(error.message || "Unable to refresh Workspace collaboration.");
       }
       if (rethrow) throw error;
@@ -875,17 +876,17 @@ export function WorkspaceReviewPanel({
   }
 
   async function refreshComments() {
-    const sequence = refreshSequence.current.comments + 1;
-    refreshSequence.current.comments = sequence;
+    const sequence = targetedRefreshSequence.current.comments + 1;
+    targetedRefreshSequence.current.comments = sequence;
     try {
       const comments = await getWorkspaceComments(submission.id);
-      if (refreshSequence.current.comments !== sequence) return;
+      if (targetedRefreshSequence.current.comments !== sequence) return;
       setReview((current) => String(current.submissionId) === String(submission.id)
         ? { ...current, comments: comments ?? [] }
         : { ...EMPTY_REVIEW, submissionId: submission.id, comments: comments ?? [] });
       setReviewError("");
     } catch (error) {
-      if (refreshSequence.current.comments === sequence) {
+      if (targetedRefreshSequence.current.comments === sequence) {
         setReviewError(error.message || "Unable to refresh Workspace comments.");
       }
       throw error;
@@ -893,17 +894,17 @@ export function WorkspaceReviewPanel({
   }
 
   async function refreshLabels() {
-    const sequence = refreshSequence.current.labels + 1;
-    refreshSequence.current.labels = sequence;
+    const sequence = targetedRefreshSequence.current.labels + 1;
+    targetedRefreshSequence.current.labels = sequence;
     try {
       const labels = await getWorkspaceLabels(submission.id);
-      if (refreshSequence.current.labels !== sequence) return;
+      if (targetedRefreshSequence.current.labels !== sequence) return;
       setReview((current) => String(current.submissionId) === String(submission.id)
         ? { ...current, labels: labels ?? [] }
         : { ...EMPTY_REVIEW, submissionId: submission.id, labels: labels ?? [] });
       setReviewError("");
     } catch (error) {
-      if (refreshSequence.current.labels === sequence) {
+      if (targetedRefreshSequence.current.labels === sequence) {
         setReviewError(error.message || "Unable to refresh Workspace labels.");
       }
       throw error;
@@ -911,13 +912,13 @@ export function WorkspaceReviewPanel({
   }
 
   async function refreshCustomLabels() {
-    const labelCatalogSequence = refreshSequence.current.labelCatalog + 1;
-    const labelsSequence = refreshSequence.current.labels + 1;
-    refreshSequence.current.labelCatalog = labelCatalogSequence;
-    refreshSequence.current.labels = labelsSequence;
+    const labelCatalogSequence = targetedRefreshSequence.current.labelCatalog + 1;
+    const labelsSequence = targetedRefreshSequence.current.labels + 1;
+    targetedRefreshSequence.current.labelCatalog = labelCatalogSequence;
+    targetedRefreshSequence.current.labels = labelsSequence;
     try {
       const labelCatalog = await getWorkspaceLabelCatalog(submission.id);
-      if (refreshSequence.current.labelCatalog !== labelCatalogSequence) return;
+      if (targetedRefreshSequence.current.labelCatalog !== labelCatalogSequence) return;
       setReview((current) => {
         const isCurrentSubmission = String(current.submissionId) === String(submission.id);
         const currentLabels = isCurrentSubmission ? current.labels : [];
@@ -925,14 +926,14 @@ export function WorkspaceReviewPanel({
           ...(isCurrentSubmission ? current : EMPTY_REVIEW),
           submissionId: submission.id,
           labelCatalog: labelCatalog ?? [],
-          labels: refreshSequence.current.labels === labelsSequence
+          labels: targetedRefreshSequence.current.labels === labelsSequence
             ? reconcileWorkspaceCustomLabels(currentLabels, labelCatalog ?? [])
             : currentLabels,
         };
       });
       setReviewError("");
     } catch (error) {
-      if (refreshSequence.current.labelCatalog === labelCatalogSequence) {
+      if (targetedRefreshSequence.current.labelCatalog === labelCatalogSequence) {
         setReviewError(error.message || "Unable to refresh custom Workspace labels.");
       }
       throw error;
@@ -958,10 +959,10 @@ export function WorkspaceReviewPanel({
       onRecover: refreshReview,
     });
     return () => {
-      refreshSequence.current.all += 1;
-      refreshSequence.current.comments += 1;
-      refreshSequence.current.labelCatalog += 1;
-      refreshSequence.current.labels += 1;
+      refreshSequence.current += 1;
+      targetedRefreshSequence.current.comments += 1;
+      targetedRefreshSequence.current.labelCatalog += 1;
+      targetedRefreshSequence.current.labels += 1;
       unsubscribe();
     };
   }, [submission.id]);
