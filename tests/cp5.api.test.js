@@ -3,15 +3,19 @@ import http from "node:http";
 import { afterEach, test } from "@jest/globals";
 import app from "../server/app.js";
 import { setSupabaseTestDoubles } from "../server/lib/supabase.js";
+import { setResourceScopeTestDoubles } from "../server/lib/authorization/resourceScopeGuard.js";
 
 const COOKIE = "crmp_access_token=access-token";
-const commissioner = { id: "commissioner-1", email: "eric@example.com", role: "commissioner" };
+const commissioner = { id: "commissioner-1", email: "eric@example.com", role: "commissioner", province: "NL" };
 const publicUser = {
   id: "public-1", email: "public@example.com", role: "public_user",
   first_name: "Public", last_name: "User", province: "NL", postal_code: "A1A 1A1", phone: "7095550100",
 };
 
-afterEach(() => setSupabaseTestDoubles(null));
+afterEach(() => {
+  setSupabaseTestDoubles(null);
+  setResourceScopeTestDoubles(null);
+});
 
 async function request(path, { method = "GET", body, cookie = COOKIE } = {}) {
   const server = http.createServer(app);
@@ -43,6 +47,9 @@ async function request(path, { method = "GET", body, cookie = COOKIE } = {}) {
 }
 
 function authDoubles(profile, admin) {
+  setResourceScopeTestDoubles({
+    getProfileForDguid: async () => ({ pruid: "10" }),
+  });
   setSupabaseTestDoubles({
     getSupabaseClient: () => ({
       auth: { getUser: async () => ({ data: { user: profile }, error: null }) },
@@ -60,6 +67,16 @@ function listAdmin(rows, capture = {}) {
           select(columns) { capture.profileColumns = columns; return this; },
           async in(_field, ids) {
             return { data: ids.map((id) => ({ id, email: `${id}@example.com` })), error: null };
+          },
+        };
+      }
+      if (table === "submission_scope_pruids") {
+        return {
+          select() { return this; },
+          eq() { return this; },
+          insert() { return this; },
+          then(resolve, reject) {
+            return Promise.resolve({ data: [], error: null }).then(resolve, reject);
           },
         };
       }
