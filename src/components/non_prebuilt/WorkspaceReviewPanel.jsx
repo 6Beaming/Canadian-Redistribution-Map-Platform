@@ -19,6 +19,7 @@ import {
   deleteWorkspaceComment,
   deleteWorkspaceLabelCatalog,
   getWorkspaceComments,
+  getWorkspaceLabelCatalog,
   getWorkspaceLabels,
   getWorkspaceReviewState,
   saveWorkspaceLabelCatalog,
@@ -28,7 +29,10 @@ import {
   updateWorkspaceArchiveAssignees,
   WORKSPACE_STATUS,
 } from "@/services/workspaceApi.js";
-import { getWorkspaceReviewInvalidationTargets } from "@/lib/realtime/workspaceRealtime.js";
+import {
+  getWorkspaceReviewInvalidationTargets,
+  reconcileWorkspaceCustomLabels,
+} from "@/lib/realtime/workspaceRealtime.js";
 
 function formatTimestamp(value) {
   const date = new Date(value);
@@ -832,11 +836,12 @@ export function WorkspaceReviewPanel({
   const reviewerEmails = [...new Set([reviewerEmail, ...availableReviewerEmails])];
   const [review, setReview] = useState(EMPTY_REVIEW);
   const [reviewError, setReviewError] = useState("");
-  const refreshSequence = useRef({ all: 0, comments: 0, labels: 0 });
+  const refreshSequence = useRef({ all: 0, comments: 0, labelCatalog: 0, labels: 0 });
 
   async function refreshReview({ rethrow = false } = {}) {
     const sequence = refreshSequence.current.all + 1;
     const commentsSequence = refreshSequence.current.comments;
+    const labelCatalogSequence = refreshSequence.current.labelCatalog;
     const labelsSequence = refreshSequence.current.labels;
     refreshSequence.current.all = sequence;
     try {
@@ -852,7 +857,9 @@ export function WorkspaceReviewPanel({
           labels: refreshSequence.current.labels === labelsSequence
             ? nextReview.labels ?? []
             : (isCurrentSubmission ? current.labels : []),
-          labelCatalog: nextReview.labelCatalog ?? [],
+          labelCatalog: refreshSequence.current.labelCatalog === labelCatalogSequence
+            ? nextReview.labelCatalog ?? []
+            : (isCurrentSubmission ? current.labelCatalog : []),
           archiveRequest: nextReview.archiveRequest ?? null,
           collaborationWarning: nextReview.collaborationWarning ?? "",
         };
@@ -903,6 +910,35 @@ export function WorkspaceReviewPanel({
     }
   }
 
+  async function refreshCustomLabels() {
+    const labelCatalogSequence = refreshSequence.current.labelCatalog + 1;
+    const labelsSequence = refreshSequence.current.labels + 1;
+    refreshSequence.current.labelCatalog = labelCatalogSequence;
+    refreshSequence.current.labels = labelsSequence;
+    try {
+      const labelCatalog = await getWorkspaceLabelCatalog(submission.id);
+      if (refreshSequence.current.labelCatalog !== labelCatalogSequence) return;
+      setReview((current) => {
+        const isCurrentSubmission = String(current.submissionId) === String(submission.id);
+        const currentLabels = isCurrentSubmission ? current.labels : [];
+        return {
+          ...(isCurrentSubmission ? current : EMPTY_REVIEW),
+          submissionId: submission.id,
+          labelCatalog: labelCatalog ?? [],
+          labels: refreshSequence.current.labels === labelsSequence
+            ? reconcileWorkspaceCustomLabels(currentLabels, labelCatalog ?? [])
+            : currentLabels,
+        };
+      });
+      setReviewError("");
+    } catch (error) {
+      if (refreshSequence.current.labelCatalog === labelCatalogSequence) {
+        setReviewError(error.message || "Unable to refresh custom Workspace labels.");
+      }
+      throw error;
+    }
+  }
+
   async function handleReviewInvalidation({ hints, resync }) {
     if (resync) {
       await refreshReview({ rethrow: true });
@@ -910,6 +946,7 @@ export function WorkspaceReviewPanel({
     }
     const targets = getWorkspaceReviewInvalidationTargets(hints, submission.id);
     if (targets.includes("comments")) await refreshComments();
+    if (targets.includes("labelCatalog")) await refreshCustomLabels();
     if (targets.includes("labels")) await refreshLabels();
   }
 
@@ -923,6 +960,7 @@ export function WorkspaceReviewPanel({
     return () => {
       refreshSequence.current.all += 1;
       refreshSequence.current.comments += 1;
+      refreshSequence.current.labelCatalog += 1;
       refreshSequence.current.labels += 1;
       unsubscribe();
     };

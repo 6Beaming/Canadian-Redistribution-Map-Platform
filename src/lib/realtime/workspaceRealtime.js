@@ -5,6 +5,7 @@ export const WORKSPACE_LIST_INVALIDATION_KEYS = Object.freeze([
 
 const WORKSPACE_REVIEW_KEY_BUILDERS = Object.freeze({
   comments: (submissionId) => `workspace:comments:${submissionId}`,
+  labelCatalog: (submissionId) => `workspace:custom-labels:${submissionId}`,
   labels: (submissionId) => `workspace:labels:${submissionId}`,
 });
 
@@ -39,4 +40,16 @@ export function reconcileWorkspaceSubmission(current, event, submission) {
   }
 
   return [...remaining, submission].sort(newestFirst);
+}
+
+export function reconcileWorkspaceCustomLabels(selectedLabels, labelCatalog) {
+  const customLabelsById = new Map(labelCatalog
+    .filter((label) => label.custom)
+    .map((label) => [String(label.id), label]));
+
+  return selectedLabels.flatMap((label) => {
+    if (!label.custom) return [label];
+    const definition = customLabelsById.get(String(label.id));
+    return definition ? [{ ...label, name: definition.name, color: definition.color }] : [];
+  });
 }
