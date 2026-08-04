@@ -738,7 +738,7 @@ export default function CommissionerWorkspace() {
   }
 
   if (isLoading) {
-    return <RouteLoadingPage label="Loading Workspace submissions…" />;
+    return <RouteLoadingPage />;
   }
 
   return (

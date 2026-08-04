@@ -181,7 +181,7 @@ export default function WorkspaceReview() {
     return <main className="workspace-review-error"><h1>Workspace unavailable</h1><p>{error}</p></main>;
   }
   if (!submission || String(submission.id) !== String(submissionId)) {
-    return <RouteLoadingPage label="Loading submission workspace…" />;
+    return <RouteLoadingPage />;
   }
 
   return (
@@ -202,7 +202,7 @@ export default function WorkspaceReview() {
           ) : (
             <div className="route-loading-overlay__indicator" role="status">
               <span className="route-loading-overlay__spinner" aria-hidden="true" />
-              <span>Loading map detail…</span>
+              <span>Loading...</span>
             </div>
           )}
           {normalizeType(submission.type) === "counter-proposal" ? (

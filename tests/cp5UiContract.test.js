@@ -21,7 +21,7 @@ test("Workspace waits behind the shared full-page loading UI before rendering it
   const exact = workspace.indexOf("await getWorkspaceSubmission(focusId");
   const full = workspace.indexOf("await getWorkspaceSubmissions", exact);
   assert.ok(exact >= 0 && full > exact);
-  assert.match(workspace, /<RouteLoadingPage label="Loading Workspace submissions…"/);
+  assert.match(workspace, /if \(isLoading\) \{[\s\S]*return <RouteLoadingPage \/>/);
   assert.doesNotMatch(workspace, /setWorkspaceSubmissions\(\[focused\]\)/);
 });
 
@@ -36,7 +36,7 @@ test("Map pages render during profile hydration and Archived Tree waits for its 
   assert.match(archived, /isLoading=\{isLoading\}/);
   assert.match(archivedCanvas, /const \[hasRendered, setHasRendered\] = useState\(false\)/);
   assert.match(archivedCanvas, /isLoading \|\| !hasRendered/);
-  assert.match(archivedCanvas, /Loading archived tree…/);
+  assert.match(archivedCanvas, /<span>Loading\.\.\.<\/span>/);
 });
 
 test("Workspace detail hydrates one exact row before its optional sibling list", () => {
@@ -46,7 +46,7 @@ test("Workspace detail hydrates one exact row before its optional sibling list",
   const full = review.indexOf("getWorkspaceSubmissions", hydrate);
   assert.ok(exact >= 0 && hydrate > exact && full > hydrate);
   assert.equal(review.includes("getDaProfiles"), false);
-  assert.match(review, /<RouteLoadingPage label="Loading submission workspace…"/);
+  assert.match(review, /return <RouteLoadingPage \/>/);
 });
 
 test("Creating an Archive Request updates the active review without navigating away", () => {
@@ -115,6 +115,35 @@ test("CP5 navigation, readiness loading, and export entry points remain wired", 
   assert.equal(table.includes("RouteLoadingOverlay"), false);
   assert.equal(publicHome.includes("RouteLoadingOverlay"), false);
   assert.equal(dashboard.includes("RouteLoadingOverlay"), false);
+});
+
+test("Shared loading UI overlays and blocks page content while leaving the header active", () => {
+  const app = read("src/App.jsx");
+  const header = read("src/pages/Header.jsx");
+  const overlay = read("src/components/non_prebuilt/RouteLoadingOverlay.jsx");
+  const loadingPage = read("src/components/non_prebuilt/RouteLoadingPage.jsx");
+  const archivedCanvas = read("src/components/non_prebuilt/ArchivedTreeCanvas.jsx");
+  const review = read("src/pages/WorkspaceReview.jsx");
+  const globals = read("src/styles/globals.css");
+  const archivedStyles = read("src/styles/archive-tree.css");
+
+  assert.match(app, /<Header[\s\S]*<div className="app-route-content">[\s\S]*<RouteLoadingOverlay \/>/);
+  assert.ok(app.indexOf("<Header") < app.indexOf("<RouteLoadingOverlay />"));
+  assert.match(overlay, /aria-label="Loading"[\s\S]*<span>Loading\.\.\.<\/span>/);
+  assert.match(loadingPage, /<span>\{error \|\| "Loading\.\.\."\}<\/span>/);
+  assert.match(archivedCanvas, /route-loading-overlay__spinner[\s\S]*<span>Loading\.\.\.<\/span>/);
+  assert.match(review, /route-loading-overlay__spinner[\s\S]*<span>Loading\.\.\.<\/span>/);
+  assert.doesNotMatch(
+    [app, loadingPage, archivedCanvas].join("\n"),
+    /RouteLoadingPage label=|Loading (?:page|archived tree|public map|commissioner map)/,
+  );
+  assert.match(globals, /\.app-route-content \{[\s\S]*z-index: 0;[\s\S]*isolation: isolate;/);
+  assert.match(
+    globals,
+    /\.route-loading-overlay,[\s\S]*\.route-loading-page \{[\s\S]*z-index: 40;[\s\S]*inset: 3\.5rem 0 0;[\s\S]*background: rgba\(226, 232, 240, 0\.58\);[\s\S]*pointer-events: all;/,
+  );
+  assert.match(header, /<header className="header relative z-50[^"]*bg-background/);
+  assert.match(archivedStyles, /\.archive-tree-canvas-loading \{[\s\S]*background: rgba\(226, 232, 240, 0\.58\);/);
 });
 
 test("Workspace label and catalog mutations stay scoped, ordered, and optimistic", () => {

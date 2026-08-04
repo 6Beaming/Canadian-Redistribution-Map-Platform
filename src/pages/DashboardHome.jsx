@@ -183,7 +183,7 @@ export default function DashboardHome({ mapSearchTarget = null }) {
   }, []);
 
   if (!initialLoad.ready && initialLoad.error) {
-    return <RouteLoadingPage label="Loading commissioner map…" error={initialLoad.error} />;
+    return <RouteLoadingPage error={initialLoad.error} />;
   }
 
   return (

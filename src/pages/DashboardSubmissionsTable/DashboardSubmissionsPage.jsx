@@ -96,7 +96,7 @@ export default function DashBoardSubmissionsPage() {
     };
   }, []);
 
-  if (loadState.loading) return <RouteLoadingPage label="Loading user submissions…" />;
+  if (loadState.loading) return <RouteLoadingPage />;
   if (loadState.error) return <RouteLoadingPage error={loadState.error} />;
 
   return (

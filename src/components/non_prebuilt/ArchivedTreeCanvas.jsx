@@ -410,7 +410,7 @@ export function ArchivedTreeCanvas({ categories, isLoading = false, selectedVers
         <div className="archive-tree-canvas-loading" role="status" aria-live="polite">
           <div className="route-loading-overlay__indicator">
             <span className="route-loading-overlay__spinner" aria-hidden="true" />
-            <span>Loading archived tree…</span>
+            <span>Loading...</span>
           </div>
         </div>
       ) : (

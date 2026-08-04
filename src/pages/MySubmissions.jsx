@@ -190,7 +190,7 @@ export default function MySubmissions() {
     return null;
   }
 
-  if (isLoading) return <RouteLoadingPage label="Loading your submissions…" />;
+  if (isLoading) return <RouteLoadingPage />;
 
   return (
     <div className="px-[clamp(0.5rem,2vw,1.5rem)] py-[clamp(1rem,3vw,1.5rem)]">
