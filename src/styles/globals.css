@@ -366,12 +366,19 @@ button:disabled {
 .commissioner-submissions-toolbar__date-group,
 .commissioner-submissions-toolbar__actions {
   display: flex;
-  width: clamp(17rem, 31vw, 22.75rem);
   max-width: 100%;
   min-width: 0;
   flex: 0 1 auto;
   flex-wrap: nowrap;
   gap: clamp(0.5rem, 1.4vw, 0.75rem);
+}
+
+.commissioner-submissions-toolbar__date-group {
+  width: clamp(17rem, 31vw, 22.75rem);
+}
+
+.commissioner-submissions-toolbar__actions {
+  width: clamp(25rem, 38vw, 31rem);
 }
 
 .commissioner-submissions-toolbar__control {
@@ -407,4 +414,28 @@ button:disabled {
 
 .commissioner-submissions-toolbar__analytics {
   justify-content: flex-start;
+  border-color: #a9c7f2;
+  background: #e8f0fe;
+  color: #1769d2;
+  font-weight: 650;
+  text-shadow: none;
+}
+
+.commissioner-submissions-toolbar__analytics:hover {
+  background: #dce9fd;
+}
+
+.commissioner-submissions-toolbar__export {
+  justify-content: flex-start;
+  border-color: #1a73e8;
+  background: #1a73e8;
+  color: #fff;
+  font-weight: 650;
+  text-shadow: none;
+}
+
+.commissioner-submissions-toolbar__export:hover {
+  border-color: #1769d2;
+  background: #1769d2;
+  color: #fff;
 }

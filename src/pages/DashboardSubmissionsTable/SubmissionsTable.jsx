@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Fragment } from "react";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, Download } from "lucide-react";
 import {
   flexRender,
   getCoreRowModel,
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DatePickerSimple } from "@/components/ui/datePicker";
 import { subDays } from "date-fns";
+import { exportCommissionerSubmissionsCsv } from "@/services/exportApi.js";
 import {
   Table,
   TableBody,
@@ -41,12 +42,21 @@ function getSubmissionTypeBucket(type) {
   return "counterproposal";
 }
 
+function isWithinDateRange(value, dateStart, dateEnd) {
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return false;
+  const start = dateStart ? new Date(dateStart).setHours(0, 0, 0, 0) : Number.NEGATIVE_INFINITY;
+  const end = dateEnd ? new Date(dateEnd).setHours(23, 59, 59, 999) : Number.POSITIVE_INFINITY;
+  return timestamp >= start && timestamp <= end;
+}
+
 export default function SubmissionsTable({ columns, data, onOpenAnalytics, onRowClick }) {
   const [sorting, setSorting] = React.useState([]);
   const [columnFilters, setColumnFilters] = React.useState([]);
   const [dateStart, setDateStart] = React.useState(subDays(new Date(), 30));
   const [dateEnd, setDateEnd] = React.useState(new Date());
   const [hoveredRowId, setHoveredRowId] = React.useState(null);
+  const [exportState, setExportState] = React.useState({ pending: false, error: "" });
   const [visibleSubmissions, setVisibleSubmissions] = React.useState({
     comments: true,
     objections: true,
@@ -54,8 +64,11 @@ export default function SubmissionsTable({ columns, data, onOpenAnalytics, onRow
   });
 
   const filteredData = React.useMemo(
-    () => data.filter((submission) => visibleSubmissions[getSubmissionTypeBucket(submission.type)]),
-    [data, visibleSubmissions],
+    () => data.filter((submission) => (
+      visibleSubmissions[getSubmissionTypeBucket(submission.type)]
+      && isWithinDateRange(submission.submittedAt, dateStart, dateEnd)
+    )),
+    [data, dateEnd, dateStart, visibleSubmissions],
   );
 
   const table = useReactTable({
@@ -73,6 +86,22 @@ export default function SubmissionsTable({ columns, data, onOpenAnalytics, onRow
     },
     initialState: { pagination: { pageSize: 10 } },
   });
+
+  async function exportCsv() {
+    if (exportState.pending) return;
+    const submissionIds = table.getPrePaginationRowModel().rows
+      .map((row) => String(row.original.id));
+    setExportState({ pending: true, error: "" });
+    try {
+      await exportCommissionerSubmissionsCsv(submissionIds);
+      setExportState({ pending: false, error: "" });
+    } catch (error) {
+      setExportState({
+        pending: false,
+        error: error.message || "Unable to export filtered submissions.",
+      });
+    }
+  }
 
   return (
     <div className="min-w-0">
@@ -143,6 +172,17 @@ export default function SubmissionsTable({ columns, data, onOpenAnalytics, onRow
           <Button
             type="button"
             variant="outline"
+            className="commissioner-submissions-toolbar__control commissioner-submissions-toolbar__export h-10"
+            disabled={exportState.pending}
+            onClick={() => void exportCsv()}
+          >
+            <Download className="h-4 w-4" aria-hidden="true" />
+            {exportState.pending ? "Preparing…" : "Export CSV"}
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
             className="commissioner-submissions-toolbar__control commissioner-submissions-toolbar__analytics h-10"
             onClick={onOpenAnalytics}
           >
@@ -151,6 +191,10 @@ export default function SubmissionsTable({ columns, data, onOpenAnalytics, onRow
           </Button>
         </div>
       </div>
+
+      {exportState.error ? (
+        <p className="mb-3 text-sm text-red-700" role="alert">{exportState.error}</p>
+      ) : null}
 
       <div className="submissions-table-shell rounded-md border">
         <Table className="min-w-[60rem]">

@@ -23,7 +23,7 @@ export function DatePickerSimple({ date, setDate, className }) {
             className={className ?? "justify-start font-normal"}
           >
             <span className="min-w-0 truncate">
-              {date ? format(date, "PPP") : "Pick a date"}
+              {date ? format(date, "MMMM d, yyyy") : "Pick a date"}
             </span>
             <ChevronDown className="ml-auto h-4 w-4 shrink-0" aria-hidden="true" />
           </Button>

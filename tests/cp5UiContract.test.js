@@ -76,6 +76,8 @@ test("CP5 navigation, readiness loading, and export entry points remain wired", 
   const workspace = read("src/pages/CommissionerWorkspace.jsx");
   const archived = read("src/pages/ArchivedTree.jsx");
   const graphs = read("src/pages/DashboardGraphs.jsx");
+  const submissionsTable = read("src/pages/DashboardSubmissionsTable/SubmissionsTable.jsx");
+  const datePicker = read("src/components/ui/datePicker.jsx");
   const publicHome = read("src/pages/UserHome.jsx");
   const dashboard = read("src/pages/DashboardHome.jsx");
 
@@ -91,7 +93,11 @@ test("CP5 navigation, readiness loading, and export entry points remain wired", 
   assert.match(archived, /\{ replace: true, state: location\.state \}/);
   assert.match(archived, /\/difference\?branch=[\s\S]*\{ state: location\.state \}/);
   assert.match(archived, /exportArchivedTreeJson/);
-  assert.match(graphs, /exportCommissionerSubmissionsCsv/);
+  assert.doesNotMatch(graphs, /exportCommissionerSubmissionsCsv|Export CSV/);
+  assert.match(submissionsTable, /exportCommissionerSubmissionsCsv\(submissionIds\)/);
+  assert.match(submissionsTable, /table\.getPrePaginationRowModel\(\)\.rows/);
+  assert.match(submissionsTable, /isWithinDateRange\(submission\.submittedAt, dateStart, dateEnd\)/);
+  assert.match(datePicker, /format\(date, "MMMM d, yyyy"\)/);
   [table, publicHome, dashboard].forEach((source) => assert.match(source, /RouteLoadingPage/));
   assert.equal(table.includes("RouteLoadingOverlay"), false);
   assert.equal(publicHome.includes("RouteLoadingOverlay"), false);
