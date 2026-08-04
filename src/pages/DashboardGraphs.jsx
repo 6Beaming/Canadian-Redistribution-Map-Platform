@@ -19,6 +19,15 @@ export default function DashboardGraphs() {
   const statusTotals = useMemo(() => buildSubmissionStatusTotals(submissions), [submissions]);
   const totalSubmissions = submissions.length;
 
+  const submissionCounts = useMemo(() => {;
+
+    return {
+      comments: submissions.filter((s) => s.type === "feedback").length,
+      objections: submissions.filter((s) => s.type === "objection").length,
+      counterProposals: submissions.filter((s) => s.type === "counter-proposal").length,
+    };
+  }, [submissions]);
+
   useEffect(() => {
     let mounted = true;
     getCommissionerSubmissionTableRows()
@@ -66,7 +75,50 @@ export default function DashboardGraphs() {
 
         {loadError ? <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">{loadError}</p> : null}
         <section className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-          <Card className="max-w-none"><CardHeader><CardAccent /><CardTitle>Total Submissions</CardTitle><CardDescription>All records currently available to this Commissioner.</CardDescription></CardHeader><CardContent className="gap-3"><div className="text-5xl font-bold text-[#1a73e8]">{loading ? "—" : totalSubmissions}</div><div className="inline-flex w-fit items-center gap-2 rounded-full bg-[#eef8ef] px-3 py-1 text-sm font-semibold text-[#17682b]"><UserCheck className="h-4 w-4" />Active review cycle</div></CardContent></Card>
+          <Card className="max-w-none">
+            <CardHeader><CardAccent /><CardTitle>Total Submissions</CardTitle><CardDescription>All records currently available to this Commissioner.</CardDescription></CardHeader>
+            <CardContent className="gap-3">
+              <div className="text-5xl font-bold text-[#1a73e8]">{loading ? "—" : totalSubmissions}</div>
+
+              {/*chat gpt generated frontend*/}
+              <div className="mt-5 border-t pt-4">
+                <div className="mb-3 text-sm font-semibold text-[#17324d]">
+                  Submission Breakdown
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-lg bg-blue-50 p-3 text-center">
+                    <div className="text-xl font-bold text-blue-700">
+                      {loading ? "—" : submissionCounts.comments}
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      Comments
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg bg-orange-50 p-3 text-center">
+                    <div className="text-xl font-bold text-orange-700">
+                      {loading ? "—" : submissionCounts.objections}
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      Objections
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg bg-purple-50 p-3 text-center">
+                    <div className="text-xl font-bold text-purple-700">
+                      {loading ? "—" : submissionCounts.counterProposals}
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      Counter Proposals
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="inline-flex w-fit items-center gap-2 rounded-full bg-[#eef8ef] px-3 py-1 text-sm font-semibold text-[#17682b]"><UserCheck className="h-4 w-4" />Active review cycle</div>
+            </CardContent>
+
+          </Card>
           <Card className="max-w-none"><CardHeader><CardAccent /><CardTitle>Workspace Status Distribution</CardTitle><CardDescription>Five current Submission statuses, calculated from live table rows.</CardDescription></CardHeader><CardContent className="gap-4"><div className="flex h-4 w-full overflow-hidden rounded-full bg-[#eef3fd]">{SUBMISSION_STATUS_SERIES.map((series) => <div key={series.id} title={`${series.label}: ${statusTotals[series.id]}`} style={{ width: percent(statusTotals[series.id], totalSubmissions), backgroundColor: series.color }} />)}</div><div className="grid grid-cols-1 gap-2 text-sm font-medium text-[#5f6368] sm:grid-cols-2">{SUBMISSION_STATUS_SERIES.map((series) => <div className="flex items-center justify-between gap-3" key={series.id}><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: series.color }} />{series.label}</span><span>{loading ? "—" : `${statusTotals[series.id]} (${percent(statusTotals[series.id], totalSubmissions)})`}</span></div>)}</div></CardContent></Card>
         </section>
         <SubmissionsGraph submissions={submissions} />
