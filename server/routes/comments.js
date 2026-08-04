@@ -65,6 +65,7 @@ router.get("/count", async (req, res) => {
   res.json({ totalSubmissions: count });
 });
 
+
 // Get all submissions for the Commissioner submissions table.
 router.get("/", requireCommissioner, async (req, res) => {
   const supabase = getSupabaseAdminDataClient();
