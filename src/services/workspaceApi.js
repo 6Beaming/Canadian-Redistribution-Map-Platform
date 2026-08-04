@@ -5,13 +5,20 @@ import {
     getCommissionerSubmissionTableRows,
     getSubmissionTableRowById,
 } from "@/services/submissionListsApi.js";
+import { subscribeRealtimeInvalidation } from "@/lib/realtime/realtimeInvalidation.js";
 import {
+    getWorkspaceReviewInvalidationKeys,
+    WORKSPACE_LIST_INVALIDATION_KEYS,
+} from "@/lib/realtime/workspaceRealtime.js";
+import {
+    getWorkspaceSubmissionStatus,
     patchWorkspaceSubmissionStatus,
 } from "@/services/workspaceStatusApi.js";
 import * as archiveRequestApi from "@/services/archiveRequestApi.js";
 
-const REALTIME_INVALIDATION_EVENT = "crmp:realtime-invalidation";
 const DURABLE_STATUS_WRITES = new Set(["accepted", "rejected"]);
+
+export { getWorkspaceSubmissionStatus };
 
 
 function handleResponse(res) {
@@ -241,9 +248,10 @@ export async function getWorkspaceReviewState(submissionId) {
     ] = await Promise.all([
         getWorkspaceComments(submissionId),
         tolerateMissingLabelMigration(getWorkspaceLabels(submissionId)),
-        // Archive Request is CP4-owned. CP5 collaboration remains usable when
-        // that optional service is not mounted or is temporarily unavailable.
-        getArchiveRequest(submissionId).catch(() => null),
+        getArchiveRequest(submissionId).catch((error) => {
+            if (error.status === 404) return null;
+            throw error;
+        }),
         tolerateMissingLabelMigration(getWorkspaceLabelCatalog(submissionId)),
     ]);
     return {
@@ -255,23 +263,64 @@ export async function getWorkspaceReviewState(submissionId) {
     };
 }
 
-export function subscribeWorkspaceState(listener) {
+export function subscribeWorkspaceState(listener, keys = "workspace:*") {
     if (typeof window === "undefined") return () => { };
     const handleFocus = () => listener();
     const handleVisibility = () => {
         if (document.visibilityState === "visible") listener();
     };
-    const handleInvalidation = (event) => {
-        const resource = event?.detail?.resource;
-        if (!resource || String(resource).startsWith("workspace")) listener();
-    };
+    const unsubscribeRealtime = subscribeRealtimeInvalidation(keys, listener);
     window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibility);
-    window.addEventListener(REALTIME_INVALIDATION_EVENT, handleInvalidation);
     return () => {
         window.removeEventListener("focus", handleFocus);
         document.removeEventListener("visibilitychange", handleVisibility);
-        window.removeEventListener(REALTIME_INVALIDATION_EVENT, handleInvalidation);
+        unsubscribeRealtime();
+    };
+}
+
+export function subscribeWorkspaceListState({ onInvalidate, onRecover = onInvalidate }) {
+    if (typeof window === "undefined") return () => { };
+    const handleFocus = () => onRecover({ event: null, reason: "focus", resync: true });
+    const handleVisibility = () => {
+        if (document.visibilityState === "visible") {
+            onRecover({ event: null, reason: "visibility", resync: true });
+        }
+    };
+    const unsubscribeRealtime = subscribeRealtimeInvalidation(
+        WORKSPACE_LIST_INVALIDATION_KEYS,
+        onInvalidate,
+    );
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+        window.removeEventListener("focus", handleFocus);
+        document.removeEventListener("visibilitychange", handleVisibility);
+        unsubscribeRealtime();
+    };
+}
+
+export function subscribeWorkspaceReviewState(
+    submissionId,
+    { onInvalidate, onRecover = onInvalidate },
+) {
+    if (typeof window === "undefined") return () => { };
+    const handleFocus = () => onRecover({ event: null, reason: "focus", resync: true });
+    const handleVisibility = () => {
+        if (document.visibilityState === "visible") {
+            onRecover({ event: null, reason: "visibility", resync: true });
+        }
+    };
+    const unsubscribeRealtime = subscribeRealtimeInvalidation(
+        getWorkspaceReviewInvalidationKeys(submissionId),
+        onInvalidate,
+    );
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+        window.removeEventListener("focus", handleFocus);
+        document.removeEventListener("visibilitychange", handleVisibility);
+        unsubscribeRealtime();
     };
 }
 
@@ -450,10 +499,6 @@ export async function commitWorkspaceAction(submission, {
             [...new Set(assignees)],
             { expectedVersion: submission.resource_version },
         );
-        if (submission) {
-            submission.status = WORKSPACE_STATUS.ARCHIVE_REQUEST;
-            submission.resource_version = Number(submission.resource_version || 1) + 1;
-        }
     } else if (action === "archive-vote-accept") {
         await voteArchiveRequest(
             submission.id,
@@ -487,7 +532,13 @@ export async function commitWorkspaceAction(submission, {
         action: actionDescription(action, reviewerEmail),
         is_closing: true,
     });
-    return { status: nextStatus, review: await getWorkspaceReviewState(submission.id) };
+    const [review, submissionStatus] = await Promise.all([
+        getWorkspaceReviewState(submission.id),
+        action === "archive-request"
+            ? getWorkspaceSubmissionStatus(submission.id)
+            : Promise.resolve(null),
+    ]);
+    return { status: nextStatus, review, submissionStatus };
 }
 
 export function canMergeArchiveRequest(request) {

@@ -1024,8 +1024,8 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
     return [];
   }, [counterProposalWorkflow.firstDguid, counterProposalWorkflow.secondDguid, counterProposalWorkflow.step, objectionWorkflow.firstDguid, objectionWorkflow.secondDguid, objectionWorkflow.step, panelView]);
 
-  if (!initialLoad.ready) {
-    return <RouteLoadingPage label="Loading public map…" error={initialLoad.error} />;
+  if (!initialLoad.ready && initialLoad.error) {
+    return <RouteLoadingPage error={initialLoad.error} />;
   }
 
   return (

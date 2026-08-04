@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Download, GitFork, Search } from "lucide-react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { ArchivedTreeCanvas } from "@/components/non_prebuilt/ArchivedTreeCanvas.jsx";
 import { ArchivedTreePanel } from "@/components/non_prebuilt/ArchivedTreePanel.jsx";
 import {
@@ -20,6 +20,7 @@ import "@/styles/archive-tree.css";
 
 export default function ArchivedTree() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [records, setRecords] = useState([]);
   const [profilesByDguid, setProfilesByDguid] = useState(new Map());
@@ -44,6 +45,7 @@ export default function ArchivedTree() {
 
   useEffect(() => {
     let isMounted = true;
+    setIsLoading(true);
     getArchiveTreeRecords()
       .then((nextRecords) => {
         if (!isMounted) return;
@@ -83,7 +85,7 @@ export default function ArchivedTree() {
       const next = new URLSearchParams(current);
       next.set("selected", version.id);
       return next;
-    }, { replace: true });
+    }, { replace: true, state: location.state });
   }
 
   function clearSelection() {
@@ -91,7 +93,7 @@ export default function ArchivedTree() {
       const next = new URLSearchParams(current);
       next.delete("selected");
       return next;
-    }, { replace: true });
+    }, { replace: true, state: location.state });
   }
 
   return (
@@ -144,6 +146,7 @@ export default function ArchivedTree() {
       <div className="archive-tree-layout">
         <ArchivedTreeCanvas
           categories={visibleCategories}
+          isLoading={isLoading}
           selectedVersionId={selectedId}
           onSelect={selectVersion}
           onOpenMap={(category) => navigate(`/dashboard?archivedMap=1&archiveCategory=${encodeURIComponent(category.id)}`)}
@@ -153,6 +156,7 @@ export default function ArchivedTree() {
           onClose={clearSelection}
           onViewDifference={(_category, branch, version) => navigate(
             `/dashboard/archivedTree/${encodeURIComponent(version.id)}/difference?branch=${encodeURIComponent(branch.key)}`,
+            { state: location.state },
           )}
           onDeleteBranch={async (branch) => {
             await deleteArchiveBranch(branch.key);

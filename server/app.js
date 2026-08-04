@@ -14,6 +14,11 @@ import submissionsRouter from "./routes/submissions.js";
 import submissionListsRouter from "./routes/submissionLists.js";
 import exportsRouter from "./routes/exports.js";
 import { requireAuth } from "./middleware/requireAuth.js";
+import { createRealtimeHarnessRouter } from "./routes/realtimeHarness.js";
+import {
+  getDefaultRealtimeEventStore,
+  syntheticRealtimeEnabled,
+} from "./realtime/eventStore.js";
 
 
 const app = express();
@@ -58,6 +63,13 @@ app.use("/api/workspace", requireAuth, workspaceRouter);
 app.use("/api/submissions", requireAuth, submissionListsRouter);
 app.use("/api/submissions", requireAuth, submissionsRouter);
 app.use("/api/exports", requireAuth, exportsRouter);
+if (syntheticRealtimeEnabled()) {
+  app.use(
+    "/api/realtime/harness",
+    requireAuth,
+    createRealtimeHarnessRouter(getDefaultRealtimeEventStore()),
+  );
+}
 
 mountMapApiService(app);
 

@@ -1,5 +1,5 @@
-async function downloadFile(url, fallbackFilename) {
-  const response = await fetch(url, { credentials: "include" });
+async function downloadFile(url, fallbackFilename, requestOptions = {}) {
+  const response = await fetch(url, { ...requestOptions, credentials: "include" });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
     throw new Error(payload.error || `Download failed (${response.status})`);
@@ -18,8 +18,12 @@ async function downloadFile(url, fallbackFilename) {
   }
 }
 
-export function exportCommissionerSubmissionsCsv() {
-  return downloadFile("/api/exports/submissions.csv", "commissioner-submissions.csv");
+export function exportCommissionerSubmissionsCsv(submissionIds) {
+  return downloadFile("/api/exports/submissions.csv", "commissioner-submissions.csv", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ submissionIds }),
+  });
 }
 
 export function exportArchivedTreeJson() {

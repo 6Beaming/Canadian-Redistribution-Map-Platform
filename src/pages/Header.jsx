@@ -71,6 +71,7 @@ export default function Header({ onPlaceSelect }) {
   const isCommissionerSurface =
     pathname === "/dashboard" || pathname.startsWith("/dashboard/");
   const isWorkspaceReview = pathname.startsWith("/dashboard/workspace/");
+  const isArchivedTree = pathname === "/dashboard/archivedTree";
   const isArchivedDifference = pathname.startsWith("/dashboard/archivedTree/") && pathname.endsWith("/difference");
   const isPublicProfilePage = pathname === "/users/profile";
   const isPublicSubmissionsPage =
@@ -85,8 +86,12 @@ export default function Header({ onPlaceSelect }) {
     !isPublicSubmissionsPage;
 
   function navigateBack() {
-    if (isWorkspaceReview && location.state?.workspaceFrom) {
+    if ((isWorkspaceReview || isArchivedTree) && location.state?.workspaceFrom) {
       navigate(backRoute, { state: { from: location.state.workspaceFrom } });
+      return;
+    }
+    if (isArchivedDifference) {
+      navigate(backRoute, { state: location.state });
       return;
     }
     navigate(backRoute);
@@ -154,7 +159,7 @@ export default function Header({ onPlaceSelect }) {
       ) : null}
 
       <div className="header__right-slot z-10 flex min-w-0 items-center justify-end gap-[clamp(0.35rem,1vw,1rem)] px-[clamp(0.4rem,1.2vw,1rem)]">
-        {isCommissionerSurface && pathname !== "/dashboard/submissionsTable" ? (
+        {isCommissioner && pathname === "/dashboard" ? (
           <Button
             type="button"
             variant="outline"

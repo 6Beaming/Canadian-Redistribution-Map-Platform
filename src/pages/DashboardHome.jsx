@@ -5,6 +5,7 @@ import { MapInfoPanel, getDefaultPanelView } from "@/components/non_prebuilt/Map
 import { MapRegionSelector } from "@/components/non_prebuilt/MapRegionSelector.jsx";
 import { useAuth } from "@/contexts/AuthContext.jsx";
 import { DEFAULT_ROLLOUT_CATEGORY_ID } from "@/lib/map/rolloutPlan.js";
+import { WORKSPACE_LIST_INVALIDATION_KEYS } from "@/lib/realtime/workspaceRealtime.js";
 import { getProvinceMapView } from "@/lib/map/provinceView.js";
 import { mapApi } from "@/services/mapApi.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
@@ -50,7 +51,7 @@ export default function DashboardHome({ mapSearchTarget = null }) {
       });
 
     loadHeatmap();
-    const unsubscribe = subscribeWorkspaceState(loadHeatmap);
+    const unsubscribe = subscribeWorkspaceState(loadHeatmap, WORKSPACE_LIST_INVALIDATION_KEYS);
 
     return () => {
       isMounted = false;
@@ -69,7 +70,7 @@ export default function DashboardHome({ mapSearchTarget = null }) {
         if (isMounted) setArchivedMap(null);
       });
     load();
-    const unsubscribe = subscribeWorkspaceState(load);
+    const unsubscribe = subscribeWorkspaceState(load, "workspace:archive:*");
     return () => {
       isMounted = false;
       unsubscribe();
@@ -181,8 +182,8 @@ export default function DashboardHome({ mapSearchTarget = null }) {
     setIsRolloutOpen(false);
   }, []);
 
-  if (!initialLoad.ready) {
-    return <RouteLoadingPage label="Loading commissioner map…" error={initialLoad.error} />;
+  if (!initialLoad.ready && initialLoad.error) {
+    return <RouteLoadingPage error={initialLoad.error} />;
   }
 
   return (

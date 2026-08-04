@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
+import { RealtimeProvider } from "./contexts/RealtimeContext.jsx";
 import Header from "./pages/Header.jsx";
 import AcceptInvitePage from "./pages/AcceptInvitePage.jsx";
 import ArchivedTree from "./pages/ArchivedTree.jsx";
@@ -19,6 +20,8 @@ import SignUpPage from "./pages/SignUpPage.jsx";
 import UserHome from "./pages/UserHome.jsx";
 import UserProfile from "./pages/UserProfile.jsx";
 import UserResumeSubmission from "./pages/UserResumeSubmission.jsx";
+import RealtimeHarness from "./pages/RealtimeHarness.jsx";
+import { RouteLoadingOverlay } from "./components/non_prebuilt/RouteLoadingOverlay.jsx";
 import { RouteLoadingPage } from "./components/non_prebuilt/RouteLoadingPage.jsx";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -26,7 +29,7 @@ function RequireCommissioner() {
   const { sessionStatus, user } = useAuth();
 
   if (sessionStatus === "checking") {
-    return <RouteLoadingPage label="Checking commissioner session…" />;
+    return <RouteLoadingPage />;
   }
 
   if (sessionStatus === "signed-out") {
@@ -47,7 +50,7 @@ function RequirePublicUser() {
   const { sessionStatus, user } = useAuth();
 
   if (sessionStatus === "checking") {
-    return <RouteLoadingPage label="Checking session…" />;
+    return <RouteLoadingPage />;
   }
 
   if (user?.role === "commissioner") {
@@ -73,55 +76,64 @@ function App() {
 
   return (
     <AuthProvider>
-      <Header onPlaceSelect={handlePlaceSelect} />
-      <Routes>
-        <Route element={<RequirePublicUser />}>
-          <Route
-            path="/"
-            element={(
-              <UserHome
-                mapSearchTarget={mapSearchTarget}
-                onClearMapSearchTarget={handleMapSearchClear}
+      <RealtimeProvider>
+        <Header onPlaceSelect={handlePlaceSelect} />
+        <div className="app-route-content">
+          <Routes>
+            <Route element={<RequirePublicUser />}>
+              <Route
+                path="/"
+                element={(
+                  <UserHome
+                    mapSearchTarget={mapSearchTarget}
+                    onClearMapSearchTarget={handleMapSearchClear}
+                  />
+                )}
               />
-            )}
-          />
-          <Route
-            path="/users"
-            element={(
-              <UserHome
-                mapSearchTarget={mapSearchTarget}
-                onClearMapSearchTarget={handleMapSearchClear}
+              <Route
+                path="/users"
+                element={(
+                  <UserHome
+                    mapSearchTarget={mapSearchTarget}
+                    onClearMapSearchTarget={handleMapSearchClear}
+                  />
+                )}
               />
-            )}
-          />
-          <Route path="/users/profile" element={<UserProfile />} />
-          <Route path="/submissions" element={<MySubmissions />} />
-          <Route
-            path="/submissions/:submissionId"
-            element={<UserResumeSubmission />}
-          />
-        </Route>
-        <Route path="/sign-in" element={<SignInPage />} />
-        <Route path="/sign-up" element={<SignUpPage />} />
-        <Route path="/forgot-password" element={<ResetPasswordRequestPage />} />
-        <Route path="/accept-invite" element={<AcceptInvitePage />} />
-        <Route path="/reset-password" element={<PasswordRecoveryPage />} />
+              <Route path="/users/profile" element={<UserProfile />} />
+              <Route path="/submissions" element={<MySubmissions />} />
+              <Route
+                path="/submissions/:submissionId"
+                element={<UserResumeSubmission />}
+              />
+            </Route>
+            <Route path="/sign-in" element={<SignInPage />} />
+            <Route path="/sign-up" element={<SignUpPage />} />
+            <Route path="/forgot-password" element={<ResetPasswordRequestPage />} />
+            <Route path="/accept-invite" element={<AcceptInvitePage />} />
+            <Route path="/reset-password" element={<PasswordRecoveryPage />} />
 
-        <Route element={<RequireCommissioner />}>
-          <Route path="/dashboard" element={<DashboardHome mapSearchTarget={mapSearchTarget} />} />
-          <Route path="/dashboard/graphs" element={<DashboardGraphs />} />
-          <Route
-            path="/dashboard/submissionsTable"
-            element={<DashBoardSubmissionsPage />}
-          />
-          <Route path="/dashboard/profile" element={<CommissionerProfile />} />
-          <Route path="/dashboard/workspace" element={<CommissionerWorkspace />} />
-          <Route path="/dashboard/workspace/:submissionId" element={<WorkspaceReview />} />
-          <Route path="/dashboard/archivedTree" element={<ArchivedTree />} />
-          <Route path="/dashboard/archivedTree/:submissionId/difference" element={<ArchivedDifference />} />
-        </Route>
-      </Routes>
-      <Toaster position="top-center" offset="80px" closeButton/>
+            <Route element={<RequireCommissioner />}>
+              <Route path="/dashboard" element={<DashboardHome mapSearchTarget={mapSearchTarget} />} />
+              <Route path="/dashboard/graphs" element={<DashboardGraphs />} />
+              <Route
+                path="/dashboard/submissionsTable"
+                element={<DashBoardSubmissionsPage />}
+              />
+              <Route path="/dashboard/profile" element={<CommissionerProfile />} />
+              <Route path="/dashboard/workspace" element={<CommissionerWorkspace />} />
+              <Route path="/dashboard/workspace/:submissionId" element={<WorkspaceReview />} />
+              <Route path="/dashboard/archivedTree" element={<ArchivedTree />} />
+              <Route path="/dashboard/archivedTree/:submissionId/difference" element={<ArchivedDifference />} />
+              <Route
+                path="/dashboard/realtime-harness"
+                element={import.meta.env.DEV ? <RealtimeHarness /> : <Navigate to="/dashboard" replace />}
+              />
+            </Route>
+          </Routes>
+        </div>
+        <RouteLoadingOverlay />
+        <Toaster position="top-center" offset="80px" closeButton/>
+      </RealtimeProvider>
     </AuthProvider>
   );
 }

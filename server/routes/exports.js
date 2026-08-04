@@ -18,6 +18,24 @@ function requireCommissioner(req, res, next) {
 
 router.use(requireCommissioner);
 
+function normalizeSubmissionIds(value) {
+  if (value === undefined) return null;
+  if (!Array.isArray(value) || value.length > 5000) {
+    const error = new Error("submissionIds must be an array of at most 5000 IDs.");
+    error.statusCode = 400;
+    throw error;
+  }
+  const normalized = value.map((entry) => {
+    if (typeof entry !== "string" || !entry.trim() || entry.trim().length > 200) {
+      const error = new Error("Each submission ID must be a non-empty string.");
+      error.statusCode = 400;
+      throw error;
+    }
+    return entry.trim();
+  });
+  return [...new Set(normalized)];
+}
+
 async function loadSubmissionExportRows(supabase) {
   const { data, error } = await supabase.from("submissions")
     .select(LIGHTWEIGHT_SUBMISSION_COLUMNS)
@@ -35,6 +53,22 @@ async function loadSubmissionExportRows(supabase) {
   return enriched.map((row) => serializeLightweightSubmission(row, profileById.get(row.user_id)));
 }
 
+async function loadSubmissionTags(supabase, submissionIds) {
+  if (!submissionIds.length) return new Map();
+  const { data, error } = await supabase.from("workspace_labels")
+    .select("submission_id,name,is_selected,updated_at")
+    .in("submission_id", submissionIds)
+    .order("updated_at", { ascending: true });
+  if (error) throw error;
+  const tagsBySubmissionId = new Map();
+  (data ?? []).filter((row) => row.is_selected !== false).forEach((row) => {
+    const submissionId = String(row.submission_id);
+    if (!tagsBySubmissionId.has(submissionId)) tagsBySubmissionId.set(submissionId, []);
+    tagsBySubmissionId.get(submissionId).push(row.name);
+  });
+  return tagsBySubmissionId;
+}
+
 const CSV_COLUMNS = [
   { label: "Reference ID", value: (row) => row.id },
   { label: "Submitted At", value: (row) => row.created_at },
@@ -43,14 +77,29 @@ const CSV_COLUMNS = [
   { label: "Title", value: (row) => row.title },
   { label: "Community Name", value: (row) => row.dissemination_areas?.community_name ?? "Unknown" },
   { label: "Status", value: (row) => row.status },
+  { label: "Tags", value: (row) => row.tags.join("; ") },
   { label: "Primary DGUID", value: (row) => row.dguid ?? "" },
   { label: "Secondary DGUID", value: (row) => row.neighboring_dguid ?? "" },
   { label: "FED", value: (row) => row.fed_num ?? "" },
 ];
 
-router.get("/submissions.csv", async (_req, res) => {
+async function sendSubmissionCsv(req, res) {
   try {
-    const rows = await loadSubmissionExportRows(getSupabaseAdminDataClient());
+    const requestedIds = normalizeSubmissionIds(req.body?.submissionIds);
+    const supabase = getSupabaseAdminDataClient();
+    const allRows = await loadSubmissionExportRows(supabase);
+    const rowsById = new Map(allRows.map((row) => [String(row.id), row]));
+    const selectedRows = requestedIds === null
+      ? allRows
+      : requestedIds.flatMap((id) => rowsById.get(id) ?? []);
+    const tagsBySubmissionId = await loadSubmissionTags(
+      supabase,
+      selectedRows.map((row) => String(row.id)),
+    );
+    const rows = selectedRows.map((row) => ({
+      ...row,
+      tags: tagsBySubmissionId.get(String(row.id)) ?? [],
+    }));
     res.set({
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": "attachment; filename=commissioner-submissions.csv",
@@ -58,9 +107,14 @@ router.get("/submissions.csv", async (_req, res) => {
     });
     return res.send(writeCsv(CSV_COLUMNS, rows));
   } catch (error) {
-    return res.status(500).json({ error: error.message || "Unable to export submissions." });
+    return res.status(error.statusCode || 500).json({
+      error: error.message || "Unable to export submissions.",
+    });
   }
-});
+}
+
+router.get("/submissions.csv", sendSubmissionCsv);
+router.post("/submissions.csv", sendSubmissionCsv);
 
 router.get("/archive-tree.json", async (_req, res) => {
   try {

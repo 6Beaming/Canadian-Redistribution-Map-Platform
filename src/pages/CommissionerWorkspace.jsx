@@ -17,8 +17,12 @@ import {
 import {
   getWorkspaceSubmission,
   getWorkspaceSubmissions,
-  subscribeWorkspaceState,
+  subscribeWorkspaceListState,
 } from "@/services/workspaceApi.js";
+import {
+  getRealtimeSubmissionId,
+  reconcileWorkspaceSubmission,
+} from "@/lib/realtime/workspaceRealtime.js";
 import { RouteLoadingPage } from "@/components/non_prebuilt/RouteLoadingPage.jsx";
 import "@/styles/workspace.css";
 
@@ -602,8 +606,8 @@ export default function CommissionerWorkspace() {
   useEffect(() => {
     let isMounted = true;
 
-    const loadSubmissions = async () => {
-      setIsLoading(true);
+    const loadSubmissions = async ({ showLoading = false } = {}) => {
+      if (showLoading) setIsLoading(true);
       try {
         if (focusId) {
           const focused = await getWorkspaceSubmission(focusId, { hydrateGeometry: false });
@@ -622,12 +626,39 @@ export default function CommissionerWorkspace() {
       } catch (error) {
         if (isMounted) setLoadError(error.message || "Submissions could not be loaded.");
       } finally {
-        if (isMounted) setIsLoading(false);
+        if (isMounted && showLoading) setIsLoading(false);
       }
     };
 
-    loadSubmissions();
-    const unsubscribe = subscribeWorkspaceState(loadSubmissions);
+    const refreshAffectedSubmission = async ({ event, hints, resync }) => {
+      const affectedSubmissionId = getRealtimeSubmissionId({ event, hints });
+      if (resync || !affectedSubmissionId) {
+        await loadSubmissions();
+        return;
+      }
+
+      try {
+        const submission = event.entity === "submission" && event.operation === "delete"
+          ? null
+          : await getWorkspaceSubmission(affectedSubmissionId, { hydrateGeometry: false });
+        if (!isMounted) return;
+        setWorkspaceSubmissions((current) => (
+          reconcileWorkspaceSubmission(current, event, submission, hints)
+        ));
+        setLoadError("");
+      } catch (error) {
+        if (isMounted) {
+          setLoadError(error.message || "The affected submission could not be refreshed.");
+        }
+        throw error;
+      }
+    };
+
+    loadSubmissions({ showLoading: true });
+    const unsubscribe = subscribeWorkspaceListState({
+      onInvalidate: refreshAffectedSubmission,
+      onRecover: loadSubmissions,
+    });
 
     return () => {
       isMounted = false;
@@ -707,7 +738,7 @@ export default function CommissionerWorkspace() {
   }
 
   if (isLoading) {
-    return <RouteLoadingPage label="Loading Workspace submissions…" />;
+    return <RouteLoadingPage />;
   }
 
   return (
@@ -737,7 +768,9 @@ export default function CommissionerWorkspace() {
               <button
                 type="button"
                 className="workspace-control-button workspace-control-button--primary"
-                onClick={() => navigate("/dashboard/archivedTree")}
+                onClick={() => navigate("/dashboard/archivedTree", {
+                  state: { workspaceFrom: location.state?.from ?? null },
+                })}
               >
                 <Archive aria-hidden="true" />
                 Archived Tree

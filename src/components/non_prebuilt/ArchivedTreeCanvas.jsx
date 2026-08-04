@@ -98,12 +98,13 @@ function hitTest(regions, point) {
   ));
 }
 
-export function ArchivedTreeCanvas({ categories, selectedVersionId, onSelect, onOpenMap }) {
+export function ArchivedTreeCanvas({ categories, isLoading = false, selectedVersionId, onSelect, onOpenMap }) {
   const canvasRef = useRef(null);
   const regionsRef = useRef([]);
   const cameraRef = useRef({ x: 0, y: 0, scale: 1 });
   const dragRef = useRef(null);
   const [viewportVersion, setViewportVersion] = useState(0);
+  const [hasRendered, setHasRendered] = useState(false);
   const [expandedBranches, setExpandedBranches] = useState(() => new Set());
   const [expandedCategories, setExpandedCategories] = useState(() => new Set());
 
@@ -117,9 +118,16 @@ export function ArchivedTreeCanvas({ categories, selectedVersionId, onSelect, on
   }, [categories, selectedVersionId]);
 
   useEffect(() => {
+    if (isLoading) {
+      regionsRef.current = [];
+      setHasRendered(false);
+      return undefined;
+    }
+
     const canvas = canvasRef.current;
     if (!canvas) return undefined;
     const context = canvas.getContext("2d");
+    if (!context) return undefined;
 
     function render() {
       const rect = canvas.getBoundingClientRect();
@@ -297,10 +305,11 @@ export function ArchivedTreeCanvas({ categories, selectedVersionId, onSelect, on
     }
 
     render();
+    setHasRendered(true);
     const observer = new ResizeObserver(render);
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, [categories, expandedBranches, expandedCategories, selectedVersionId, viewportVersion]);
+  }, [categories, expandedBranches, expandedCategories, isLoading, selectedVersionId, viewportVersion]);
 
   function changeZoom(nextScale, anchor = null) {
     const canvas = canvasRef.current;
@@ -385,10 +394,11 @@ export function ArchivedTreeCanvas({ categories, selectedVersionId, onSelect, on
   }
 
   return (
-    <div className="archive-tree-canvas-shell">
+    <div className="archive-tree-canvas-shell" aria-busy={isLoading || !hasRendered}>
       <canvas
         ref={canvasRef}
         className="archive-tree-canvas"
+        aria-hidden={isLoading || !hasRendered || undefined}
         aria-label="Interactive archived submission version tree. Drag to pan and use the mouse wheel to zoom."
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -396,11 +406,20 @@ export function ArchivedTreeCanvas({ categories, selectedVersionId, onSelect, on
         onPointerCancel={() => { dragRef.current = null; }}
         onWheel={handleWheel}
       />
-      <div className="archive-tree-canvas-controls" aria-label="Tree viewport controls">
-        <button type="button" aria-label="Zoom in" onClick={() => changeZoom(cameraRef.current.scale * 1.15)}><Plus /></button>
-        <button type="button" aria-label="Zoom out" onClick={() => changeZoom(cameraRef.current.scale / 1.15)}><Minus /></button>
-        <button type="button" aria-label="Reset viewport" onClick={resetViewport}><Maximize2 /></button>
-      </div>
+      {isLoading || !hasRendered ? (
+        <div className="archive-tree-canvas-loading" role="status" aria-live="polite">
+          <div className="route-loading-overlay__indicator">
+            <span className="route-loading-overlay__spinner" aria-hidden="true" />
+            <span>Loading...</span>
+          </div>
+        </div>
+      ) : (
+        <div className="archive-tree-canvas-controls" aria-label="Tree viewport controls">
+          <button type="button" aria-label="Zoom in" onClick={() => changeZoom(cameraRef.current.scale * 1.15)}><Plus /></button>
+          <button type="button" aria-label="Zoom out" onClick={() => changeZoom(cameraRef.current.scale / 1.15)}><Minus /></button>
+          <button type="button" aria-label="Reset viewport" onClick={resetViewport}><Maximize2 /></button>
+        </div>
+      )}
     </div>
   );
 }

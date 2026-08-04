@@ -57,7 +57,7 @@ function getRouteLoadingDuration(fromPathname, toPathname) {
 }
 
 /**
- * Fixed-duration navigation feedback for the explicitly selected Commissioner
+ * Fixed-duration navigation feedback for explicitly selected data-heavy
  * transitions. It deliberately has no relationship with data fetch or map
  * readiness so page loading cannot extend or shorten the animation.
  */
@@ -98,10 +98,10 @@ export function RouteLoadingOverlay() {
   if (!isVisible) return null;
 
   return (
-    <div className="route-loading-overlay" role="status" aria-live="polite" aria-label="Loading page">
+    <div className="route-loading-overlay" role="status" aria-live="polite" aria-label="Loading">
       <div className="route-loading-overlay__indicator">
         <span className="route-loading-overlay__spinner" aria-hidden="true" />
-        <span>Loading page...</span>
+        <span>Loading...</span>
       </div>
     </div>
   );

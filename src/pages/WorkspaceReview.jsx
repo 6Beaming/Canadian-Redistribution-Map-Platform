@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
 import { WorkspaceReviewPanel } from "@/components/non_prebuilt/WorkspaceReviewPanel.jsx";
 import { MAP_INTERACTION_MODE } from "@/lib/map/interactionMode.js";
@@ -136,19 +137,51 @@ export default function WorkspaceReview() {
       (entry) => entry.id !== submission.id,
     );
     if (next) {
+      toast.success("Submission resolved. Moving to the next submission.", {
+        duration: 3000,
+        className: "workspace-resolution-toast",
+      });
       navigate(`/dashboard/workspace/${encodeURIComponent(next.id)}`, { state: location.state });
     } else {
+      toast.success("Submission resolved. Returning to the Workspace.", {
+        duration: 3000,
+        className: "workspace-resolution-toast",
+      });
       navigate("/dashboard/workspace", {
         state: { from: location.state?.workspaceFrom ?? null },
       });
     }
   }
 
+  function updateSubmissionStatus(nextStatus) {
+    const applyStatus = (current) => {
+      if (!current || String(current.id) !== String(nextStatus?.submissionId)) return current;
+      return {
+        ...current,
+        status: normalizeWorkspaceStatus(nextStatus.status),
+        resource_version: Number(nextStatus.version) || current.resource_version,
+        updated_at: nextStatus.updatedAt ?? current.updated_at,
+        crossProvinceWarning: nextStatus.crossProvinceWarning ?? current.crossProvinceWarning,
+        scope_pruids: nextStatus.eligibilityPruids ?? current.scope_pruids,
+      };
+    };
+    setSubmission(applyStatus);
+    setAllSubmissions((current) => current.map(applyStatus));
+  }
+
+  function handleCommitted(action, committed) {
+    if (action === "archive-request") {
+      updateSubmissionStatus(committed?.submissionStatus);
+      return;
+    }
+    advanceAfterCommit();
+  }
+
   if (error) {
     return <main className="workspace-review-error"><h1>Workspace unavailable</h1><p>{error}</p></main>;
   }
   if (!submission || String(submission.id) !== String(submissionId)) {
-    return <RouteLoadingPage label="Loading submission workspace…" />;
+    return <RouteLoadingPage />;
   }
 
   return (
@@ -169,7 +202,7 @@ export default function WorkspaceReview() {
           ) : (
             <div className="route-loading-overlay__indicator" role="status">
               <span className="route-loading-overlay__spinner" aria-hidden="true" />
-              <span>Loading map detail…</span>
+              <span>Loading...</span>
             </div>
           )}
           {normalizeType(submission.type) === "counter-proposal" ? (
@@ -186,7 +219,8 @@ export default function WorkspaceReview() {
           onSubmissionSelect={(id) => navigate(`/dashboard/workspace/${encodeURIComponent(id)}`, {
             state: location.state,
           })}
-          onCommitted={advanceAfterCommit}
+          onCommitted={handleCommitted}
+          onSubmissionUpdated={updateSubmissionStatus}
           reviewerEmails={reviewerEmails}
         />
       </div>

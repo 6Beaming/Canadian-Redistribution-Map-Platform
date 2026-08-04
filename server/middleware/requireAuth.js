@@ -107,6 +107,28 @@ export async function requireAuth(req, res, next) {
   }
 }
 
+// WebSocket upgrades do not have an Express response object that can safely
+// rotate cookies. Reuse the normal access-cookie verification and profile
+// lookup, but fail closed when that access token is expired instead of trying
+// to refresh a session during the protocol switch.
+export async function authenticateWebSocketRequest(req) {
+  const accessToken = getCookie(req, ACCESS_COOKIE);
+  if (!accessToken) return null;
+
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.auth.getUser(accessToken);
+  if (error || !data?.user) return null;
+
+  const profile = await getSupabaseProfile(accessToken, data.user.id);
+  if (!hasCompletePublicProfile(data.user, profile)) return null;
+
+  return {
+    accessToken,
+    profile,
+    user: data.user,
+  };
+}
+
 // This is the server counterpart to App.jsx's RequirePublicUser route guard.
 // It is intentionally applied after requireAuth so role checks always use the
 // verified profile rather than an untrusted client value.

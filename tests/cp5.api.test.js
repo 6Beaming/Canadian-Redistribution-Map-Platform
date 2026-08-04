@@ -59,7 +59,7 @@ function authDoubles(profile, admin) {
   });
 }
 
-function listAdmin(rows, capture = {}) {
+function listAdmin(rows, capture = {}, workspaceLabels = []) {
   return {
     from(table) {
       if (table === "profiles") {
@@ -78,6 +78,17 @@ function listAdmin(rows, capture = {}) {
           then(resolve, reject) {
             return Promise.resolve({ data: [], error: null }).then(resolve, reject);
           },
+        };
+      }
+      if (table === "workspace_labels") {
+        let filtered = [...workspaceLabels];
+        return {
+          select(columns) { capture.labelColumns = columns; return this; },
+          in(field, values) {
+            filtered = filtered.filter((row) => values.includes(String(row[field])));
+            return this;
+          },
+          async order() { return { data: filtered, error: null }; },
         };
       }
       assert.equal(table, "submissions");
@@ -241,7 +252,7 @@ test("Workspace label replacement returns stable assignment/catalog identities",
   assert.equal(response.body[0].id, "assignment-1");
   assert.equal(response.body[0].catalogId, "catalog-1");
   assert.equal(response.body[0].custom, true);
-  assert.equal(rpcCalls[0].name, "set_submission_workspace_labels");
+  assert.equal(rpcCalls[0].name, "checkpoint0_set_submission_workspace_labels");
 
   const duplicate = await request("/api/workspace/labels/submission-1", {
     method: "PUT",
@@ -324,19 +335,41 @@ test("a missing local Workspace label migration is reported as service unavailab
   assert.equal(response.body.error, "Workspace label migration is not installed.");
 });
 
-test("Commissioner CSV is authorized, formula-safe, and backed by the lightweight select", async () => {
+test("Commissioner CSV is authorized, subset-filtered, tag-inclusive, and formula-safe", async () => {
   const capture = {};
-  const rows = [{ ...submissionRows(1)[0], title: "=DANGEROUS", user_id: "public-1" }];
-  authDoubles(commissioner, listAdmin(rows, capture));
-  const response = await request("/api/exports/submissions.csv");
+  const rows = submissionRows(2).map((row, index) => ({
+    ...row,
+    title: index === 0 ? "=DANGEROUS" : "SHOULD-NOT-EXPORT",
+    user_id: "public-1",
+  }));
+  const labels = [
+    { submission_id: rows[0].id, name: "Constructive", is_selected: true },
+    { submission_id: rows[0].id, name: "Follow Up", is_selected: true },
+    { submission_id: rows[0].id, name: "Removed", is_selected: false },
+    { submission_id: rows[1].id, name: "Excluded Tag", is_selected: true },
+  ];
+  const admin = listAdmin(rows, capture, labels);
+  authDoubles(commissioner, admin);
+  const response = await request("/api/exports/submissions.csv", {
+    method: "POST",
+    body: { submissionIds: [rows[0].id] },
+  });
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-disposition"), /commissioner-submissions\.csv/);
   assert.deepEqual([...response.raw.subarray(0, 3)], [0xef, 0xbb, 0xbf]);
   assert.ok(response.text.includes("'=DANGEROUS"));
+  assert.equal(response.text.includes("SHOULD-NOT-EXPORT"), false);
+  assert.ok(response.text.includes("Constructive; Follow Up"));
+  assert.equal(response.text.includes("Removed"), false);
+  assert.equal(response.text.includes("Excluded Tag"), false);
   assert.equal(capture.submissionColumns.includes("geometry"), false);
+  assert.equal(capture.labelColumns, "submission_id,name,is_selected,updated_at");
 
-  authDoubles(publicUser, listAdmin(rows));
-  const forbidden = await request("/api/exports/submissions.csv");
+  authDoubles(publicUser, admin);
+  const forbidden = await request("/api/exports/submissions.csv", {
+    method: "POST",
+    body: { submissionIds: [rows[0].id] },
+  });
   assert.equal(forbidden.status, 403);
 });
 

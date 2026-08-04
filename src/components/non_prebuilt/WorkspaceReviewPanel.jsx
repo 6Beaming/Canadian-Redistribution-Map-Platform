@@ -18,14 +18,23 @@ import {
   createWorkspaceLabelCatalog,
   deleteWorkspaceComment,
   deleteWorkspaceLabelCatalog,
+  getArchiveRequest,
+  getWorkspaceComments,
+  getWorkspaceLabelCatalog,
+  getWorkspaceLabels,
   getWorkspaceReviewState,
+  getWorkspaceSubmissionStatus,
   saveWorkspaceLabelCatalog,
   saveWorkspaceLabels,
-  subscribeWorkspaceState,
+  subscribeWorkspaceReviewState,
   updateWorkspaceComment,
   updateWorkspaceArchiveAssignees,
   WORKSPACE_STATUS,
 } from "@/services/workspaceApi.js";
+import {
+  getWorkspaceReviewInvalidationTargets,
+  reconcileWorkspaceCustomLabels,
+} from "@/lib/realtime/workspaceRealtime.js";
 
 function formatTimestamp(value) {
   const date = new Date(value);
@@ -34,6 +43,14 @@ function formatTimestamp(value) {
 
 function normalizeType(value) {
   return String(value ?? "feedback").toLowerCase().replaceAll("_", "-");
+}
+
+function getClosingNoteTitle(action) {
+  const normalized = String(action ?? "").toLowerCase();
+  if (normalized.includes("accepted this submission")) return "Approved Note";
+  if (normalized.includes("rejected this submission")) return "Rejection Note";
+  if (normalized.includes("archive")) return "Archive Note";
+  return "Decision Note";
 }
 
 function customPlaceholder(label, index) {
@@ -223,10 +240,15 @@ function LabelEditor({
     }
     await persist(
       isSelected
-        ? optimisticSelected.filter((entry) => identity(entry) !== labelId)
+        ? optimisticSelected.filter((entry) => labelIdentity(entry) !== labelId)
         : [...optimisticSelected, label],
       labelId,
     );
+  }
+
+  function handleLabelRowClick(event, label) {
+    if (event.target.closest("button, input")) return;
+    void toggleLabel(label);
   }
 
   function editCustomLabel(id, changes) {
@@ -348,13 +370,17 @@ function LabelEditor({
             const checked = optimisticSelected.some((entry) => labelIdentity(entry) === label.id);
             const invalidCustomLabel = invalidCustomIds.has(label.id);
             return (
-              <div className="workspace-label-picker__row" key={label.id ?? `${label.name}-${index}`}>
+              <div
+                className={`workspace-label-picker__row${mutationPending ? " is-disabled" : ""}`}
+                key={label.id ?? `${label.name}-${index}`}
+                onClick={(event) => handleLabelRowClick(event, label)}
+              >
                 <button
                   type="button"
                   aria-pressed={checked}
                   aria-label={checked ? `Remove ${label.name}` : `Add ${label.name || "custom label"}`}
                   disabled={mutationPending}
-                  onClick={() => toggleLabel(label)}
+                  onClick={() => void toggleLabel(label)}
                 >
                   <i style={{ background: label.color }} />
                   {checked ? <Check aria-hidden="true" /> : null}
@@ -547,7 +573,7 @@ function CommentThread({ submissionId, comments, reviewerEmail, onChange, readOn
         {visibleComments.length ? visibleComments.map((comment) => (
           <article className={comment.isClosing ? "is-closing" : ""} key={comment.id}>
             <header>
-              <strong>{comment.isClosing ? `${comment.email}'s Closing Comment:` : comment.email}</strong>
+              <strong>{comment.isClosing ? getClosingNoteTitle(comment.action) : comment.email}</strong>
               <time>{formatTimestamp(comment.createdAt)}</time>
             </header>
             {comment.action ? <p className="workspace-comment-action">{comment.action}</p> : null}
@@ -687,7 +713,14 @@ function CounterProposalImpact({ submission }) {
   );
 }
 
-function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, onCommitted }) {
+function DecisionControls({
+  submission,
+  review,
+  reviewerEmail,
+  reviewerEmails,
+  archiveRequestLoading,
+  onCommitted,
+}) {
   const [message, setMessage] = useState("");
   const [assignees, setAssignees] = useState(() =>
     review.archiveRequest?.assignees?.length
@@ -695,11 +728,21 @@ function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, o
       : reviewerEmails,
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittedStatus, setSubmittedStatus] = useState(null);
   const [isUpdatingAssignees, setIsUpdatingAssignees] = useState(false);
   const [error, setError] = useState("");
+  const displayedStatus = submittedStatus ?? submission.status;
   const request = review.archiveRequest;
-  const isRequester = request?.requesterEmail === reviewerEmail;
-  const canMerge = isRequester && canMergeArchiveRequest(request);
+  const requesterEmail = String(request?.requesterEmail ?? "").trim().toLowerCase();
+  const signedInEmail = String(reviewerEmail ?? "").trim().toLowerCase();
+  const isRequester = Boolean(request) && (
+    request.allowedActions?.includes("cancel")
+    || (requesterEmail && requesterEmail === signedInEmail)
+  );
+  const canMerge = isRequester && (
+    request.allowedActions?.includes("merge")
+    || canMergeArchiveRequest(request)
+  );
 
   useEffect(() => {
     if (request?.assignees) setAssignees(request.assignees);
@@ -736,28 +779,34 @@ function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, o
       setError("A commit message is required.");
       return;
     }
+    setSubmittedStatus(submission.status);
     setIsSubmitting(true);
     setError("");
+    let keepControlsFrozen = false;
     try {
-      await commitWorkspaceAction(submission, {
+      const committed = await commitWorkspaceAction(submission, {
         action,
         email: reviewerEmail,
         message,
         assignees,
       });
       setMessage("");
-      onCommitted(action);
+      onCommitted(action, committed);
+      keepControlsFrozen = action !== "archive-request";
     } catch (actionError) {
       setError(actionError.message);
     } finally {
-      setIsSubmitting(false);
+      if (!keepControlsFrozen) {
+        setSubmittedStatus(null);
+        setIsSubmitting(false);
+      }
     }
   }
 
   return (
     <section className="workspace-review-section workspace-decision-panel">
       <div className="workspace-review-section__heading"><div><strong>Decision</strong></div></div>
-      {submission.status === WORKSPACE_STATUS.ARCHIVE_REQUEST && isRequester ? (
+      {displayedStatus === WORKSPACE_STATUS.ARCHIVE_REQUEST && isRequester ? (
         <fieldset className="workspace-assignees">
           <legend>Archive request assignees</legend>
           {reviewerEmails.map((email) => (
@@ -784,30 +833,37 @@ function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, o
       </label>
       {error ? <p className="workspace-decision-error" role="alert">{error}</p> : null}
       <div className="workspace-decision-actions">
-        {submission.status === WORKSPACE_STATUS.PENDING ? <>
+        {displayedStatus === WORKSPACE_STATUS.PENDING ? <>
           <button type="button" className="is-accept" disabled={isSubmitting} onClick={() => runAction("accept")}><Check />Accept</button>
           <button type="button" className="is-reject" disabled={isSubmitting} onClick={() => runAction("reject")}><X />Reject</button>
         </> : null}
-        {submission.status === WORKSPACE_STATUS.ACCEPTED ? (
+        {displayedStatus === WORKSPACE_STATUS.ACCEPTED ? (
           <button type="button" className="is-archive" disabled={isSubmitting} onClick={() => runAction("archive-request")}>
             <ArchiveRestore />Make an Archive Request
           </button>
         ) : null}
-        {submission.status === WORKSPACE_STATUS.REJECTED ? (
+        {displayedStatus === WORKSPACE_STATUS.REJECTED ? (
           <button type="button" className="is-accept" disabled={isSubmitting} onClick={() => runAction("accept-again")}><Check />Accept Again</button>
         ) : null}
-        {submission.status === WORKSPACE_STATUS.ARCHIVE_REQUEST && !isRequester ? <>
+        {displayedStatus === WORKSPACE_STATUS.ARCHIVE_REQUEST && request && !isRequester ? <>
           <button type="button" className="is-accept" disabled={isSubmitting} onClick={() => runAction("archive-vote-accept")}><Check />Accept</button>
           <button type="button" className="is-reject" disabled={isSubmitting} onClick={() => runAction("archive-vote-reject")}><X />Reject</button>
         </> : null}
-        {submission.status === WORKSPACE_STATUS.ARCHIVE_REQUEST && isRequester ? <>
+        {displayedStatus === WORKSPACE_STATUS.ARCHIVE_REQUEST && isRequester ? <>
           <button type="button" className="is-reject" disabled={isSubmitting} onClick={() => runAction("archive-cancel")}><X />Cancel Request</button>
           <button type="button" className="is-archive" disabled={isSubmitting || !canMerge} onClick={() => runAction("archive-merge")}>
             <ArchiveRestore />Merge into the Archive Tree
           </button>
         </> : null}
       </div>
-      {submission.status === WORKSPACE_STATUS.ARCHIVE_REQUEST && isRequester && !canMerge ? (
+      {displayedStatus === WORKSPACE_STATUS.ARCHIVE_REQUEST && !request ? (
+        <p className="workspace-decision-note" role="status">
+          {archiveRequestLoading
+            ? "Loading Archive Request…"
+            : "Archive Request details are unavailable."}
+        </p>
+      ) : null}
+      {displayedStatus === WORKSPACE_STATUS.ARCHIVE_REQUEST && isRequester && !canMerge ? (
         <p className="workspace-decision-note">Every selected assignee must accept before merge is enabled.</p>
       ) : null}
     </section>
@@ -821,6 +877,7 @@ export function WorkspaceReviewPanel({
   siblingSubmissions,
   onSubmissionSelect,
   onCommitted,
+  onSubmissionUpdated,
   reviewerEmails: availableReviewerEmails = [],
 }) {
 
@@ -829,37 +886,208 @@ export function WorkspaceReviewPanel({
   const reviewerEmails = [...new Set([reviewerEmail, ...availableReviewerEmails])];
   const [review, setReview] = useState(EMPTY_REVIEW);
   const [reviewError, setReviewError] = useState("");
+  const [archiveRequestLoad, setArchiveRequestLoad] = useState({
+    submissionId: null,
+    loading: false,
+  });
   const refreshSequence = useRef(0);
+  const targetedRefreshSequence = useRef({
+    archiveRequest: 0,
+    comments: 0,
+    labelCatalog: 0,
+    labels: 0,
+    status: 0,
+  });
 
-  async function refreshReview() {
+  async function refreshReview({ rethrow = false } = {}) {
     const sequence = refreshSequence.current + 1;
+    const commentsSequence = targetedRefreshSequence.current.comments;
+    const archiveRequestSequence = targetedRefreshSequence.current.archiveRequest;
+    const labelCatalogSequence = targetedRefreshSequence.current.labelCatalog;
+    const labelsSequence = targetedRefreshSequence.current.labels;
+    const statusSequence = targetedRefreshSequence.current.status;
     refreshSequence.current = sequence;
     try {
-      const nextReview = await getWorkspaceReviewState(submission.id);
+      const [nextReview, nextStatus] = await Promise.all([
+        getWorkspaceReviewState(submission.id),
+        getWorkspaceSubmissionStatus(submission.id),
+      ]);
       if (refreshSequence.current !== sequence) return;
-      setReview({
-        submissionId: submission.id,
-        comments: nextReview.comments ?? [],
-        labels: nextReview.labels ?? [],
-        labelCatalog: nextReview.labelCatalog ?? [],
-        archiveRequest: nextReview.archiveRequest ?? null,
-        collaborationWarning: nextReview.collaborationWarning ?? "",
+      setReview((current) => {
+        const isCurrentSubmission = String(current.submissionId) === String(submission.id);
+        return {
+          submissionId: submission.id,
+          comments: targetedRefreshSequence.current.comments === commentsSequence
+            ? nextReview.comments ?? []
+            : (isCurrentSubmission ? current.comments : []),
+          labels: targetedRefreshSequence.current.labels === labelsSequence
+            ? nextReview.labels ?? []
+            : (isCurrentSubmission ? current.labels : []),
+          labelCatalog: targetedRefreshSequence.current.labelCatalog === labelCatalogSequence
+            ? nextReview.labelCatalog ?? []
+            : (isCurrentSubmission ? current.labelCatalog : []),
+          archiveRequest: targetedRefreshSequence.current.archiveRequest === archiveRequestSequence
+            ? nextReview.archiveRequest ?? null
+            : (isCurrentSubmission ? current.archiveRequest : null),
+          collaborationWarning: nextReview.collaborationWarning ?? "",
+        };
       });
+      if (targetedRefreshSequence.current.status === statusSequence) {
+        onSubmissionUpdated?.(nextStatus);
+      }
       setReviewError("");
     } catch (error) {
       console.error("Unable to load workspace review:", error);
       if (refreshSequence.current === sequence) {
         setReviewError(error.message || "Unable to refresh Workspace collaboration.");
       }
+      if (rethrow) throw error;
     }
+  }
+
+  async function refreshComments() {
+    const sequence = targetedRefreshSequence.current.comments + 1;
+    targetedRefreshSequence.current.comments = sequence;
+    try {
+      const comments = await getWorkspaceComments(submission.id);
+      if (targetedRefreshSequence.current.comments !== sequence) return;
+      setReview((current) => String(current.submissionId) === String(submission.id)
+        ? { ...current, comments: comments ?? [] }
+        : { ...EMPTY_REVIEW, submissionId: submission.id, comments: comments ?? [] });
+      setReviewError("");
+    } catch (error) {
+      if (targetedRefreshSequence.current.comments === sequence) {
+        setReviewError(error.message || "Unable to refresh Workspace comments.");
+      }
+      throw error;
+    }
+  }
+
+  async function refreshLabels() {
+    const sequence = targetedRefreshSequence.current.labels + 1;
+    targetedRefreshSequence.current.labels = sequence;
+    try {
+      const labels = await getWorkspaceLabels(submission.id);
+      if (targetedRefreshSequence.current.labels !== sequence) return;
+      setReview((current) => String(current.submissionId) === String(submission.id)
+        ? { ...current, labels: labels ?? [] }
+        : { ...EMPTY_REVIEW, submissionId: submission.id, labels: labels ?? [] });
+      setReviewError("");
+    } catch (error) {
+      if (targetedRefreshSequence.current.labels === sequence) {
+        setReviewError(error.message || "Unable to refresh Workspace labels.");
+      }
+      throw error;
+    }
+  }
+
+  async function refreshCustomLabels() {
+    const labelCatalogSequence = targetedRefreshSequence.current.labelCatalog + 1;
+    const labelsSequence = targetedRefreshSequence.current.labels + 1;
+    targetedRefreshSequence.current.labelCatalog = labelCatalogSequence;
+    targetedRefreshSequence.current.labels = labelsSequence;
+    try {
+      const labelCatalog = await getWorkspaceLabelCatalog(submission.id);
+      if (targetedRefreshSequence.current.labelCatalog !== labelCatalogSequence) return;
+      setReview((current) => {
+        const isCurrentSubmission = String(current.submissionId) === String(submission.id);
+        const currentLabels = isCurrentSubmission ? current.labels : [];
+        return {
+          ...(isCurrentSubmission ? current : EMPTY_REVIEW),
+          submissionId: submission.id,
+          labelCatalog: labelCatalog ?? [],
+          labels: targetedRefreshSequence.current.labels === labelsSequence
+            ? reconcileWorkspaceCustomLabels(currentLabels, labelCatalog ?? [])
+            : currentLabels,
+        };
+      });
+      setReviewError("");
+    } catch (error) {
+      if (targetedRefreshSequence.current.labelCatalog === labelCatalogSequence) {
+        setReviewError(error.message || "Unable to refresh custom Workspace labels.");
+      }
+      throw error;
+    }
+  }
+
+  async function refreshArchiveRequest() {
+    const sequence = targetedRefreshSequence.current.archiveRequest + 1;
+    const activeSubmissionId = String(submission.id);
+    targetedRefreshSequence.current.archiveRequest = sequence;
+    setArchiveRequestLoad({ submissionId: activeSubmissionId, loading: true });
+    try {
+      let archiveRequest;
+      try {
+        archiveRequest = await getArchiveRequest(submission.id);
+      } catch (error) {
+        if (error.status !== 404) throw error;
+        archiveRequest = null;
+      }
+      if (targetedRefreshSequence.current.archiveRequest !== sequence) return;
+      setReview((current) => String(current.submissionId) === String(submission.id)
+        ? { ...current, archiveRequest }
+        : { ...EMPTY_REVIEW, submissionId: submission.id, archiveRequest });
+      setReviewError("");
+    } catch (error) {
+      if (targetedRefreshSequence.current.archiveRequest === sequence) {
+        setReviewError(error.message || "Unable to refresh the Archive Request.");
+      }
+      throw error;
+    } finally {
+      if (targetedRefreshSequence.current.archiveRequest === sequence) {
+        setArchiveRequestLoad({ submissionId: activeSubmissionId, loading: false });
+      }
+    }
+  }
+
+  async function refreshStatus() {
+    const sequence = targetedRefreshSequence.current.status + 1;
+    targetedRefreshSequence.current.status = sequence;
+    try {
+      const nextStatus = await getWorkspaceSubmissionStatus(submission.id);
+      if (targetedRefreshSequence.current.status !== sequence) return;
+      onSubmissionUpdated?.(nextStatus);
+      setReviewError("");
+    } catch (error) {
+      if (targetedRefreshSequence.current.status === sequence) {
+        setReviewError(error.message || "Unable to refresh the Workspace status.");
+      }
+      throw error;
+    }
+  }
+
+  async function handleReviewInvalidation({ hints, resync }) {
+    if (resync) {
+      await refreshReview({ rethrow: true });
+      return;
+    }
+    const targets = getWorkspaceReviewInvalidationTargets(hints, submission.id);
+    await Promise.all([
+      ...(targets.includes("archiveRequest") ? [refreshArchiveRequest()] : []),
+      ...(targets.includes("comments") ? [refreshComments()] : []),
+      ...(targets.includes("labelCatalog") ? [refreshCustomLabels()] : []),
+      ...(targets.includes("labels") ? [refreshLabels()] : []),
+      ...(targets.includes("status") ? [refreshStatus()] : []),
+    ]);
   }
 
   useEffect(() => {
     setReviewError("");
     refreshReview();
-    const unsubscribe = subscribeWorkspaceState(refreshReview);
+    if (submission.status === WORKSPACE_STATUS.ARCHIVE_REQUEST) {
+      void refreshArchiveRequest().catch(() => {});
+    }
+    const unsubscribe = subscribeWorkspaceReviewState(submission.id, {
+      onInvalidate: handleReviewInvalidation,
+      onRecover: refreshReview,
+    });
     return () => {
       refreshSequence.current += 1;
+      targetedRefreshSequence.current.archiveRequest += 1;
+      targetedRefreshSequence.current.comments += 1;
+      targetedRefreshSequence.current.labelCatalog += 1;
+      targetedRefreshSequence.current.labels += 1;
+      targetedRefreshSequence.current.status += 1;
       unsubscribe();
     };
   }, [submission.id]);
@@ -867,6 +1095,12 @@ export function WorkspaceReviewPanel({
   const activeReview = String(review.submissionId) === String(submission.id)
     ? review
     : EMPTY_REVIEW;
+  const archiveRequestLoading = submission.status === WORKSPACE_STATUS.ARCHIVE_REQUEST
+    && !activeReview.archiveRequest
+    && (
+      archiveRequestLoad.submissionId !== String(submission.id)
+      || archiveRequestLoad.loading
+    );
 
   function updateActiveLabels(labels) {
     setReview((current) => String(current.submissionId) === String(submission.id)
@@ -895,6 +1129,20 @@ export function WorkspaceReviewPanel({
           : [...current.labelCatalog, change],
       };
     });
+  }
+
+  function handleDecisionCommitted(action, committed) {
+    if (committed?.review) {
+      setReview({
+        submissionId: submission.id,
+        comments: committed.review.comments ?? [],
+        labels: committed.review.labels ?? [],
+        labelCatalog: committed.review.labelCatalog ?? [],
+        archiveRequest: committed.review.archiveRequest ?? null,
+        collaborationWarning: committed.review.collaborationWarning ?? "",
+      });
+    }
+    onCommitted?.(action, committed);
   }
 
   return (
@@ -929,7 +1177,7 @@ export function WorkspaceReviewPanel({
           submissionId={submission.id}
           comments={activeReview.comments}
           reviewerEmail={reviewerEmail}
-          onChange={refreshReview}
+          onChange={refreshComments}
           readOnly={submission.status !== WORKSPACE_STATUS.PENDING}
         />
         <SubmissionDetails submission={submission} />
@@ -939,7 +1187,8 @@ export function WorkspaceReviewPanel({
           review={activeReview}
           reviewerEmail={reviewerEmail}
           reviewerEmails={reviewerEmails}
-          onCommitted={onCommitted}
+          archiveRequestLoading={archiveRequestLoading}
+          onCommitted={handleDecisionCommitted}
         />
       </div>
     </aside>
