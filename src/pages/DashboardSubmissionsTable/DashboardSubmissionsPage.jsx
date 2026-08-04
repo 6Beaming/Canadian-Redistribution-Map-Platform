@@ -10,7 +10,9 @@ import {
 } from "@/services/submissionListsApi";
 import {
   getRealtimeSubmissionId,
-  reconcileCommissionerSubmissionRows,
+  reconcileCommissionerSubmissionSnapshot,
+  reconcileCommissionerSubmissionView,
+  revealCommissionerSubmissionRows,
 } from "@/lib/realtime/workspaceRealtime.js";
 import { RouteLoadingPage } from "@/components/non_prebuilt/RouteLoadingPage.jsx";
 
@@ -28,7 +30,10 @@ function toTableSubmission(submission) {
 
 export default function DashBoardSubmissionsPage() {
   const navigate = useNavigate();
-  const [submissions, setSubmissions] = useState([]);
+  const [submissionView, setSubmissionView] = useState({
+    visibleRows: [],
+    bufferedRows: [],
+  });
   const [loadState, setLoadState] = useState({ loading: true, error: "" });
 
   useEffect(() => {
@@ -41,12 +46,15 @@ export default function DashBoardSubmissionsPage() {
       return result;
     }
 
-    async function loadSubmissions({ showLoading = false } = {}) {
+    async function loadSubmissions({ replace = false, showLoading = false } = {}) {
       if (showLoading && isMounted) setLoadState({ loading: true, error: "" });
       try {
         const { items: data } = await getCommissionerSubmissionTableRows();
         if (!isMounted) return;
-        setSubmissions(data.map(toTableSubmission));
+        const rows = data.map(toTableSubmission);
+        setSubmissionView((current) => replace
+          ? { visibleRows: rows, bufferedRows: [] }
+          : reconcileCommissionerSubmissionSnapshot(current, rows));
         setLoadState({ loading: false, error: "" });
       } catch (err) {
         console.error(err);
@@ -69,7 +77,7 @@ export default function DashBoardSubmissionsPage() {
           ? null
           : await getSubmissionTableRowById(submissionId);
         if (!isMounted) return;
-        setSubmissions((current) => reconcileCommissionerSubmissionRows(
+        setSubmissionView((current) => reconcileCommissionerSubmissionView(
           current,
           event,
           row ? toTableSubmission(row) : null,
@@ -88,7 +96,7 @@ export default function DashBoardSubmissionsPage() {
       onInvalidate: (payload) => enqueueRefresh(() => refreshAffectedSubmission(payload)),
       onRecover: (payload) => enqueueRefresh(() => refreshAffectedSubmission(payload)),
     });
-    void enqueueRefresh(() => loadSubmissions({ showLoading: true })).catch(() => {});
+    void enqueueRefresh(() => loadSubmissions({ replace: true, showLoading: true })).catch(() => {});
 
     return () => {
       isMounted = false;
@@ -105,8 +113,12 @@ export default function DashBoardSubmissionsPage() {
         <div>
           <SubmissionsTable
             columns={columns}
-            data={submissions}
+            data={submissionView.visibleRows}
+            newSubmissionCount={submissionView.bufferedRows.length}
             onOpenAnalytics={() => navigate("/dashboard/graphs")}
+            onRevealNewSubmissions={() => {
+              setSubmissionView((current) => revealCommissionerSubmissionRows(current));
+            }}
             onRowClick={(submission) =>
               navigate(
                 submission.status === "archived"
