@@ -241,7 +241,7 @@ test("Workspace label replacement returns stable assignment/catalog identities",
   assert.equal(response.body[0].id, "assignment-1");
   assert.equal(response.body[0].catalogId, "catalog-1");
   assert.equal(response.body[0].custom, true);
-  assert.equal(rpcCalls[0].name, "set_submission_workspace_labels");
+  assert.equal(rpcCalls[0].name, "checkpoint0_set_submission_workspace_labels");
 
   const duplicate = await request("/api/workspace/labels/submission-1", {
     method: "PUT",

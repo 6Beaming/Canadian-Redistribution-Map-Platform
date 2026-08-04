@@ -201,7 +201,7 @@ router.put("/labels/:submissionId", async (req, res) => {
   if (!(await requireSubmission(supabase, req.params.submissionId))) {
     return res.status(404).json({ error: "Submission not found." });
   }
-  const { data, error } = await supabase.rpc("set_submission_workspace_labels", {
+  const { data, error } = await supabase.rpc("checkpoint0_set_submission_workspace_labels", {
     target_submission_id: req.params.submissionId,
     target_updated_by: req.user.id,
     target_labels: normalized,
