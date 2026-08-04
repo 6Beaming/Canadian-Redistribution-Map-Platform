@@ -17,7 +17,7 @@ router.get("/proposal/:proposalId", requirePublicUser, async (req, res) => {
   const supabase = getSupabaseClient();
   const { proposalId } = req.params;
 
-  // Verify proposal exists and is in Yukon
+  // Verify proposal exists
   const { data: proposal, error: proposalError } = await supabase
     .from("map_proposals")
     .select("id, province_code")
@@ -212,6 +212,27 @@ router.post("/", requirePublicUser, async (req, res) => {
     String(fed_num ?? "").trim()
     || (await getProfileForDguid(primaryDguid))?.fed_num
     || null;
+
+  if (normalizedType === "objection" && secondaryDguid) {
+    const { error: daInsertError } = await supabase
+      .from("dissemination_areas")
+      .upsert(
+        {
+          dguid: secondaryDguid,
+          status: "ok",
+          source_label: "submission_validation",
+        },
+        {
+          onConflict: "dguid",
+        }
+      );
+
+    if (daInsertError) {
+      return res.status(500).json({
+        error: `Failed to register neighboring DA: ${daInsertError.message}`,
+      });
+    }
+  }
 
   const { data, error } = await supabase
     .from("submissions")

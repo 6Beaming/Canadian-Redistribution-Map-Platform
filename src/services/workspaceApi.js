@@ -10,6 +10,12 @@ import {
     getWorkspaceReviewInvalidationKeys,
     WORKSPACE_LIST_INVALIDATION_KEYS,
 } from "@/lib/realtime/workspaceRealtime.js";
+import {
+    patchWorkspaceSubmissionStatus,
+} from "@/services/workspaceStatusApi.js";
+import * as archiveRequestApi from "@/services/archiveRequestApi.js";
+
+const DURABLE_STATUS_WRITES = new Set(["accepted", "rejected"]);
 
 
 function handleResponse(res) {
@@ -57,57 +63,34 @@ export async function addWorkspaceLabels(submissionId, labels) {
     return handleResponse(res);
 }
 
-export async function createArchiveRequest(submissionId, assignees) {
-    const res = await fetch(`/api/workspace/archive-requests/${submissionId}`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            assignees,
-        }),
-    });
-
-    return handleResponse(res);
+export async function createArchiveRequest(submissionId, assignees, options = {}) {
+    return archiveRequestApi.createArchiveRequest(submissionId, assignees, options);
 }
-
 
 export async function getArchiveRequest(submissionId) {
-    const res = await fetch(`/api/workspace/archive-requests/${submissionId}`, {
-        method: "GET",
-        credentials: "include",
-    });
-
-    return handleResponse(res);
+    return archiveRequestApi.getArchiveRequest(submissionId);
 }
 
-
-export async function voteArchiveRequest(submissionId, vote) {
-    const res = await fetch(`/api/workspace/archive-requests/${submissionId}/vote`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            vote,
-        }),
+export async function voteArchiveRequest(submissionId, vote, options = {}) {
+    const current = options.request
+        ?? await archiveRequestApi.getArchiveRequest(submissionId);
+    if (!current?.id) {
+        throw new Error("Archive request not found.");
+    }
+    return archiveRequestApi.voteArchiveRequest(current.id, vote, {
+        expectedVersion: options.expectedVersion ?? current.version,
     });
-
-    return handleResponse(res);
 }
 
-export async function cancelArchiveRequest(submissionId) {
-    const res = await fetch(
-        `/api/workspace/archive-requests/${submissionId}`,
-        {
-            method: "DELETE",
-            credentials: "include",
-        }
-    );
-
-    return handleResponse(res);
+export async function cancelArchiveRequest(submissionId, options = {}) {
+    const current = options.request
+        ?? await archiveRequestApi.getArchiveRequest(submissionId);
+    if (!current?.id) {
+        throw new Error("Archive request not found.");
+    }
+    return archiveRequestApi.cancelArchiveRequest(current.id, {
+        expectedVersion: options.expectedVersion ?? current.version,
+    });
 }
 
 export async function getWorkspaceLabelCatalog(submissionId) {
@@ -159,10 +142,21 @@ export function normalizeWorkspaceStatus(value) {
 }
 
 function normalizeSubmission(submission, source) {
+    const resourceVersion = Number(
+        submission.resource_version ?? submission.version ?? submission.resourceVersion,
+    );
+
     return {
         ...submission,
         source,
         status: normalizeWorkspaceStatus(submission.status),
+        resource_version: Number.isInteger(resourceVersion) && resourceVersion > 0
+            ? resourceVersion
+            : 1,
+        crossProvinceWarning: submission.crossProvinceWarning
+            ?? submission.cross_province_warning
+            ?? null,
+        scope_pruids: Array.isArray(submission.scope_pruids) ? submission.scope_pruids : [],
         authorEmail:
             submission.profile?.email ?? submission.authorEmail ?? "Unknown",
         profile: submission.profile ?? (submission.authorEmail ? { email: submission.authorEmail } : null),
@@ -391,21 +385,13 @@ export async function deleteWorkspaceLabel(labelId) {
 }
 
 export async function updateWorkspaceArchiveAssignees(submissionId, assignees) {
-    const res = await fetch(
-        `/api/workspace/archive-requests/${submissionId}/assignees`,
-        {
-            method: "PATCH",
-            credentials: "include",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                assignees,
-            }),
-        }
-    );
-
-    return handleResponse(res);
+    const current = await archiveRequestApi.getArchiveRequest(submissionId);
+    if (!current?.id) {
+        throw new Error("Archive request not found.");
+    }
+    return archiveRequestApi.updateArchiveRequestAssignees(current.id, assignees, {
+        expectedVersion: current.version,
+    });
 }
 
 async function persistLiveStatus(submission, status) {
@@ -413,25 +399,36 @@ async function persistLiveStatus(submission, status) {
         throw new Error("Only persisted submissions can change Workspace status.");
     }
 
-    // HARD API: this temporary authenticated PATCH is implemented by
-    // server/routes/workspace.js and should move into a durable domain service.
-    const response = await fetch(`/api/workspace/submissions/${submission.id}/status`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+    const expectedVersion = Number(submission.resource_version);
+    const persisted = await patchWorkspaceSubmissionStatus(submission.id, {
+        status,
+        ...(Number.isInteger(expectedVersion) && expectedVersion > 0
+            ? { expectedVersion }
+            : {}),
     });
 
-    return handleResponse(response);
+    return {
+        ...persisted,
+        resource_version: Number(persisted?.version) || expectedVersion || 1,
+    };
 }
 
 /**
- * Writes real Supabase submissions through the temporary Workspace route and
- * mirrors the result locally for the current UI. Fixture submissions remain local.
+ * Durable accepted/rejected writes via the CP4 Workspace status API.
+ * Archive-owned statuses are owned by Archive Request / archive transactions.
  */
 export async function setWorkspaceSubmissionStatus(submission, status) {
     const normalizedStatus = normalizeWorkspaceStatus(status);
+    if (!DURABLE_STATUS_WRITES.has(normalizedStatus)) {
+        throw new Error(
+            "Archive-owned statuses cannot be written through the Workspace status route.",
+        );
+    }
+
     const persisted = await persistLiveStatus(submission, normalizedStatus);
+    if (submission && persisted?.resource_version) {
+        submission.resource_version = persisted.resource_version;
+    }
     return normalizeWorkspaceStatus(persisted?.status ?? normalizedStatus);
 }
 
@@ -495,12 +492,17 @@ export async function commitWorkspaceAction(submission, {
     if (action === "archive-request") {
         await createArchiveRequest(
             submission.id,
-            [...new Set(assignees)]
+            [...new Set(assignees)],
+            { expectedVersion: submission.resource_version },
         );
+        if (submission) {
+            submission.status = WORKSPACE_STATUS.ARCHIVE_REQUEST;
+            submission.resource_version = Number(submission.resource_version || 1) + 1;
+        }
     } else if (action === "archive-vote-accept") {
         await voteArchiveRequest(
             submission.id,
-            "accepted"
+            "accepted",
         );
     } else if (action === "archive-cancel") {
         await cancelArchiveRequest(submission.id);
@@ -509,7 +511,7 @@ export async function commitWorkspaceAction(submission, {
     else if (action === "archive-vote-reject") {
         await voteArchiveRequest(
             submission.id,
-            "rejected"
+            "rejected",
         );
     }
     if (action === "archive-merge") {
@@ -520,7 +522,9 @@ export async function commitWorkspaceAction(submission, {
         });
     }
 
-    if (action !== "archive-merge") {
+    // Accept/reject (and cancel/reject-vote returning to accepted) use the
+    // durable status route. Archive-request and archived stay Archive-owned.
+    if (DURABLE_STATUS_WRITES.has(nextStatus) && action !== "archive-merge") {
         await setWorkspaceSubmissionStatus(submission, nextStatus);
     }
     await addWorkspaceComment(submission.id, {
