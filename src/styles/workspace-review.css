@@ -22,6 +22,31 @@
   min-height: 0;
 }
 
+.workspace-review-map-empty {
+  display: grid;
+  place-content: center;
+  gap: 0.45rem;
+  height: 100%;
+  min-height: 16rem;
+  padding: 1.25rem;
+  border-radius: clamp(14px, 1.5vw, 24px);
+  background: #f4f7fa;
+  color: #4a6072;
+  text-align: center;
+}
+
+.workspace-review-map-empty strong {
+  color: #17324d;
+  font-size: 0.95rem;
+}
+
+.workspace-review-map-empty p {
+  margin: 0;
+  max-width: 28rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
 .workspace-review-map .map-canvas {
   border-radius: clamp(14px, 1.5vw, 24px);
 }

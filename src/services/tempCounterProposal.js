@@ -7,6 +7,11 @@ import {
   getPairOuterBoundaryFeatureCollection,
   getSharedBoundaryFeatureCollection,
 } from "@/lib/map/objectionWorkflow.js";
+import {
+  getFallbackDaAssetManifest,
+  getMetadataGeojsonPathsForFed,
+  normalizeDaAssetManifest,
+} from "@/lib/map/daAssetManifest.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
 import { getAllComments } from "@/services/commentsApi.js";
 import { mapApi } from "@/services/mapApi.js";
@@ -19,6 +24,7 @@ import { calculateCounterProposalImpact } from "@/lib/map/counterProposalImpact.
 const EMPTY_FEATURE_COLLECTION = Object.freeze({ type: "FeatureCollection", features: [] });
 const metadataByFedPromise = new Map();
 let profilesPromise = null;
+let assetManifestPromise = null;
 
 function normalizeFedNum(value) {
   return String(value ?? "").trim();
@@ -46,6 +52,15 @@ async function getProfilesByDguid(profilesByDguid) {
   return profilesPromise;
 }
 
+async function getAssetManifest() {
+  if (!assetManifestPromise) {
+    assetManifestPromise = mapApi.getDaAssetManifest()
+      .then((manifest) => normalizeDaAssetManifest(manifest))
+      .catch(() => getFallbackDaAssetManifest());
+  }
+  return assetManifestPromise;
+}
+
 async function getMetadataForFed(fedNum) {
   const normalizedFedNum = normalizeFedNum(fedNum);
 
@@ -56,7 +71,33 @@ async function getMetadataForFed(fedNum) {
   if (!metadataByFedPromise.has(normalizedFedNum)) {
     metadataByFedPromise.set(
       normalizedFedNum,
-      mapApi.fetchAssetJson(`metadata/fed_${normalizedFedNum}.geojson`),
+      (async () => {
+        try {
+          const manifest = await getAssetManifest();
+          const paths = getMetadataGeojsonPathsForFed(manifest, normalizedFedNum);
+          // Prefer manifest shard paths (multipart FEDs). Fall back to the
+          // conventional single-file name used by most districts.
+          const assetPaths = paths.length
+            ? paths
+            : [`metadata/fed_${normalizedFedNum}.geojson`];
+          // Guard against the manifest helper falling back to the wrong FED
+          // (first asset) when the requested FED is missing.
+          const resolvedPaths = assetPaths.every((path) => path.includes(`fed_${normalizedFedNum}`))
+            ? assetPaths
+            : [`metadata/fed_${normalizedFedNum}.geojson`];
+          const collections = await Promise.all(
+            resolvedPaths.map((path) => mapApi.fetchAssetJson(path)),
+          );
+          return {
+            type: "FeatureCollection",
+            features: collections.flatMap((collection) => collection?.features ?? []),
+          };
+        } catch (error) {
+          console.warn(`Failed to load FED metadata ${normalizedFedNum}`, error);
+          metadataByFedPromise.delete(normalizedFedNum);
+          return EMPTY_FEATURE_COLLECTION;
+        }
+      })(),
     );
   }
 
@@ -64,15 +105,24 @@ async function getMetadataForFed(fedNum) {
 }
 
 async function getPairIndex(submission, profilesByDguid) {
-  const firstDguid = String(submission?.dguid ?? "");
-  const secondDguid = String(submission?.neighboring_dguid ?? "");
-  const firstFedNum = normalizeFedNum(submission?.fed_num);
+  const firstDguid = String(submission?.dguid ?? "").trim();
+  const secondDguid = String(submission?.neighboring_dguid ?? "").trim();
+  const firstProfile = profilesByDguid?.get?.(firstDguid) ?? null;
+  const secondProfile = profilesByDguid?.get?.(secondDguid) ?? null;
+  // Prefer live profile FED mapping over serialized enrichment fields, which
+  // historically collapsed the neighbour onto the primary FED.
+  const firstFedNum = normalizeFedNum(
+    firstProfile?.fed_num
+    ?? submission?.primary_fed_num
+    ?? submission?.fed_num,
+  );
   const secondFedNum = normalizeFedNum(
-    submission?.secondary_fed_num ?? profilesByDguid.get(secondDguid)?.fed_num,
-  ) || firstFedNum;
+    secondProfile?.fed_num
+    ?? submission?.secondary_fed_num,
+  );
   const fedNums = [...new Set([firstFedNum, secondFedNum].filter(Boolean))];
 
-  if (!firstDguid || !secondDguid || !fedNums.length) {
+  if (!firstDguid || !secondDguid || !firstFedNum || !secondFedNum) {
     return null;
   }
 
@@ -117,13 +167,28 @@ function normalizeSubmission(submission, source) {
 async function hydrateObjection(submission, profilesByDguid) {
   const normalized = normalizeSubmission(submission, "supabase");
   const index = await getPairIndex(normalized, profilesByDguid);
-  const geometry = index
-    ? buildOriginalPairGeometry(index, normalized.dguid, normalized.neighboring_dguid)
-    : null;
+  if (!index) {
+    return {
+      ...normalized,
+      geometry: null,
+      geometryError:
+        "Objection map geometry could not be rebuilt for this DA pair. "
+        + "Both dissemination areas must resolve to local FED metadata.",
+    };
+  }
+
+  const geometry = buildOriginalPairGeometry(
+    index,
+    normalized.dguid,
+    normalized.neighboring_dguid,
+  );
 
   return {
     ...normalized,
     geometry,
+    geometryError: geometry
+      ? null
+      : "Objection map geometry could not be prepared for this DA pair.",
   };
 }
 
@@ -375,18 +440,11 @@ export async function getTemporaryCounterProposalSubmissions() {
  * Counter-proposals prefer immutable revision snapshots from Supabase.
  */
 export async function hydrateWorkspaceSubmission(submission, profilesByDguid) {
+  // Always prefer the full DA profile index so cross-FED / cross-province
+  // neighbours resolve to the correct metadata shard.
   const profiles = profilesByDguid instanceof Map
     ? profilesByDguid
-    : new Map([
-      [String(submission?.dguid ?? ""), {
-        fed_num: submission?.primary_fed_num ?? submission?.fed_num ?? null,
-        population: submission?.primary_population ?? null,
-      }],
-      [String(submission?.neighboring_dguid ?? ""), {
-        fed_num: submission?.secondary_fed_num ?? submission?.primary_fed_num ?? submission?.fed_num ?? null,
-        population: submission?.secondary_population ?? null,
-      }],
-    ].filter(([dguid]) => dguid));
+    : await getProfilesByDguid();
   const type = normalizeSubmissionType(submission?.type);
 
   if (type === "counter-proposal") {

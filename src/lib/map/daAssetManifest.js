@@ -91,10 +91,10 @@ export function getFallbackDaAssetManifest() {
 
 export function getMetadataGeojsonPathsForFed(manifest, fedNum) {
   const normalizedManifest = normalizeDaAssetManifest(manifest);
+  const normalizedFedNum = String(fedNum ?? "").trim();
   return (
-    normalizedManifest.assets.find((asset) => asset.fedNum === String(fedNum))?.metadataGeojsons ??
-    normalizedManifest.assets[0]?.metadataGeojsons ??
-    []
+    normalizedManifest.assets.find((asset) => asset.fedNum === normalizedFedNum)?.metadataGeojsons
+    ?? []
   );
 }
 
