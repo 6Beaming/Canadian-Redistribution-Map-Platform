@@ -728,8 +728,10 @@ function DecisionControls({
       : reviewerEmails,
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittedStatus, setSubmittedStatus] = useState(null);
   const [isUpdatingAssignees, setIsUpdatingAssignees] = useState(false);
   const [error, setError] = useState("");
+  const displayedStatus = submittedStatus ?? submission.status;
   const request = review.archiveRequest;
   const requesterEmail = String(request?.requesterEmail ?? "").trim().toLowerCase();
   const signedInEmail = String(reviewerEmail ?? "").trim().toLowerCase();
@@ -777,8 +779,10 @@ function DecisionControls({
       setError("A commit message is required.");
       return;
     }
+    setSubmittedStatus(submission.status);
     setIsSubmitting(true);
     setError("");
+    let keepControlsFrozen = false;
     try {
       const committed = await commitWorkspaceAction(submission, {
         action,
@@ -788,17 +792,21 @@ function DecisionControls({
       });
       setMessage("");
       onCommitted(action, committed);
+      keepControlsFrozen = action !== "archive-request";
     } catch (actionError) {
       setError(actionError.message);
     } finally {
-      setIsSubmitting(false);
+      if (!keepControlsFrozen) {
+        setSubmittedStatus(null);
+        setIsSubmitting(false);
+      }
     }
   }
 
   return (
     <section className="workspace-review-section workspace-decision-panel">
       <div className="workspace-review-section__heading"><div><strong>Decision</strong></div></div>
-      {submission.status === WORKSPACE_STATUS.ARCHIVE_REQUEST && isRequester ? (
+      {displayedStatus === WORKSPACE_STATUS.ARCHIVE_REQUEST && isRequester ? (
         <fieldset className="workspace-assignees">
           <legend>Archive request assignees</legend>
           {reviewerEmails.map((email) => (
@@ -825,37 +833,37 @@ function DecisionControls({
       </label>
       {error ? <p className="workspace-decision-error" role="alert">{error}</p> : null}
       <div className="workspace-decision-actions">
-        {submission.status === WORKSPACE_STATUS.PENDING ? <>
+        {displayedStatus === WORKSPACE_STATUS.PENDING ? <>
           <button type="button" className="is-accept" disabled={isSubmitting} onClick={() => runAction("accept")}><Check />Accept</button>
           <button type="button" className="is-reject" disabled={isSubmitting} onClick={() => runAction("reject")}><X />Reject</button>
         </> : null}
-        {submission.status === WORKSPACE_STATUS.ACCEPTED ? (
+        {displayedStatus === WORKSPACE_STATUS.ACCEPTED ? (
           <button type="button" className="is-archive" disabled={isSubmitting} onClick={() => runAction("archive-request")}>
             <ArchiveRestore />Make an Archive Request
           </button>
         ) : null}
-        {submission.status === WORKSPACE_STATUS.REJECTED ? (
+        {displayedStatus === WORKSPACE_STATUS.REJECTED ? (
           <button type="button" className="is-accept" disabled={isSubmitting} onClick={() => runAction("accept-again")}><Check />Accept Again</button>
         ) : null}
-        {submission.status === WORKSPACE_STATUS.ARCHIVE_REQUEST && request && !isRequester ? <>
+        {displayedStatus === WORKSPACE_STATUS.ARCHIVE_REQUEST && request && !isRequester ? <>
           <button type="button" className="is-accept" disabled={isSubmitting} onClick={() => runAction("archive-vote-accept")}><Check />Accept</button>
           <button type="button" className="is-reject" disabled={isSubmitting} onClick={() => runAction("archive-vote-reject")}><X />Reject</button>
         </> : null}
-        {submission.status === WORKSPACE_STATUS.ARCHIVE_REQUEST && isRequester ? <>
+        {displayedStatus === WORKSPACE_STATUS.ARCHIVE_REQUEST && isRequester ? <>
           <button type="button" className="is-reject" disabled={isSubmitting} onClick={() => runAction("archive-cancel")}><X />Cancel Request</button>
           <button type="button" className="is-archive" disabled={isSubmitting || !canMerge} onClick={() => runAction("archive-merge")}>
             <ArchiveRestore />Merge into the Archive Tree
           </button>
         </> : null}
       </div>
-      {submission.status === WORKSPACE_STATUS.ARCHIVE_REQUEST && !request ? (
+      {displayedStatus === WORKSPACE_STATUS.ARCHIVE_REQUEST && !request ? (
         <p className="workspace-decision-note" role="status">
           {archiveRequestLoading
             ? "Loading Archive Request…"
             : "Archive Request details are unavailable."}
         </p>
       ) : null}
-      {submission.status === WORKSPACE_STATUS.ARCHIVE_REQUEST && isRequester && !canMerge ? (
+      {displayedStatus === WORKSPACE_STATUS.ARCHIVE_REQUEST && isRequester && !canMerge ? (
         <p className="workspace-decision-note">Every selected assignee must accept before merge is enabled.</p>
       ) : null}
     </section>

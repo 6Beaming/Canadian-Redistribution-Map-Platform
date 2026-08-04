@@ -167,3 +167,24 @@ test("Resolved Workspace submissions announce navigation to the next item", () =
   const navigation = review.indexOf("navigate(`/dashboard/workspace/${encodeURIComponent(next.id)}`", notice);
   assert.ok(notice >= 0 && navigation > notice);
 });
+
+test("Workspace decision controls do not flash the next status before navigation", () => {
+  const panel = read("src/components/non_prebuilt/WorkspaceReviewPanel.jsx");
+  const controls = panel.slice(
+    panel.indexOf("function DecisionControls"),
+    panel.indexOf("export function WorkspaceReviewPanel"),
+  );
+
+  assert.match(controls, /const \[submittedStatus, setSubmittedStatus\] = useState\(null\)/);
+  assert.match(controls, /const displayedStatus = submittedStatus \?\? submission\.status/);
+  assert.match(controls, /setSubmittedStatus\(submission\.status\)[\s\S]*commitWorkspaceAction/);
+  assert.match(controls, /keepControlsFrozen = action !== "archive-request"/);
+  assert.match(
+    controls,
+    /if \(!keepControlsFrozen\) \{[\s\S]*setSubmittedStatus\(null\)[\s\S]*setIsSubmitting\(false\)/,
+  );
+  assert.match(controls, /displayedStatus === WORKSPACE_STATUS\.PENDING/);
+  assert.match(controls, /displayedStatus === WORKSPACE_STATUS\.ACCEPTED/);
+  assert.match(controls, /displayedStatus === WORKSPACE_STATUS\.REJECTED/);
+  assert.doesNotMatch(controls, /submission\.status === WORKSPACE_STATUS/);
+});
