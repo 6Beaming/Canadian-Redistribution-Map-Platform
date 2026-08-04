@@ -61,13 +61,21 @@ function isWithinDateRange(value, dateStart, dateEnd) {
   return timestamp >= start && timestamp <= end;
 }
 
-export default function SubmissionsTable({ columns, data, onOpenAnalytics, onRowClick }) {
+export default function SubmissionsTable({
+  columns,
+  data,
+  newSubmissionCount = 0,
+  onOpenAnalytics,
+  onRevealNewSubmissions,
+  onRowClick,
+}) {
   const [sorting, setSorting] = React.useState([]);
   const [columnFilters, setColumnFilters] = React.useState([]);
   const [dateStart, setDateStart] = React.useState(subDays(new Date(), 30));
   const [dateEnd, setDateEnd] = React.useState(new Date());
   const [hoveredRowId, setHoveredRowId] = React.useState(null);
   const [exportState, setExportState] = React.useState({ pending: false, error: "" });
+  const tableShellRef = React.useRef(null);
   const [visibleSubmissions, setVisibleSubmissions] = React.useState({
     comments: true,
     objections: true,
@@ -98,6 +106,15 @@ export default function SubmissionsTable({ columns, data, onOpenAnalytics, onRow
     initialState: { pagination: { pageSize: 10 } },
   });
   const filteredSubmissionCount = table.getPrePaginationRowModel().rows.length;
+
+  function revealNewSubmissions() {
+    if (!newSubmissionCount) return;
+    table.setPageIndex(0);
+    onRevealNewSubmissions?.();
+    window.requestAnimationFrame(() => {
+      tableShellRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
 
   async function exportCsv() {
     if (exportState.pending) return;
@@ -229,7 +246,22 @@ export default function SubmissionsTable({ columns, data, onOpenAnalytics, onRow
         <p className="mb-3 text-sm text-red-700" role="alert">{exportState.error}</p>
       ) : null}
 
-      <div className="submissions-table-shell rounded-md border">
+      <div ref={tableShellRef} className="submissions-table-shell relative rounded-md border">
+        {newSubmissionCount > 0 ? (
+          <div
+            className="pointer-events-none sticky top-2 z-20 flex h-0 justify-center"
+            aria-live="polite"
+          >
+            <Button
+              type="button"
+              size="sm"
+              className="pointer-events-auto mt-2 rounded-full bg-blue-600 px-4 text-white shadow-lg hover:bg-blue-700"
+              onClick={revealNewSubmissions}
+            >
+              {newSubmissionCount} new {newSubmissionCount === 1 ? "submission" : "submissions"}
+            </Button>
+          </div>
+        ) : null}
         <Table className="min-w-[60rem]">
           <TableHeader className="bg-gray-50">
             {table.getHeaderGroups().map((headerGroup) => (

@@ -46,6 +46,10 @@ function newestFirst(left, right) {
   return new Date(right.created_at) - new Date(left.created_at);
 }
 
+function newestCommissionerRowFirst(left, right) {
+  return new Date(right.submittedAt) - new Date(left.submittedAt);
+}
+
 export function reconcileWorkspaceSubmission(current, event, submission, hints = []) {
   const submissionId = getRealtimeSubmissionId({ event, hints });
   if (!submissionId) return current;
@@ -79,8 +83,91 @@ export function reconcileCommissionerSubmissionRows(current, event, submission, 
   }
 
   return [submission, ...current].sort((left, right) => (
-    new Date(right.submittedAt) - new Date(left.submittedAt)
+    newestCommissionerRowFirst(left, right)
   ));
+}
+
+export function reconcileCommissionerSubmissionView(
+  current,
+  event,
+  submission,
+  hints = [],
+) {
+  const submissionId = getRealtimeSubmissionId({ event, hints });
+  if (!submissionId) return current;
+
+  const visibleRows = current?.visibleRows ?? [];
+  const bufferedRows = current?.bufferedRows ?? [];
+  const isDelete = event?.entity === "submission" && event?.operation === "delete";
+
+  if (isDelete || !submission) {
+    return {
+      visibleRows: visibleRows.filter((item) => String(item.id) !== submissionId),
+      bufferedRows: bufferedRows.filter((item) => String(item.id) !== submissionId),
+    };
+  }
+
+  if (visibleRows.some((item) => String(item.id) === submissionId)) {
+    return {
+      visibleRows: visibleRows.map((item) => (
+        String(item.id) === submissionId ? submission : item
+      )),
+      bufferedRows: bufferedRows.filter((item) => String(item.id) !== submissionId),
+    };
+  }
+
+  return {
+    visibleRows,
+    bufferedRows: [
+      submission,
+      ...bufferedRows.filter((item) => String(item.id) !== submissionId),
+    ].sort(newestCommissionerRowFirst),
+  };
+}
+
+export function reconcileCommissionerSubmissionSnapshot(current, submissions) {
+  const visibleRows = current?.visibleRows ?? [];
+  const bufferedRows = current?.bufferedRows ?? [];
+  const rowsById = new Map();
+
+  for (const submission of submissions ?? []) {
+    const submissionId = String(submission?.id ?? "");
+    if (submissionId) rowsById.set(submissionId, submission);
+  }
+
+  const knownIds = new Set(
+    [...visibleRows, ...bufferedRows].map((submission) => String(submission.id)),
+  );
+  const refreshKnownRows = (rows) => rows.flatMap((submission) => {
+    const refreshed = rowsById.get(String(submission.id));
+    return refreshed ? [refreshed] : [];
+  });
+  const newlyDiscoveredRows = [...rowsById.entries()]
+    .filter(([submissionId]) => !knownIds.has(submissionId))
+    .map(([, submission]) => submission);
+
+  return {
+    visibleRows: refreshKnownRows(visibleRows),
+    bufferedRows: [
+      ...refreshKnownRows(bufferedRows),
+      ...newlyDiscoveredRows,
+    ].sort(newestCommissionerRowFirst),
+  };
+}
+
+export function revealCommissionerSubmissionRows(current) {
+  const visibleRows = current?.visibleRows ?? [];
+  const bufferedRows = current?.bufferedRows ?? [];
+  if (!bufferedRows.length) return current;
+
+  const bufferedIds = new Set(bufferedRows.map((submission) => String(submission.id)));
+  return {
+    visibleRows: [
+      ...bufferedRows.slice().sort(newestCommissionerRowFirst),
+      ...visibleRows.filter((submission) => !bufferedIds.has(String(submission.id))),
+    ],
+    bufferedRows: [],
+  };
 }
 
 export function reconcileWorkspaceCustomLabels(selectedLabels, labelCatalog) {
