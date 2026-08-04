@@ -200,9 +200,12 @@ export default function WorkspaceReview() {
               onStatusChange={setStatus}
             />
           ) : (
-            <div className="route-loading-overlay__indicator" role="status">
-              <span className="route-loading-overlay__spinner" aria-hidden="true" />
-              <span>Loading...</span>
+            <div className="workspace-review-map-empty" role="status">
+              <strong>Map geometry unavailable</strong>
+              <p>
+                {submission.geometryError
+                  || "This submission loaded, but its boundary geometry could not be prepared."}
+              </p>
             </div>
           )}
           {normalizeType(submission.type) === "counter-proposal" ? (

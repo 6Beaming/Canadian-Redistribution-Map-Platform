@@ -56,7 +56,11 @@ async function getMetadataForFed(fedNum) {
   if (!metadataByFedPromise.has(normalizedFedNum)) {
     metadataByFedPromise.set(
       normalizedFedNum,
-      mapApi.fetchAssetJson(`metadata/fed_${normalizedFedNum}.geojson`),
+      mapApi.fetchAssetJson(`metadata/fed_${normalizedFedNum}.geojson`).catch((error) => {
+        console.warn(`Failed to load FED metadata ${normalizedFedNum}`, error);
+        metadataByFedPromise.delete(normalizedFedNum);
+        return EMPTY_FEATURE_COLLECTION;
+      }),
     );
   }
 
@@ -64,15 +68,24 @@ async function getMetadataForFed(fedNum) {
 }
 
 async function getPairIndex(submission, profilesByDguid) {
-  const firstDguid = String(submission?.dguid ?? "");
-  const secondDguid = String(submission?.neighboring_dguid ?? "");
-  const firstFedNum = normalizeFedNum(submission?.fed_num);
+  const firstDguid = String(submission?.dguid ?? "").trim();
+  const secondDguid = String(submission?.neighboring_dguid ?? "").trim();
+  const firstProfile = profilesByDguid?.get?.(firstDguid) ?? null;
+  const secondProfile = profilesByDguid?.get?.(secondDguid) ?? null;
+  const firstFedNum = normalizeFedNum(
+    submission?.primary_fed_num
+    ?? submission?.fed_num
+    ?? firstProfile?.fed_num,
+  );
+  // Never fall back the neighbour onto the primary FED — that breaks
+  // cross-province / cross-FED objections by loading only one metadata shard.
   const secondFedNum = normalizeFedNum(
-    submission?.secondary_fed_num ?? profilesByDguid.get(secondDguid)?.fed_num,
-  ) || firstFedNum;
+    submission?.secondary_fed_num
+    ?? secondProfile?.fed_num,
+  );
   const fedNums = [...new Set([firstFedNum, secondFedNum].filter(Boolean))];
 
-  if (!firstDguid || !secondDguid || !fedNums.length) {
+  if (!firstDguid || !secondDguid || !firstFedNum || !secondFedNum) {
     return null;
   }
 
@@ -117,13 +130,28 @@ function normalizeSubmission(submission, source) {
 async function hydrateObjection(submission, profilesByDguid) {
   const normalized = normalizeSubmission(submission, "supabase");
   const index = await getPairIndex(normalized, profilesByDguid);
-  const geometry = index
-    ? buildOriginalPairGeometry(index, normalized.dguid, normalized.neighboring_dguid)
-    : null;
+  if (!index) {
+    return {
+      ...normalized,
+      geometry: null,
+      geometryError:
+        "Objection map geometry could not be rebuilt for this DA pair. "
+        + "Both dissemination areas must resolve to local FED metadata.",
+    };
+  }
+
+  const geometry = buildOriginalPairGeometry(
+    index,
+    normalized.dguid,
+    normalized.neighboring_dguid,
+  );
 
   return {
     ...normalized,
     geometry,
+    geometryError: geometry
+      ? null
+      : "Objection map geometry could not be prepared for this DA pair.",
   };
 }
 
@@ -375,18 +403,11 @@ export async function getTemporaryCounterProposalSubmissions() {
  * Counter-proposals prefer immutable revision snapshots from Supabase.
  */
 export async function hydrateWorkspaceSubmission(submission, profilesByDguid) {
+  // Always prefer the full DA profile index so cross-FED / cross-province
+  // neighbours resolve to the correct metadata shard.
   const profiles = profilesByDguid instanceof Map
     ? profilesByDguid
-    : new Map([
-      [String(submission?.dguid ?? ""), {
-        fed_num: submission?.primary_fed_num ?? submission?.fed_num ?? null,
-        population: submission?.primary_population ?? null,
-      }],
-      [String(submission?.neighboring_dguid ?? ""), {
-        fed_num: submission?.secondary_fed_num ?? submission?.primary_fed_num ?? submission?.fed_num ?? null,
-        population: submission?.secondary_population ?? null,
-      }],
-    ].filter(([dguid]) => dguid));
+    : await getProfilesByDguid();
   const type = normalizeSubmissionType(submission?.type);
 
   if (type === "counter-proposal") {

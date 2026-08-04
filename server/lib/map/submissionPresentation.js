@@ -37,7 +37,7 @@ export async function enrichSubmissionsWithDaMetadata(submissions = []) {
         community_name: communityName,
       },
       primary_fed_num: profile?.fed_num ?? submission.fed_num ?? null,
-      secondary_fed_num: secondaryProfile?.fed_num ?? profile?.fed_num ?? submission.fed_num ?? null,
+      secondary_fed_num: secondaryProfile?.fed_num ?? null,
       primary_population: profile?.population ?? null,
       secondary_population: secondaryProfile?.population ?? null,
     };
