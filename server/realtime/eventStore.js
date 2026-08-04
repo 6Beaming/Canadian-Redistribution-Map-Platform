@@ -293,10 +293,10 @@ export class SyntheticRealtimeEventStore {
 }
 
 let defaultEventStore = null;
+const REALTIME_EVENT_STORE = "supabase";
 
 export function syntheticRealtimeEnabled() {
-  return process.env.REALTIME_EVENT_STORE === "synthetic"
-    || (process.env.NODE_ENV !== "production" && process.env.REALTIME_EVENT_STORE !== "supabase");
+  return REALTIME_EVENT_STORE === "synthetic";
 }
 
 export function getDefaultRealtimeEventStore() {
