@@ -45,6 +45,7 @@ export default function ArchivedTree() {
 
   useEffect(() => {
     let isMounted = true;
+    setIsLoading(true);
     getArchiveTreeRecords()
       .then((nextRecords) => {
         if (!isMounted) return;
@@ -145,6 +146,7 @@ export default function ArchivedTree() {
       <div className="archive-tree-layout">
         <ArchivedTreeCanvas
           categories={visibleCategories}
+          isLoading={isLoading}
           selectedVersionId={selectedId}
           onSelect={selectVersion}
           onOpenMap={(category) => navigate(`/dashboard?archivedMap=1&archiveCategory=${encodeURIComponent(category.id)}`)}

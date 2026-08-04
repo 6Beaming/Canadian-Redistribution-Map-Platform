@@ -25,6 +25,20 @@ test("Workspace waits behind the shared full-page loading UI before rendering it
   assert.doesNotMatch(workspace, /setWorkspaceSubmissions\(\[focused\]\)/);
 });
 
+test("Map pages render during profile hydration and Archived Tree waits for its canvas", () => {
+  const publicHome = read("src/pages/UserHome.jsx");
+  const dashboard = read("src/pages/DashboardHome.jsx");
+  const archived = read("src/pages/ArchivedTree.jsx");
+  const archivedCanvas = read("src/components/non_prebuilt/ArchivedTreeCanvas.jsx");
+
+  assert.match(publicHome, /if \(!initialLoad\.ready && initialLoad\.error\)/);
+  assert.match(dashboard, /if \(!initialLoad\.ready && initialLoad\.error\)/);
+  assert.match(archived, /isLoading=\{isLoading\}/);
+  assert.match(archivedCanvas, /const \[hasRendered, setHasRendered\] = useState\(false\)/);
+  assert.match(archivedCanvas, /isLoading \|\| !hasRendered/);
+  assert.match(archivedCanvas, /Loading archived tree…/);
+});
+
 test("Workspace detail hydrates one exact row before its optional sibling list", () => {
   const review = read("src/pages/WorkspaceReview.jsx");
   const exact = review.indexOf("await getSubmissionTableRowById(submissionId)");

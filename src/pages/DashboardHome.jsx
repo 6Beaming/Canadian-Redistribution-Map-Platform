@@ -182,7 +182,7 @@ export default function DashboardHome({ mapSearchTarget = null }) {
     setIsRolloutOpen(false);
   }, []);
 
-  if (!initialLoad.ready) {
+  if (!initialLoad.ready && initialLoad.error) {
     return <RouteLoadingPage label="Loading commissioner map…" error={initialLoad.error} />;
   }
 
