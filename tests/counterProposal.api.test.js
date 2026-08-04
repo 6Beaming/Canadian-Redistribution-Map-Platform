@@ -93,6 +93,17 @@ function authenticate(profile) {
           return createRevisionStore();
         }
 
+        if (table === "dissemination_areas") {
+          return {
+            upsert(values, options) {
+              return Promise.resolve({
+                data: values,
+                error: null,
+              });
+            },
+          };
+        }
+
         throw new Error(`Unexpected table: ${table}`);
       },
     }),
@@ -124,7 +135,7 @@ function createSubmissionStore() {
         },
         order() {
           return {
-            async then() {},
+            async then() { },
           };
         },
       };
