@@ -768,7 +768,9 @@ export default function CommissionerWorkspace() {
               <button
                 type="button"
                 className="workspace-control-button workspace-control-button--primary"
-                onClick={() => navigate("/dashboard/archivedTree")}
+                onClick={() => navigate("/dashboard/archivedTree", {
+                  state: { workspaceFrom: location.state?.from ?? null },
+                })}
               >
                 <Archive aria-hidden="true" />
                 Archived Tree

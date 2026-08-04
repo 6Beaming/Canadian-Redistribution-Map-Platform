@@ -59,6 +59,7 @@ test("CP5 navigation, readiness loading, and export entry points remain wired", 
   const table = read("src/pages/DashboardSubmissionsTable/DashboardSubmissionsPage.jsx");
   const mapCards = read("src/components/non_prebuilt/CommissionerSubmissionCollections.jsx");
   const header = read("src/pages/Header.jsx");
+  const workspace = read("src/pages/CommissionerWorkspace.jsx");
   const archived = read("src/pages/ArchivedTree.jsx");
   const graphs = read("src/pages/DashboardGraphs.jsx");
   const publicHome = read("src/pages/UserHome.jsx");
@@ -69,7 +70,12 @@ test("CP5 navigation, readiness loading, and export entry points remain wired", 
   assert.match(header, /pathname === "\/dashboard\/archivedTree"[\s\S]*return "\/dashboard\/workspace"/);
   assert.match(header, /pathname === "\/dashboard\/graphs"[\s\S]*return "\/dashboard\/submissionsTable"/);
   assert.match(header, /pathname\.startsWith\("\/dashboard\/workspace\/"\)[\s\S]*return "\/dashboard\/workspace"/);
-  assert.match(header, /workspaceFrom/);
+  assert.match(header, /\(isWorkspaceReview \|\| isArchivedTree\) && location\.state\?\.workspaceFrom/);
+  assert.match(header, /isCommissioner && pathname === "\/dashboard"/);
+  assert.doesNotMatch(header, /isCommissionerSurface && pathname !== "\/dashboard\/submissionsTable"/);
+  assert.match(workspace, /navigate\("\/dashboard\/archivedTree", \{[\s\S]*workspaceFrom: location\.state\?\.from \?\? null/);
+  assert.match(archived, /\{ replace: true, state: location\.state \}/);
+  assert.match(archived, /\/difference\?branch=[\s\S]*\{ state: location\.state \}/);
   assert.match(archived, /exportArchivedTreeJson/);
   assert.match(graphs, /exportCommissionerSubmissionsCsv/);
   [table, publicHome, dashboard].forEach((source) => assert.match(source, /RouteLoadingPage/));
