@@ -246,22 +246,23 @@ export default function SubmissionsTable({
         <p className="mb-3 text-sm text-red-700" role="alert">{exportState.error}</p>
       ) : null}
 
-      <div ref={tableShellRef} className="submissions-table-shell relative rounded-md border">
-        {newSubmissionCount > 0 ? (
-          <div
-            className="pointer-events-none sticky top-2 z-20 flex h-0 justify-center"
-            aria-live="polite"
+      {newSubmissionCount > 0 ? (
+        <div
+          className="pointer-events-none sticky top-2 z-20 mb-3 flex justify-center"
+          aria-live="polite"
+        >
+          <Button
+            type="button"
+            size="sm"
+            className="pointer-events-auto rounded-full bg-blue-600 px-4 text-white shadow-lg hover:bg-blue-700"
+            onClick={revealNewSubmissions}
           >
-            <Button
-              type="button"
-              size="sm"
-              className="pointer-events-auto mt-2 rounded-full bg-blue-600 px-4 text-white shadow-lg hover:bg-blue-700"
-              onClick={revealNewSubmissions}
-            >
-              {newSubmissionCount} new {newSubmissionCount === 1 ? "submission" : "submissions"}
-            </Button>
-          </div>
-        ) : null}
+            {newSubmissionCount} new {newSubmissionCount === 1 ? "submission" : "submissions"}
+          </Button>
+        </div>
+      ) : null}
+
+      <div ref={tableShellRef} className="submissions-table-shell rounded-md border">
         <Table className="min-w-[60rem]">
           <TableHeader className="bg-gray-50">
             {table.getHeaderGroups().map((headerGroup) => (

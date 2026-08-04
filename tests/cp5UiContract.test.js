@@ -16,6 +16,20 @@ test("Public and Commissioner tables use the lightweight service without changin
   assert.match(commissioner, /<SubmissionsTable/);
 });
 
+test("Commissioner new-submission indicator renders above the table shell", () => {
+  const table = read("src/pages/DashboardSubmissionsTable/SubmissionsTable.jsx");
+  const indicatorStart = table.indexOf("{newSubmissionCount > 0 ? (");
+  const indicatorEnd = table.indexOf(") : null}", indicatorStart);
+  const tableShell = table.indexOf(
+    '<div ref={tableShellRef} className="submissions-table-shell rounded-md border">',
+  );
+
+  assert.ok(indicatorStart >= 0);
+  assert.ok(indicatorEnd > indicatorStart);
+  assert.ok(tableShell > indicatorEnd);
+  assert.match(table, /sticky top-2 z-20 mb-3 flex justify-center/);
+});
+
 test("Workspace waits behind the shared full-page loading UI before rendering its complete tree", () => {
   const workspace = read("src/pages/CommissionerWorkspace.jsx");
   const exact = workspace.indexOf("await getWorkspaceSubmission(focusId");
