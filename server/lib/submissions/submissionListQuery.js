@@ -7,6 +7,7 @@ export const LIGHTWEIGHT_SUBMISSION_COLUMNS = [
   "neighboring_dguid",
   "title",
   "status",
+  "resource_version",
   "created_at",
   "updated_at",
 ].join(",");
@@ -139,6 +140,7 @@ export function serializeLightweightSubmission(row, profile = null) {
     neighboring_dguid: row.neighboring_dguid ?? null,
     title: row.title ?? "",
     status: normalizeSubmissionStatus(row.status),
+    resource_version: Number(row.resource_version) > 0 ? Number(row.resource_version) : 1,
     created_at: row.created_at,
     updated_at: row.updated_at ?? row.created_at,
     primary_fed_num: row.primary_fed_num ?? row.fed_num ?? null,
@@ -150,5 +152,8 @@ export function serializeLightweightSubmission(row, profile = null) {
     },
     profile: profile ? { id: profile.id, email: profile.email } : null,
     authorEmail: profile?.email ?? null,
+    scope_pruids: Array.isArray(row.scope_pruids) ? row.scope_pruids : [],
+    operating_pruid: row.operating_pruid ?? null,
+    crossProvinceWarning: row.cross_province_warning ?? row.crossProvinceWarning ?? null,
   };
 }
