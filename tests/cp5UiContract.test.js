@@ -102,6 +102,11 @@ test("Workspace label and catalog mutations stay scoped, ordered, and optimistic
   const panel = read("src/components/non_prebuilt/WorkspaceReviewPanel.jsx");
   assert.match(panel, /const mutationPending = pendingIds\.size > 0/);
   assert.match(panel, /setOptimisticSelected\(nextLabels\)/);
+  assert.match(panel, /optimisticSelected\.filter\(\(entry\) => labelIdentity\(entry\) !== labelId\)/);
+  assert.doesNotMatch(panel, /identity\(entry\)/);
+  assert.match(panel, /function handleLabelRowClick\(event, label\)/);
+  assert.match(panel, /event\.target\.closest\("button, input"\)/);
+  assert.match(panel, /onClick=\{\(event\) => handleLabelRowClick\(event, label\)\}/);
   assert.match(panel, /prepareCatalog\(entries/);
   assert.match(panel, /Customized Label/);
   assert.match(panel, /reconcileLabelsInOrder\(nextLabels, persisted\)/);

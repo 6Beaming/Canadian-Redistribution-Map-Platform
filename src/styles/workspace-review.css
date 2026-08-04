@@ -260,10 +260,15 @@
   gap: 0.5rem;
   border-radius: 0.4rem;
   padding: 0.3rem;
+  cursor: pointer;
 }
 
 .workspace-label-picker__row:hover {
   background: #f5f9fc;
+}
+
+.workspace-label-picker__row.is-disabled {
+  cursor: not-allowed;
 }
 
 .workspace-label-picker__row > button {

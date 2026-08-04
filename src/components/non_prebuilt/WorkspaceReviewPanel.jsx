@@ -232,10 +232,15 @@ function LabelEditor({
     }
     await persist(
       isSelected
-        ? optimisticSelected.filter((entry) => identity(entry) !== labelId)
+        ? optimisticSelected.filter((entry) => labelIdentity(entry) !== labelId)
         : [...optimisticSelected, label],
       labelId,
     );
+  }
+
+  function handleLabelRowClick(event, label) {
+    if (event.target.closest("button, input")) return;
+    void toggleLabel(label);
   }
 
   function editCustomLabel(id, changes) {
@@ -357,13 +362,17 @@ function LabelEditor({
             const checked = optimisticSelected.some((entry) => labelIdentity(entry) === label.id);
             const invalidCustomLabel = invalidCustomIds.has(label.id);
             return (
-              <div className="workspace-label-picker__row" key={label.id ?? `${label.name}-${index}`}>
+              <div
+                className={`workspace-label-picker__row${mutationPending ? " is-disabled" : ""}`}
+                key={label.id ?? `${label.name}-${index}`}
+                onClick={(event) => handleLabelRowClick(event, label)}
+              >
                 <button
                   type="button"
                   aria-pressed={checked}
                   aria-label={checked ? `Remove ${label.name}` : `Add ${label.name || "custom label"}`}
                   disabled={mutationPending}
-                  onClick={() => toggleLabel(label)}
+                  onClick={() => void toggleLabel(label)}
                 >
                   <i style={{ background: label.color }} />
                   {checked ? <Check aria-hidden="true" /> : null}
