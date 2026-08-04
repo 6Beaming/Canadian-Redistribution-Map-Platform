@@ -45,3 +45,26 @@ test("Archived Tree deletion recovers legacy scope and removes request dependenc
   assert.ok(sourceDelete < archiveDelete);
   assert.ok(archiveDelete < submissionDelete);
 });
+
+test("Archived Tree deletion skips scope backfill for orphaned submission IDs", () => {
+  const sql = fs.readFileSync(
+    "supabase/migrations/20260804140000_fix_orphan_archive_branch_delete.sql",
+    "utf8",
+  );
+
+  assert.match(
+    sql,
+    /for submission_id in[\s\S]*from public\.submissions submission[\s\S]*where submission\.id = any\(submission_ids\)[\s\S]*checkpoint0_submission_scope\(submission_id\)/i,
+  );
+  assert.doesNotMatch(sql, /foreach submission_id in array submission_ids/i);
+
+  const requestDelete = sql.indexOf("delete from public.workspace_archive_requests");
+  const sourceDelete = sql.indexOf("delete from public.archive_source_revisions");
+  const archiveDelete = sql.indexOf("delete from public.archive_tree");
+  const submissionDelete = sql.indexOf("delete from public.submissions");
+
+  assert.ok(requestDelete >= 0);
+  assert.ok(requestDelete < sourceDelete);
+  assert.ok(sourceDelete < archiveDelete);
+  assert.ok(archiveDelete < submissionDelete);
+});
