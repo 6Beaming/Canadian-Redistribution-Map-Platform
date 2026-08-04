@@ -3,13 +3,20 @@ import { getSupabaseAdminDataClient } from "../lib/supabase.js";
 import { validateRealtimeEvent } from "./eventContract.js";
 import { resolveRealtimeInvalidations } from "./invalidationRegistry.js";
 
-function normalizeOutboxRow(row, delivery) {
+const OUTBOX_ENTITY_ALIASES = Object.freeze({
+  "workspace.archive_request": "workspace.archive-request",
+});
+
+export function normalizeRealtimeOutboxDelivery(row, delivery) {
   const hints = row.projection_hints ?? {};
   const eventIdentity = {
     aggregateId: String(row.aggregate_id),
-    entity: hints.entity ?? row.aggregate_type,
+    entity: hints.entity
+      ?? OUTBOX_ENTITY_ALIASES[row.aggregate_type]
+      ?? row.aggregate_type,
     entityId: String(hints.entityId ?? row.aggregate_id),
     operation: row.operation,
+    submissionId: hints.submissionId ? String(hints.submissionId) : undefined,
   };
   return validateRealtimeEvent({
     aggregateId: eventIdentity.aggregateId,
@@ -64,7 +71,7 @@ export class SupabaseRealtimeEventStore {
     for (const row of data ?? []) {
       for (const delivery of row.realtime_scope_deliveries ?? []) {
         deliveries.push({
-          event: normalizeOutboxRow(row, delivery),
+          event: normalizeRealtimeOutboxDelivery(row, delivery),
           outboxId: row.id,
           pruid: String(delivery.pruid),
         });
@@ -137,7 +144,7 @@ export class SupabaseRealtimeEventStore {
       };
     }
 
-    const events = (data ?? []).map((delivery) => normalizeOutboxRow(
+    const events = (data ?? []).map((delivery) => normalizeRealtimeOutboxDelivery(
       delivery.realtime_outbox,
       delivery,
     ));

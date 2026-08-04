@@ -11,11 +11,14 @@ import {
     WORKSPACE_LIST_INVALIDATION_KEYS,
 } from "@/lib/realtime/workspaceRealtime.js";
 import {
+    getWorkspaceSubmissionStatus,
     patchWorkspaceSubmissionStatus,
 } from "@/services/workspaceStatusApi.js";
 import * as archiveRequestApi from "@/services/archiveRequestApi.js";
 
 const DURABLE_STATUS_WRITES = new Set(["accepted", "rejected"]);
+
+export { getWorkspaceSubmissionStatus };
 
 
 function handleResponse(res) {

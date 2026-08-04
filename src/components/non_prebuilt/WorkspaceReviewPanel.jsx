@@ -18,10 +18,12 @@ import {
   createWorkspaceLabelCatalog,
   deleteWorkspaceComment,
   deleteWorkspaceLabelCatalog,
+  getArchiveRequest,
   getWorkspaceComments,
   getWorkspaceLabelCatalog,
   getWorkspaceLabels,
   getWorkspaceReviewState,
+  getWorkspaceSubmissionStatus,
   saveWorkspaceLabelCatalog,
   saveWorkspaceLabels,
   subscribeWorkspaceReviewState,
@@ -828,6 +830,7 @@ export function WorkspaceReviewPanel({
   siblingSubmissions,
   onSubmissionSelect,
   onCommitted,
+  onSubmissionUpdated,
   reviewerEmails: availableReviewerEmails = [],
 }) {
 
@@ -837,16 +840,27 @@ export function WorkspaceReviewPanel({
   const [review, setReview] = useState(EMPTY_REVIEW);
   const [reviewError, setReviewError] = useState("");
   const refreshSequence = useRef(0);
-  const targetedRefreshSequence = useRef({ comments: 0, labelCatalog: 0, labels: 0 });
+  const targetedRefreshSequence = useRef({
+    archiveRequest: 0,
+    comments: 0,
+    labelCatalog: 0,
+    labels: 0,
+    status: 0,
+  });
 
   async function refreshReview({ rethrow = false } = {}) {
     const sequence = refreshSequence.current + 1;
     const commentsSequence = targetedRefreshSequence.current.comments;
+    const archiveRequestSequence = targetedRefreshSequence.current.archiveRequest;
     const labelCatalogSequence = targetedRefreshSequence.current.labelCatalog;
     const labelsSequence = targetedRefreshSequence.current.labels;
+    const statusSequence = targetedRefreshSequence.current.status;
     refreshSequence.current = sequence;
     try {
-      const nextReview = await getWorkspaceReviewState(submission.id);
+      const [nextReview, nextStatus] = await Promise.all([
+        getWorkspaceReviewState(submission.id),
+        getWorkspaceSubmissionStatus(submission.id),
+      ]);
       if (refreshSequence.current !== sequence) return;
       setReview((current) => {
         const isCurrentSubmission = String(current.submissionId) === String(submission.id);
@@ -861,10 +875,15 @@ export function WorkspaceReviewPanel({
           labelCatalog: targetedRefreshSequence.current.labelCatalog === labelCatalogSequence
             ? nextReview.labelCatalog ?? []
             : (isCurrentSubmission ? current.labelCatalog : []),
-          archiveRequest: nextReview.archiveRequest ?? null,
+          archiveRequest: targetedRefreshSequence.current.archiveRequest === archiveRequestSequence
+            ? nextReview.archiveRequest ?? null
+            : (isCurrentSubmission ? current.archiveRequest : null),
           collaborationWarning: nextReview.collaborationWarning ?? "",
         };
       });
+      if (targetedRefreshSequence.current.status === statusSequence) {
+        onSubmissionUpdated?.(nextStatus);
+      }
       setReviewError("");
     } catch (error) {
       console.error("Unable to load workspace review:", error);
@@ -940,15 +959,59 @@ export function WorkspaceReviewPanel({
     }
   }
 
+  async function refreshArchiveRequest() {
+    const sequence = targetedRefreshSequence.current.archiveRequest + 1;
+    targetedRefreshSequence.current.archiveRequest = sequence;
+    try {
+      let archiveRequest;
+      try {
+        archiveRequest = await getArchiveRequest(submission.id);
+      } catch (error) {
+        if (error.status !== 404) throw error;
+        archiveRequest = null;
+      }
+      if (targetedRefreshSequence.current.archiveRequest !== sequence) return;
+      setReview((current) => String(current.submissionId) === String(submission.id)
+        ? { ...current, archiveRequest }
+        : { ...EMPTY_REVIEW, submissionId: submission.id, archiveRequest });
+      setReviewError("");
+    } catch (error) {
+      if (targetedRefreshSequence.current.archiveRequest === sequence) {
+        setReviewError(error.message || "Unable to refresh the Archive Request.");
+      }
+      throw error;
+    }
+  }
+
+  async function refreshStatus() {
+    const sequence = targetedRefreshSequence.current.status + 1;
+    targetedRefreshSequence.current.status = sequence;
+    try {
+      const nextStatus = await getWorkspaceSubmissionStatus(submission.id);
+      if (targetedRefreshSequence.current.status !== sequence) return;
+      onSubmissionUpdated?.(nextStatus);
+      setReviewError("");
+    } catch (error) {
+      if (targetedRefreshSequence.current.status === sequence) {
+        setReviewError(error.message || "Unable to refresh the Workspace status.");
+      }
+      throw error;
+    }
+  }
+
   async function handleReviewInvalidation({ hints, resync }) {
     if (resync) {
       await refreshReview({ rethrow: true });
       return;
     }
     const targets = getWorkspaceReviewInvalidationTargets(hints, submission.id);
-    if (targets.includes("comments")) await refreshComments();
-    if (targets.includes("labelCatalog")) await refreshCustomLabels();
-    if (targets.includes("labels")) await refreshLabels();
+    await Promise.all([
+      ...(targets.includes("archiveRequest") ? [refreshArchiveRequest()] : []),
+      ...(targets.includes("comments") ? [refreshComments()] : []),
+      ...(targets.includes("labelCatalog") ? [refreshCustomLabels()] : []),
+      ...(targets.includes("labels") ? [refreshLabels()] : []),
+      ...(targets.includes("status") ? [refreshStatus()] : []),
+    ]);
   }
 
   useEffect(() => {
@@ -960,9 +1023,11 @@ export function WorkspaceReviewPanel({
     });
     return () => {
       refreshSequence.current += 1;
+      targetedRefreshSequence.current.archiveRequest += 1;
       targetedRefreshSequence.current.comments += 1;
       targetedRefreshSequence.current.labelCatalog += 1;
       targetedRefreshSequence.current.labels += 1;
+      targetedRefreshSequence.current.status += 1;
       unsubscribe();
     };
   }, [submission.id]);

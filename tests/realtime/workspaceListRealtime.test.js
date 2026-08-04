@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "@jest/globals";
 import { SyntheticRealtimeEventStore } from "../../server/realtime/eventStore.js";
 import { resolveRealtimeInvalidations } from "../../server/realtime/invalidationRegistry.js";
-import { reconcileWorkspaceSubmission } from "../../src/lib/realtime/workspaceRealtime.js";
+import {
+  getRealtimeSubmissionId,
+  reconcileWorkspaceSubmission,
+} from "../../src/lib/realtime/workspaceRealtime.js";
 
 test("Issue 103 maps a submission event to its exact Workspace row and derived branch", () => {
   assert.deepEqual(resolveRealtimeInvalidations({
@@ -11,6 +14,7 @@ test("Issue 103 maps a submission event to its exact Workspace row and derived b
   }), [
     "workspace:submission:submission-123",
     "workspace:branch:submission-123",
+    "commissioner-table:submission:submission-123",
   ]);
 });
 
@@ -30,6 +34,7 @@ test("Issue 103 synthetic events match the frozen identifier-only contract", () 
   assert.deepEqual(result.events[0].invalidate, [
     "workspace:submission:submission-123",
     "workspace:branch:submission-123",
+    "commissioner-table:submission:submission-123",
   ]);
   assert.equal(Object.hasOwn(result.events[0], "submission"), false);
 });
@@ -64,6 +69,7 @@ test("Issue 103 reconciles one lightweight row without replacing the whole list"
   assert.deepEqual(
     reconcileWorkspaceSubmission(current, {
       aggregateId: "submission-1",
+      entity: "submission",
       operation: "update",
     }, updated),
     [current[1], updated],
@@ -71,8 +77,15 @@ test("Issue 103 reconciles one lightweight row without replacing the whole list"
   assert.deepEqual(
     reconcileWorkspaceSubmission(current, {
       aggregateId: "submission-1",
+      entity: "submission",
       operation: "delete",
     }, null),
     [current[1]],
   );
+});
+
+test("Issue 103 resolves Archive Request invalidations back to the submission row", () => {
+  const event = { aggregateId: "archive-request-1", entity: "workspace.archive-request" };
+  const hints = ["workspace:submission:submission-123"];
+  assert.equal(getRealtimeSubmissionId({ event, hints }), "submission-123");
 });

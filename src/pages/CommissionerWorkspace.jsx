@@ -19,7 +19,10 @@ import {
   getWorkspaceSubmissions,
   subscribeWorkspaceListState,
 } from "@/services/workspaceApi.js";
-import { reconcileWorkspaceSubmission } from "@/lib/realtime/workspaceRealtime.js";
+import {
+  getRealtimeSubmissionId,
+  reconcileWorkspaceSubmission,
+} from "@/lib/realtime/workspaceRealtime.js";
 import { RouteLoadingPage } from "@/components/non_prebuilt/RouteLoadingPage.jsx";
 import "@/styles/workspace.css";
 
@@ -627,19 +630,20 @@ export default function CommissionerWorkspace() {
       }
     };
 
-    const refreshAffectedSubmission = async ({ event, resync }) => {
-      if (resync || !event?.aggregateId) {
+    const refreshAffectedSubmission = async ({ event, hints, resync }) => {
+      const affectedSubmissionId = getRealtimeSubmissionId({ event, hints });
+      if (resync || !affectedSubmissionId) {
         await loadSubmissions();
         return;
       }
 
       try {
-        const submission = event.operation === "delete"
+        const submission = event.entity === "submission" && event.operation === "delete"
           ? null
-          : await getWorkspaceSubmission(event.aggregateId, { hydrateGeometry: false });
+          : await getWorkspaceSubmission(affectedSubmissionId, { hydrateGeometry: false });
         if (!isMounted) return;
         setWorkspaceSubmissions((current) => (
-          reconcileWorkspaceSubmission(current, event, submission)
+          reconcileWorkspaceSubmission(current, event, submission, hints)
         ));
         setLoadError("");
       } catch (error) {

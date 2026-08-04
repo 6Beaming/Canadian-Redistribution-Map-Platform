@@ -16,11 +16,14 @@ test("Issue 104 maps comment CRUD to only the affected submission thread", () =>
 
   assert.deepEqual(resolveRealtimeInvalidations(identity), [
     "workspace:comments:submission-123",
+    "workspace:branch:submission-123",
   ]);
   assert.deepEqual(getWorkspaceReviewInvalidationKeys("submission-123"), [
+    "workspace:archive-request:submission-123",
     "workspace:comments:submission-123",
     "workspace:custom-labels:submission-123",
     "workspace:labels:submission-123",
+    "workspace:status:submission-123",
   ]);
   assert.deepEqual(getWorkspaceReviewInvalidationTargets(
     resolveRealtimeInvalidations(identity),

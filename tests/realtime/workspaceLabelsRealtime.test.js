@@ -19,9 +19,11 @@ test("Issue 105 maps assigned-label CRUD to the selected submission and its bran
     "workspace:branch:submission-123",
   ]);
   assert.deepEqual(getWorkspaceReviewInvalidationKeys("submission-123"), [
+    "workspace:archive-request:submission-123",
     "workspace:comments:submission-123",
     "workspace:custom-labels:submission-123",
     "workspace:labels:submission-123",
+    "workspace:status:submission-123",
   ]);
   assert.deepEqual(getWorkspaceReviewInvalidationTargets(
     resolveRealtimeInvalidations(identity),

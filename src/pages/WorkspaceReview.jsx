@@ -144,6 +144,22 @@ export default function WorkspaceReview() {
     }
   }
 
+  function updateSubmissionStatus(nextStatus) {
+    const applyStatus = (current) => {
+      if (!current || String(current.id) !== String(nextStatus?.submissionId)) return current;
+      return {
+        ...current,
+        status: normalizeWorkspaceStatus(nextStatus.status),
+        resource_version: Number(nextStatus.version) || current.resource_version,
+        updated_at: nextStatus.updatedAt ?? current.updated_at,
+        crossProvinceWarning: nextStatus.crossProvinceWarning ?? current.crossProvinceWarning,
+        scope_pruids: nextStatus.eligibilityPruids ?? current.scope_pruids,
+      };
+    };
+    setSubmission(applyStatus);
+    setAllSubmissions((current) => current.map(applyStatus));
+  }
+
   if (error) {
     return <main className="workspace-review-error"><h1>Workspace unavailable</h1><p>{error}</p></main>;
   }
@@ -187,6 +203,7 @@ export default function WorkspaceReview() {
             state: location.state,
           })}
           onCommitted={advanceAfterCommit}
+          onSubmissionUpdated={updateSubmissionStatus}
           reviewerEmails={reviewerEmails}
         />
       </div>

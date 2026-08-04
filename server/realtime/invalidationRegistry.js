@@ -2,10 +2,12 @@ const INVALIDATION_RESOLVERS = Object.freeze({
   submission: ({ aggregateId }) => [
     `workspace:submission:${aggregateId}`,
     `workspace:branch:${aggregateId}`,
+    `commissioner-table:submission:${aggregateId}`,
   ],
   "synthetic.resource": () => ["realtime:harness"],
   "workspace.comment": ({ aggregateId }) => [
     `workspace:comments:${aggregateId}`,
+    `workspace:branch:${aggregateId}`,
   ],
   "workspace.custom-label": ({ aggregateId }) => [
     `workspace:custom-labels:${aggregateId}`,
@@ -14,6 +16,22 @@ const INVALIDATION_RESOLVERS = Object.freeze({
     `workspace:labels:${aggregateId}`,
     `workspace:branch:${aggregateId}`,
   ],
+  "workspace.status": ({ aggregateId }) => [
+    `workspace:status:${aggregateId}`,
+    `workspace:submission:${aggregateId}`,
+    `workspace:branch:${aggregateId}`,
+    `commissioner-table:submission:${aggregateId}`,
+  ],
+  "workspace.archive-request": ({ aggregateId, submissionId }) => {
+    const targetId = submissionId ?? aggregateId;
+    return [
+      `workspace:archive-request:${targetId}`,
+      `workspace:status:${targetId}`,
+      `workspace:submission:${targetId}`,
+      `workspace:branch:${targetId}`,
+      `commissioner-table:submission:${targetId}`,
+    ];
+  },
 });
 
 export class RealtimeInvalidationRegistryError extends Error {

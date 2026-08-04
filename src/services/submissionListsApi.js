@@ -1,3 +1,6 @@
+import { subscribeRealtimeInvalidation } from "@/lib/realtime/realtimeInvalidation.js";
+import { COMMISSIONER_TABLE_INVALIDATION_KEYS } from "@/lib/realtime/workspaceRealtime.js";
+
 function appendFilters(url, filters = {}) {
   const params = new URLSearchParams();
   ["query", "createdFrom", "createdTo", "type", "status", "sort"].forEach((key) => {
@@ -36,4 +39,28 @@ export async function getSubmissionTableRowById(submissionId) {
     `/api/submissions/table-row/${encodeURIComponent(submissionId)}`,
   );
   return payload.item ?? null;
+}
+
+export function subscribeCommissionerSubmissionTable({ onInvalidate, onRecover = onInvalidate }) {
+  if (typeof window === "undefined") return () => {};
+  const recover = (reason) => {
+    void Promise.resolve(onRecover({ event: null, reason, resync: true })).catch(() => {});
+  };
+  const handleFocus = () => recover("focus");
+  const handleVisibility = () => {
+    if (document.visibilityState === "visible") {
+      recover("visibility");
+    }
+  };
+  const unsubscribeRealtime = subscribeRealtimeInvalidation(
+    COMMISSIONER_TABLE_INVALIDATION_KEYS,
+    onInvalidate,
+  );
+  window.addEventListener("focus", handleFocus);
+  document.addEventListener("visibilitychange", handleVisibility);
+  return () => {
+    window.removeEventListener("focus", handleFocus);
+    document.removeEventListener("visibilitychange", handleVisibility);
+    unsubscribeRealtime();
+  };
 }
