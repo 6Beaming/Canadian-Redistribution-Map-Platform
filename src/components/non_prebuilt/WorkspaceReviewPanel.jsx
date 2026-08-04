@@ -748,14 +748,14 @@ function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, o
     setIsSubmitting(true);
     setError("");
     try {
-      await commitWorkspaceAction(submission, {
+      const committed = await commitWorkspaceAction(submission, {
         action,
         email: reviewerEmail,
         message,
         assignees,
       });
       setMessage("");
-      onCommitted(action);
+      onCommitted(action, committed);
     } catch (actionError) {
       setError(actionError.message);
     } finally {
@@ -1065,6 +1065,20 @@ export function WorkspaceReviewPanel({
     });
   }
 
+  function handleDecisionCommitted(action, committed) {
+    if (committed?.review) {
+      setReview({
+        submissionId: submission.id,
+        comments: committed.review.comments ?? [],
+        labels: committed.review.labels ?? [],
+        labelCatalog: committed.review.labelCatalog ?? [],
+        archiveRequest: committed.review.archiveRequest ?? null,
+        collaborationWarning: committed.review.collaborationWarning ?? "",
+      });
+    }
+    onCommitted?.(action, committed);
+  }
+
   return (
     <aside className="map-info-panel workspace-review-panel" aria-label="Submission workspace review">
       <SubmissionSelector
@@ -1107,7 +1121,7 @@ export function WorkspaceReviewPanel({
           review={activeReview}
           reviewerEmail={reviewerEmail}
           reviewerEmails={reviewerEmails}
-          onCommitted={onCommitted}
+          onCommitted={handleDecisionCommitted}
         />
       </div>
     </aside>

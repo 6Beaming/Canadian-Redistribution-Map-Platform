@@ -498,10 +498,6 @@ export async function commitWorkspaceAction(submission, {
             [...new Set(assignees)],
             { expectedVersion: submission.resource_version },
         );
-        if (submission) {
-            submission.status = WORKSPACE_STATUS.ARCHIVE_REQUEST;
-            submission.resource_version = Number(submission.resource_version || 1) + 1;
-        }
     } else if (action === "archive-vote-accept") {
         await voteArchiveRequest(
             submission.id,
@@ -535,7 +531,13 @@ export async function commitWorkspaceAction(submission, {
         action: actionDescription(action, reviewerEmail),
         is_closing: true,
     });
-    return { status: nextStatus, review: await getWorkspaceReviewState(submission.id) };
+    const [review, submissionStatus] = await Promise.all([
+        getWorkspaceReviewState(submission.id),
+        action === "archive-request"
+            ? getWorkspaceSubmissionStatus(submission.id)
+            : Promise.resolve(null),
+    ]);
+    return { status: nextStatus, review, submissionStatus };
 }
 
 export function canMergeArchiveRequest(request) {

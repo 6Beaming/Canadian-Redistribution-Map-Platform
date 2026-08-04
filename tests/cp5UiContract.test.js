@@ -35,6 +35,21 @@ test("Workspace detail hydrates one exact row before its optional sibling list",
   assert.match(review, /<RouteLoadingPage label="Loading submission workspace…"/);
 });
 
+test("Creating an Archive Request updates the active review without navigating away", () => {
+  const api = read("src/services/workspaceApi.js");
+  const panel = read("src/components/non_prebuilt/WorkspaceReviewPanel.jsx");
+  const review = read("src/pages/WorkspaceReview.jsx");
+
+  assert.doesNotMatch(api, /submission\.status\s*=\s*WORKSPACE_STATUS\.ARCHIVE_REQUEST/);
+  assert.match(api, /action === "archive-request"[\s\S]*getWorkspaceSubmissionStatus\(submission\.id\)/);
+  assert.match(api, /return \{ status: nextStatus, review, submissionStatus \}/);
+  assert.match(panel, /const committed = await commitWorkspaceAction/);
+  assert.match(panel, /onCommitted\(action, committed\)/);
+  assert.match(panel, /archiveRequest: committed\.review\.archiveRequest \?\? null/);
+  assert.match(review, /if \(action === "archive-request"\) \{[\s\S]*updateSubmissionStatus\(committed\?\.submissionStatus\);[\s\S]*return;/);
+  assert.match(review, /onCommitted=\{handleCommitted\}/);
+});
+
 test("CP5 navigation, readiness loading, and export entry points remain wired", () => {
   const table = read("src/pages/DashboardSubmissionsTable/DashboardSubmissionsPage.jsx");
   const mapCards = read("src/components/non_prebuilt/CommissionerSubmissionCollections.jsx");

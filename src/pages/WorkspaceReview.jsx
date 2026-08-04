@@ -160,6 +160,14 @@ export default function WorkspaceReview() {
     setAllSubmissions((current) => current.map(applyStatus));
   }
 
+  function handleCommitted(action, committed) {
+    if (action === "archive-request") {
+      updateSubmissionStatus(committed?.submissionStatus);
+      return;
+    }
+    advanceAfterCommit();
+  }
+
   if (error) {
     return <main className="workspace-review-error"><h1>Workspace unavailable</h1><p>{error}</p></main>;
   }
@@ -202,7 +210,7 @@ export default function WorkspaceReview() {
           onSubmissionSelect={(id) => navigate(`/dashboard/workspace/${encodeURIComponent(id)}`, {
             state: location.state,
           })}
-          onCommitted={advanceAfterCommit}
+          onCommitted={handleCommitted}
           onSubmissionUpdated={updateSubmissionStatus}
           reviewerEmails={reviewerEmails}
         />
