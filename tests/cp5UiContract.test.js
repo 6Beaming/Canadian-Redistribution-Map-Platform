@@ -139,3 +139,14 @@ test("Workspace closing comments use action-specific note headings without repea
   assert.match(panel, /comment\.isClosing \? getClosingNoteTitle\(comment\.action\) : comment\.email/);
   assert.doesNotMatch(panel, /\$\{comment\.email\}'s Closing Comment/);
 });
+
+test("Resolved Workspace submissions announce navigation to the next item", () => {
+  const review = read("src/pages/WorkspaceReview.jsx");
+  assert.match(review, /import \{ toast \} from "sonner"/);
+  assert.match(review, /toast\.success\("Submission resolved\. Moving to the next submission\."/);
+  assert.match(review, /toast\.success\("Submission resolved\. Returning to the Workspace\."/);
+  assert.match(review, /if \(action === "archive-request"\) \{[\s\S]*updateSubmissionStatus[\s\S]*return;/);
+  const notice = review.indexOf("Submission resolved. Moving to the next submission.");
+  const navigation = review.indexOf("navigate(`/dashboard/workspace/${encodeURIComponent(next.id)}`", notice);
+  assert.ok(notice >= 0 && navigation > notice);
+});

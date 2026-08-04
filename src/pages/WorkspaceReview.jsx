@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
 import { WorkspaceReviewPanel } from "@/components/non_prebuilt/WorkspaceReviewPanel.jsx";
 import { MAP_INTERACTION_MODE } from "@/lib/map/interactionMode.js";
@@ -136,8 +137,14 @@ export default function WorkspaceReview() {
       (entry) => entry.id !== submission.id,
     );
     if (next) {
+      toast.success("Submission resolved. Moving to the next submission.", {
+        duration: 1500,
+      });
       navigate(`/dashboard/workspace/${encodeURIComponent(next.id)}`, { state: location.state });
     } else {
+      toast.success("Submission resolved. Returning to the Workspace.", {
+        duration: 1500,
+      });
       navigate("/dashboard/workspace", {
         state: { from: location.state?.workspaceFrom ?? null },
       });
