@@ -31,5 +31,5 @@ test("postal navigation resets the stale panel selection and the heatmap uses re
   assert.match(userHome, /onPostalAreaActivate=\{handlePostalAreaActivate\}/);
   assert.match(heatmap, /#fff7ed/);
   assert.match(heatmap, /#450a0a/);
-  assert.match(styles, /\.heatmap-button\.active[\s\S]*#fdba74/);
+  assert.match(styles, /\.heatmap-button\.active[\s\S]*#fee2e2/);
 });
