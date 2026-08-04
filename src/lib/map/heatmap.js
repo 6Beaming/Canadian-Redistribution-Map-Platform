@@ -44,12 +44,12 @@ export function buildSubmissionHeatmapFillExpression(countsByDguid = {}, totalSu
     ["linear"],
     buildSubmissionCountExpression(countsByDguid),
     0, "rgba(0,0,0,0)",
-    maxIntensity * 0.05, "#fff5f5", // almost white: very low
-    maxIntensity * 0.20, "#fecaca", // light pink: low
-    maxIntensity * 0.40, "#f87171", // medium red: medium
-    maxIntensity * 0.60, "#ef4444", // strong red: high
-    maxIntensity * 0.80, "#b91c1c", // dark red: very high
-    maxIntensity, "#450a0a",        // deepest red: hotspot
+    maxIntensity * 0.05, "#fff7ed", // almost white
+    maxIntensity * 0.20, "#fdba74", // light orange
+    maxIntensity * 0.40, "#fb923c", // orange
+    maxIntensity * 0.60, "#ef4444", // bright red
+    maxIntensity * 0.80, "#b91c1c", // dark red
+    maxIntensity, "#450a0a",        // hotspot
   ];
 }
 
