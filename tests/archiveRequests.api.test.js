@@ -257,6 +257,67 @@ test("archive request create seals source, claims province, and writes outbox de
   assert.equal(admin.state.workspace_archive_request_votes.length, 1);
 });
 
+test("counter-proposal Archive Request identifies its requester", async () => {
+  const admin = makeAdmin();
+  admin.state.submissions[0].type = "counter-proposal";
+  admin.state.counter_proposal_revisions.push({
+    id: "counter-revision-1",
+    submission_id: "submission-1",
+    revision_number: 1,
+    primary_dguid: admin.state.submissions[0].dguid,
+    secondary_dguid: null,
+    baseline_revision: "baseline-1",
+    original_geometry: {},
+    proposed_geometry: {},
+    shared_boundary: null,
+    outer_boundary: {},
+    validation_report: {},
+  });
+  auth(requester, admin);
+
+  const response = await request("/api/workspace/archive-requests", {
+    method: "POST",
+    body: {
+      submissionId: "submission-1",
+      assignees: [assignee.email],
+      expectedVersion: 1,
+    },
+  });
+
+  assert.equal(response.status, 201);
+  assert.equal(response.body.requesterEmail, requester.email);
+  assert.ok(response.body.allowedActions.includes("cancel"));
+  assert.equal(response.body.allowedActions.includes("merge"), false);
+});
+
+test("approved Archive Request keeps requester cancel and merge actions", async () => {
+  const admin = makeAdmin();
+  auth(requester, admin);
+  const created = await request("/api/workspace/archive-requests", {
+    method: "POST",
+    body: {
+      submissionId: "submission-1",
+      assignees: [assignee.email],
+      expectedVersion: 1,
+    },
+  });
+  assert.equal(created.status, 201);
+
+  auth(assignee, admin);
+  const voted = await request(`/api/workspace/archive-requests/${created.body.id}/votes`, {
+    method: "POST",
+    body: { vote: "accepted", expectedVersion: 1 },
+  });
+  assert.equal(voted.status, 200);
+  assert.equal(voted.body.state, "approved");
+
+  auth(requester, admin);
+  const loaded = await request("/api/workspace/archive-requests/submission-1");
+  assert.equal(loaded.status, 200);
+  assert.ok(loaded.body.allowedActions.includes("cancel"));
+  assert.ok(loaded.body.allowedActions.includes("merge"));
+});
+
 test("archive request vote reject cancels claim and returns to accepted", async () => {
   const admin = makeAdmin();
   auth(requester, admin);

@@ -248,9 +248,10 @@ export async function getWorkspaceReviewState(submissionId) {
     ] = await Promise.all([
         getWorkspaceComments(submissionId),
         tolerateMissingLabelMigration(getWorkspaceLabels(submissionId)),
-        // Archive Request is CP4-owned. CP5 collaboration remains usable when
-        // that optional service is not mounted or is temporarily unavailable.
-        getArchiveRequest(submissionId).catch(() => null),
+        getArchiveRequest(submissionId).catch((error) => {
+            if (error.status === 404) return null;
+            throw error;
+        }),
         tolerateMissingLabelMigration(getWorkspaceLabelCatalog(submissionId)),
     ]);
     return {

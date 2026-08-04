@@ -165,6 +165,8 @@ function deriveAllowedActions(request, votes, actor) {
       if (canApproveFromVotes(request, votes)) actions.push("merge");
     }
     if (isAssignee || isRequester) actions.push("vote");
+  } else if (state === APPROVED && isRequester) {
+    actions.push("cancel", "merge");
   }
   return actions;
 }

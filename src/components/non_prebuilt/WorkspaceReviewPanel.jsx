@@ -696,7 +696,14 @@ function CounterProposalImpact({ submission }) {
   );
 }
 
-function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, onCommitted }) {
+function DecisionControls({
+  submission,
+  review,
+  reviewerEmail,
+  reviewerEmails,
+  archiveRequestLoading,
+  onCommitted,
+}) {
   const [message, setMessage] = useState("");
   const [assignees, setAssignees] = useState(() =>
     review.archiveRequest?.assignees?.length
@@ -707,8 +714,16 @@ function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, o
   const [isUpdatingAssignees, setIsUpdatingAssignees] = useState(false);
   const [error, setError] = useState("");
   const request = review.archiveRequest;
-  const isRequester = request?.requesterEmail === reviewerEmail;
-  const canMerge = isRequester && canMergeArchiveRequest(request);
+  const requesterEmail = String(request?.requesterEmail ?? "").trim().toLowerCase();
+  const signedInEmail = String(reviewerEmail ?? "").trim().toLowerCase();
+  const isRequester = Boolean(request) && (
+    request.allowedActions?.includes("cancel")
+    || (requesterEmail && requesterEmail === signedInEmail)
+  );
+  const canMerge = isRequester && (
+    request.allowedActions?.includes("merge")
+    || canMergeArchiveRequest(request)
+  );
 
   useEffect(() => {
     if (request?.assignees) setAssignees(request.assignees);
@@ -805,7 +820,7 @@ function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, o
         {submission.status === WORKSPACE_STATUS.REJECTED ? (
           <button type="button" className="is-accept" disabled={isSubmitting} onClick={() => runAction("accept-again")}><Check />Accept Again</button>
         ) : null}
-        {submission.status === WORKSPACE_STATUS.ARCHIVE_REQUEST && !isRequester ? <>
+        {submission.status === WORKSPACE_STATUS.ARCHIVE_REQUEST && request && !isRequester ? <>
           <button type="button" className="is-accept" disabled={isSubmitting} onClick={() => runAction("archive-vote-accept")}><Check />Accept</button>
           <button type="button" className="is-reject" disabled={isSubmitting} onClick={() => runAction("archive-vote-reject")}><X />Reject</button>
         </> : null}
@@ -816,6 +831,13 @@ function DecisionControls({ submission, review, reviewerEmail, reviewerEmails, o
           </button>
         </> : null}
       </div>
+      {submission.status === WORKSPACE_STATUS.ARCHIVE_REQUEST && !request ? (
+        <p className="workspace-decision-note" role="status">
+          {archiveRequestLoading
+            ? "Loading Archive Request…"
+            : "Archive Request details are unavailable."}
+        </p>
+      ) : null}
       {submission.status === WORKSPACE_STATUS.ARCHIVE_REQUEST && isRequester && !canMerge ? (
         <p className="workspace-decision-note">Every selected assignee must accept before merge is enabled.</p>
       ) : null}
@@ -839,6 +861,10 @@ export function WorkspaceReviewPanel({
   const reviewerEmails = [...new Set([reviewerEmail, ...availableReviewerEmails])];
   const [review, setReview] = useState(EMPTY_REVIEW);
   const [reviewError, setReviewError] = useState("");
+  const [archiveRequestLoad, setArchiveRequestLoad] = useState({
+    submissionId: null,
+    loading: false,
+  });
   const refreshSequence = useRef(0);
   const targetedRefreshSequence = useRef({
     archiveRequest: 0,
@@ -961,7 +987,9 @@ export function WorkspaceReviewPanel({
 
   async function refreshArchiveRequest() {
     const sequence = targetedRefreshSequence.current.archiveRequest + 1;
+    const activeSubmissionId = String(submission.id);
     targetedRefreshSequence.current.archiveRequest = sequence;
+    setArchiveRequestLoad({ submissionId: activeSubmissionId, loading: true });
     try {
       let archiveRequest;
       try {
@@ -980,6 +1008,10 @@ export function WorkspaceReviewPanel({
         setReviewError(error.message || "Unable to refresh the Archive Request.");
       }
       throw error;
+    } finally {
+      if (targetedRefreshSequence.current.archiveRequest === sequence) {
+        setArchiveRequestLoad({ submissionId: activeSubmissionId, loading: false });
+      }
     }
   }
 
@@ -1017,6 +1049,9 @@ export function WorkspaceReviewPanel({
   useEffect(() => {
     setReviewError("");
     refreshReview();
+    if (submission.status === WORKSPACE_STATUS.ARCHIVE_REQUEST) {
+      void refreshArchiveRequest().catch(() => {});
+    }
     const unsubscribe = subscribeWorkspaceReviewState(submission.id, {
       onInvalidate: handleReviewInvalidation,
       onRecover: refreshReview,
@@ -1035,6 +1070,12 @@ export function WorkspaceReviewPanel({
   const activeReview = String(review.submissionId) === String(submission.id)
     ? review
     : EMPTY_REVIEW;
+  const archiveRequestLoading = submission.status === WORKSPACE_STATUS.ARCHIVE_REQUEST
+    && !activeReview.archiveRequest
+    && (
+      archiveRequestLoad.submissionId !== String(submission.id)
+      || archiveRequestLoad.loading
+    );
 
   function updateActiveLabels(labels) {
     setReview((current) => String(current.submissionId) === String(submission.id)
@@ -1121,6 +1162,7 @@ export function WorkspaceReviewPanel({
           review={activeReview}
           reviewerEmail={reviewerEmail}
           reviewerEmails={reviewerEmails}
+          archiveRequestLoading={archiveRequestLoading}
           onCommitted={handleDecisionCommitted}
         />
       </div>

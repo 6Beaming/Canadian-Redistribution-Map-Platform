@@ -46,6 +46,11 @@ test("Creating an Archive Request updates the active review without navigating a
   assert.match(panel, /const committed = await commitWorkspaceAction/);
   assert.match(panel, /onCommitted\(action, committed\)/);
   assert.match(panel, /archiveRequest: committed\.review\.archiveRequest \?\? null/);
+  assert.match(panel, /request\.allowedActions\?\.includes\("cancel"\)/);
+  assert.match(panel, /ARCHIVE_REQUEST && request && !isRequester/);
+  assert.match(panel, /refreshReview\(\);[\s\S]*refreshArchiveRequest\(\)\.catch/);
+  assert.match(panel, /archiveRequestLoading=\{archiveRequestLoading\}/);
+  assert.match(api, /if \(error\.status === 404\) return null;[\s\S]*throw error;/);
   assert.match(review, /if \(action === "archive-request"\) \{[\s\S]*updateSubmissionStatus\(committed\?\.submissionStatus\);[\s\S]*return;/);
   assert.match(review, /onCommitted=\{handleCommitted\}/);
 });
