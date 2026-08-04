@@ -13,6 +13,8 @@ import {
 
 const FIRST_DGUID = "2021S051247020124";
 const SECOND_DGUID = "2021S051247020154";
+const WHITEHORSE_FIRST_DGUID = "2021S051260010251";
+const WHITEHORSE_SECOND_DGUID = "2021S051260010269";
 const fedGeometry = JSON.parse(
   fs.readFileSync(
     new URL("../src/data/map/metadata/fed_47012.geojson", import.meta.url),
@@ -143,6 +145,43 @@ test("counter-proposal endpoints remain visible but locked", () => {
   );
 
   assert.strictEqual(attemptedMove, cache);
+});
+
+test("the reported Whitehorse pair retains an editable interior boundary point", () => {
+  const selected = yukonFedGeometry.features.filter((feature) =>
+    [WHITEHORSE_FIRST_DGUID, WHITEHORSE_SECOND_DGUID].includes(feature.properties?.DGUID),
+  );
+  const index = buildDaObjectionIndex({ type: "FeatureCollection", features: selected });
+  const cache = buildCounterProposalCache(
+    index,
+    new Map(),
+    WHITEHORSE_FIRST_DGUID,
+    WHITEHORSE_SECOND_DGUID,
+  );
+  const editableHandles = cache.handles.filter((handle) => !handle.locked);
+
+  assert.equal(selected.length, 2);
+  assert.equal(editableHandles.length, 1);
+  assert.deepEqual(editableHandles[0].coordinate, [-135.01398287079488, 60.71015636877909]);
+  assert.equal(editableHandles[0].required, true);
+  assert.equal(
+    cache.handleFeatureCollection.features.some((feature) =>
+      feature.properties.id === editableHandles[0].id && feature.properties.required),
+    true,
+  );
+
+  const targetCoordinate = [
+    editableHandles[0].coordinate[0] + 0.0001,
+    editableHandles[0].coordinate[1],
+  ];
+  const nextCache = previewCounterProposalHandleMove(
+    cache,
+    editableHandles[0].id,
+    targetCoordinate,
+  );
+  const movedHandle = nextCache.handles.find((handle) => handle.id === editableHandles[0].id);
+
+  assert.deepEqual(movedHandle?.coordinate, targetCoordinate);
 });
 
 test("the large Yukon counter-proposal fixture produces a visible valid boundary change", () => {

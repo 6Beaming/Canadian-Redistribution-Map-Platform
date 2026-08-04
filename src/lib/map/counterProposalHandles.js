@@ -120,7 +120,7 @@ function isStraightChain(chain) {
     && pointSegmentDistanceMeters(coordinate, chain[0], chain.at(-1)) <= STRAIGHT_RUN_MAX_DEVIATION_METERS);
 }
 
-function selectVisibleIndexes(chain, project) {
+function selectVisibleIndexes(chain, project, hasOccurrences = () => true) {
   const selected = new Set([0, chain.length - 1]);
   const required = new Set([0, chain.length - 1]);
   chain.slice(1, -1).forEach((coordinate, offset) => {
@@ -150,6 +150,28 @@ function selectVisibleIndexes(chain, project) {
     selected.add(index);
     lastSelected = index;
   }
+
+  const hasEditableHandle = [...selected].some((index) =>
+    index > 0 && index < chain.length - 1 && hasOccurrences(chain[index]));
+  if (!hasEditableHandle && chain.length > 2) {
+    const fallbackIndex = chain
+      .slice(1, -1)
+      .map((coordinate, offset) => ({
+        index: offset + 1,
+        clearance: Math.min(
+          distanceMeters(chain[0], coordinate),
+          distanceMeters(coordinate, chain.at(-1)),
+        ),
+      }))
+      .filter(({ index }) => hasOccurrences(chain[index]))
+      .sort((left, right) => right.clearance - left.clearance)[0]?.index;
+
+    if (fallbackIndex !== undefined) {
+      selected.add(fallbackIndex);
+      required.add(fallbackIndex);
+    }
+  }
+
   return { selected, required, straight, length };
 }
 
@@ -171,7 +193,18 @@ export function buildSharedBoundaryHandles(features, boundaryGeoJson, { project 
   const diagnostics = [];
   const handles = [];
   buildOrderedChains(boundaryGeoJson).forEach((chain, chainIndex) => {
-    const { selected, required, straight, length } = selectVisibleIndexes(chain, project);
+    const occursInBothFeatures = (coordinate) => {
+      const dguids = new Set(
+        (occurrenceByCoordinate.get(coordinateKey(coordinate)) ?? [])
+          .map((occurrence) => occurrence.featureDguid),
+      );
+      return features.every((feature) => dguids.has(featureDguid(feature)));
+    };
+    const { selected, required, straight, length } = selectVisibleIndexes(
+      chain,
+      project,
+      occursInBothFeatures,
+    );
     diagnostics.push({
       chainId: `line-${chainIndex}`,
       lengthMeters: length,
