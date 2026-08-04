@@ -68,3 +68,26 @@ test("Archived Tree deletion skips scope backfill for orphaned submission IDs", 
   assert.ok(sourceDelete < archiveDelete);
   assert.ok(archiveDelete < submissionDelete);
 });
+
+test("Archived Tree deletion removes realtime child rows before submissions", () => {
+  const sql = fs.readFileSync(
+    "supabase/migrations/20260804150000_fix_archive_branch_realtime_cascades.sql",
+    "utf8",
+  );
+
+  const scopeBackfill = sql.indexOf("checkpoint0_submission_scope(submission_id)");
+  const commentDelete = sql.indexOf("delete from public.workspace_comments");
+  const labelDelete = sql.indexOf("delete from public.workspace_labels");
+  const requestDelete = sql.indexOf("delete from public.workspace_archive_requests");
+  const sourceDelete = sql.indexOf("delete from public.archive_source_revisions");
+  const archiveDelete = sql.indexOf("delete from public.archive_tree");
+  const submissionDelete = sql.indexOf("delete from public.submissions");
+
+  assert.ok(scopeBackfill >= 0);
+  assert.ok(scopeBackfill < commentDelete);
+  assert.ok(commentDelete < labelDelete);
+  assert.ok(labelDelete < requestDelete);
+  assert.ok(requestDelete < sourceDelete);
+  assert.ok(sourceDelete < archiveDelete);
+  assert.ok(archiveDelete < submissionDelete);
+});
