@@ -78,6 +78,7 @@ test("CP5 navigation, readiness loading, and export entry points remain wired", 
   const graphs = read("src/pages/DashboardGraphs.jsx");
   const submissionsTable = read("src/pages/DashboardSubmissionsTable/SubmissionsTable.jsx");
   const datePicker = read("src/components/ui/datePicker.jsx");
+  const globals = read("src/styles/globals.css");
   const publicHome = read("src/pages/UserHome.jsx");
   const dashboard = read("src/pages/DashboardHome.jsx");
 
@@ -97,7 +98,19 @@ test("CP5 navigation, readiness loading, and export entry points remain wired", 
   assert.match(submissionsTable, /exportCommissionerSubmissionsCsv\(submissionIds\)/);
   assert.match(submissionsTable, /table\.getPrePaginationRowModel\(\)\.rows/);
   assert.match(submissionsTable, /isWithinDateRange\(submission\.submittedAt, dateStart, dateEnd\)/);
-  assert.match(datePicker, /format\(date, "MMMM d, yyyy"\)/);
+  assert.match(datePicker, /"Jan\."[\s\S]*"Aug\."[\s\S]*"Dec\."/);
+  assert.match(datePicker, /formatDateLabel\(date\)/);
+  assert.doesNotMatch(datePicker, /min-w-0 truncate/);
+  assert.match(submissionsTable, /<span>Submission Type<\/span>/);
+  assert.match(submissionsTable, /<AlertDialogTitle>Export filtered submissions\?<\/AlertDialogTitle>/);
+  assert.match(submissionsTable, /based on[\s\S]*the current filters\? Associated tags will be included\./);
+  assert.match(submissionsTable, /<AlertDialogAction onClick=\{\(\) => void exportCsv\(\)\}>/);
+  assert.match(globals, /\.commissioner-submissions-toolbar__search \{[\s\S]*max-width: 20rem[\s\S]*flex: 1 1 18rem/);
+  assert.match(globals, /\.commissioner-submissions-toolbar__date-group \{[\s\S]*flex: 1\.05 1 21rem/);
+  assert.match(globals, /\.commissioner-submissions-toolbar__actions \{[\s\S]*flex: 1\.6 1 30rem/);
+  assert.match(globals, /@media \(min-width: 64rem\) \{[\s\S]*\.commissioner-submissions-toolbar \{[\s\S]*flex-wrap: nowrap/);
+  assert.match(globals, /font-size: clamp\(0\.75rem, calc\(0\.68rem \+ 0\.32vw\), 0\.95rem\)/);
+  assert.match(globals, /\.commissioner-submissions-toolbar__type \{[\s\S]*min-width: clamp\(9\.5rem, 14vw, 12rem\)[\s\S]*flex-grow: 1\.25/);
   [table, publicHome, dashboard].forEach((source) => assert.match(source, /RouteLoadingPage/));
   assert.equal(table.includes("RouteLoadingOverlay"), false);
   assert.equal(publicHome.includes("RouteLoadingOverlay"), false);
@@ -142,9 +155,13 @@ test("Workspace closing comments use action-specific note headings without repea
 
 test("Resolved Workspace submissions announce navigation to the next item", () => {
   const review = read("src/pages/WorkspaceReview.jsx");
+  const globals = read("src/styles/globals.css");
   assert.match(review, /import \{ toast \} from "sonner"/);
   assert.match(review, /toast\.success\("Submission resolved\. Moving to the next submission\."/);
   assert.match(review, /toast\.success\("Submission resolved\. Returning to the Workspace\."/);
+  assert.equal((review.match(/className: "workspace-resolution-toast"/g) ?? []).length, 2);
+  assert.match(globals, /\.workspace-resolution-toast \{[\s\S]*width: max-content !important;[\s\S]*translate: -50% 0/);
+  assert.match(globals, /\.workspace-resolution-toast \[data-title\] \{[\s\S]*white-space: nowrap/);
   assert.match(review, /if \(action === "archive-request"\) \{[\s\S]*updateSubmissionStatus[\s\S]*return;/);
   const notice = review.indexOf("Submission resolved. Moving to the next submission.");
   const navigation = review.indexOf("navigate(`/dashboard/workspace/${encodeURIComponent(next.id)}`", notice);

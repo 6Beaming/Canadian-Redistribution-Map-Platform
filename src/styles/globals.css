@@ -215,6 +215,23 @@ button:disabled {
   to { transform: rotate(360deg); }
 }
 
+.workspace-resolution-toast {
+  left: 50% !important;
+  width: max-content !important;
+  max-width: calc(100vw - 2rem);
+  translate: -50% 0;
+}
+
+.workspace-resolution-toast [data-title] {
+  white-space: nowrap;
+}
+
+@media (max-width: 37.5rem) {
+  .workspace-resolution-toast [data-title] {
+    font-size: clamp(0.625rem, 2.75vw, 0.8125rem);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .route-loading-overlay,
   .route-loading-overlay__spinner {
@@ -357,9 +374,10 @@ button:disabled {
 }
 
 .commissioner-submissions-toolbar__search {
-  width: clamp(10rem, 28vw, 24rem);
-  min-width: 10rem;
-  flex: 1 1 12rem;
+  width: auto;
+  min-width: 12rem;
+  max-width: 20rem;
+  flex: 1 1 18rem;
   font-size: clamp(0.72rem, 1.2vw, 0.875rem);
 }
 
@@ -374,11 +392,19 @@ button:disabled {
 }
 
 .commissioner-submissions-toolbar__date-group {
-  width: clamp(17rem, 31vw, 22.75rem);
+  width: auto;
+  flex: 1.05 1 21rem;
 }
 
 .commissioner-submissions-toolbar__actions {
-  width: clamp(25rem, 38vw, 31rem);
+  width: auto;
+  flex: 1.6 1 30rem;
+}
+
+@media (min-width: 64rem) {
+  .commissioner-submissions-toolbar {
+    flex-wrap: nowrap;
+  }
 }
 
 .commissioner-submissions-toolbar__control {
@@ -387,7 +413,7 @@ button:disabled {
   flex: 1 1 0;
   justify-content: flex-start;
   padding-inline: clamp(0.65rem, 1.5vw, 1.25rem);
-  font-size: clamp(0.7rem, 1.1vw, 0.875rem) !important;
+  font-size: clamp(0.75rem, calc(0.68rem + 0.32vw), 0.95rem) !important;
   font-weight: 400;
   border: 1px solid #b8d1f5;
   background: #ffffff;
@@ -410,6 +436,17 @@ button:disabled {
 
 .commissioner-submissions-toolbar__control::after {
   border-top-color: #1a73e8;
+}
+
+.commissioner-submissions-toolbar__type {
+  overflow: hidden;
+  min-width: clamp(9.5rem, 14vw, 12rem);
+  flex-grow: 1.25;
+  justify-content: space-between;
+}
+
+.commissioner-submissions-toolbar__type::after {
+  content: none;
 }
 
 .commissioner-submissions-toolbar__analytics {

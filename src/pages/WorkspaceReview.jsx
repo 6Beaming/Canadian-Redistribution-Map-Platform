@@ -138,12 +138,14 @@ export default function WorkspaceReview() {
     );
     if (next) {
       toast.success("Submission resolved. Moving to the next submission.", {
-        duration: 1500,
+        duration: 3000,
+        className: "workspace-resolution-toast",
       });
       navigate(`/dashboard/workspace/${encodeURIComponent(next.id)}`, { state: location.state });
     } else {
       toast.success("Submission resolved. Returning to the Workspace.", {
-        duration: 1500,
+        duration: 3000,
+        className: "workspace-resolution-toast",
       });
       navigate("/dashboard/workspace", {
         state: { from: location.state?.workspaceFrom ?? null },

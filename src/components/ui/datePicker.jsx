@@ -12,6 +12,25 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 
+const MONTH_ABBREVIATIONS = [
+  "Jan.",
+  "Feb.",
+  "Mar.",
+  "Apr.",
+  "May",
+  "Jun.",
+  "Jul.",
+  "Aug.",
+  "Sept.",
+  "Oct.",
+  "Nov.",
+  "Dec.",
+]
+
+function formatDateLabel(date) {
+  return `${MONTH_ABBREVIATIONS[date.getMonth()]} ${format(date, "d, yyyy")}`
+}
+
 export function DatePickerSimple({ date, setDate, className }) {
 
   return (
@@ -22,8 +41,8 @@ export function DatePickerSimple({ date, setDate, className }) {
             id="date-picker-simple"
             className={className ?? "justify-start font-normal"}
           >
-            <span className="min-w-0 truncate">
-              {date ? format(date, "MMMM d, yyyy") : "Pick a date"}
+            <span>
+              {date ? formatDateLabel(date) : "Pick a date"}
             </span>
             <ChevronDown className="ml-auto h-4 w-4 shrink-0" aria-hidden="true" />
           </Button>

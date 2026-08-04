@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Fragment } from "react";
-import { BarChart3, Download } from "lucide-react";
+import { BarChart3, ChevronDown, Download } from "lucide-react";
 import {
   flexRender,
   getCoreRowModel,
@@ -18,6 +18,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DatePickerSimple } from "@/components/ui/datePicker";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { subDays } from "date-fns";
 import { exportCommissionerSubmissionsCsv } from "@/services/exportApi.js";
 import {
@@ -86,6 +97,7 @@ export default function SubmissionsTable({ columns, data, onOpenAnalytics, onRow
     },
     initialState: { pagination: { pageSize: 10 } },
   });
+  const filteredSubmissionCount = table.getPrePaginationRowModel().rows.length;
 
   async function exportCsv() {
     if (exportState.pending) return;
@@ -133,9 +145,10 @@ export default function SubmissionsTable({ columns, data, onOpenAnalytics, onRow
               <Button
                 type="button"
                 variant="outline"
-                className="commissioner-submissions-toolbar__control h-10"
+                className="commissioner-submissions-toolbar__control commissioner-submissions-toolbar__type h-10"
               >
-                Submission Type
+                <span>Submission Type</span>
+                <ChevronDown className="ml-auto h-4 w-4 shrink-0" aria-hidden="true" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -169,16 +182,36 @@ export default function SubmissionsTable({ columns, data, onOpenAnalytics, onRow
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button
-            type="button"
-            variant="outline"
-            className="commissioner-submissions-toolbar__control commissioner-submissions-toolbar__export h-10"
-            disabled={exportState.pending}
-            onClick={() => void exportCsv()}
-          >
-            <Download className="h-4 w-4" aria-hidden="true" />
-            {exportState.pending ? "Preparing…" : "Export CSV"}
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="commissioner-submissions-toolbar__control commissioner-submissions-toolbar__export h-10"
+                disabled={exportState.pending}
+              >
+                <Download className="h-4 w-4" aria-hidden="true" />
+                {exportState.pending ? "Preparing…" : "Export CSV"}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Export filtered submissions?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Do you want to download {filteredSubmissionCount}{" "}
+                  {filteredSubmissionCount === 1 ? "submission" : "submissions"} based on
+                  the current filters? Associated tags will be included.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => void exportCsv()}>
+                  <Download className="h-4 w-4" aria-hidden="true" />
+                  Download CSV
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <Button
             type="button"
