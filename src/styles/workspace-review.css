@@ -32,6 +32,17 @@
   overflow: hidden;
 }
 
+.workspace-cross-province-warning {
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid #f1b4b4;
+  background: #fff1f1;
+  color: #b42318;
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
 .workspace-review-selector {
   position: relative;
   z-index: 10;

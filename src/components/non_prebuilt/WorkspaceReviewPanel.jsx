@@ -904,6 +904,11 @@ export function WorkspaceReviewPanel({
         activeId={submission.id}
         onSelect={onSubmissionSelect}
       />
+      {submission.crossProvinceWarning ? (
+        <p className="workspace-cross-province-warning" role="alert">
+          {submission.crossProvinceWarning}
+        </p>
+      ) : null}
       <div className="workspace-review-panel__scroll">
         {reviewError ? (
           <div className="workspace-decision-error" role="alert">

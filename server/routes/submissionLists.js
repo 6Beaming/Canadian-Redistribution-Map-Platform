@@ -2,6 +2,10 @@ import { Router } from "express";
 import { getSupabaseAdminDataClient } from "../lib/supabase.js";
 import { enrichSubmissionsWithDaMetadata } from "../lib/map/submissionPresentation.js";
 import {
+  authorizeSubmissionScope,
+  filterSubmissionsForCommissionerScope,
+} from "../lib/authorization/resourceScopeGuard.js";
+import {
   filterAndSortSubmissionRows,
   LIGHTWEIGHT_SUBMISSION_COLUMNS,
   normalizeSubmissionListFilters,
@@ -38,7 +42,11 @@ async function presentRows(supabase, rows, { includeProfiles }) {
   return enriched.map((row) => serializeLightweightSubmission(row, profilesById.get(row.user_id)));
 }
 
-async function listRows(req, res, { ownerId = null, includeProfiles = false } = {}) {
+async function listRows(req, res, {
+  ownerId = null,
+  includeProfiles = false,
+  scopeToCommissioner = false,
+} = {}) {
   let filters;
   try {
     filters = normalizeSubmissionListFilters(req.query);
@@ -52,10 +60,22 @@ async function listRows(req, res, { ownerId = null, includeProfiles = false } = 
     if (ownerId) query = query.eq("user_id", ownerId);
     const { data, error } = await query.order("created_at", { ascending: false });
     if (error) return res.status(500).json({ error: error.message });
-    const rows = await presentRows(supabase, data ?? [], { includeProfiles });
-    return res.json({ items: filterAndSortSubmissionRows(rows, filters), appliedFilters: filters });
+
+    let scopedRows = data ?? [];
+    if (scopeToCommissioner) {
+      scopedRows = await filterSubmissionsForCommissionerScope(scopedRows, req.profile);
+    }
+
+    const rows = await presentRows(supabase, scopedRows, { includeProfiles });
+    return res.json({
+      items: filterAndSortSubmissionRows(rows, filters),
+      appliedFilters: filters,
+    });
   } catch (error) {
-    return res.status(500).json({ error: error.message || "Unable to load submissions." });
+    return res.status(error.statusCode || 500).json({
+      error: error.message || "Unable to load submissions.",
+      ...(error.code ? { code: error.code } : {}),
+    });
   }
 }
 
@@ -72,14 +92,32 @@ router.get("/table-row/:submissionId", requireCommissioner, async (req, res) => 
       .maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
     if (!data) return res.status(404).json({ error: "Submission not found." });
-    const [item] = await presentRows(supabase, [data], { includeProfiles: true });
-    return res.json({ item });
+
+    try {
+      const scope = await authorizeSubmissionScope(supabase, {
+        submission: data,
+        commissionerProfile: req.profile,
+        requireClaim: false,
+      });
+      const [item] = await presentRows(supabase, [{
+        ...data,
+        scope_pruids: scope.eligibilityPruids,
+        operating_pruid: scope.operatingPruid,
+        cross_province_warning: scope.crossProvinceWarning,
+      }], { includeProfiles: true });
+      return res.json({ item });
+    } catch (scopeError) {
+      return res.status(scopeError.statusCode || 500).json({
+        error: scopeError.message,
+        ...(scopeError.code ? { code: scopeError.code } : {}),
+      });
+    }
   } catch (error) {
     return res.status(500).json({ error: error.message || "Unable to load submission." });
   }
 });
 
 router.get("/", requireCommissioner, (req, res) =>
-  listRows(req, res, { includeProfiles: true }));
+  listRows(req, res, { includeProfiles: true, scopeToCommissioner: true }));
 
 export default router;

@@ -76,17 +76,7 @@ test("workspace status writes require a commissioner", async () => {
   assert.equal(response.body.error, "Commissioner access is required.");
 });
 
-test("a commissioner can update a supported workspace status", async () => {
-  let updatedStatus;
-  const query = {
-    update(values) { updatedStatus = values.status; return this; },
-    eq() { return this; },
-    select() { return this; },
-    async maybeSingle() {
-      return { data: { id: "submission-1", status: updatedStatus }, error: null };
-    },
-  };
-
+test("workspace status route rejects archive-owned status writes", async () => {
   setSupabaseTestDoubles({
     getSupabaseClient: () => ({
       auth: {
@@ -94,7 +84,11 @@ test("a commissioner can update a supported workspace status", async () => {
       },
     }),
     getSupabaseProfile: async () => commissioner,
-    getSupabaseAdminDataClient: () => ({ from: () => query }),
+    getSupabaseAdminDataClient: () => ({
+      from() {
+        throw new Error("archive-owned status writes must not touch submissions");
+      },
+    }),
   });
 
   const response = await request("PATCH", "/api/workspace/submissions/submission-1/status", {
@@ -102,9 +96,8 @@ test("a commissioner can update a supported workspace status", async () => {
     cookie: "crmp_access_token=access-token",
   });
 
-  assert.equal(response.status, 200);
-  assert.equal(response.body.status, "archive-request");
-  assert.equal(updatedStatus, "archive-request");
+  assert.equal(response.status, 400);
+  assert.equal(response.body.code, "ARCHIVE_OWNED_STATUS");
 });
 
 test("a commissioner can load the archive-reviewer email list", async () => {
