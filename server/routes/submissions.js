@@ -58,6 +58,53 @@ router.post("/counter-proposals", requirePublicUser, async (req, res, next) => {
     const supabase = getSupabaseAdminDataClient();
     const now = new Date().toISOString();
 
+    const primaryDguid = prepared.submission.dguid;
+    const neighboringDguid = prepared.submission.neighboring_dguid;
+
+    // Ensure neighboring DA exists for FK constraint
+    if (neighboringDguid) {
+      const { error: daError } = await supabase
+        .from("dissemination_areas")
+        .upsert(
+          {
+            dguid: neighboringDguid,
+            status: "ok",
+            source_label: "counter_proposal",
+          },
+          {
+            onConflict: "dguid",
+          }
+        );
+
+      if (daError) {
+        return res.status(500).json({
+          error: `Failed to register neighboring DA: ${daError.message}`,
+        });
+      }
+    }
+
+    // Ensure primary DA exists too
+    if (primaryDguid) {
+      const { error: daError } = await supabase
+        .from("dissemination_areas")
+        .upsert(
+          {
+            dguid: primaryDguid,
+            status: "ok",
+            source_label: "counter_proposal",
+          },
+          {
+            onConflict: "dguid",
+          }
+        );
+
+      if (daError) {
+        return res.status(500).json({
+          error: `Failed to register primary DA: ${daError.message}`,
+        });
+      }
+    }
+
     const { data: submission, error: submissionError } = await supabase
       .from("submissions")
       .insert([{
@@ -85,7 +132,10 @@ router.post("/counter-proposals", requirePublicUser, async (req, res, next) => {
 
     if (revisionError) {
       await supabase.from("submissions").delete().eq("id", submission.id);
-      return res.status(500).json({ error: revisionError.message });
+
+      return res.status(500).json({
+        error: revisionError.message,
+      });
     }
 
     return res.status(201).json(
@@ -93,10 +143,11 @@ router.post("/counter-proposals", requirePublicUser, async (req, res, next) => {
         normalizeCounterProposalRecord(submission, revision),
       ]))[0],
     );
+
   } catch (error) {
     if (
-      error instanceof CounterProposalValidationError
-      || error instanceof MapAssetValidationError
+      error instanceof CounterProposalValidationError ||
+      error instanceof MapAssetValidationError
     ) {
       return res.status(error.statusCode || 400).json({
         error: error.publicMessage || error.message,
