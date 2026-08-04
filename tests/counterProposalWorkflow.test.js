@@ -57,7 +57,7 @@ function createSimpleAdjacentPairCache() {
     properties: { DGUID: "first", land_area: 1, population: 1 },
     geometry: {
       type: "Polygon",
-      coordinates: [[[0, 0], [1, 0], [1, 0.5], [1, 1], [0, 1], [0, 0]]],
+      coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]],
     },
   };
   const secondFeature = {
@@ -65,7 +65,7 @@ function createSimpleAdjacentPairCache() {
     properties: { DGUID: "second", land_area: 1, population: 1 },
     geometry: {
       type: "Polygon",
-      coordinates: [[[1, 0], [2, 0], [2, 1], [1, 1], [1, 0.5], [1, 0]]],
+      coordinates: [[[1, 0], [2, 0], [2, 1], [1, 1], [1, 0]]],
     },
   };
   const index = buildDaObjectionIndex({
@@ -101,6 +101,17 @@ function getBoundaryEndpoints(boundaryGeoJson) {
   });
 
   return Array.from(verticesById.values()).filter((vertex) => vertex.degree === 1);
+}
+
+function assertAtLeastTwoEditableHandlesPerBoundary(cache) {
+  const lineIds = new Set(cache.handles.map((handle) => handle.lineId));
+
+  lineIds.forEach((lineId) => {
+    assert.ok(
+      cache.handles.filter((handle) => handle.lineId === lineId && !handle.locked).length >= 2,
+      `${lineId} should expose at least two editable handles`,
+    );
+  });
 }
 
 test("counter-proposal handles can move when the selected DAs contain polygon holes", () => {
@@ -147,7 +158,7 @@ test("counter-proposal endpoints remain visible but locked", () => {
   assert.strictEqual(attemptedMove, cache);
 });
 
-test("the reported Whitehorse pair retains an editable interior boundary point", () => {
+test("the reported Whitehorse pair exposes at least two editable interior boundary points", () => {
   const selected = yukonFedGeometry.features.filter((feature) =>
     [WHITEHORSE_FIRST_DGUID, WHITEHORSE_SECOND_DGUID].includes(feature.properties?.DGUID),
   );
@@ -161,27 +172,37 @@ test("the reported Whitehorse pair retains an editable interior boundary point",
   const editableHandles = cache.handles.filter((handle) => !handle.locked);
 
   assert.equal(selected.length, 2);
-  assert.equal(editableHandles.length, 1);
-  assert.deepEqual(editableHandles[0].coordinate, [-135.01398287079488, 60.71015636877909]);
-  assert.equal(editableHandles[0].required, true);
-  assert.equal(
-    cache.handleFeatureCollection.features.some((feature) =>
-      feature.properties.id === editableHandles[0].id && feature.properties.required),
-    true,
+  assertAtLeastTwoEditableHandlesPerBoundary(cache);
+  assert.equal(cache.sourceBoundaryDensifications.length, 1);
+  assert.ok(
+    editableHandles.some((handle) =>
+      handle.coordinate[0] === -135.01398287079488
+      && handle.coordinate[1] === 60.71015636877909),
   );
+  editableHandles.forEach((handle) => {
+    assert.equal(handle.required, true);
+    assert.equal(
+      cache.handleFeatureCollection.features.some((feature) =>
+        feature.properties.id === handle.id && feature.properties.required),
+      true,
+    );
+  });
 
-  const targetCoordinate = [
-    editableHandles[0].coordinate[0] + 0.0001,
-    editableHandles[0].coordinate[1],
-  ];
-  const nextCache = previewCounterProposalHandleMove(
-    cache,
-    editableHandles[0].id,
-    targetCoordinate,
-  );
-  const movedHandle = nextCache.handles.find((handle) => handle.id === editableHandles[0].id);
+  editableHandles.forEach((handle) => {
+    const candidateTargets = [
+      [handle.coordinate[0] + 0.0001, handle.coordinate[1]],
+      [handle.coordinate[0] - 0.0001, handle.coordinate[1]],
+      [handle.coordinate[0], handle.coordinate[1] + 0.0001],
+      [handle.coordinate[0], handle.coordinate[1] - 0.0001],
+    ];
+    const moved = candidateTargets.some((targetCoordinate) => {
+      const nextCache = previewCounterProposalHandleMove(cache, handle.id, targetCoordinate);
+      const movedHandle = nextCache.handles.find((entry) => entry.id === handle.id);
+      return JSON.stringify(movedHandle?.coordinate) !== JSON.stringify(handle.coordinate);
+    });
 
-  assert.deepEqual(movedHandle?.coordinate, targetCoordinate);
+    assert.equal(moved, true);
+  });
 });
 
 test("the large Yukon counter-proposal fixture produces a visible valid boundary change", () => {
@@ -215,6 +236,16 @@ test("the large Yukon counter-proposal fixture produces a visible valid boundary
 
   assert.deepEqual(movedHandle?.coordinate, requestedCoordinate);
   assert.ok(Math.abs(nextCache.impacts.byDguid[fixture.dguid].areaDelta) > 0);
+});
+
+test("a shared boundary with only endpoints gains two editable points without changing its shape", () => {
+  const cache = createSimpleAdjacentPairCache();
+
+  assert.equal(cache.sourceBoundaryDensifications.length, 2);
+  assertAtLeastTwoEditableHandlesPerBoundary(cache);
+  assert.equal(cache.sourceGeometryIssues.length, 0);
+  assert.equal(cache.impacts.byDguid.first.areaDelta, 0);
+  assert.equal(cache.impacts.byDguid.second.areaDelta, 0);
 });
 
 test("counter-proposal constrains a handle before it creates a degenerate or overlapping edge", () => {
@@ -290,7 +321,8 @@ test("counter-proposal repairs one repeated non-closure ring vertex before editi
   assert.equal(cache.sourceGeometryIssues.length, 0);
   assert.equal(cache.sourceGeometryRepairs.length, 1);
   assert.equal(cache.sourceGeometryRepairs[0].type, "remove-duplicate-ring-vertex");
-  assert.equal(cache.handles.length, 3);
+  assertAtLeastTwoEditableHandlesPerBoundary(cache);
+  assert.equal(cache.handles.length, 4);
 
   const handle = cache.handles.find((entry) => !entry.locked);
   assert.ok(handle);

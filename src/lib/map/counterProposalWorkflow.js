@@ -6,7 +6,12 @@ import "jsts/org/locationtech/jts/monkey.js";
 import GeoJSONReader from "jsts/org/locationtech/jts/io/GeoJSONReader.js";
 import IsValidOp from "jsts/org/locationtech/jts/operation/valid/IsValidOp.js";
 import { calculateCounterProposalImpact } from "./counterProposalImpact.js";
-import { buildSharedBoundaryHandles } from "./counterProposalHandles.js";
+import {
+  buildSharedBoundaryHandles,
+  distanceMeters,
+  getSharedBoundaryChains,
+  MIN_EDITABLE_HANDLES_PER_BOUNDARY,
+} from "./counterProposalHandles.js";
 
 const ACTIVE_DRAFT_KEY = "counter-proposal-active-draft";
 const DRAFT_KEY_PREFIX = "counter-proposal-draft:";
@@ -512,6 +517,121 @@ function normalizeCounterProposalSourceFeatures(features) {
   return { features: normalizedFeatures, repairs, issues };
 }
 
+function insertCoordinateIntoFeatureSegment(feature, start, end, coordinate) {
+  const polygons = feature.geometry?.type === "Polygon"
+    ? [feature.geometry.coordinates]
+    : feature.geometry?.type === "MultiPolygon"
+      ? feature.geometry.coordinates
+      : [];
+
+  for (let polygonIndex = 0; polygonIndex < polygons.length; polygonIndex += 1) {
+    const polygon = polygons[polygonIndex];
+
+    for (let ringIndex = 0; ringIndex < polygon.length; ringIndex += 1) {
+      const ring = polygon[ringIndex];
+
+      for (let coordinateIndex = 0; coordinateIndex < ring.length - 1; coordinateIndex += 1) {
+        const segmentStart = ring[coordinateIndex];
+        const segmentEnd = ring[coordinateIndex + 1];
+        const matchesForward = coordinatesEqual(segmentStart, start)
+          && coordinatesEqual(segmentEnd, end);
+        const matchesReverse = coordinatesEqual(segmentStart, end)
+          && coordinatesEqual(segmentEnd, start);
+
+        if (!matchesForward && !matchesReverse) continue;
+
+        ring.splice(coordinateIndex + 1, 0, [...coordinate]);
+        return { polygonIndex, ringIndex, coordinateIndex: coordinateIndex + 1 };
+      }
+    }
+  }
+
+  return null;
+}
+
+function insertSharedBoundaryMidpoint(features, start, end) {
+  const midpoint = interpolateCoordinate(start, end, 0.5);
+  const nextFeatures = cloneValue(features);
+  const occurrences = [];
+
+  for (const feature of nextFeatures) {
+    const occurrence = insertCoordinateIntoFeatureSegment(feature, start, end, midpoint);
+
+    if (!occurrence) return null;
+    occurrences.push({
+      dguid: getFeatureDguid(feature),
+      ...occurrence,
+    });
+  }
+
+  return {
+    features: nextFeatures,
+    insertion: {
+      type: "insert-shared-boundary-midpoint",
+      coordinate: midpoint,
+      segment: [[...start], [...end]],
+      occurrences,
+    },
+  };
+}
+
+function ensureMinimumSharedBoundaryHandles(features, firstDguid, secondDguid) {
+  let currentFeatures = cloneValue(features);
+  const insertions = [];
+
+  for (let pass = 0; pass < MIN_EDITABLE_HANDLES_PER_BOUNDARY; pass += 1) {
+    const pairIndex = buildDaObjectionIndex(createFeatureCollection(currentFeatures));
+    const boundaryGeoJson = getSharedBoundaryFeatureCollection(
+      pairIndex,
+      firstDguid,
+      secondDguid,
+    );
+    const chains = getSharedBoundaryChains(boundaryGeoJson);
+    const handles = buildSharedBoundaryHandles(currentFeatures, boundaryGeoJson);
+    const editableCountByLine = handles.reduce((counts, handle) => {
+      if (!handle.locked) counts.set(handle.lineId, (counts.get(handle.lineId) ?? 0) + 1);
+      return counts;
+    }, new Map());
+    let insertedDuringPass = false;
+
+    for (let chainIndex = 0; chainIndex < chains.length; chainIndex += 1) {
+      if ((editableCountByLine.get(`line-${chainIndex}`) ?? 0) >= MIN_EDITABLE_HANDLES_PER_BOUNDARY) {
+        continue;
+      }
+
+      const candidateSegments = chains[chainIndex]
+        .slice(0, -1)
+        .map((start, index) => ({
+          start,
+          end: chains[chainIndex][index + 1],
+          length: distanceMeters(start, chains[chainIndex][index + 1]),
+        }))
+        .sort((left, right) => right.length - left.length);
+
+      for (const segment of candidateSegments) {
+        const result = insertSharedBoundaryMidpoint(
+          currentFeatures,
+          segment.start,
+          segment.end,
+        );
+
+        if (!result) continue;
+        currentFeatures = result.features;
+        insertions.push({
+          ...result.insertion,
+          chainId: `line-${chainIndex}`,
+        });
+        insertedDuringPass = true;
+        break;
+      }
+    }
+
+    if (!insertedDuringPass) break;
+  }
+
+  return { features: currentFeatures, insertions };
+}
+
 /**
  * JSTS is the authoritative topology check for an edited DA pair.  Both DA
  * geometries must stay valid, remain covered by their original combined area,
@@ -843,7 +963,12 @@ export function buildCounterProposalCache(
     firstFeature,
     secondFeature,
   ]);
-  const originalFeatures = normalization.features;
+  const densification = ensureMinimumSharedBoundaryHandles(
+    normalization.features,
+    String(firstDguid),
+    String(secondDguid),
+  );
+  const originalFeatures = densification.features;
   const currentFeatures = cloneValue(originalFeatures);
   const sourceGeometryIssues = [...normalization.issues];
 
@@ -869,6 +994,7 @@ export function buildCounterProposalCache(
     originalFeatures,
     populationByDguid,
     sourceGeometryRepairs: normalization.repairs,
+    sourceBoundaryDensifications: densification.insertions,
     sourceGeometryIssues,
     baselineFingerprint: geometryFingerprint(originalFeatures),
     history: [],

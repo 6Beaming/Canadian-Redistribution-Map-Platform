@@ -1,4 +1,5 @@
 export const MAX_EDITABLE_HANDLES_PER_KM = 2;
+export const MIN_EDITABLE_HANDLES_PER_BOUNDARY = 2;
 export const MIN_HANDLE_SPACING_METERS = 500;
 export const MIN_HANDLE_SPACING_PX = 40;
 export const STRAIGHT_RUN_ANGLE_TOLERANCE_DEGREES = 12;
@@ -90,6 +91,11 @@ function buildOrderedChains(boundaryGeoJson) {
   return chains.sort((left, right) => compareCoordinates(left[0], right[0]));
 }
 
+export function getSharedBoundaryChains(boundaryGeoJson) {
+  return buildOrderedChains(boundaryGeoJson).map((chain) =>
+    chain.map((coordinate) => [...coordinate]));
+}
+
 function turnAngleDegrees(previous, current, next) {
   const a = [previous[0] - current[0], previous[1] - current[1]];
   const b = [next[0] - current[0], next[1] - current[1]];
@@ -151,25 +157,30 @@ function selectVisibleIndexes(chain, project, hasOccurrences = () => true) {
     lastSelected = index;
   }
 
-  const hasEditableHandle = [...selected].some((index) =>
-    index > 0 && index < chain.length - 1 && hasOccurrences(chain[index]));
-  if (!hasEditableHandle && chain.length > 2) {
+  const isEditableIndex = (index) =>
+    index > 0 && index < chain.length - 1 && hasOccurrences(chain[index]);
+  const targetEditableHandles = Math.min(
+    MIN_EDITABLE_HANDLES_PER_BOUNDARY,
+    Math.max(0, chain.length - 2),
+  );
+
+  while ([...selected].filter(isEditableIndex).length < targetEditableHandles) {
     const fallbackIndex = chain
       .slice(1, -1)
-      .map((coordinate, offset) => ({
-        index: offset + 1,
+      .map((_, offset) => offset + 1)
+      .filter((index) => !selected.has(index) && isEditableIndex(index))
+      .map((index) => ({
+        index,
         clearance: Math.min(
-          distanceMeters(chain[0], coordinate),
-          distanceMeters(coordinate, chain.at(-1)),
+          ...[...selected].map((selectedIndex) =>
+            distanceMeters(chain[selectedIndex], chain[index])),
         ),
       }))
-      .filter(({ index }) => hasOccurrences(chain[index]))
-      .sort((left, right) => right.clearance - left.clearance)[0]?.index;
+      .sort((left, right) => right.clearance - left.clearance || left.index - right.index)[0]?.index;
 
-    if (fallbackIndex !== undefined) {
-      selected.add(fallbackIndex);
-      required.add(fallbackIndex);
-    }
+    if (fallbackIndex === undefined) break;
+    selected.add(fallbackIndex);
+    required.add(fallbackIndex);
   }
 
   return { selected, required, straight, length };
@@ -192,7 +203,7 @@ export function buildSharedBoundaryHandles(features, boundaryGeoJson, { project 
   });
   const diagnostics = [];
   const handles = [];
-  buildOrderedChains(boundaryGeoJson).forEach((chain, chainIndex) => {
+  getSharedBoundaryChains(boundaryGeoJson).forEach((chain, chainIndex) => {
     const occursInBothFeatures = (coordinate) => {
       const dguids = new Set(
         (occurrenceByCoordinate.get(coordinateKey(coordinate)) ?? [])
