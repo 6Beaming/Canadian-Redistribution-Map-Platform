@@ -199,13 +199,15 @@ export default function WorkspaceReview() {
               interactionMode={MAP_INTERACTION_MODE.COUNTER_REVIEW}
               onStatusChange={setStatus}
             />
-          ) : (
+          ) : submission.geometryError ? (
             <div className="workspace-review-map-empty" role="status">
               <strong>Map geometry unavailable</strong>
-              <p>
-                {submission.geometryError
-                  || "This submission loaded, but its boundary geometry could not be prepared."}
-              </p>
+              <p>{submission.geometryError}</p>
+            </div>
+          ) : (
+            <div className="route-loading-overlay__indicator" role="status">
+              <span className="route-loading-overlay__spinner" aria-hidden="true" />
+              <span>Loading...</span>
             </div>
           )}
           {normalizeType(submission.type) === "counter-proposal" ? (
