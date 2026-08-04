@@ -1,9 +1,10 @@
 # Canadian Redistribution Map Platform (CRMP)
 
 ## Release
-The current software release is [CRMP v0.2.0](https://github.com/UTSC-CSCC01-Software-Engineering-I/course-project-five-guys/releases/tag/v0.2.0)
+The current software release is [CRMP v1.0.0](https://github.com/UTSC-CSCC01-Software-Engineering-I/course-project-five-guys/releases/tag/v1.0.0)
 
 Past Releases:
+[CRMP v0.2.0](https://github.com/UTSC-CSCC01-Software-Engineering-I/course-project-five-guys/releases/tag/v0.2.0)
 [CRMP v0.1.0](https://github.com/UTSC-CSCC01-Software-Engineering-I/course-project-five-guys/releases/tag/v0.1.0).
 
 These releases were verified with `npm test`, `npm run check:server`, and `npm run build`.
