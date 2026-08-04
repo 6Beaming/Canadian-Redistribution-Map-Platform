@@ -130,3 +130,12 @@ test("Workspace label and catalog mutations stay scoped, ordered, and optimistic
     /onCommitted\(/,
   );
 });
+
+test("Workspace closing comments use action-specific note headings without repeating email", () => {
+  const panel = read("src/components/non_prebuilt/WorkspaceReviewPanel.jsx");
+  assert.match(panel, /accepted this submission"\)\) return "Approved Note"/);
+  assert.match(panel, /rejected this submission"\)\) return "Rejection Note"/);
+  assert.match(panel, /includes\("archive"\)\) return "Archive Note"/);
+  assert.match(panel, /comment\.isClosing \? getClosingNoteTitle\(comment\.action\) : comment\.email/);
+  assert.doesNotMatch(panel, /\$\{comment\.email\}'s Closing Comment/);
+});

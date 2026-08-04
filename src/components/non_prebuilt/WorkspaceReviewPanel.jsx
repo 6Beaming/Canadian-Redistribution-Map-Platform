@@ -45,6 +45,14 @@ function normalizeType(value) {
   return String(value ?? "feedback").toLowerCase().replaceAll("_", "-");
 }
 
+function getClosingNoteTitle(action) {
+  const normalized = String(action ?? "").toLowerCase();
+  if (normalized.includes("accepted this submission")) return "Approved Note";
+  if (normalized.includes("rejected this submission")) return "Rejection Note";
+  if (normalized.includes("archive")) return "Archive Note";
+  return "Decision Note";
+}
+
 function customPlaceholder(label, index) {
   if (!label?.custom || label?.createdBy) return "";
   const match = String(label.name ?? "").match(/^custom (?:label )?(cyan|pink|purple|[1-3])$/iu);
@@ -565,7 +573,7 @@ function CommentThread({ submissionId, comments, reviewerEmail, onChange, readOn
         {visibleComments.length ? visibleComments.map((comment) => (
           <article className={comment.isClosing ? "is-closing" : ""} key={comment.id}>
             <header>
-              <strong>{comment.isClosing ? `${comment.email}'s Closing Comment:` : comment.email}</strong>
+              <strong>{comment.isClosing ? getClosingNoteTitle(comment.action) : comment.email}</strong>
               <time>{formatTimestamp(comment.createdAt)}</time>
             </header>
             {comment.action ? <p className="workspace-comment-action">{comment.action}</p> : null}
