@@ -144,7 +144,9 @@ export function serializeLightweightSubmission(row, profile = null) {
     created_at: row.created_at,
     updated_at: row.updated_at ?? row.created_at,
     primary_fed_num: row.primary_fed_num ?? row.fed_num ?? null,
-    secondary_fed_num: row.secondary_fed_num ?? row.primary_fed_num ?? row.fed_num ?? null,
+    // Never invent a secondary FED from the primary — that collapses
+    // cross-province objections onto one metadata shard.
+    secondary_fed_num: row.secondary_fed_num ?? null,
     primary_population: Number.isFinite(Number(row.primary_population)) ? Number(row.primary_population) : null,
     secondary_population: Number.isFinite(Number(row.secondary_population)) ? Number(row.secondary_population) : null,
     dissemination_areas: {

@@ -214,12 +214,18 @@ router.post("/", requirePublicUser, async (req, res) => {
     || (await getProfileForDguid(primaryDguid))?.fed_num
     || null;
 
-  if (normalizedType === "objection" && secondaryDguid) {
+  // Mirror counter-proposal writes: register both DAs so legacy
+  // dissemination_areas FKs (if still present) do not block the insert.
+  const dguidsToRegister = normalizedType === "objection"
+    ? [primaryDguid, secondaryDguid]
+    : [primaryDguid];
+
+  for (const dguidToRegister of dguidsToRegister.filter(Boolean)) {
     const { error: daInsertError } = await supabase
       .from("dissemination_areas")
       .upsert(
         {
-          dguid: secondaryDguid,
+          dguid: dguidToRegister,
           status: "ok",
           source_label: "submission_validation",
         },
@@ -230,7 +236,7 @@ router.post("/", requirePublicUser, async (req, res) => {
 
     if (daInsertError) {
       return res.status(500).json({
-        error: `Failed to register neighboring DA: ${daInsertError.message}`,
+        error: `Failed to register dissemination area: ${daInsertError.message}`,
       });
     }
   }
