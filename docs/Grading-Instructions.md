@@ -24,7 +24,7 @@ mkdir .\run-five-guys-CRMP
 cd .\run-five-guys-CRMP
 ```
 
-3. Request access to the private secrets folder (environment file and GitHub token are **not** public):
+3. For general visitors: Request access to the private secrets folder (environment file and GitHub token are **not** public):
 
 [Google Drive — CSCC01 Group Project secrets](https://drive.google.com/drive/folders/1vghIpVvFSZXfrdK4OnuEW62W0a3WoseV?usp=sharing)
 
@@ -36,6 +36,8 @@ You may notify either of the following so we can approve quickly:
 - Eric Liu (Google Drive folder owner): [ericb.liu@mail.utoronto.ca](mailto:ericb.liu@mail.utoronto.ca)
 
 We will process requests as soon as possible.
+
+**Note: For the grading process of CSCC01, as this repository is already private, for convenience, we have temporarily changed the access permission of Google Drive to public. After the end of this course, we will change to restricted to maintain proper safety practices.**
 
 ---
 
