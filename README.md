@@ -1,5 +1,9 @@
 # Canadian Redistribution Map Platform (CRMP)
 
+**Graders:** follow [docs/Grading-Instructions.md](docs/Grading-Instructions.md) to pull and run the published Docker image without cloning this repository.
+
+**User Guide (GitHub Wiki):** [Platform, Public User, and Commissioner feature docs](https://github.com/UTSC-CSCC01-Software-Engineering-I/course-project-five-guys/wiki)
+
 ## Release
 The current software release is [CRMP v1.0.0](https://github.com/UTSC-CSCC01-Software-Engineering-I/course-project-five-guys/releases/tag/v1.0.0)
 
