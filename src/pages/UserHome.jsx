@@ -670,10 +670,32 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
     });
   }, []);
 
-  const handleCounterProposalSubmitSuccess = useCallback(() => {
+  const handleSubmissionComplete = useCallback((dguid) => {
+    setObjectionWorkflow(createInitialObjectionWorkflow());
     setCounterProposalWorkflow(createInitialCounterProposalWorkflow());
+    setPanelView(getDefaultPanelView("user"));
+    setRolloutHoverSelection(null);
+    setIsRolloutOpen(false);
+
+    if (dguid) {
+      setSelection({ type: "da", dguid: String(dguid) });
+      return;
+    }
+
     setSelection(null);
   }, []);
+
+  const handleCommentSubmitSuccess = useCallback((dguid) => {
+    handleSubmissionComplete(dguid);
+  }, [handleSubmissionComplete]);
+
+  const handleObjectionSubmitSuccess = useCallback((dguid) => {
+    handleSubmissionComplete(dguid);
+  }, [handleSubmissionComplete]);
+
+  const handleCounterProposalSubmitSuccess = useCallback((dguid) => {
+    handleSubmissionComplete(dguid);
+  }, [handleSubmissionComplete]);
 
   const handlePostalAreaActivate = useCallback(() => {
     // A postal-code center is not a DA selection. Clear the previous DA so the
@@ -1094,6 +1116,8 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
             objectionWorkflow={objectionWorkflow}
             onObjectionBackStep={handleObjectionBackStep}
             onObjectionConfirmReview={handleObjectionConfirmReview}
+            onCommentSubmitSuccess={handleCommentSubmitSuccess}
+            onObjectionSubmitSuccess={handleObjectionSubmitSuccess}
             counterProposalWorkflow={counterProposalPanelWorkflow}
             onCounterProposalBackStep={handleCounterProposalBackStep}
             onCounterProposalConfirmEdit={handleCounterProposalConfirmEdit}

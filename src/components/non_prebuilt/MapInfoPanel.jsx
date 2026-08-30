@@ -628,6 +628,8 @@ export function MapInfoPanel({
   objectionWorkflow,
   onObjectionBackStep,
   onObjectionConfirmReview,
+  onCommentSubmitSuccess,
+  onObjectionSubmitSuccess,
   counterProposalWorkflow,
   onCounterProposalBackStep,
   onCounterProposalConfirmEdit,
@@ -934,6 +936,7 @@ export function MapInfoPanel({
                 dguid={dguid}
                 daName={profile ? getDaPanelTitle(profile).text : ""}
                 hasSelection={hasSelection}
+                onSubmitSuccess={onCommentSubmitSuccess}
               />
             </div>
           );
@@ -947,6 +950,7 @@ export function MapInfoPanel({
                 neighboring_dguid={objectionWorkflow?.secondDguid ?? null}
                 onBackStep={onObjectionBackStep}
                 onConfirmReview={onObjectionConfirmReview}
+                onSubmitSuccess={onObjectionSubmitSuccess}
                 profilesByDguid={profilesByDguid}
                 workflow={objectionWorkflow}
               />

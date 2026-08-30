@@ -31,7 +31,14 @@ function FieldHoverHint({ message }) {
   );
 }
 
-export default function UserMakeComments({ proposalId, fedNum, dguid, daName, hasSelection }) {
+export default function UserMakeComments({
+  proposalId,
+  fedNum,
+  dguid,
+  daName,
+  hasSelection,
+  onSubmitSuccess,
+}) {
   const { sessionStatus, user } = useAuth();
   const isSignedIn = sessionStatus === "signed-in";
   const [comment, setComment] = useState("");
@@ -75,6 +82,7 @@ export default function UserMakeComments({ proposalId, fedNum, dguid, daName, ha
 
       setTitle("");
       setComment("");
+      onSubmitSuccess?.(dguid);
       toast.success("Comment submitted successfully.", {
         duration: 1000,
       });

@@ -619,6 +619,8 @@ export function MapCanvas({
   const [mapReadyTick, setMapReadyTick] = useState(0);
   const [boundariesVisible, setBoundariesVisible] = useState(true);
   const [isPostalAreaMarkerVisible, setIsPostalAreaMarkerVisible] = useState(true);
+  const [isSearchMarkerVisible, setIsSearchMarkerVisible] = useState(true);
+  const lastAppliedSearchTargetRef = useRef(null);
   const [totalSubmissions, setTotalSubmissions] = useState(0);
   const totalSubmissionsRef = useRef(0);
 
@@ -651,6 +653,12 @@ export function MapCanvas({
     postalAreaMarkerRef.current = null;
   }
 
+  function clearSearchMarker() {
+    setIsSearchMarkerVisible(false);
+    searchMarkerRef.current?.remove();
+    searchMarkerRef.current = null;
+  }
+
   function focusPostalArea() {
     const map = mapRef.current;
     const target = postalAreaTargetRef.current;
@@ -663,8 +671,7 @@ export function MapCanvas({
     setIsPostalAreaMarkerVisible(true);
     skipNextPostalTargetSyncRef.current = true;
     onPostalAreaActivateRef.current?.();
-    searchMarkerRef.current?.remove();
-    searchMarkerRef.current = null;
+    clearSearchMarker();
     map.flyTo({
       center: coordinates,
       zoom: Number.isFinite(target?.zoom) ? target.zoom : 12,
@@ -902,6 +909,11 @@ export function MapCanvas({
     const coordinates = getMapTargetCoordinates(mapSearchTarget);
     const viewport = getMapTargetViewport(mapSearchTarget);
 
+    if (mapSearchTarget !== lastAppliedSearchTargetRef.current) {
+      setIsSearchMarkerVisible(true);
+      lastAppliedSearchTargetRef.current = mapSearchTarget;
+    }
+
     if (skipNextPostalTargetSyncRef.current) {
       // Clearing the app-level Places result exposes the postal target again.
       // The postal button already started that exact camera move, so avoid a
@@ -935,7 +947,11 @@ export function MapCanvas({
       });
     }
 
-    if (mapSearchTarget?.showMarker === false || !coordinates) {
+    if (
+      !isSearchMarkerVisible
+      || mapSearchTarget?.showMarker === false
+      || !coordinates
+    ) {
       searchMarkerRef.current?.remove();
       searchMarkerRef.current = null;
     } else {
@@ -949,7 +965,7 @@ export function MapCanvas({
     }
 
     onStatusChangeRef.current?.(`Map moved to ${mapSearchTarget.label || "the selected place"}.`);
-  }, [mapReadyTick, mapSearchTarget]);
+  }, [isSearchMarkerVisible, mapReadyTick, mapSearchTarget]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -2290,11 +2306,12 @@ export function MapCanvas({
         return;
       }
 
-      // A direct map-area selection moves attention away from the user's
-      // postal presenter marker. It returns only through My Postal Area, the
-      // rollout Toggle, or a fresh map session.
+      // A direct map-area selection moves attention away from presenter
+      // markers (postal area and Places search). They return only through
+      // My Postal Area, a new search, the rollout Toggle, or a fresh session.
       if (hit) {
         clearPostalAreaMarker();
+        clearSearchMarker();
       }
 
       if (

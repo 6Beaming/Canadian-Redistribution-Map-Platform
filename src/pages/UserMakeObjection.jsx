@@ -130,6 +130,7 @@ export default function UserMakeObjection({
   profilesByDguid,
   onBackStep,
   onConfirmReview,
+  onSubmitSuccess,
 }) {
   const { sessionStatus, user } = useAuth();
   const isSignedIn = sessionStatus === "signed-in";
@@ -174,6 +175,7 @@ export default function UserMakeObjection({
 
       setTitle("");
       setObjectionText("");
+      onSubmitSuccess?.(workflow?.firstDguid ?? dguid);
       toast.success("Objection submitted successfully.", {
         duration: 1000,
       });

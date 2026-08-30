@@ -382,7 +382,7 @@ export default function UserMakeCounterProposal({
           neighboring_dguid: workflow.secondDguid,
           proposed_geometry: cache.currentFeatureCollection,
         },
-        onSuccess: onSubmitSuccess,
+        onSuccess: () => onSubmitSuccess?.(workflow.secondDguid ?? workflow.firstDguid),
       });
 
       setTitle("");
