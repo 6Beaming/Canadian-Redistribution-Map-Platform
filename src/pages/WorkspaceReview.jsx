@@ -185,49 +185,53 @@ export default function WorkspaceReview() {
   }
 
   return (
-    <main className="workspace-review-page">
-      <div className="workspace-review-layout">
-        <section className="workspace-review-map" aria-label="Read-only submission map">
-          <div className="sr-only" aria-live="polite">{status}</div>
-          {submission.geometry ? (
-            <MapCanvas
-              selection={null}
-              objectionPreview={mapPresentation.objectionPreview}
-              counterProposalPreview={mapPresentation.counterProposalPreview}
-              focusGeoJson={mapFocusGeoJson}
-              workflowFocusDguids={focusDguids}
-              interactionMode={MAP_INTERACTION_MODE.COUNTER_REVIEW}
-              onStatusChange={setStatus}
-            />
-          ) : submission.geometryError ? (
-            <div className="workspace-review-map-empty" role="status">
-              <strong>Map geometry unavailable</strong>
-              <p>{submission.geometryError}</p>
+    <main className="workspace-review-page map-page">
+      <div className="map-workspace map-workspace--single-column">
+        <div className="map-dashboard workspace-review-dashboard">
+          <section className="map-dashboard__main workspace-review-map" aria-label="Read-only submission map">
+            <div className="map-dashboard__map-wrap">
+              <div className="sr-only" aria-live="polite">{status}</div>
+              {submission.geometry ? (
+                <MapCanvas
+                  selection={null}
+                  objectionPreview={mapPresentation.objectionPreview}
+                  counterProposalPreview={mapPresentation.counterProposalPreview}
+                  focusGeoJson={mapFocusGeoJson}
+                  workflowFocusDguids={focusDguids}
+                  interactionMode={MAP_INTERACTION_MODE.COUNTER_REVIEW}
+                  onStatusChange={setStatus}
+                />
+              ) : submission.geometryError ? (
+                <div className="workspace-review-map-empty" role="status">
+                  <strong>Map geometry unavailable</strong>
+                  <p>{submission.geometryError}</p>
+                </div>
+              ) : (
+                <div className="route-loading-overlay__indicator" role="status">
+                  <span className="route-loading-overlay__spinner" aria-hidden="true" />
+                  <span>Loading...</span>
+                </div>
+              )}
+              {normalizeType(submission.type) === "counter-proposal" ? (
+                <div className="workspace-comparison-toggle" role="group" aria-label="Boundary comparison">
+                  <button type="button" className={comparisonView === "proposed" ? "is-active" : ""} onClick={() => setComparisonView("proposed")}>Proposed</button>
+                  <button type="button" className={comparisonView === "original" ? "is-active" : ""} onClick={() => setComparisonView("original")}>Original</button>
+                </div>
+              ) : null}
             </div>
-          ) : (
-            <div className="route-loading-overlay__indicator" role="status">
-              <span className="route-loading-overlay__spinner" aria-hidden="true" />
-              <span>Loading...</span>
-            </div>
-          )}
-          {normalizeType(submission.type) === "counter-proposal" ? (
-            <div className="workspace-comparison-toggle" role="group" aria-label="Boundary comparison">
-              <button type="button" className={comparisonView === "proposed" ? "is-active" : ""} onClick={() => setComparisonView("proposed")}>Proposed</button>
-              <button type="button" className={comparisonView === "original" ? "is-active" : ""} onClick={() => setComparisonView("original")}>Original</button>
-            </div>
-          ) : null}
-        </section>
-        <WorkspaceReviewPanel
-          key={submission.id}
-          submission={submission}
-          siblingSubmissions={siblingSubmissions}
-          onSubmissionSelect={(id) => navigate(`/dashboard/workspace/${encodeURIComponent(id)}`, {
-            state: location.state,
-          })}
-          onCommitted={handleCommitted}
-          onSubmissionUpdated={updateSubmissionStatus}
-          reviewerEmails={reviewerEmails}
-        />
+          </section>
+          <WorkspaceReviewPanel
+            key={submission.id}
+            submission={submission}
+            siblingSubmissions={siblingSubmissions}
+            onSubmissionSelect={(id) => navigate(`/dashboard/workspace/${encodeURIComponent(id)}`, {
+              state: location.state,
+            })}
+            onCommitted={handleCommitted}
+            onSubmissionUpdated={updateSubmissionStatus}
+            reviewerEmails={reviewerEmails}
+          />
+        </div>
       </div>
     </main>
   );

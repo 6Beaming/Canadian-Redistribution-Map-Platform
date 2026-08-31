@@ -1,25 +1,31 @@
 .workspace-review-page {
+  box-sizing: border-box;
   height: calc(100dvh - 3.5rem);
   min-height: 0;
   overflow: hidden;
-  background: var(--background);
   padding: clamp(0.5rem, 1.2vw, 0.85rem);
 }
 
-.workspace-review-layout {
-  display: grid;
-  width: 100%;
+.workspace-review-page.map-page {
+  padding: clamp(0.5rem, 1.2vw, 0.85rem) clamp(0.5rem, 1.2vw, 0.85rem) clamp(0.75rem, 1.2vw, 1rem) 0;
+}
+
+.workspace-review-dashboard {
   height: 100%;
-  min-width: 0;
   min-height: 0;
-  grid-template-columns: minmax(0, 1fr) clamp(22rem, 34vw, 38rem);
-  gap: clamp(0.5rem, 1.2vw, 1rem);
 }
 
 .workspace-review-map {
   position: relative;
   min-width: 0;
   min-height: 0;
+}
+
+.workspace-review-map .map-dashboard__map-wrap {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
 }
 
 .workspace-review-map-empty {
@@ -53,6 +59,13 @@
 
 .workspace-review-panel {
   height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.workspace-review-panel__content {
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   overflow: hidden;
 }
@@ -147,7 +160,7 @@
 }
 
 .workspace-review-selector__menu span {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-family-sans), var(--font-family-mono);
   font-size: 0.75rem;
   font-weight: 700;
 }
@@ -155,12 +168,14 @@
 .workspace-review-selector__menu small {
   overflow: hidden;
   color: #65798b;
+  font-family: var(--font-family-sans), var(--font-family-mono);
   font-size: 0.68rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .workspace-review-panel__scroll {
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   overflow-x: hidden;
@@ -821,20 +836,6 @@
 .workspace-review-error h1 { margin: 0; color: #17324d; }
 .workspace-review-error p { color: #65798b; }
 
-@media (max-width: 1050px) {
-  .workspace-review-layout {
-    grid-template-columns: minmax(0, 1fr) minmax(20rem, 50%);
-  }
-}
-
-@media (max-width: 700px) {
-  .workspace-review-page {
-    overflow: auto;
-  }
-
-  .workspace-review-layout {
-    min-height: 58rem;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 43dvh minmax(32rem, 1fr);
-  }
+.workspace-review-panel.map-info-panel--floating .workspace-review-panel__scroll {
+  max-height: none;
 }

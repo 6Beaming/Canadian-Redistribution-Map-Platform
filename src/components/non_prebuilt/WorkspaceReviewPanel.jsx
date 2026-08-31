@@ -49,6 +49,7 @@ import {
 import { createLabelMutationQueue } from "@/lib/workspace/labelMutationQueue.js";
 import { createLocalMutationGuard } from "@/lib/workspace/localMutationGuard.js";
 import { preparePayloadWithRealUuids } from "@/lib/workspace/prepareLabelPayload.js";
+import { MapInfoPanelShell } from "@/components/non_prebuilt/MapInfoPanelShell.jsx";
 
 function formatTimestamp(value) {
   const date = new Date(value);
@@ -1426,59 +1427,65 @@ export function WorkspaceReviewPanel({
   }
 
   return (
-    <aside className="map-info-panel workspace-review-panel" aria-label="Submission workspace review">
-      <SubmissionSelector
-        submissions={siblingSubmissions}
-        activeId={submission.id}
-        onSelect={onSubmissionSelect}
-      />
-      {submission.crossProvinceWarning ? (
-        <p className="workspace-cross-province-warning" role="alert">
-          {submission.crossProvinceWarning}
-        </p>
-      ) : null}
-      <div className="workspace-review-panel__scroll">
-        {reviewError ? (
-          <div className="workspace-decision-error" role="alert">
-            <span>{reviewError}</span>
-            <button type="button" onClick={() => void refreshReview()}>Retry</button>
-          </div>
+    <MapInfoPanelShell
+      isOpen
+      className="workspace-review-panel"
+      ariaLabel="Submission workspace review"
+    >
+      <div className="map-info-panel__content workspace-review-panel__content">
+        <SubmissionSelector
+          submissions={siblingSubmissions}
+          activeId={submission.id}
+          onSelect={onSubmissionSelect}
+        />
+        {submission.crossProvinceWarning ? (
+          <p className="workspace-cross-province-warning" role="alert">
+            {submission.crossProvinceWarning}
+          </p>
         ) : null}
-        <LabelEditor
-          key={submission.id}
-          submissionId={submission.id}
-          selectedLabels={activeReview.labels}
-          savedCatalog={activeReview.labelCatalog}
-          onChange={updateActiveLabels}
-          onCatalogChange={updateActiveCatalog}
-          onSuppressEcho={markEchoSuppressed}
-          onLocalMutation={localMutationGuardRef.current}
-          unavailableMessage={activeReview.collaborationWarning}
-        />
-        <CommentThread
-          submissionId={submission.id}
-          comments={activeReview.comments}
-          reviewerEmail={reviewerEmail}
-          onCommentsChange={updateComments}
-          onSuppressEcho={markEchoSuppressed}
-          onLocalMutation={localMutationGuardRef.current}
-          readOnly={submission.status !== WORKSPACE_STATUS.PENDING}
-        />
-        <SubmissionDetails submission={submission} />
-        <CounterProposalImpact submission={submission} />
-        <DecisionControls
-          submission={submission}
-          review={activeReview}
-          reviewerEmail={reviewerEmail}
-          reviewerEmails={reviewerEmails}
-          archiveRequestLoading={archiveRequestLoading}
-          onCommitted={handleDecisionCommitted}
-          onArchiveRequestChange={updateArchiveRequest}
-          onRefreshArchiveRequest={refreshArchiveRequest}
-          onSuppressEcho={markEchoSuppressed}
-          onLocalMutation={localMutationGuardRef.current}
-        />
+        <div className="workspace-review-panel__scroll">
+          {reviewError ? (
+            <div className="workspace-decision-error" role="alert">
+              <span>{reviewError}</span>
+              <button type="button" onClick={() => void refreshReview()}>Retry</button>
+            </div>
+          ) : null}
+          <LabelEditor
+            key={submission.id}
+            submissionId={submission.id}
+            selectedLabels={activeReview.labels}
+            savedCatalog={activeReview.labelCatalog}
+            onChange={updateActiveLabels}
+            onCatalogChange={updateActiveCatalog}
+            onSuppressEcho={markEchoSuppressed}
+            onLocalMutation={localMutationGuardRef.current}
+            unavailableMessage={activeReview.collaborationWarning}
+          />
+          <CommentThread
+            submissionId={submission.id}
+            comments={activeReview.comments}
+            reviewerEmail={reviewerEmail}
+            onCommentsChange={updateComments}
+            onSuppressEcho={markEchoSuppressed}
+            onLocalMutation={localMutationGuardRef.current}
+            readOnly={submission.status !== WORKSPACE_STATUS.PENDING}
+          />
+          <SubmissionDetails submission={submission} />
+          <CounterProposalImpact submission={submission} />
+          <DecisionControls
+            submission={submission}
+            review={activeReview}
+            reviewerEmail={reviewerEmail}
+            reviewerEmails={reviewerEmails}
+            archiveRequestLoading={archiveRequestLoading}
+            onCommitted={handleDecisionCommitted}
+            onArchiveRequestChange={updateArchiveRequest}
+            onRefreshArchiveRequest={refreshArchiveRequest}
+            onSuppressEcho={markEchoSuppressed}
+            onLocalMutation={localMutationGuardRef.current}
+          />
+        </div>
       </div>
-    </aside>
+    </MapInfoPanelShell>
   );
 }
