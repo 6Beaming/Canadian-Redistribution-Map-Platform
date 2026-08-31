@@ -388,12 +388,16 @@ export async function deleteWorkspaceLabel(labelId) {
     return handleResponse(res);
 }
 
+export async function updateWorkspaceArchiveAssigneesById(requestId, assignees, { expectedVersion } = {}) {
+    return archiveRequestApi.updateArchiveRequestAssignees(requestId, assignees, { expectedVersion });
+}
+
 export async function updateWorkspaceArchiveAssignees(submissionId, assignees) {
     const current = await archiveRequestApi.getArchiveRequest(submissionId);
     if (!current?.id) {
         throw new Error("Archive request not found.");
     }
-    return archiveRequestApi.updateArchiveRequestAssignees(current.id, assignees, {
+    return updateWorkspaceArchiveAssigneesById(current.id, assignees, {
         expectedVersion: current.version,
     });
 }

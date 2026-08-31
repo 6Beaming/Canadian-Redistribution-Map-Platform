@@ -162,23 +162,39 @@ test("Shared loading UI overlays and blocks page content while leaving the heade
 
 test("Workspace label and catalog mutations stay scoped, ordered, and optimistic", () => {
   const panel = read("src/components/non_prebuilt/WorkspaceReviewPanel.jsx");
-  assert.match(panel, /const mutationPending = pendingIds\.size > 0/);
-  assert.match(panel, /setOptimisticSelected\(nextLabels\)/);
-  assert.match(panel, /optimisticSelected\.filter\(\(entry\) => labelIdentity\(entry\) !== labelId\)/);
-  assert.doesNotMatch(panel, /identity\(entry\)/);
+  assert.match(panel, /const \[pendingLabelKeys, setPendingLabelKeys\] = useState\(\(\) => new Set\(\)\)/);
+  assert.match(panel, /createLabelMutationQueue/);
+  assert.match(panel, /scheduleLabelSync/);
+  assert.match(panel, /createLocalMutationGuard/);
+  assert.match(panel, /localMutationGuardRef/);
+  assert.match(panel, /pumpLabelDrain/);
+  assert.match(panel, /runLabelDrainUntilSettled/);
+  assert.match(panel, /selectionFingerprint/);
+  assert.match(panel, /customEditDeselectedRef/);
+  assert.match(panel, /optimisticSelectedRef\.current/);
+  assert.match(panel, /lastCommittedSelectedRef/);
+  assert.match(panel, /mergeCatalogFromServer/);
+  assert.match(panel, /isSameLabel\(entry, label\)/);
+  assert.match(panel, /preparePayloadWithRealUuids/);
+  assert.match(panel, /onSuppressEcho=\{markEchoSuppressed\}/);
+  assert.match(panel, /echoSuppressorRef\.current\.filter/);
+  assert.match(panel, /onCommentsChange=\{updateComments\}/);
+  assert.match(panel, /updateWorkspaceArchiveAssigneesById/);
+  assert.match(panel, /pendingAssigneeEmails/);
+  assert.doesNotMatch(panel, /const mutationPending = pendingIds\.size > 0/);
+  assert.match(panel, /handleToggleLabel/);
   assert.match(panel, /function handleLabelRowClick\(event, label\)/);
   assert.match(panel, /event\.target\.closest\("button, input"\)/);
   assert.match(panel, /onClick=\{\(event\) => handleLabelRowClick\(event, label\)\}/);
-  assert.match(panel, /prepareCatalog\(entries/);
   assert.match(panel, /Customized Label/);
-  assert.match(panel, /reconcileLabelsInOrder\(nextLabels, persisted\)/);
+  assert.match(panel, /reconcileLabelsInOrder\(optimisticSelectedRef\.current, persisted\)/);
   assert.match(panel, /onChange=\{updateActiveLabels\}/);
   assert.match(panel, /onCatalogChange=\{updateActiveCatalog\}/);
   assert.match(panel, /key=\{submission\.id\}/);
   assert.match(panel, /review\.submissionId[\s\S]*submission\.id[\s\S]*EMPTY_REVIEW/);
   assert.match(panel, /Labels cannot be empty/);
   assert.match(panel, /}, 5000\)/);
-  assert.match(panel, /startsWith\("draft-custom-"\)[\s\S]*clearInvalidCustomLabel[\s\S]*setCatalog/);
+  assert.match(panel, /isDraftCustomLabelId\(label\.id\)[\s\S]*clearInvalidCustomLabel[\s\S]*setCatalog/);
   assert.match(panel, /deleteWorkspaceLabelCatalog\(label\.id, submissionId\)/);
   assert.match(panel, /refreshSequence\.current !== sequence/);
   assert.doesNotMatch(
