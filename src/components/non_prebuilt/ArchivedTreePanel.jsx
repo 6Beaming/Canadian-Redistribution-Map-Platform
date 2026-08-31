@@ -56,12 +56,12 @@ function ConfirmationModal({ mode, version, onCancel, onConfirm }) {
         <h2 id="archive-modal-title">{isDelete ? "Delete this branch forever?" : `Revert to ${version?.label}?`}</h2>
         <p>
           {isDelete
-            ? "All versions of DA changes stored in this branch will be cleared."
+            ? "All versions of DA changes stored in this branch will be cleared. All related submissions will be initialized as new (pending) submissions."
             : "This historical version will become the branch's Latest Version in this local milestone."}
         </p>
         {isDelete ? (
           <label>
-            Type <strong>I confirm</strong> to continue
+            <span style={{ textAlign: "center", display: "block" }}>Type <strong>'I confirm'</strong> to continue</span>
             <input
               autoFocus
               value={confirmation}
