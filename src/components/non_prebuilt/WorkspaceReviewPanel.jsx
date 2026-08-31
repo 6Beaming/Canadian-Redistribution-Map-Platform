@@ -1073,13 +1073,14 @@ function DecisionControls({
           <button type="button" className="is-accept" disabled={isSubmitting} onClick={() => runAction("accept")}><Check />Accept</button>
           <button type="button" className="is-reject" disabled={isSubmitting} onClick={() => runAction("reject")}><X />Reject</button>
         </> : null}
-        {displayedStatus === WORKSPACE_STATUS.ACCEPTED ? (
+        {displayedStatus === WORKSPACE_STATUS.ACCEPTED ? <>
+          <button type="button" className="is-reject" disabled={isSubmitting} onClick={() => runAction("reject-again")}><X />Reject again</button>
           <button type="button" className="is-archive" disabled={isSubmitting} onClick={() => runAction("archive-request")}>
             <ArchiveRestore />Make an Archive Request
           </button>
-        ) : null}
+        </> : null}
         {displayedStatus === WORKSPACE_STATUS.REJECTED ? (
-          <button type="button" className="is-accept" disabled={isSubmitting} onClick={() => runAction("accept-again")}><Check />Accept Again</button>
+          <button type="button" className="is-accept" disabled={isSubmitting} onClick={() => runAction("accept-again")}><Check />Accept again</button>
         ) : null}
         {displayedStatus === WORKSPACE_STATUS.ARCHIVE_REQUEST && request && !isRequester ? <>
           <button type="button" className="is-accept" disabled={isSubmitting} onClick={() => runAction("archive-vote-accept")}><Check />Accept</button>

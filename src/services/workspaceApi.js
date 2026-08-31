@@ -463,6 +463,7 @@ function actionDescription(action, email) {
     const descriptions = {
         accept: `${email} accepted this submission.`,
         reject: `${email} rejected this submission.`,
+        "reject-again": `${email} rejected this submission again.`,
         "accept-again": `${email} accepted this submission again.`,
         "archive-request": `${email} requested that this submission be archived.`,
         "archive-cancel": `${email} cancelled the archive request.`,
@@ -490,7 +491,7 @@ export async function commitWorkspaceAction(submission, {
     let nextStatus = submission.status;
 
     if (action === "accept" || action === "accept-again") nextStatus = WORKSPACE_STATUS.ACCEPTED;
-    if (action === "reject") nextStatus = WORKSPACE_STATUS.REJECTED;
+    if (action === "reject" || action === "reject-again") nextStatus = WORKSPACE_STATUS.REJECTED;
     if (action === "archive-request") nextStatus = WORKSPACE_STATUS.ARCHIVE_REQUEST;
     if (action === "archive-cancel" || action === "archive-vote-reject") {
         nextStatus = WORKSPACE_STATUS.ACCEPTED;

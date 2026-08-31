@@ -244,6 +244,8 @@ test("Workspace decision controls do not flash the next status before navigation
   );
   assert.match(controls, /displayedStatus === WORKSPACE_STATUS\.PENDING/);
   assert.match(controls, /displayedStatus === WORKSPACE_STATUS\.ACCEPTED/);
+  assert.match(controls, /runAction\("reject-again"\)/);
+  assert.match(controls, /Reject again/);
   assert.match(controls, /displayedStatus === WORKSPACE_STATUS\.REJECTED/);
   assert.doesNotMatch(controls, /submission\.status === WORKSPACE_STATUS/);
 });
