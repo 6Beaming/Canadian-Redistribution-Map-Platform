@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Maximize2, Minus, Plus } from "lucide-react";
 
+const SUPER_ROOT_Y = 34;
+const CATEGORY_BAND_OFFSET = 150;
 const ROOT_X = 48;
 const BRANCH_X = 382;
 const VERSION_X = 710;
@@ -98,7 +100,13 @@ function hitTest(regions, point) {
   ));
 }
 
-export function ArchivedTreeCanvas({ categories, isLoading = false, selectedVersionId, onSelect, onOpenMap }) {
+export function ArchivedTreeCanvas({
+  categories,
+  isLoading = false,
+  selectedVersionId,
+  onSelect,
+  onOpenSuperRootMap,
+}) {
   const canvasRef = useRef(null);
   const regionsRef = useRef([]);
   const cameraRef = useRef({ x: 0, y: 0, scale: 1 });
@@ -150,14 +158,40 @@ export function ArchivedTreeCanvas({ categories, isLoading = false, selectedVers
       const regions = [];
 
       if (!categories.some((category) => category.branches.length)) {
-        drawText(context, "No archived submissions match this view.", 54, 72, {
+        drawText(context, "No archived submissions match this view.", 54, SUPER_ROOT_Y + 120, {
           color: "#758899",
           size: 15,
         });
       }
 
+      const superRootY = SUPER_ROOT_Y;
+      roundedRect(context, ROOT_X, superRootY, ROOT_WIDTH, ROOT_HEIGHT, 14);
+      context.fillStyle = "#17324d";
+      context.fill();
+      context.strokeStyle = "#0f9f94";
+      context.lineWidth = 1.5;
+      context.stroke();
+      drawText(context, "Click to open the Archived Map", ROOT_X + 18, superRootY + 42, {
+        color: "#fff",
+        size: 13,
+        weight: 750,
+        maxWidth: 220,
+      });
+      drawText(context, "Latest legal archived geometry overlay", ROOT_X + 18, superRootY + 66, {
+        color: "#c8d8ea",
+        size: 11,
+        maxWidth: 220,
+      });
+      regions.push({
+        type: "super-root",
+        x: ROOT_X,
+        y: superRootY,
+        width: ROOT_WIDTH,
+        height: ROOT_HEIGHT,
+      });
+
       categories.forEach((category, categoryIndex) => {
-        const bandTop = 34 + categoryIndex * BAND_HEIGHT;
+        const bandTop = SUPER_ROOT_Y + CATEGORY_BAND_OFFSET + categoryIndex * BAND_HEIGHT;
         const rootY = bandTop + 55;
         const visibleBranches = expandedCategories.has(category.id)
           ? category.branches
@@ -362,8 +396,15 @@ export function ArchivedTreeCanvas({ categories, isLoading = false, selectedVers
     const canvas = canvasRef.current;
     const hit = hitTest(regionsRef.current, getWorldPoint(event, canvas, cameraRef.current));
     if (!hit) return;
-    if (hit.type === "category") {
-      onOpenMap(hit.category);
+    if (hit.type === "super-root") {
+      onOpenSuperRootMap?.();
+    } else if (hit.type === "category") {
+      setExpandedCategories((current) => {
+        const next = new Set(current);
+        if (next.has(hit.category.id)) next.delete(hit.category.id);
+        else next.add(hit.category.id);
+        return next;
+      });
     } else if (hit.type === "more") {
       setExpandedCategories((current) => {
         const next = new Set(current);

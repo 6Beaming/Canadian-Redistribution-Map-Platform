@@ -149,7 +149,9 @@ export default function ArchivedTree() {
           isLoading={isLoading}
           selectedVersionId={selectedId}
           onSelect={selectVersion}
-          onOpenMap={(category) => navigate(`/dashboard?archivedMap=1&archiveCategory=${encodeURIComponent(category.id)}`)}
+          onOpenSuperRootMap={() => navigate("/dashboard?archivedMap=1", {
+            state: { from: "/dashboard/archivedTree" },
+          })}
         />
         <ArchivedTreePanel
           selection={selection}
