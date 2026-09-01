@@ -3,9 +3,15 @@ import { getSupabaseAdminDataClient } from "../lib/supabase.js";
 import {
   getArchiveBranch,
   getArchiveVersion,
+  listArchiveProjectionsForDguid,
   listArchiveTreeRecords,
 } from "../lib/archive/archiveRepository.js";
 import { getArchivedMapSnapshot } from "../lib/archive/archivedMapRepository.js";
+import {
+  mergeApprovedArchiveRequest,
+  reinitializeArchiveBranch,
+  revertArchiveVersion,
+} from "../lib/archive/archiveMergeService.js";
 
 const router = Router();
 
@@ -79,6 +85,66 @@ router.get("/archive-map", async (req, res) => {
     return res.json(payload);
   } catch (error) {
     return handleArchiveError(res, error, "Unable to load the archived map.");
+  }
+});
+
+router.get("/archive-map/projections", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdminDataClient();
+    const payload = await listArchiveProjectionsForDguid(supabase, req.query.dguid);
+    return res.json(payload);
+  } catch (error) {
+    return handleArchiveError(res, error, "Unable to load archived map projections.");
+  }
+});
+
+router.post("/archive/merge", async (req, res) => {
+  try {
+    const archiveRequestId = String(req.body?.archiveRequestId ?? "").trim();
+    if (!archiveRequestId) {
+      return res.status(400).json({ error: "archiveRequestId is required." });
+    }
+    const supabase = getSupabaseAdminDataClient();
+    const payload = await mergeApprovedArchiveRequest(supabase, {
+      archiveRequestId,
+      closingComment: req.body?.closingComment ?? null,
+      actorUser: req.user,
+      actorProfile: req.profile,
+    });
+    return res.status(201).json(payload);
+  } catch (error) {
+    return handleArchiveError(res, error, "Unable to merge into the archive.");
+  }
+});
+
+router.post("/archive/versions/:versionId/revert", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdminDataClient();
+    const payload = await revertArchiveVersion(supabase, {
+      versionId: req.params.versionId,
+      actorUser: req.user,
+      actorProfile: req.profile,
+      expectedBranchVersion: Number(req.body?.expectedBranchVersion),
+      expectedMapRevision: req.body?.expectedMapRevision ?? null,
+    });
+    return res.json(payload);
+  } catch (error) {
+    return handleArchiveError(res, error, "Unable to revert the archive version.");
+  }
+});
+
+router.delete("/archive/branches/:branchId", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdminDataClient();
+    const payload = await reinitializeArchiveBranch(supabase, {
+      branchId: req.params.branchId,
+      actorUser: req.user,
+      actorProfile: req.profile,
+      expectedBranchVersion: Number(req.body?.expectedBranchVersion),
+    });
+    return res.json(payload);
+  } catch (error) {
+    return handleArchiveError(res, error, "Unable to reinitialize the archive branch.");
   }
 });
 

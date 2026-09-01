@@ -636,6 +636,7 @@ async function getRemoteArchiveTreeRecords() {
         versionId: record.versionId ?? null,
         branchId: record.branchId ?? null,
         releaseId: record.releaseId ?? null,
+        resourceVersion: record.resourceVersion ?? 1,
     }));
 }
 
@@ -682,16 +683,43 @@ async function mutateArchiveTree(path, method, body) {
 }
 
 /** Durable, destructive Archive Tree mutation via the commissioner-only API. */
-export function deleteArchiveBranch(branchKey) {
+export function deleteArchiveBranch(branchKey, { branchId, expectedBranchVersion } = {}) {
+    if (branchId && expectedBranchVersion) {
+        return mutateArchiveTree(
+            `/api/workspace/archive/branches/${encodeURIComponent(branchId)}`,
+            "DELETE",
+            { expectedBranchVersion },
+        );
+    }
     return mutateArchiveTree("/api/workspace/archive/branch", "DELETE", { branchKey });
 }
 
 /** Durable Archive Tree latest-version mutation via the commissioner-only API. */
-export function revertArchiveBranch(branchKey, submissionId) {
+export function revertArchiveBranch(branchKey, submissionId, {
+    versionId,
+    expectedBranchVersion,
+} = {}) {
+    if (versionId && expectedBranchVersion) {
+        return mutateArchiveTree(
+            `/api/workspace/archive/versions/${encodeURIComponent(versionId)}/revert`,
+            "POST",
+            { expectedBranchVersion },
+        );
+    }
     return mutateArchiveTree("/api/workspace/archive/branch/latest", "PATCH", {
         branchKey,
         submissionId,
     });
+}
+
+export async function getArchivedMapProjections(dguid, { signal } = {}) {
+    const params = new URLSearchParams({ dguid: String(dguid ?? "") });
+    const response = await fetch(`/api/workspace/archive-map/projections?${params}`, {
+        credentials: "include",
+        signal,
+    });
+    const payload = await handleResponse(response);
+    return payload;
 }
 
 function normalizeType(value) {

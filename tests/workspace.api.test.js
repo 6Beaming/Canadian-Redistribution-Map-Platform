@@ -167,6 +167,16 @@ test("a commissioner archive merge uses the atomic Supabase function", async () 
     }),
     getSupabaseProfile: async () => commissioner,
     getSupabaseAdminDataClient: () => ({
+      from(table) {
+        if (table === "workspace_archive_requests") {
+          return {
+            select() { return this; },
+            eq() { return this; },
+            maybeSingle: async () => ({ data: null, error: null }),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
       async rpc(name, values) {
         called = { name, values };
         return { data: { submission_id: values.target_submission_id }, error: null };

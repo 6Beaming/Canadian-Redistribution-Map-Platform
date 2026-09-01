@@ -377,25 +377,59 @@ test("Archived Tree JSON exports complete ordered snapshots and is Commissioner-
   const rows = [
     {
       id: "archive-2", branch_key: "branch-a", submission_id: "submission-1",
-      version_number: 2, is_latest: true, submission_snapshot: { geometry: { type: "Polygon" } },
+      version_number: 2, is_latest: true, submission_snapshot: {
+        id: "submission-1",
+        type: "feedback",
+        dguid: "2021S051260010118",
+        title: "Later version",
+        comment: "Updated comment",
+      },
       closing_comment: { content: "done" }, merged_by: commissioner.id, merged_at: "2026-08-02T12:00:00Z",
     },
     {
       id: "archive-1", branch_key: "branch-a", submission_id: "submission-1",
-      version_number: 1, is_latest: false, submission_snapshot: { geometry: { type: "Polygon" } },
+      version_number: 1, is_latest: false, submission_snapshot: {
+        id: "submission-1",
+        type: "feedback",
+        dguid: "2021S051260010118",
+        title: "Earlier version",
+        comment: "Original comment",
+      },
       closing_comment: null, merged_by: commissioner.id, merged_at: "2026-08-01T12:00:00Z",
     },
   ];
   const admin = {
     from(table) {
+      if (table === "archive_branches") {
+        return {
+          select() { return this; },
+          order() { return Promise.resolve({ data: [], error: null }); },
+        };
+      }
+      if (table === "archive_map_revisions") {
+        return {
+          select() { return this; },
+          eq() { return this; },
+          order() { return this; },
+          limit() { return this; },
+          maybeSingle() { return Promise.resolve({ data: { sequence: 3, release_id: "statscan-da-2021-r1" }, error: null }); },
+        };
+      }
+      if (table === "profiles") {
+        return {
+          select() { return this; },
+          in(_field, ids) {
+            return Promise.resolve({
+              data: ids.map((id) => ({ id, email: `${id}@example.com` })),
+              error: null,
+            });
+          },
+        };
+      }
       assert.equal(table, "archive_tree");
-      let orderCalls = 0;
       return {
         select(columns) { assert.equal(columns, "*"); return this; },
-        order() {
-          orderCalls += 1;
-          return orderCalls === 2 ? Promise.resolve({ data: rows, error: null }) : this;
-        },
+        order() { return Promise.resolve({ data: rows, error: null }); },
       };
     },
   };
@@ -403,10 +437,12 @@ test("Archived Tree JSON exports complete ordered snapshots and is Commissioner-
   const response = await request("/api/exports/archive-tree.json");
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-disposition"), /archived-tree\.json/);
-  assert.equal(response.body.schemaVersion, 1);
+  assert.equal(response.body.schemaVersion, "1.0");
+  assert.equal(response.body.archiveMapRevision, 3);
   assert.equal(response.body.branches.length, 1);
   assert.equal(response.body.branches[0].versions.length, 2);
-  assert.equal(response.body.branches[0].versions[0].submissionSnapshot.geometry.type, "Polygon");
+  assert.equal(response.body.branches[0].versions[0].submission.comment, "Original comment");
+  assert.equal(response.body.branches[0].versions[1].submission.comment, "Updated comment");
 
   authDoubles(publicUser, admin);
   const forbidden = await request("/api/exports/archive-tree.json");

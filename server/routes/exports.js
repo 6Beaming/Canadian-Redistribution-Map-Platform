@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { getSupabaseAdminDataClient } from "../lib/supabase.js";
 import { enrichSubmissionsWithDaMetadata } from "../lib/map/submissionPresentation.js";
+import { streamArchiveTreeExport } from "../lib/archive/archiveExportSerializer.js";
 import {
   LIGHTWEIGHT_SUBMISSION_COLUMNS,
   serializeLightweightSubmission,
@@ -119,43 +120,13 @@ router.post("/submissions.csv", sendSubmissionCsv);
 router.get("/archive-tree.json", async (_req, res) => {
   try {
     const supabase = getSupabaseAdminDataClient();
-    const { data, error } = await supabase.from("archive_tree").select("*")
-      .order("branch_key", { ascending: true })
-      .order("version_number", { ascending: true });
-    if (error && error.code !== "PGRST205") throw error;
-    const rows = data ?? [];
-    const branchesByKey = new Map();
-    rows.forEach((row) => {
-      const branchKey = row.branch_key ?? `submission:${row.submission_id}`;
-      if (!branchesByKey.has(branchKey)) {
-        branchesByKey.set(branchKey, { branchKey, versions: [] });
-      }
-      branchesByKey.get(branchKey).versions.push({
-        id: row.id,
-        submissionId: row.submission_id,
-        versionNumber: row.version_number ?? 1,
-        isLatest: Boolean(row.is_latest),
-        submissionSnapshot: row.submission_snapshot,
-        closingComment: row.closing_comment ?? null,
-        mergedBy: row.merged_by,
-        mergedAt: row.merged_at,
-        revertedBy: row.reverted_by ?? null,
-        revertedAt: row.reverted_at ?? null,
-      });
-    });
-    const document = {
-      schemaVersion: 1,
-      exportedAt: new Date().toISOString(),
-      branches: [...branchesByKey.values()],
-    };
-    res.set({
-      "Content-Type": "application/json; charset=utf-8",
-      "Content-Disposition": "attachment; filename=archived-tree.json",
-      "Cache-Control": "no-store",
-    });
-    return res.send(JSON.stringify(document, null, 2));
+    await streamArchiveTreeExport(res, supabase);
+    if (!res.writableEnded) res.end();
   } catch (error) {
-    return res.status(500).json({ error: error.message || "Unable to export the Archived Tree." });
+    if (!res.headersSent) {
+      return res.status(500).json({ error: error.message || "Unable to export the Archived Tree." });
+    }
+    res.end();
   }
 });
 

@@ -90,6 +90,9 @@ export function buildArchiveTree(records, profilesByDguid = new Map(), latestOve
 
     existing.versions.push({
       id: String(submission.id),
+      versionId: record.versionId ?? null,
+      branchId: record.branchId ?? null,
+      resourceVersion: record.resourceVersion ?? 1,
       record,
       submission,
       mergedAt: record.mergedAt ?? submission.updated_at ?? submission.created_at,
@@ -124,6 +127,8 @@ export function buildArchiveTree(records, profilesByDguid = new Map(), latestOve
 
         return {
           ...branch,
+          branchId: branch.versions.find((entry) => entry.branchId)?.branchId ?? null,
+          resourceVersion: branch.versions.find((entry) => entry.resourceVersion)?.resourceVersion ?? 1,
           versions,
           latestVersion,
           label: branch.dguids.join(" / ") || versions[0]?.id || "Unknown branch",

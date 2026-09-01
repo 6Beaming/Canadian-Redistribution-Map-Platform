@@ -238,3 +238,110 @@ export async function getArchiveVersion(supabase, versionId, { includeGeometry =
     validationReport: includeGeometry ? version.validation_report ?? null : undefined,
   };
 }
+
+function neighborKey(primary, secondary) {
+  return [String(primary), String(secondary)].sort().join("|");
+}
+
+export async function listArchiveProjectionsForDguid(supabase, dguid) {
+  const normalized = String(dguid ?? "").trim();
+  if (!normalized) {
+    return { dguid: normalized, comments: [], objections: [], counterProposals: [] };
+  }
+
+  const { source, records } = await listArchiveTreeRecords(supabase);
+  const relevant = records.filter((record) => {
+    const primary = String(record.primaryDguid ?? record.submission?.dguid ?? "");
+    const secondary = String(record.secondaryDguid ?? record.submission?.neighboring_dguid ?? "");
+    return primary === normalized || secondary === normalized;
+  });
+
+  const comments = relevant
+    .filter((record) => record.submissionType === "comment")
+    .map((record) => ({
+      versionId: record.versionId,
+      branchId: record.branchId,
+      branchKey: record.branchKey,
+      versionNumber: record.versionNumber,
+      isLatest: record.isLatest,
+      mergedAt: record.mergedAt,
+      mergedBy: record.mergedBy,
+      closingComment: record.closingComment,
+      submission: record.submission,
+    }))
+    .sort((left, right) => new Date(right.mergedAt) - new Date(left.mergedAt));
+
+  const objectionsByNeighbor = new Map();
+  const counterProposalsByNeighbor = new Map();
+
+  relevant
+    .filter((record) => record.submissionType === "objection")
+    .forEach((record) => {
+      const primary = String(record.primaryDguid ?? "");
+      const secondary = String(record.secondaryDguid ?? "");
+      const key = neighborKey(primary, secondary);
+      const bucket = objectionsByNeighbor.get(key) ?? {
+        neighborKey: key,
+        primaryDguid: primary,
+        secondaryDguid: secondary,
+        versions: [],
+      };
+      bucket.versions.push({
+        versionId: record.versionId,
+        branchId: record.branchId,
+        branchKey: record.branchKey,
+        versionNumber: record.versionNumber,
+        isLatest: record.isLatest,
+        mergedAt: record.mergedAt,
+        mergedBy: record.mergedBy,
+        closingComment: record.closingComment,
+        submission: record.submission,
+      });
+      objectionsByNeighbor.set(key, bucket);
+    });
+
+  relevant
+    .filter((record) => record.submissionType === "counter_proposal")
+    .forEach((record) => {
+      const primary = String(record.primaryDguid ?? "");
+      const secondary = String(record.secondaryDguid ?? "");
+      const key = neighborKey(primary, secondary);
+      const bucket = counterProposalsByNeighbor.get(key) ?? {
+        neighborKey: key,
+        primaryDguid: primary,
+        secondaryDguid: secondary,
+        versions: [],
+      };
+      bucket.versions.push({
+        versionId: record.versionId,
+        branchId: record.branchId,
+        branchKey: record.branchKey,
+        versionNumber: record.versionNumber,
+        isLatest: record.isLatest,
+        mergedAt: record.mergedAt,
+        mergedBy: record.mergedBy,
+        closingComment: record.closingComment,
+        geometryDigest: record.geometryDigest,
+        hasGeometry: record.hasGeometry,
+        submission: record.submission,
+        validationReport: record.submission?.validation_report ?? null,
+      });
+      counterProposalsByNeighbor.set(key, bucket);
+    });
+
+  const sortVersions = (bucket) => ({
+    ...bucket,
+    versions: bucket.versions.sort((left, right) => {
+      const versionDelta = Number(left.versionNumber) - Number(right.versionNumber);
+      return versionDelta || new Date(left.mergedAt) - new Date(right.mergedAt);
+    }),
+  });
+
+  return {
+    dguid: normalized,
+    source,
+    comments,
+    objections: [...objectionsByNeighbor.values()].map(sortVersions),
+    counterProposals: [...counterProposalsByNeighbor.values()].map(sortVersions),
+  };
+}

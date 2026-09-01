@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
 import { MapInfoPanel, getDefaultPanelView } from "@/components/non_prebuilt/MapInfoPanel.jsx";
+import { ArchivedMapInfoPanel, ARCHIVED_MAP_PANEL_VIEWS } from "@/components/non_prebuilt/ArchivedMapInfoPanel.jsx";
 import { MapRegionSelector } from "@/components/non_prebuilt/MapRegionSelector.jsx";
 import { useAuth } from "@/contexts/AuthContext.jsx";
 import { useMapFullscreen } from "@/contexts/MapFullscreenContext.jsx";
@@ -32,6 +33,7 @@ export default function DashboardHome({ mapSearchTarget = null }) {
   const [archivedMap, setArchivedMap] = useState(null);
   const [initialLoad, setInitialLoad] = useState({ ready: false, error: "" });
   const initialArchivedMapEnabled = searchParams.get("archivedMap") === "1";
+  const [archivedPanelView, setArchivedPanelView] = useState(ARCHIVED_MAP_PANEL_VIEWS[0].id);
   const commissionerProvinceView = useMemo(
     () => getProvinceMapView(user?.province),
     [user?.province],
@@ -206,18 +208,27 @@ export default function DashboardHome({ mapSearchTarget = null }) {
             </div>
           </section>
 
-          <MapInfoPanel
-            variant="commissioner"
-            selection={selection}
-            profilesByDguid={profilesByDguid}
-            panelView={panelView}
-            onPanelViewChange={setPanelView}
-            rolloutEnabled={isRolloutOpen}
-            rolloutCategoryId={rolloutCategoryId}
-            onRolloutHoverChange={handleRolloutHoverChange}
-            onRolloutSelect={handleRolloutSelect}
-            onSelectDguid={handleDaSelect}
-          />
+          {initialArchivedMapEnabled ? (
+            <ArchivedMapInfoPanel
+              selection={selection}
+              profilesByDguid={profilesByDguid}
+              panelView={archivedPanelView}
+              onPanelViewChange={setArchivedPanelView}
+            />
+          ) : (
+            <MapInfoPanel
+              variant="commissioner"
+              selection={selection}
+              profilesByDguid={profilesByDguid}
+              panelView={panelView}
+              onPanelViewChange={setPanelView}
+              rolloutEnabled={isRolloutOpen}
+              rolloutCategoryId={rolloutCategoryId}
+              onRolloutHoverChange={handleRolloutHoverChange}
+              onRolloutSelect={handleRolloutSelect}
+              onSelectDguid={handleDaSelect}
+            />
+          )}
         </div>
       </div>
     </div>

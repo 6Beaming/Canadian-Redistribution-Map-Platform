@@ -115,3 +115,115 @@ test("archive-tree route requires commissioner access", async () => {
   const response = await request("/api/workspace/archive-tree");
   assert.equal(response.status, 403);
 });
+
+test("archive-map projections groups comments and pair branches for a DGUID", async () => {
+  authenticate(commissioner, {
+    from(table) {
+      if (table === "archive_branches") {
+        return {
+          select() { return this; },
+          order() {
+            return Promise.resolve({
+              data: [
+                {
+                  id: "branch-comment",
+                  branch_key: "comment:statscan-da-2021-r1:2021S051260010118",
+                  submission_type: "comment",
+                  release_id: "statscan-da-2021-r1",
+                  primary_dguid: "2021S051260010118",
+                  secondary_dguid: null,
+                  head_version_id: "version-comment",
+                  head_version_number: 1,
+                  resource_version: 1,
+                },
+                {
+                  id: "branch-objection",
+                  branch_key: "objection:statscan-da-2021-r1:2021S051260010118|2021S051260010119",
+                  submission_type: "objection",
+                  release_id: "statscan-da-2021-r1",
+                  primary_dguid: "2021S051260010118",
+                  secondary_dguid: "2021S051260010119",
+                  head_version_id: "version-objection",
+                  head_version_number: 1,
+                  resource_version: 1,
+                },
+              ],
+              error: null,
+            });
+          },
+        };
+      }
+      if (table === "archive_versions") {
+        return {
+          select() { return this; },
+          in() { return this; },
+          order() {
+            return Promise.resolve({
+              data: [
+                {
+                  id: "version-comment",
+                  branch_id: "branch-comment",
+                  version_number: 1,
+                  merge_sequence: 1,
+                  version_kind: "merge",
+                  submission_projection: {
+                    id: "submission-comment",
+                    type: "feedback",
+                    title: "Archived comment",
+                    comment: "Comment body",
+                    dguid: "2021S051260010118",
+                  },
+                  geometry_digest: null,
+                  closing_comment: null,
+                  merged_by: "commissioner-1",
+                  merged_at: "2026-01-02T00:00:00.000Z",
+                },
+                {
+                  id: "version-objection",
+                  branch_id: "branch-objection",
+                  version_number: 1,
+                  merge_sequence: 1,
+                  version_kind: "merge",
+                  submission_projection: {
+                    id: "submission-objection",
+                    type: "objection",
+                    title: "Archived objection",
+                    comment: "Objection body",
+                    dguid: "2021S051260010118",
+                    neighboring_dguid: "2021S051260010119",
+                  },
+                  geometry_digest: null,
+                  closing_comment: null,
+                  merged_by: "commissioner-1",
+                  merged_at: "2026-01-03T00:00:00.000Z",
+                },
+              ],
+              error: null,
+            });
+          },
+        };
+      }
+      if (table === "profiles") {
+        return {
+          select() { return this; },
+          in() {
+            return Promise.resolve({
+              data: [{ id: "commissioner-1", email: "commissioner@example.com" }],
+              error: null,
+            });
+          },
+        };
+      }
+      throw new Error(`Unexpected table ${table}`);
+    },
+  });
+
+  const response = await request("/api/workspace/archive-map/projections?dguid=2021S051260010118");
+  assert.equal(response.status, 200);
+  assert.equal(response.body.dguid, "2021S051260010118");
+  assert.equal(response.body.comments.length, 1);
+  assert.equal(response.body.comments[0].submission.comment, "Comment body");
+  assert.equal(response.body.objections.length, 1);
+  assert.equal(response.body.objections[0].secondaryDguid, "2021S051260010119");
+  assert.equal(response.body.objections[0].versions[0].submission.comment, "Objection body");
+});

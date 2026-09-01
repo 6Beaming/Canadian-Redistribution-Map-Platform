@@ -161,12 +161,18 @@ export default function ArchivedTree() {
             { state: location.state },
           )}
           onDeleteBranch={async (branch) => {
-            await deleteArchiveBranch(branch.key);
+            await deleteArchiveBranch(branch.key, {
+              branchId: branch.branchId,
+              expectedBranchVersion: branch.resourceVersion,
+            });
             clearSelection();
             setReloadVersion((current) => current + 1);
           }}
           onRevertVersion={async (branch, version) => {
-            await revertArchiveBranch(branch.key, version.id);
+            await revertArchiveBranch(branch.key, version.id, {
+              versionId: version.versionId,
+              expectedBranchVersion: branch.resourceVersion,
+            });
             setReloadVersion((current) => current + 1);
           }}
         />

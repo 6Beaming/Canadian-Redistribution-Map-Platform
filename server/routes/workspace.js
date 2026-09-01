@@ -7,6 +7,7 @@ import { requireAuth } from "../middleware/requireAuth.js";
 import { resolveCommissionerFedContext } from "../lib/authorization/commissionerAreaContext.js";
 import { queryDashboardAreaSubmissions } from "../lib/submissions/dashboardAreaQuery.js";
 import archiveTreeRouter from "./archiveTree.js";
+import { mergeApprovedArchiveRequest } from "../lib/archive/archiveMergeService.js";
 
 const router = Router();
 function requireCommissioner(req, res, next) {
@@ -105,6 +106,30 @@ router.post("/archive", async (req, res) => {
   }
 
   const supabase = getSupabaseAdminDataClient();
+  const { data: approvedRequest } = await supabase
+    .from("workspace_archive_requests")
+    .select("id")
+    .eq("submission_id", submissionId)
+    .eq("state", "approved")
+    .maybeSingle();
+
+  if (approvedRequest?.id) {
+    try {
+      const payload = await mergeApprovedArchiveRequest(supabase, {
+        archiveRequestId: approvedRequest.id,
+        closingComment: req.body?.closingComment ?? null,
+        actorUser: req.user,
+        actorProfile: req.profile,
+      });
+      return res.status(201).json(payload);
+    } catch (error) {
+      return res.status(error.statusCode || 500).json({
+        error: error.message || "Unable to merge into the archive.",
+        ...(error.code ? { code: error.code } : {}),
+      });
+    }
+  }
+
   const { data: archived, error: archiveError } = await supabase.rpc(
     "merge_submission_into_archive",
     {
