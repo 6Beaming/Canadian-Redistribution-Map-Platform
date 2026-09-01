@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,6 +43,11 @@ export default function UserMakeComments({
   const isSignedIn = sessionStatus === "signed-in";
   const [comment, setComment] = useState("");
   const [title, setTitle] = useState("");
+
+  useEffect(() => {
+    setTitle("");
+    setComment("");
+  }, [dguid]);
 
   function handleCommentChange(event) {
     setComment(event.target.value);

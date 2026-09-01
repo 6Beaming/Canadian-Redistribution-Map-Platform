@@ -96,7 +96,7 @@ export function getSharedBoundaryChains(boundaryGeoJson) {
     chain.map((coordinate) => [...coordinate]));
 }
 
-function turnAngleDegrees(previous, current, next) {
+export function turnAngleDegrees(previous, current, next) {
   const a = [previous[0] - current[0], previous[1] - current[1]];
   const b = [next[0] - current[0], next[1] - current[1]];
   const magnitude = Math.hypot(...a) * Math.hypot(...b);
@@ -252,9 +252,17 @@ export function filterHandlesForViewport(handles, project) {
   let lastPoint = null;
   handles.forEach((handle) => {
     const point = project(handle.coordinate);
-    if (handle.required || handle.locked || handle.selected || !lastPoint || Math.hypot(point.x - lastPoint.x, point.y - lastPoint.y) >= MIN_HANDLE_SPACING_PX) {
+    if (
+      !handle.locked
+      || handle.required
+      || handle.selected
+      || !lastPoint
+      || Math.hypot(point.x - lastPoint.x, point.y - lastPoint.y) >= MIN_HANDLE_SPACING_PX
+    ) {
       visible.push(handle);
-      lastPoint = point;
+      if (!handle.locked || handle.required || handle.selected) {
+        lastPoint = point;
+      }
     }
   });
   return visible;

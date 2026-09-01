@@ -12,6 +12,8 @@ test("UserHome loads objection and counter-proposal geometry through release pai
   const mapApi = read("src/services/mapApi.js");
 
   assert.match(loader, /getReleaseDaPair/);
+  assert.match(loader, /getReleaseAdjacency/);
+  assert.match(loader, /buildCounterProposalCacheFromReleasePair/);
   assert.match(loader, /representation: "edit"/);
   assert.match(loader, /representation: "display"/);
   assert.match(mapApi, /pairCacheKey|pair:\$\{releaseId\}/);

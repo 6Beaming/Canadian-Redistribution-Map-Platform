@@ -333,6 +333,37 @@ test("PATCH rejects archive-owned statuses without writing", async () => {
   assert.equal(admin.state.submissions[0].status, "pending");
 });
 
+test("PATCH cannot overwrite a submission held by an active Archive Request", async () => {
+  const admin = statusAdmin(
+    [{
+      id: "submission-1",
+      status: "archive-request",
+      resource_version: 4,
+      updated_at: "2026-09-01T12:00:00.000Z",
+      dguid: "2021S051246050041",
+      neighboring_dguid: null,
+      active_claim_pruid: "46",
+      active_claim_kind: "archive-request",
+    }],
+    [{ submission_id: "submission-1", pruid: "46" }],
+  );
+  withAdmin(admin);
+
+  const response = await request(
+    "PATCH",
+    "/api/workspace/submissions/submission-1/status",
+    {
+      body: { status: "rejected", expectedVersion: 4 },
+      cookie: "crmp_access_token=access-token",
+    },
+  );
+
+  assert.equal(response.status, 409);
+  assert.equal(response.body.code, "ARCHIVE_REQUEST_ACTIVE");
+  assert.equal(admin.writes.length, 0);
+  assert.equal(admin.state.submissions[0].status, "archive-request");
+});
+
 test("PATCH returns 409 when expectedVersion is stale", async () => {
   const admin = statusAdmin(
     [{

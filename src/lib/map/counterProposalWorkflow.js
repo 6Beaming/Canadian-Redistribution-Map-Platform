@@ -11,7 +11,14 @@ import {
   distanceMeters,
   getSharedBoundaryChains,
   MIN_EDITABLE_HANDLES_PER_BOUNDARY,
+  STRAIGHT_RUN_ANGLE_TOLERANCE_DEGREES,
+  turnAngleDegrees,
 } from "./counterProposalHandles.js";
+import { buildReleaseEditableHandles } from "./counterProposalReleaseCache.js";
+import {
+  getIncidentSegmentsForHandleMove,
+  hasValidAnchoredBoundarySegments,
+} from "./counterProposalBorderValidation.js";
 
 const ACTIVE_DRAFT_KEY = "counter-proposal-active-draft";
 const DRAFT_KEY_PREFIX = "counter-proposal-draft:";
@@ -35,6 +42,20 @@ function normalizeNumber(value) {
 
 function coordinateKey(coordinate) {
   return `${normalizeNumber(coordinate[0])},${normalizeNumber(coordinate[1])}`;
+}
+
+function segmentKey(start, end) {
+  const left = coordinateKey(start);
+  const right = coordinateKey(end);
+  return left < right ? `${left}|${right}` : `${right}|${left}`;
+}
+
+function rebuildSharedBoundaryGeoJson(pairIndex, firstDguid, secondDguid) {
+  return getSharedBoundaryFeatureCollection(
+    pairIndex,
+    String(firstDguid),
+    String(secondDguid),
+  );
 }
 
 function exactCoordinateKey(coordinate) {
@@ -265,6 +286,39 @@ function coordinatesEqual(left, right, epsilon = 1e-9) {
   );
 }
 
+function readHandleCoordinateFromFeatures(features, handle) {
+  if (!Array.isArray(features) || !handle) {
+    return null;
+  }
+
+  if (!handle.occurrences?.length) {
+    return Array.isArray(handle.coordinate) ? [...handle.coordinate] : null;
+  }
+
+  const occurrence = handle.occurrences[0];
+  const feature = features.find((entry) => getFeatureDguid(entry) === occurrence.featureDguid);
+  const ring = getRingReference(feature?.geometry, occurrence.polygonIndex, occurrence.ringIndex);
+  const coordinate = ring?.[occurrence.coordinateIndex];
+
+  return Array.isArray(coordinate) ? [...coordinate] : null;
+}
+
+function syncHandleCoordinatesFromFeatures(handles, features) {
+  return (handles ?? []).map((handle) => {
+    const coordinate = readHandleCoordinateFromFeatures(features, handle);
+
+    if (!coordinate) {
+      return handle;
+    }
+
+    return {
+      ...handle,
+      coordinate,
+      legacyId: coordinateKey(coordinate),
+    };
+  });
+}
+
 function interpolateCoordinate(start, end, weight) {
   return [
     start[0] + (end[0] - start[0]) * weight,
@@ -274,24 +328,23 @@ function interpolateCoordinate(start, end, weight) {
 
 function buildMovedCurrentFeatures(currentFeatures, handle, nextCoordinate) {
   const nextCurrentFeatures = cloneValue(currentFeatures);
-  const featureLookup = new Map(
-    nextCurrentFeatures.map((feature) => [getFeatureDguid(feature), feature]),
-  );
+  const sourceKey = coordinateKey(handle.coordinate);
+  const targetCoordinate = [...nextCoordinate];
 
-  handle.occurrences.forEach((occurrence) => {
-    const feature = featureLookup.get(occurrence.featureDguid);
+  nextCurrentFeatures.forEach((feature) => {
+    visitGeometryCoordinates(feature.geometry, (entry) => {
+      if (coordinateKey(entry.coordinate) !== sourceKey) {
+        return;
+      }
 
-    if (!feature) {
-      return;
-    }
-
-    setCoordinateReference(
-      feature.geometry,
-      occurrence.polygonIndex,
-      occurrence.ringIndex,
-      occurrence.coordinateIndex,
-      nextCoordinate,
-    );
+      setCoordinateReference(
+        feature.geometry,
+        entry.polygonIndex,
+        entry.ringIndex,
+        entry.coordinateIndex,
+        targetCoordinate,
+      );
+    });
   });
 
   return nextCurrentFeatures;
@@ -592,10 +645,19 @@ function ensureMinimumSharedBoundaryHandles(features, firstDguid, secondDguid) {
       if (!handle.locked) counts.set(handle.lineId, (counts.get(handle.lineId) ?? 0) + 1);
       return counts;
     }, new Map());
+    const totalCountByLine = handles.reduce((counts, handle) => {
+      counts.set(handle.lineId, (counts.get(handle.lineId) ?? 0) + 1);
+      return counts;
+    }, new Map());
     let insertedDuringPass = false;
 
     for (let chainIndex = 0; chainIndex < chains.length; chainIndex += 1) {
-      if ((editableCountByLine.get(`line-${chainIndex}`) ?? 0) >= MIN_EDITABLE_HANDLES_PER_BOUNDARY) {
+      const lineId = `line-${chainIndex}`;
+      const editableCount = editableCountByLine.get(lineId) ?? 0;
+      const totalCount = totalCountByLine.get(lineId) ?? 0;
+      const endpointOnlyBoundary = totalCount === 2 && editableCount === 0;
+
+      if (!endpointOnlyBoundary && editableCount >= MIN_EDITABLE_HANDLES_PER_BOUNDARY) {
         continue;
       }
 
@@ -630,6 +692,338 @@ function ensureMinimumSharedBoundaryHandles(features, firstDguid, secondDguid) {
   }
 
   return { features: currentFeatures, insertions };
+}
+
+function arcNeedsEndpointMidpoint(arcHandles) {
+  if (!Array.isArray(arcHandles) || arcHandles.length === 0) {
+    return false;
+  }
+
+  if (arcHandles.length === 2) {
+    return true;
+  }
+
+  return arcHandles.every((handle) => handle.locked);
+}
+
+function releaseArcsNeedingEndpointMidpoint(releaseHandles) {
+  const handlesByArc = releaseHandles.reduce((groups, handle) => {
+    const arcId = String(handle?.arcId ?? "arc-0");
+    if (!groups.has(arcId)) {
+      groups.set(arcId, []);
+    }
+    groups.get(arcId).push(handle);
+    return groups;
+  }, new Map());
+
+  return [...handlesByArc.values()].some((arcHandles) => arcNeedsEndpointMidpoint(arcHandles));
+}
+
+function collectSharedBoundarySegmentKeys(pairIndex, firstDguid, secondDguid) {
+  const pairKeyValue = [String(firstDguid), String(secondDguid)].sort().join("|");
+  const segments = pairIndex?.boundarySegmentsByPair?.get(pairKeyValue) ?? [];
+  const keys = new Set();
+
+  segments.forEach((segment) => {
+    if (!Array.isArray(segment) || segment.length < 2) {
+      return;
+    }
+
+    keys.add(segmentKey(segment[0], segment[1]));
+  });
+
+  return keys;
+}
+
+function findRingVertexIndex(ring, coordinate) {
+  const key = coordinateKey(coordinate);
+  return ring.findIndex((entry) => coordinateKey(entry) === key);
+}
+
+function collectRingPath(ring, startIndex, endIndex, step) {
+  const limit = ring.length - 1;
+
+  if (startIndex < 0 || endIndex < 0 || startIndex >= limit || endIndex >= limit) {
+    return null;
+  }
+
+  const indices = [startIndex];
+  let index = startIndex;
+
+  while (index !== endIndex) {
+    index += step;
+
+    if (index < 0 || index >= limit) {
+      return null;
+    }
+
+    indices.push(index);
+
+    if (indices.length > limit + 1) {
+      return null;
+    }
+  }
+
+  return indices;
+}
+
+function ringPathUsesSharedBoundary(ring, indices, sharedKeys) {
+  if (!indices || indices.length < 2) {
+    return false;
+  }
+
+  for (let index = 0; index < indices.length - 1; index += 1) {
+    const key = segmentKey(ring[indices[index]], ring[indices[index + 1]]);
+
+    if (!sharedKeys.has(key)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function findSharedBoundaryPathIndices(ring, startCoordinate, endCoordinate, sharedKeys) {
+  const startIndex = findRingVertexIndex(ring, startCoordinate);
+  const endIndex = findRingVertexIndex(ring, endCoordinate);
+
+  if (startIndex < 0 || endIndex < 0 || startIndex === endIndex) {
+    return null;
+  }
+
+  const forward = collectRingPath(ring, startIndex, endIndex, 1);
+  const backward = collectRingPath(ring, startIndex, endIndex, -1);
+  const forwardValid = forward && ringPathUsesSharedBoundary(ring, forward, sharedKeys);
+  const backwardValid = backward && ringPathUsesSharedBoundary(ring, backward, sharedKeys);
+
+  if (forwardValid && backwardValid) {
+    return forward.length <= backward.length ? forward : backward;
+  }
+
+  if (forwardValid) {
+    return forward;
+  }
+
+  if (backwardValid) {
+    return backward;
+  }
+
+  return null;
+}
+
+function findLongestPathSegment(ring, pathIndices) {
+  let best = null;
+
+  for (let index = 0; index < pathIndices.length - 1; index += 1) {
+    const start = ring[pathIndices[index]];
+    const end = ring[pathIndices[index + 1]];
+    const length = distanceMeters(start, end);
+
+    if (!best || length > best.length) {
+      best = { start, end, length };
+    }
+  }
+
+  return best;
+}
+
+function insertMidpointAlongArcEndpoints(features, start, end, firstDguid, secondDguid) {
+  const pairIndex = buildDaObjectionIndex(createFeatureCollection(features));
+  const sharedKeys = collectSharedBoundarySegmentKeys(pairIndex, firstDguid, secondDguid);
+  let longestSegment = null;
+
+  features.forEach((feature) => {
+    const polygons = feature.geometry?.type === "Polygon"
+      ? [feature.geometry.coordinates]
+      : feature.geometry?.type === "MultiPolygon"
+        ? feature.geometry.coordinates
+        : [];
+
+    polygons.forEach((polygon) => {
+      polygon.forEach((ring) => {
+        const pathIndices = findSharedBoundaryPathIndices(ring, start, end, sharedKeys);
+
+        if (!pathIndices) {
+          return;
+        }
+
+        const segment = findLongestPathSegment(ring, pathIndices);
+
+        if (!segment || (longestSegment && segment.length <= longestSegment.length)) {
+          return;
+        }
+
+        longestSegment = segment;
+      });
+    });
+  });
+
+  if (!longestSegment) {
+    return null;
+  }
+
+  return insertSharedBoundaryMidpoint(
+    features,
+    longestSegment.start,
+    longestSegment.end,
+  );
+}
+
+function getReleaseArcChain(sharedBoundaryGeoJson, arcId) {
+  const arcBoundary = (sharedBoundaryGeoJson?.features ?? []).find(
+    (feature) => String(feature?.properties?.arcId ?? feature?.id ?? "") === arcId,
+  );
+
+  if (!arcBoundary) {
+    return [];
+  }
+
+  return getSharedBoundaryChains({
+    type: "FeatureCollection",
+    features: [arcBoundary],
+  })[0] ?? [];
+}
+
+function coordinateLiesOnChain(coordinate, chain) {
+  if (!Array.isArray(coordinate) || !Array.isArray(chain) || chain.length < 2) {
+    return false;
+  }
+
+  const key = coordinateKey(coordinate);
+
+  if (chain.some((entry) => coordinateKey(entry) === key)) {
+    return true;
+  }
+
+  for (let index = 0; index < chain.length - 1; index += 1) {
+    const start = chain[index];
+    const end = chain[index + 1];
+    const segmentLength = distanceMeters(start, end);
+
+    if (segmentLength <= 0) {
+      continue;
+    }
+
+    const distanceToStart = distanceMeters(coordinate, start);
+    const distanceToEnd = distanceMeters(coordinate, end);
+
+    if (distanceToStart + distanceToEnd <= segmentLength + 1) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function insertReleaseArcMidpoints(features, releaseHandles, sharedBoundaryGeoJson, firstDguid, secondDguid) {
+  const handlesByArc = releaseHandles.reduce((groups, handle) => {
+    const arcId = String(handle?.arcId ?? "arc-0");
+
+    if (!groups.has(arcId)) {
+      groups.set(arcId, []);
+    }
+
+    groups.get(arcId).push(handle);
+    return groups;
+  }, new Map());
+  let currentFeatures = cloneValue(features);
+  const insertions = [];
+
+  handlesByArc.forEach((arcHandles, arcId) => {
+    if (!arcNeedsEndpointMidpoint(arcHandles)) {
+      return;
+    }
+
+    const arcChain = getReleaseArcChain(sharedBoundaryGeoJson, arcId);
+
+    if (arcChain.length < 2) {
+      return;
+    }
+
+    const result = insertMidpointAlongArcEndpoints(
+      currentFeatures,
+      arcChain[0],
+      arcChain[arcChain.length - 1],
+      firstDguid,
+      secondDguid,
+    );
+
+    if (!result) {
+      return;
+    }
+
+    currentFeatures = result.features;
+    insertions.push({
+      ...result.insertion,
+      arcId,
+      chainId: arcId,
+    });
+  });
+
+  return { features: currentFeatures, insertions };
+}
+
+function expandEndpointOnlyReleaseHandles(releaseHandles, sharedBoundaryGeoJson, densificationInsertions) {
+  const handlesByArc = releaseHandles.reduce((groups, handle) => {
+    const arcId = String(handle?.arcId ?? "arc-0");
+    if (!groups.has(arcId)) {
+      groups.set(arcId, []);
+    }
+    groups.get(arcId).push(handle);
+    return groups;
+  }, new Map());
+  const expanded = [];
+
+  handlesByArc.forEach((arcHandles, arcId) => {
+    expanded.push(...arcHandles);
+
+    if (!arcNeedsEndpointMidpoint(arcHandles)) {
+      return;
+    }
+
+    const existingKeys = new Set(
+      arcHandles.map((handle) => coordinateKey(handle.coordinate)),
+    );
+    const arcChain = getReleaseArcChain(sharedBoundaryGeoJson, arcId);
+
+    densificationInsertions
+      .filter((insertion) => coordinateLiesOnChain(insertion.coordinate, arcChain))
+      .forEach((insertion, index) => {
+        const key = coordinateKey(insertion.coordinate);
+
+        if (existingKeys.has(key)) {
+          return;
+        }
+
+        expanded.push({
+          vertexId: `release-midpoint-${arcId}-${index}`,
+          coordinate: [...insertion.coordinate],
+          arcId,
+          locked: false,
+          required: true,
+        });
+        existingKeys.add(key);
+      });
+
+    arcChain.slice(1, -1).forEach((coordinate) => {
+      const key = coordinateKey(coordinate);
+
+      if (existingKeys.has(key)) {
+        return;
+      }
+
+      expanded.push({
+        vertexId: `release-interior-${arcId}-${key}`,
+        coordinate: [...coordinate],
+        arcId,
+        locked: false,
+        required: true,
+      });
+      existingKeys.add(key);
+    });
+  });
+
+  return expanded;
 }
 
 /**
@@ -787,6 +1181,10 @@ function isHandleMoveWithinAllowedRegion(cache, handle, nextCoordinate) {
     return false;
   }
 
+  if (!hasValidAnchoredBoundarySegments(cache, handle, nextCoordinate, nextCurrentFeatures)) {
+    return false;
+  }
+
   return hasValidCounterProposalTopology(cache.originalFeatures, nextCurrentFeatures);
 }
 
@@ -815,6 +1213,38 @@ function constrainHandleMoveCoordinate(cache, handle, nextCoordinate) {
 
 function rebuildCounterProposalCache(baseCache, nextCurrentFeatures, nextSelectedHandleId = null) {
   const currentFeatures = cloneValue(nextCurrentFeatures);
+
+  if (baseCache.releaseLod) {
+    const pairIndex = buildDaObjectionIndex(createFeatureCollection(currentFeatures));
+    const selectedHandleId = baseCache.handles.some((handle) => handle.id === nextSelectedHandleId)
+      ? nextSelectedHandleId
+      : null;
+    const handles = syncHandleCoordinatesFromFeatures(baseCache.handles, currentFeatures)
+      .filter((handle) => handle.locked || handle.occurrences.length > 0);
+
+    return {
+      ...baseCache,
+      currentFeatures,
+      currentFeatureCollection: createFeatureCollection(currentFeatures),
+      pairIndex,
+      sharedBoundaryGeoJson: rebuildSharedBoundaryGeoJson(
+        pairIndex,
+        baseCache.firstDguid,
+        baseCache.secondDguid,
+      ),
+      handles,
+      selectedHandleId,
+      handleFeatureCollection: buildHandleFeatureCollection(handles, selectedHandleId),
+      impacts: calculateCounterProposalImpact({
+        originalFeatures: baseCache.originalFeatures,
+        proposedFeatures: currentFeatures,
+        populationByDguid: baseCache.populationByDguid,
+        firstDguid: baseCache.firstDguid,
+        secondDguid: baseCache.secondDguid,
+      }),
+    };
+  }
+
   const pairIndex = buildDaObjectionIndex(createFeatureCollection(currentFeatures));
   const sharedBoundaryGeoJson = getSharedBoundaryFeatureCollection(
     pairIndex,
@@ -946,6 +1376,101 @@ export function writeCounterProposalStorage(workflow) {
   }
 }
 
+export function buildCounterProposalCacheFromReleasePair(
+  pairPayload,
+  profilesByDguid,
+  firstDguid,
+  secondDguid,
+) {
+  const features = Array.isArray(pairPayload?.features?.features)
+    ? pairPayload.features.features
+    : [];
+
+  if (features.length !== 2) {
+    return null;
+  }
+
+  const normalization = normalizeCounterProposalSourceFeatures(features);
+  const releaseHandles = Array.isArray(pairPayload.editableHandles)
+    ? pairPayload.editableHandles
+    : [];
+  const needsEndpointMidpoint = releaseArcsNeedingEndpointMidpoint(releaseHandles);
+  const sharedBoundaryGeoJson = pairPayload.sharedBoundary ?? {
+    type: "FeatureCollection",
+    features: [],
+  };
+  const densification = needsEndpointMidpoint
+    ? insertReleaseArcMidpoints(
+      normalization.features,
+      releaseHandles,
+      sharedBoundaryGeoJson,
+      String(firstDguid),
+      String(secondDguid),
+    )
+    : null;
+  const originalFeatures = densification?.features ?? normalization.features;
+  const sourceGeometryIssues = [...normalization.issues];
+  const currentFeatures = cloneValue(originalFeatures);
+  const pairIndex = buildDaObjectionIndex(createFeatureCollection(originalFeatures));
+  const resolvedSharedBoundaryGeoJson = rebuildSharedBoundaryGeoJson(
+    pairIndex,
+    firstDguid,
+    secondDguid,
+  );
+  const handles = needsEndpointMidpoint
+    ? buildReleaseEditableHandles(
+      expandEndpointOnlyReleaseHandles(
+        releaseHandles,
+        sharedBoundaryGeoJson,
+        densification?.insertions ?? [],
+      ),
+      originalFeatures,
+    )
+    : buildReleaseEditableHandles(releaseHandles, originalFeatures);
+  const populationByDguid = getPopulationLookup(
+    profilesByDguid,
+    String(firstDguid),
+    String(secondDguid),
+  );
+
+  const baseCache = {
+    id: `${String(firstDguid)}:${String(secondDguid)}`,
+    createdAt: new Date().toISOString(),
+    sourceAsset: "counter-proposal-release-cache",
+    firstDguid: String(firstDguid),
+    secondDguid: String(secondDguid),
+    originalFeatures,
+    populationByDguid,
+    sourceGeometryRepairs: normalization.repairs,
+    sourceBoundaryDensifications: densification?.insertions ?? [],
+    sourceGeometryIssues,
+    baselineFingerprint: geometryFingerprint(originalFeatures),
+    releaseLod: pairPayload.lod ?? "auto",
+    history: [],
+    future: [],
+  };
+
+  return {
+    ...baseCache,
+    currentFeatures,
+    currentFeatureCollection: createFeatureCollection(currentFeatures),
+    pairIndex,
+    sharedBoundaryGeoJson: resolvedSharedBoundaryGeoJson,
+    handles,
+    handleFeatureCollection: buildHandleFeatureCollection(handles, null),
+    selectedHandleId: null,
+    impacts: calculateCounterProposalImpact({
+      originalFeatures,
+      proposedFeatures: currentFeatures,
+      populationByDguid,
+      firstDguid: String(firstDguid),
+      secondDguid: String(secondDguid),
+    }),
+    history: [],
+    future: [],
+  };
+}
+
 export function buildCounterProposalCache(
   index,
   profilesByDguid,
@@ -1046,6 +1571,222 @@ export function selectCounterProposalHandle(cache, handleId) {
   };
 }
 
+function measureBendAtVertex(ring, index) {
+  if (!Array.isArray(ring) || index <= 0 || index >= ring.length - 2) {
+    return 0;
+  }
+
+  return turnAngleDegrees(ring[index - 1], ring[index], ring[index + 1]);
+}
+
+function findOccurrencesForCoordinate(features, coordinate) {
+  const targetKey = coordinateKey(coordinate);
+  const occurrences = [];
+
+  features.forEach((feature) => {
+    const dguid = getFeatureDguid(feature);
+    visitGeometryCoordinates(feature.geometry, (entry) => {
+      if (coordinateKey(entry.coordinate) !== targetKey) {
+        return;
+      }
+
+      occurrences.push({
+        featureDguid: dguid,
+        polygonIndex: entry.polygonIndex,
+        ringIndex: entry.ringIndex,
+        coordinateIndex: entry.coordinateIndex,
+      });
+    });
+  });
+
+  return occurrences;
+}
+
+function detectSuddenlyBentHiddenVertices(cache, handle, nextCoordinate) {
+  const baselineFeatures = cache.currentFeatures;
+  const nextFeatures = buildMovedCurrentFeatures(baselineFeatures, handle, nextCoordinate);
+  const pairIndex = buildDaObjectionIndex(createFeatureCollection(nextFeatures));
+  const sharedKeys = collectSharedBoundarySegmentKeys(
+    pairIndex,
+    cache.firstDguid,
+    cache.secondDguid,
+  );
+  const existingHandleKeys = new Set(
+    cache.handles.map((entry) => coordinateKey(entry.coordinate)),
+  );
+  const promotions = new Map();
+  const bendThreshold = STRAIGHT_RUN_ANGLE_TOLERANCE_DEGREES;
+  const suddenDelta = 4;
+
+  handle.occurrences.forEach((occurrence) => {
+    const nextFeature = nextFeatures.find(
+      (entry) => getFeatureDguid(entry) === occurrence.featureDguid,
+    );
+    const baselineFeature = baselineFeatures.find(
+      (entry) => getFeatureDguid(entry) === occurrence.featureDguid,
+    );
+    const nextRing = getRingReference(
+      nextFeature?.geometry,
+      occurrence.polygonIndex,
+      occurrence.ringIndex,
+    );
+    const baselineRing = getRingReference(
+      baselineFeature?.geometry,
+      occurrence.polygonIndex,
+      occurrence.ringIndex,
+    );
+
+    if (!nextRing || !baselineRing) {
+      return;
+    }
+
+    const previous = nextRing[occurrence.coordinateIndex - 1];
+    const next = nextRing[occurrence.coordinateIndex + 1];
+
+    if (!previous || !next) {
+      return;
+    }
+
+    const pathIndices = findSharedBoundaryPathIndices(nextRing, previous, next, sharedKeys);
+
+    if (!pathIndices) {
+      return;
+    }
+
+    pathIndices.forEach((index) => {
+      if (index <= 0 || index >= nextRing.length - 2) {
+        return;
+      }
+
+      const coordinate = nextRing[index];
+      const key = coordinateKey(coordinate);
+
+      if (existingHandleKeys.has(key) || promotions.has(key)) {
+        return;
+      }
+
+      const nextAngle = measureBendAtVertex(nextRing, index);
+      const baselineIndex = findRingVertexIndex(baselineRing, coordinate);
+      const baselineAngle = baselineIndex > 0
+        ? measureBendAtVertex(baselineRing, baselineIndex)
+        : 0;
+
+      const becameBent = nextAngle > bendThreshold && baselineAngle <= bendThreshold;
+      const bentSharply = nextAngle > bendThreshold && (nextAngle - baselineAngle) >= suddenDelta;
+
+      if (becameBent || bentSharply) {
+        promotions.set(key, [...coordinate]);
+      }
+    });
+  });
+
+  return [...promotions.values()];
+}
+
+function createPromotedHandle(cache, coordinate, features, lineId) {
+  const occurrences = findOccurrencesForCoordinate(features, coordinate);
+
+  if (!occurrences.length) {
+    return null;
+  }
+
+  const key = coordinateKey(coordinate);
+
+  return {
+    id: `bent:${key}`,
+    legacyId: key,
+    vertexId: `bent-${key}`,
+    lineId: lineId ?? "line-0",
+    segmentIndex: 0,
+    coordinate: [...coordinate],
+    locked: false,
+    required: true,
+    featureDguids: [...new Set(occurrences.map((entry) => entry.featureDguid))],
+    occurrences,
+  };
+}
+
+function promoteBentHiddenVerticesToHandles(cache, handle, nextCoordinate, nextFeatures, handles) {
+  const bentVertices = detectSuddenlyBentHiddenVertices(cache, handle, nextCoordinate);
+  const promoted = [...handles];
+  const seen = new Set(handles.map((entry) => coordinateKey(entry.coordinate)));
+
+  bentVertices.forEach((coordinate) => {
+    const key = coordinateKey(coordinate);
+
+    if (seen.has(key)) {
+      return;
+    }
+
+    const nextHandle = createPromotedHandle(cache, coordinate, nextFeatures, handle.lineId);
+
+    if (!nextHandle) {
+      return;
+    }
+
+    promoted.push(nextHandle);
+    seen.add(key);
+  });
+
+  return promoted;
+}
+
+export function buildFastDragOverlay(cache, handleId, nextCoordinate) {
+  if (!cache || !handleId || !Array.isArray(nextCoordinate)) {
+    return null;
+  }
+
+  const handle = cache.handles.find((entry) => entry.id === handleId || entry.legacyId === handleId);
+
+  if (!handle || handle.locked) {
+    return null;
+  }
+
+  return {
+    coordinate: [...nextCoordinate],
+    overlaySegments: getIncidentSegmentsForHandleMove(
+      handle,
+      nextCoordinate,
+      cache.currentFeatures,
+    ),
+  };
+}
+
+export function previewCounterProposalDragState(cache, handleId, nextCoordinate) {
+  if (!cache || !handleId || !Array.isArray(nextCoordinate)) {
+    return null;
+  }
+
+  const handle = cache.handles.find((entry) => entry.id === handleId || entry.legacyId === handleId);
+
+  if (!handle || handle.locked) {
+    return null;
+  }
+
+  const constrainedCoordinate = constrainHandleMoveCoordinate(cache, handle, nextCoordinate);
+  const nextCurrentFeatures = buildMovedCurrentFeatures(
+    cache.currentFeatures,
+    handle,
+    constrainedCoordinate,
+  );
+  const pairIndex = buildDaObjectionIndex(createFeatureCollection(nextCurrentFeatures));
+
+  return {
+    coordinate: [...constrainedCoordinate],
+    featureCollection: createFeatureCollection(nextCurrentFeatures),
+    boundaryGeoJson: rebuildSharedBoundaryGeoJson(
+      pairIndex,
+      cache.firstDguid,
+      cache.secondDguid,
+    ),
+    overlaySegments: getIncidentSegmentsForHandleMove(
+      handle,
+      constrainedCoordinate,
+      nextCurrentFeatures,
+    ),
+  };
+}
+
 export function previewCounterProposalHandleMove(cache, handleId, nextCoordinate) {
   if (!cache || !handleId || !Array.isArray(nextCoordinate)) {
     return cache;
@@ -1071,6 +1812,7 @@ export function previewCounterProposalHandleMove(cache, handleId, nextCoordinate
     handle,
     constrainedCoordinate,
   );
+  const pairIndex = buildDaObjectionIndex(createFeatureCollection(nextCurrentFeatures));
 
   const nextHandles = cache.handles.map((entry) =>
     entry.id === handle.id
@@ -1081,18 +1823,28 @@ export function previewCounterProposalHandleMove(cache, handleId, nextCoordinate
         }
       : entry,
   );
+  const promotedHandles = promoteBentHiddenVerticesToHandles(
+    cache,
+    handle,
+    constrainedCoordinate,
+    nextCurrentFeatures,
+    nextHandles,
+  );
+  const handles = syncHandleCoordinatesFromFeatures(promotedHandles, nextCurrentFeatures)
+    .filter((entry) => entry.locked || entry.occurrences.length > 0);
 
   return {
     ...cache,
     currentFeatures: nextCurrentFeatures,
     currentFeatureCollection: createFeatureCollection(nextCurrentFeatures),
-    sharedBoundaryGeoJson: updateBoundaryFeatureCollection(
-      cache.sharedBoundaryGeoJson,
-      handle.coordinate,
-      constrainedCoordinate,
+    pairIndex,
+    sharedBoundaryGeoJson: rebuildSharedBoundaryGeoJson(
+      pairIndex,
+      cache.firstDguid,
+      cache.secondDguid,
     ),
-    handles: nextHandles,
-    handleFeatureCollection: buildHandleFeatureCollection(nextHandles, handle.id),
+    handles,
+    handleFeatureCollection: buildHandleFeatureCollection(handles, handle.id),
     selectedHandleId: handle.id,
     impacts: calculateCounterProposalImpact({
       originalFeatures: cache.originalFeatures,
@@ -1113,15 +1865,22 @@ export function commitCounterProposalCacheHistory(cache, baselineSnapshot = null
     return cache;
   }
 
-  const baselineCache = rebuildCounterProposalCache(cache, baselineSnapshot, cache.selectedHandleId);
-  const fromHandle = baselineCache.handles.find((handle) => handle.id === cache.selectedHandleId);
-  const toHandle = cache.handles.find((handle) => handle.id === cache.selectedHandleId);
-  if (!fromHandle || !toHandle || coordinatesEqual(fromHandle.coordinate, toHandle.coordinate)) return cache;
+  const handle = cache.handles.find((entry) => entry.id === cache.selectedHandleId);
+  if (!handle) {
+    return cache;
+  }
+
+  const fromCoordinate = readHandleCoordinateFromFeatures(baselineSnapshot, handle);
+  const toCoordinate = readHandleCoordinateFromFeatures(cache.currentFeatures, handle);
+  if (!fromCoordinate || !toCoordinate || coordinatesEqual(fromCoordinate, toCoordinate)) {
+    return rebuildCounterProposalCache(cache, cache.currentFeatures, cache.selectedHandleId);
+  }
+
   const operation = {
     type: "move-handle",
     handleId: cache.selectedHandleId,
-    from: [...fromHandle.coordinate],
-    to: [...toHandle.coordinate],
+    from: fromCoordinate,
+    to: toCoordinate,
   };
   const rebuilt = rebuildCounterProposalCache(cache, cache.currentFeatures, cache.selectedHandleId);
 

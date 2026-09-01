@@ -159,6 +159,15 @@ export default function WorkspaceReview() {
       return {
         ...current,
         status: normalizeWorkspaceStatus(nextStatus.status),
+        actual_status: nextStatus.actualStatus ?? current.actual_status ?? nextStatus.status,
+        archive_request_status_hidden:
+          nextStatus.archiveRequestStatusHidden
+          ?? current.archive_request_status_hidden
+          ?? false,
+        archive_request_assigned_to_viewer:
+          nextStatus.archiveRequestAssignedToViewer
+          ?? current.archive_request_assigned_to_viewer
+          ?? null,
         resource_version: Number(nextStatus.version) || current.resource_version,
         updated_at: nextStatus.updatedAt ?? current.updated_at,
         crossProvinceWarning: nextStatus.crossProvinceWarning ?? current.crossProvinceWarning,

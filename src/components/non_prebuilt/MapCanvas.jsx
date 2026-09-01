@@ -32,7 +32,10 @@ import {
   buildProfileIndex
 } from "@/lib/map/profileUtils.js";
 import { emptyBoundaryFeatureCollection } from "@/lib/map/objectionWorkflow.js";
-import { emptyCounterProposalFeatureCollection } from "@/lib/map/counterProposalWorkflow.js";
+import {
+  emptyCounterProposalFeatureCollection,
+  buildFastDragOverlay,
+} from "@/lib/map/counterProposalWorkflow.js";
 import {
   applyLabelScale,
   DA_LABEL_ZOOM,
@@ -1915,9 +1918,10 @@ export function MapCanvas({
         source: "counter-proposal-drag-overlay",
         filter: ["==", ["geometry-type"], "LineString"],
         paint: {
-          "line-color": "#1a73e8",
+          "line-color": "#d93025",
           "line-width": 4,
           "line-dasharray": [1.5, 1.5],
+          "line-opacity": 0.92,
         },
       });
       map.addLayer({
@@ -1927,7 +1931,7 @@ export function MapCanvas({
         filter: ["==", ["geometry-type"], "Point"],
         paint: {
           "circle-radius": 8,
-          "circle-color": "#1a73e8",
+          "circle-color": "#d93025",
           "circle-stroke-width": 3,
           "circle-stroke-color": "#ffffff",
         },
@@ -2371,6 +2375,17 @@ export function MapCanvas({
     };
 
     const pushCounterProposalDragMove = (nextCoordinate) => {
+      const preview = counterProposalPreviewRef.current;
+      const dragState = preview?.cache && counterProposalDragRef.current?.id
+        ? buildFastDragOverlay(
+          preview.cache,
+          counterProposalDragRef.current.id,
+          nextCoordinate,
+        )
+        : null;
+      const displayCoordinate = dragState?.coordinate ?? nextCoordinate;
+      const overlaySegments = dragState?.overlaySegments;
+
       counterProposalDragRef.current = {
         ...counterProposalDragRef.current,
         moved: true,
@@ -2378,26 +2393,37 @@ export function MapCanvas({
       map.getCanvas().style.cursor = "grabbing";
       const overlaySource = map.getSource("counter-proposal-drag-overlay");
       if (overlaySource && typeof overlaySource.setData === "function") {
-        overlaySource.setData({
-          type: "FeatureCollection",
-          features: [
-            {
+        const segmentFeatures = Array.isArray(overlaySegments) && overlaySegments.length
+          ? overlaySegments.map((segment, index) => ({
+              type: "Feature",
+              properties: { kind: "segment", index },
+              geometry: {
+                type: "LineString",
+                coordinates: [segment.start, segment.end],
+              },
+            }))
+          : [{
               type: "Feature",
               properties: { kind: "segment" },
               geometry: {
                 type: "LineString",
-                coordinates: [counterProposalDragRef.current.startCoordinate, nextCoordinate],
+                coordinates: [counterProposalDragRef.current.startCoordinate, displayCoordinate],
               },
-            },
+            }];
+
+        overlaySource.setData({
+          type: "FeatureCollection",
+          features: [
+            ...segmentFeatures,
             {
               type: "Feature",
               properties: { kind: "handle" },
-              geometry: { type: "Point", coordinates: nextCoordinate },
+              geometry: { type: "Point", coordinates: displayCoordinate },
             },
           ],
         });
       }
-      counterProposalDragRef.current.lastCoordinate = nextCoordinate;
+      counterProposalDragRef.current.lastCoordinate = displayCoordinate;
       onCounterProposalDragMoveRef.current?.(
         counterProposalDragRef.current.id,
         nextCoordinate,

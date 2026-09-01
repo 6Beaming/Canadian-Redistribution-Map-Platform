@@ -87,7 +87,7 @@ function searchableText(row) {
     row.id,
     row.title,
     row.type,
-    row.status,
+    row.visible_status ?? row.status,
     row.fed_num,
     row.dguid,
     row.neighboring_dguid,
@@ -107,7 +107,7 @@ export function filterAndSortSubmissionRows(rows = [], filters) {
   const filtered = rows.filter((row) => {
     const createdAt = Date.parse(row.created_at);
     const type = normalizeSubmissionType(row.type);
-    const status = normalizeSubmissionStatus(row.status);
+    const status = normalizeSubmissionStatus(row.visible_status ?? row.status);
     if (needle && !searchableText(row).includes(needle)) return false;
     if (filters.type && type !== filters.type) return false;
     if (filters.status && status !== filters.status) return false;
@@ -131,6 +131,7 @@ export function filterAndSortSubmissionRows(rows = [], filters) {
 }
 
 export function serializeLightweightSubmission(row, profile = null) {
+  const actualStatus = normalizeSubmissionStatus(row.status);
   return {
     id: row.id,
     user_id: row.user_id,
@@ -139,7 +140,14 @@ export function serializeLightweightSubmission(row, profile = null) {
     dguid: row.dguid ?? null,
     neighboring_dguid: row.neighboring_dguid ?? null,
     title: row.title ?? "",
-    status: normalizeSubmissionStatus(row.status),
+    status: actualStatus,
+    visible_status: normalizeSubmissionStatus(row.visible_status ?? actualStatus),
+    archive_request_assigned_to_viewer:
+      typeof row.archive_request_assigned_to_viewer === "boolean"
+        ? row.archive_request_assigned_to_viewer
+        : null,
+    archive_request_id: row.archive_request_id ?? null,
+    archive_request_version: row.archive_request_version ?? null,
     resource_version: Number(row.resource_version) > 0 ? Number(row.resource_version) : 1,
     created_at: row.created_at,
     updated_at: row.updated_at ?? row.created_at,

@@ -15,6 +15,7 @@ import {
   emptyCounterProposalFeatureCollection,
   readCounterProposalStorage,
   restoreCounterProposalCacheFromDraft,
+  previewCounterProposalDragState,
   selectCounterProposalHandle,
   writeCounterProposalStorage,
 } from "@/lib/map/counterProposalWorkflow.js";
@@ -68,6 +69,7 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
   const counterProposalDragTimerRef = useRef(0);
   const counterProposalWorkerRef = useRef(null);
   const counterProposalWorkerInitRef = useRef(Promise.resolve());
+  const counterProposalWorkerSkipSyncRef = useRef(false);
   const counterProposalCacheRef = useRef(null);
   const counterProposalDraggingRef = useRef(false);
   const counterProposalPreviewVersionRef = useRef(0);
@@ -159,7 +161,13 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
 
   useEffect(() => {
     const client = counterProposalWorkerRef.current;
-    if (!client || !counterProposalWorkflow.cache || counterProposalDraggingRef.current) return;
+    if (!client || !counterProposalWorkflow.cache || counterProposalDraggingRef.current) {
+      return;
+    }
+    if (counterProposalWorkerSkipSyncRef.current) {
+      counterProposalWorkerSkipSyncRef.current = false;
+      return;
+    }
     counterProposalWorkerInitRef.current = client.init(counterProposalWorkflow.cache).catch(() => undefined);
   }, [counterProposalWorkflow.cache]);
 
@@ -648,6 +656,10 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
         cache: nextCache,
         dragBaselineSnapshot: nextCache.currentFeatures,
         dragPreviewImpacts: null,
+        dragPreviewCoordinate: null,
+        dragPreviewFeatureCollection: null,
+        dragPreviewBoundaryGeoJson: null,
+        dragPreviewOverlaySegments: null,
         dragValidating: false,
         error: "",
       };
@@ -702,18 +714,28 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
     setCounterProposalWorkflow((current) => ({ ...current, dragValidating: true }));
     try {
       await counterProposalWorkerInitRef.current;
+      const cache = counterProposalCacheRef.current;
+      const dragState = cache
+        ? previewCounterProposalDragState(cache, handleId, finalCoordinate)
+        : null;
+      const constrainedCoordinate = dragState?.coordinate ?? finalCoordinate;
       const result = counterProposalWorkerRef.current
-        ? await counterProposalWorkerRef.current.commit(handleId, finalCoordinate)
+        ? await counterProposalWorkerRef.current.commit(handleId, constrainedCoordinate)
         : null;
       if (result?.type !== "COMMIT_RESULT" || !result.cache) {
         throw new Error("Worker commit unavailable.");
       }
+      counterProposalWorkerSkipSyncRef.current = true;
       counterProposalCacheRef.current = result.cache;
       startTransition(() => setCounterProposalWorkflow((current) => ({
         ...current,
         cache: result.cache,
         dragBaselineSnapshot: null,
         dragPreviewImpacts: null,
+        dragPreviewCoordinate: null,
+        dragPreviewFeatureCollection: null,
+        dragPreviewBoundaryGeoJson: null,
+        dragPreviewOverlaySegments: null,
         dragValidating: false,
         error: "",
       })));
@@ -724,6 +746,10 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
         cache: baselineCache,
         dragBaselineSnapshot: null,
         dragPreviewImpacts: null,
+        dragPreviewCoordinate: null,
+        dragPreviewFeatureCollection: null,
+        dragPreviewBoundaryGeoJson: null,
+        dragPreviewOverlaySegments: null,
         dragValidating: false,
         error: `The boundary move was not committed: ${error.message}`,
       }));
@@ -734,15 +760,22 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
 
   const handleCounterProposalUndo = useCallback(async () => {
     const currentCache = counterProposalCacheRef.current;
-    if (!currentCache) return;
+    if (!currentCache?.history?.length || !counterProposalWorkerRef.current) {
+      return;
+    }
     try {
-      await counterProposalWorkerRef.current?.init(currentCache);
-      const result = await counterProposalWorkerRef.current?.undo();
+      await counterProposalWorkerInitRef.current;
+      const result = await counterProposalWorkerRef.current.undo();
       if (result?.type !== "COMMIT_RESULT" || !result.cache) {
         throw new Error("Worker undo unavailable.");
       }
+      counterProposalWorkerSkipSyncRef.current = true;
       counterProposalCacheRef.current = result.cache;
-      setCounterProposalWorkflow((current) => ({ ...current, cache: result.cache, error: "" }));
+      startTransition(() => setCounterProposalWorkflow((current) => ({
+        ...current,
+        cache: result.cache,
+        error: "",
+      })));
     } catch (error) {
       setCounterProposalWorkflow((current) => ({
         ...current,
@@ -753,15 +786,22 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
 
   const handleCounterProposalRedo = useCallback(async () => {
     const currentCache = counterProposalCacheRef.current;
-    if (!currentCache) return;
+    if (!currentCache?.future?.length || !counterProposalWorkerRef.current) {
+      return;
+    }
     try {
-      await counterProposalWorkerRef.current?.init(currentCache);
-      const result = await counterProposalWorkerRef.current?.redo();
+      await counterProposalWorkerInitRef.current;
+      const result = await counterProposalWorkerRef.current.redo();
       if (result?.type !== "COMMIT_RESULT" || !result.cache) {
         throw new Error("Worker redo unavailable.");
       }
+      counterProposalWorkerSkipSyncRef.current = true;
       counterProposalCacheRef.current = result.cache;
-      setCounterProposalWorkflow((current) => ({ ...current, cache: result.cache, error: "" }));
+      startTransition(() => setCounterProposalWorkflow((current) => ({
+        ...current,
+        cache: result.cache,
+        error: "",
+      })));
     } catch (error) {
       setCounterProposalWorkflow((current) => ({
         ...current,
@@ -893,6 +933,7 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
         ? counterProposalWorkflow.cache.handleFeatureCollection
         : emptyCounterProposalFeatureCollection(),
       selectedHandleId: counterProposalWorkflow.cache.selectedHandleId,
+      cache: counterProposalWorkflow.cache,
       editable: showHandles,
     };
   }, [

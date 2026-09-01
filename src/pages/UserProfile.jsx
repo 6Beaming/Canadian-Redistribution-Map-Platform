@@ -12,6 +12,15 @@ import {
 } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext.jsx";
 import { authApi } from "@/services/authApi.js";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog.jsx";
 
 const actionButtonClassName = "w-auto min-w-0 px-6 py-2";
 const secondaryActionButtonClassName = actionButtonClassName;
@@ -31,6 +40,10 @@ const provinces = [
   ["SK", "Saskatchewan"],
   ["YT", "Yukon"]
 ];
+
+function provinceName(code) {
+  return provinces.find(([value]) => value === code)?.[1] ?? code;
+}
 
 function profileFormFromUser(user) {
   return {
@@ -52,6 +65,7 @@ export default function UserProfile() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  const [provinceAdjustment, setProvinceAdjustment] = useState(null);
 
   useEffect(() => {
     if (!otpRequired) {
@@ -151,6 +165,9 @@ export default function UserProfile() {
       resetOtpState();
       setIsEditingProfile(false);
       setStatus(result.message);
+      if (result.profileAdjustments?.province) {
+        setProvinceAdjustment(result.profileAdjustments.province);
+      }
     } catch (updateError) {
       setError(updateError.message);
     } finally {
@@ -172,6 +189,9 @@ export default function UserProfile() {
       resetOtpState();
       setIsEditingProfile(false);
       setStatus(result.message);
+      if (result.profileAdjustments?.province) {
+        setProvinceAdjustment(result.profileAdjustments.province);
+      }
     } catch (verifyError) {
       setError(verifyError.message);
     } finally {
@@ -359,6 +379,28 @@ export default function UserProfile() {
           </div>
         ) : null}
       </section>
+
+      <AlertDialog
+        open={Boolean(provinceAdjustment)}
+        onOpenChange={(open) => {
+          if (!open) setProvinceAdjustment(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Province updated to match your postal code</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your postal code is located in {provinceName(provinceAdjustment?.to)}.
+              {" "}We updated your province from {provinceName(provinceAdjustment?.from)} to {provinceName(provinceAdjustment?.to)} so your map presenter and submissions stay aligned.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction type="button" onClick={() => setProvinceAdjustment(null)}>
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

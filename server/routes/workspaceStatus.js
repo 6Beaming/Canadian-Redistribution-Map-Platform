@@ -4,6 +4,10 @@ import {
   authorizeSubmissionScope,
   notFoundScopeError,
 } from "../lib/authorization/resourceScopeGuard.js";
+import {
+  loadArchiveRequestVisibility,
+  projectSingleArchiveRequestStatus,
+} from "../lib/archiveRequests/visibilityProjection.js";
 
 const router = Router();
 
@@ -33,10 +37,12 @@ function requireCommissioner(req, res, next) {
   next();
 }
 
-function serializeStatus(row, scope = null) {
+function serializeStatus(row, scope = null, archiveRequestVisibility = null) {
   return {
     submissionId: row.id,
     status: row.status,
+    visibleStatus: projectSingleArchiveRequestStatus(row, archiveRequestVisibility),
+    archiveRequestAssignedToViewer: archiveRequestVisibility?.isAssignee ?? null,
     version: Number(row.resource_version) || 1,
     updatedAt: row.updated_at ?? null,
     eligibilityPruids: scope?.eligibilityPruids ?? [],
@@ -101,7 +107,17 @@ router.get("/submissions/:submissionId/status", async (req, res) => {
       commissionerProfile: req.profile,
       requireClaim: false,
     });
-    return res.json(serializeStatus(data, scope));
+    const isArchiveRequest = ["archive-request", "archive_request", "archive-requested"].includes(
+      String(data.status ?? "").trim().toLowerCase(),
+    );
+    const visibility = isArchiveRequest
+      ? (await loadArchiveRequestVisibility(
+        supabase,
+        [submissionId],
+        req.profile?.id ?? req.user?.id,
+      )).get(submissionId) ?? null
+      : null;
+    return res.json(serializeStatus(data, scope, visibility));
   } catch (scopeError) {
     return sendScopeError(res, scopeError);
   }
@@ -153,6 +169,15 @@ router.patch("/submissions/:submissionId/status", async (req, res) => {
 
   if (!current) {
     return res.status(404).json({ error: "Submission not found." });
+  }
+
+  if (["archive-request", "archive_request", "archive-requested"].includes(
+    String(current.status ?? "").trim().toLowerCase(),
+  )) {
+    return res.status(409).json({
+      error: "This submission is locked by an active Archive Request.",
+      code: "ARCHIVE_REQUEST_ACTIVE",
+    });
   }
 
   let scope;

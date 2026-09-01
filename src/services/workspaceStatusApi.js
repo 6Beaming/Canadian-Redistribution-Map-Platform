@@ -21,7 +21,14 @@ export async function getWorkspaceSubmissionStatus(submissionId) {
     },
   );
 
-  return handleResponse(response);
+  const result = await handleResponse(response);
+  return {
+    ...result,
+    actualStatus: result.status,
+    status: result.visibleStatus ?? result.status,
+    archiveRequestStatusHidden:
+      result.status === "archive-request" && result.visibleStatus !== "archive-request",
+  };
 }
 
 export async function patchWorkspaceSubmissionStatus(

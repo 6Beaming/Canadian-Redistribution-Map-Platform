@@ -1,8 +1,10 @@
 import { mapApi } from "@/services/mapApi.js";
 import { buildDaObjectionIndex } from "./objectionWorkflow.js";
-import { buildCounterProposalCache } from "./counterProposalWorkflow.js";
+import { buildCounterProposalCacheFromReleasePair } from "./counterProposalWorkflow.js";
 
 let cachedReleaseId = null;
+let cachedAdjacencyByDguid = null;
+let cachedAdjacencyReleaseId = null;
 
 async function resolveReleaseId() {
   if (!cachedReleaseId) {
@@ -12,8 +14,20 @@ async function resolveReleaseId() {
   return cachedReleaseId;
 }
 
+async function loadAdjacencyIndex(releaseId, { signal } = {}) {
+  if (cachedAdjacencyReleaseId === releaseId && cachedAdjacencyByDguid) {
+    return cachedAdjacencyByDguid;
+  }
+  const payload = await mapApi.getReleaseAdjacency(releaseId, { signal });
+  cachedAdjacencyReleaseId = releaseId;
+  cachedAdjacencyByDguid = payload.items ?? {};
+  return cachedAdjacencyByDguid;
+}
+
 export function clearReleasePairLoaderCache() {
   cachedReleaseId = null;
+  cachedAdjacencyByDguid = null;
+  cachedAdjacencyReleaseId = null;
   mapApi.clearImmutableReleaseCache();
 }
 
@@ -41,19 +55,19 @@ export async function loadCounterProposalPair(firstDguid, secondDguid, profilesB
     representation: "edit",
     signal,
   });
-  const index = buildDaObjectionIndex(payload.features);
-  const cache = buildCounterProposalCache(index, profilesByDguid, firstDguid, secondDguid);
+  const cache = buildCounterProposalCacheFromReleasePair(
+    payload,
+    profilesByDguid,
+    firstDguid,
+    secondDguid,
+  );
+  const index = cache?.pairIndex ?? buildDaObjectionIndex(payload.features);
   return { index, payload, cache };
 }
 
 export async function areReleaseDaNeighbours(firstDguid, secondDguid, { signal } = {}) {
-  try {
-    await loadDisplayPairIndex(firstDguid, secondDguid, { signal });
-    return true;
-  } catch (error) {
-    if (error.code === "MAP_DA_PAIR_NOT_ADJACENT" || error.status === 400) {
-      return false;
-    }
-    throw error;
-  }
+  const releaseId = await resolveReleaseId();
+  const adjacency = await loadAdjacencyIndex(releaseId, { signal });
+  const neighbors = adjacency[String(firstDguid)] ?? [];
+  return neighbors.includes(String(secondDguid));
 }

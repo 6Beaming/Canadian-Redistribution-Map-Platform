@@ -18,11 +18,26 @@ function createCameraCommand(source, target) {
 export function useMapCameraCommands({ initialTarget = null } = {}) {
   const [cameraCommand, setCameraCommand] = useState(null);
   const issuedInitialRef = useRef(false);
+  const lastInitialTargetKeyRef = useRef("");
 
   useEffect(() => {
-    if (!initialTarget || issuedInitialRef.current) return;
+    if (!initialTarget) return;
+
+    const targetKey = [
+      initialTarget.location?.[0],
+      initialTarget.location?.[1],
+      initialTarget.zoom,
+      initialTarget.label,
+    ].join(":");
+
+    if (!targetKey || targetKey === lastInitialTargetKeyRef.current) {
+      return;
+    }
+
+    lastInitialTargetKeyRef.current = targetKey;
+    const source = issuedInitialRef.current ? "recenter" : "initial";
     issuedInitialRef.current = true;
-    setCameraCommand(createCameraCommand("initial", initialTarget));
+    setCameraCommand(createCameraCommand(source, initialTarget));
   }, [initialTarget]);
 
   const issueCommand = useCallback((source, target) => {

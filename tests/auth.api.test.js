@@ -783,6 +783,42 @@ test("PATCH /api/auth/me updates public profile when the phone is unchanged", as
   assert.match(response.setCookie, /crmp_pending_profile_update=;/);
 });
 
+test("PATCH /api/auth/me auto-adjusts province from postal geocode and reports the change", async () => {
+  setGoogleGeocodingTestDouble(async () => ({
+    latitude: 49.2827,
+    longitude: -123.1207,
+    province: "BC",
+  }));
+  setSupabaseTestDoubles({
+    findSupabaseProfileByPhone: async () => null,
+    getSupabaseClient: () => authenticatedSupabaseDouble(),
+    getSupabaseProfile: async () => completePublicProfile,
+    updateSupabaseProfile: async (accessToken, userId, updates) => ({
+      ...completePublicProfile,
+      ...updates,
+    }),
+  });
+
+  const response = await request("PATCH", "/api/auth/me", {
+    body: {
+      firstName: "Ada",
+      lastName: "Byron",
+      phoneNumber: "416-555-0100",
+      postalCode: "V6B1A1",
+      province: "ON",
+    },
+    cookie: sessionCookies(),
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.user.province, "BC");
+  assert.deepEqual(response.body.profileAdjustments?.province, {
+    from: "ON",
+    to: "BC",
+  });
+  assert.equal(response.body.user.mapCenter?.latitude, 49.2827);
+});
+
 test("PATCH /api/auth/me saves non-phone profile fields before phone OTP succeeds", async () => {
   const phoneLookups = [];
   const profileUpdates = [];

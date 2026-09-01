@@ -45,6 +45,19 @@ router.get("/releases/current", (_req, res, next) => {
   }
 });
 
+router.get("/releases/:releaseId/adjacency", (req, res, next) => {
+  try {
+    const release = loadCanonicalRelease(req.params.releaseId);
+    sendImmutableJson(req, res, {
+      releaseId: release.manifest.releaseId,
+      schemaVersion: "1.0",
+      items: release.adjacency,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get("/releases/:releaseId/das/:dguid", async (req, res, next) => {
   try {
     if ((req.query.representation ?? "display") !== "display") {

@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, RefreshCcw } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -334,6 +334,11 @@ export default function UserMakeCounterProposal({
   const second = getDaDisplay(profilesByDguid, workflow?.secondDguid);
   const textFieldMessage = isSignedIn ? "" : SIGN_IN_NOTICE;
   const hasGeometryIssues = Boolean(cache?.sourceGeometryIssues?.length);
+
+  useEffect(() => {
+    setTitle("");
+    setProposalText("");
+  }, [workflow?.firstDguid, workflow?.secondDguid, step]);
 
   async function handleSubmitCounterProposal() {
     if (!isSignedIn || isSubmitting) {

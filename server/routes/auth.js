@@ -184,25 +184,44 @@ function isPublicProfileComplete(profile) {
   );
 }
 
-async function postalGeocodeUpdates(profile) {
+async function resolvePostalGeocodeUpdates(profile) {
   if (!isGoogleGeocodingConfigured()) {
-    return {};
+    return { updates: {}, adjustments: {} };
   }
+
+  const submittedProvince = String(profile.province ?? "").toUpperCase();
 
   try {
     const result = await geocodeCanadianPostalCode({
-      postalCode: profile.postalCode,
-      province: profile.province
+      postalCode: profile.postalCode ?? profile.postal_code,
+      province: submittedProvince,
     });
 
-    return {
+    const updates = {
       postal_geocoded_at: new Date().toISOString(),
-      postal_latitude: result?.latitude ?? null,
-      postal_longitude: result?.longitude ?? null
     };
+    const adjustments = {};
+
+    if (result?.latitude != null && result?.longitude != null) {
+      updates.postal_latitude = result.latitude;
+      updates.postal_longitude = result.longitude;
+    }
+
+    if (result?.province) {
+      const resolvedProvince = String(result.province).toUpperCase();
+      if (resolvedProvince !== submittedProvince) {
+        updates.province = resolvedProvince;
+        adjustments.province = {
+          from: submittedProvince,
+          to: resolvedProvince,
+        };
+      }
+    }
+
+    return { updates, adjustments };
   } catch (error) {
     console.warn("Unable to geocode a profile postal code:", error.message);
-    return {};
+    return { updates: {}, adjustments: {} };
   }
 }
 
@@ -264,9 +283,9 @@ async function profileWithPostalMapCenter(accessToken, userId, profile) {
     return profile;
   }
 
-  const geocodeUpdates = await postalGeocodeUpdates({
+  const { updates: geocodeUpdates } = await resolvePostalGeocodeUpdates({
     postalCode: profile.postal_code,
-    province: profile.province
+    province: profile.province,
   });
 
   if (!Object.keys(geocodeUpdates).length) {
@@ -434,6 +453,25 @@ router.post("/login", async (req, res, next) => {
       if (message.toLowerCase().includes("email not confirmed")) {
         res.status(403).json({
           error: "Verify your email before signing in."
+        });
+        return;
+      }
+
+      if (
+        process.env.NODE_ENV !== "production"
+        && (
+          message.toLowerCase().includes("fetch failed")
+          || message.toLowerCase().includes("invalid api key")
+          || message.toLowerCase().includes("invalid jwt")
+        )
+      ) {
+        const supabaseUrl = process.env.SUPABASE_URL || "";
+        const localhostHint = /127\.0\.0\.1|localhost/.test(supabaseUrl)
+          ? " SUPABASE_URL points to a local Supabase instance; run `npx supabase start` or update .env to your remote project URL."
+          : "";
+
+        res.status(503).json({
+          error: `Authentication service is unavailable: ${message}.${localhostHint}`,
         });
         return;
       }
@@ -729,9 +767,9 @@ router.post(
         return;
       }
 
-      const geocodeUpdates = pendingInvite
-        ? {}
-        : await postalGeocodeUpdates(pendingProfile);
+      const { updates: geocodeUpdates } = pendingInvite
+        ? { updates: {} }
+        : await resolvePostalGeocodeUpdates(pendingProfile);
       const completedProfile = await upsertSupabaseProfile(req.accessToken, {
         email: req.user.email,
         first_name: pendingProfile.firstName,
@@ -740,7 +778,9 @@ router.post(
         last_name: pendingProfile.lastName,
         phone: pendingProfile.phoneNational,
         postal_code: pendingProfile.postalCode,
-        province: inviterProfile?.province || pendingProfile.province,
+        province: inviterProfile?.province
+          || geocodeUpdates.province
+          || pendingProfile.province,
         role: pendingInvite
           ? "commissioner"
           : existingProfile?.role || "public_user",
@@ -862,34 +902,40 @@ router.patch("/me", requireAuth, async (req, res, next) => {
     }
 
     const phoneChanged = requiredString(req.profile?.phone) !== phoneNational;
-    const geocodeUpdates = shouldRefreshPostalGeocode(req.profile, {
+    const { updates: geocodeUpdates, adjustments } = shouldRefreshPostalGeocode(req.profile, {
       postalCode: validation.profile.postalCode,
-      province: validation.profile.province
+      province: validation.profile.province,
     })
-      ? await postalGeocodeUpdates(validation.profile)
-      : {};
+      ? await resolvePostalGeocodeUpdates(validation.profile)
+      : { updates: {}, adjustments: {} };
+    const resolvedProfile = {
+      ...validation.profile,
+      province: geocodeUpdates.province ?? validation.profile.province,
+    };
+    const profileAdjustments = Object.keys(adjustments).length ? adjustments : undefined;
 
     if (phoneChanged) {
       const updatedProfile = await updateSupabaseProfile(
         req.accessToken,
         req.user.id,
         {
-          ...publicProfileInformationUpdates(req.user, validation.profile),
-          ...geocodeUpdates
-        }
+          ...publicProfileInformationUpdates(req.user, resolvedProfile),
+          ...geocodeUpdates,
+        },
       );
 
       await startSupabasePhoneVerification(
         req.accessToken,
         validation.profile.phoneAuth
       );
-      setPendingProfileUpdateCookie(res, validation.profile);
+      setPendingProfileUpdateCookie(res, resolvedProfile);
 
       res.status(202).json({
         message: "Profile information saved. Verification code sent.",
         otpRequired: true,
         phoneMasked: maskPhoneNumber(phoneNumber),
-        user: publicUser(req.user, updatedProfile)
+        user: publicUser(req.user, updatedProfile),
+        ...(profileAdjustments ? { profileAdjustments } : {}),
       });
       return;
     }
@@ -898,15 +944,16 @@ router.patch("/me", requireAuth, async (req, res, next) => {
       req.accessToken,
       req.user.id,
       {
-        ...publicProfileUpdates(req.user, validation.profile),
-        ...geocodeUpdates
-      }
+        ...publicProfileUpdates(req.user, resolvedProfile),
+        ...geocodeUpdates,
+      },
     );
 
     clearPendingProfileUpdateCookie(res);
     res.json({
       message: "Profile information updated.",
-      user: publicUser(req.user, updatedProfile)
+      user: publicUser(req.user, updatedProfile),
+      ...(profileAdjustments ? { profileAdjustments } : {}),
     });
   } catch (error) {
     next(error);

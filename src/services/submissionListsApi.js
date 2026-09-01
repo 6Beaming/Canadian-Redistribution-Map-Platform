@@ -18,10 +18,25 @@ async function requestJson(url, options = {}) {
   return payload;
 }
 
+export function applyCommissionerStatusVisibility(item) {
+  if (!item || typeof item !== "object") return item;
+  const actualStatus = item.status;
+  const visibleStatus = item.visible_status ?? actualStatus;
+  return {
+    ...item,
+    actual_status: actualStatus,
+    status: visibleStatus,
+    archive_request_status_hidden:
+      actualStatus === "archive-request" && visibleStatus !== "archive-request",
+  };
+}
+
 export async function getCommissionerSubmissionTableRows(filters = {}) {
   const payload = await requestJson(appendFilters("/api/submissions", filters));
   return {
-    items: Array.isArray(payload.items) ? payload.items : [],
+    items: Array.isArray(payload.items)
+      ? payload.items.map(applyCommissionerStatusVisibility)
+      : [],
     appliedFilters: payload.appliedFilters ?? {},
   };
 }
@@ -38,7 +53,7 @@ export async function getSubmissionTableRowById(submissionId) {
   const payload = await requestJson(
     `/api/submissions/table-row/${encodeURIComponent(submissionId)}`,
   );
-  return payload.item ?? null;
+  return payload.item ? applyCommissionerStatusVisibility(payload.item) : null;
 }
 
 export function subscribeCommissionerSubmissionTable({ onInvalidate, onRecover = onInvalidate }) {

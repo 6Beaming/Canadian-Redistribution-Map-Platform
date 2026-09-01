@@ -171,8 +171,15 @@ function deriveAllowedActions(request, votes, actor) {
   return actions;
 }
 
+function requiredAssigneeIds(request) {
+  return [...new Set([
+    request?.requester_id,
+    ...(request?.assignee_ids ?? []),
+  ].filter(Boolean).map(String))];
+}
+
 function canApproveFromVotes(request, votes) {
-  const assigneeIds = (request.assignee_ids ?? []).map(String);
+  const assigneeIds = requiredAssigneeIds(request);
   if (!assigneeIds.length) return false;
   const byVoter = new Map(votes.map((vote) => [String(vote.voter_id), vote.vote]));
   return assigneeIds.every((id) => byVoter.get(id) === "accepted");
@@ -188,14 +195,14 @@ export async function serializeArchiveRequestReadModel(supabase, request, {
   const votes = await repo.listVotes(supabase, request.id);
   const profileIds = [
     request.requester_id,
-    ...(request.assignee_ids ?? []),
+    ...requiredAssigneeIds(request),
     ...votes.map((vote) => vote.voter_id),
   ];
   const profiles = await repo.loadProfilesByIds(supabase, profileIds);
   const byId = new Map(profiles.map((profile) => [String(profile.id), profile]));
 
   const requester = byId.get(String(request.requester_id));
-  const assignees = (request.assignee_ids ?? [])
+  const assignees = requiredAssigneeIds(request)
     .map((id) => byId.get(String(id)))
     .filter(Boolean)
     .map((profile) => ({ id: profile.id, email: profile.email }));
@@ -215,6 +222,8 @@ export async function serializeArchiveRequestReadModel(supabase, request, {
       .filter((vote) => vote.email)
       .map((vote) => [vote.email, vote.vote]),
   );
+  const actorId = String(actorProfile?.id ?? "");
+  const isAssignee = Boolean(actorId) && requiredAssigneeIds(request).includes(actorId);
 
   return {
     id: request.id,
@@ -236,6 +245,8 @@ export async function serializeArchiveRequestReadModel(supabase, request, {
     requesterEmail: requester?.email ?? null,
     assigneeEmails: assignees.map((entry) => entry.email),
     votesByEmail,
+    isAssignee,
+    visibleSubmissionStatus: isAssignee ? "archive-request" : "accepted",
   };
 }
 
@@ -282,6 +293,36 @@ async function resolveSameProvinceAssignees(supabase, emails, operatingPruid) {
   }
 
   return resolved;
+}
+
+function includeRequiredRequester(assignees, { actorUser, actorProfile }) {
+  const requesterId = String(actorUser?.id ?? actorProfile?.id ?? "");
+  const requesterEmail = String(actorProfile?.email ?? actorUser?.email ?? "").trim();
+  const requester = {
+    ...actorProfile,
+    id: requesterId,
+    email: requesterEmail,
+  };
+  return [
+    requester,
+    ...(assignees ?? []).filter((profile) => String(profile.id) !== requesterId),
+  ];
+}
+
+async function includeStoredRequester(supabase, assignees, request) {
+  const requesterId = String(request.requester_id);
+  const byId = new Map((assignees ?? []).map((profile) => [String(profile.id), profile]));
+  if (!byId.has(requesterId)) {
+    const [requester] = await repo.loadProfilesByIds(supabase, [requesterId]);
+    if (!requester) {
+      throw archiveError("The Archive Request requester profile is unavailable.", {
+        statusCode: 409,
+        code: "REQUESTER_PROFILE_UNAVAILABLE",
+      });
+    }
+    byId.set(requesterId, requester);
+  }
+  return [...byId.values()];
 }
 
 export async function getArchiveRequestForSubmission({
@@ -356,17 +397,12 @@ export async function createArchiveRequest({
     });
   }
 
-  const assignees = await resolveSameProvinceAssignees(
+  const requestedAssignees = await resolveSameProvinceAssignees(
     supabase,
     assigneeEmails,
     scope.operatingPruid,
   );
-  if (!assignees.length) {
-    throw archiveError("At least one same-province assignee is required.", {
-      statusCode: 400,
-      code: "INVALID_ASSIGNEES",
-    });
-  }
+  const assignees = includeRequiredRequester(requestedAssignees, { actorUser, actorProfile });
 
   await claimSubmissionForOperation(supabase, {
     submissionId,
@@ -426,7 +462,11 @@ export async function createArchiveRequest({
     eligibilityPruids: scope.eligibilityPruids,
     operatingPruid: scope.operatingPruid,
     resourceVersion: 1,
-    hints: { submissionId, state: OPEN },
+    hints: {
+      submissionId,
+      state: OPEN,
+      assigneeIds: assignees.map((profile) => profile.id),
+    },
   });
 
   const readModel = await serializeArchiveRequestReadModel(supabase, request, {
@@ -482,17 +522,13 @@ export async function updateArchiveRequestAssignees({
     });
   }
 
-  const assignees = await resolveSameProvinceAssignees(
+  const requestedAssignees = await resolveSameProvinceAssignees(
     supabase,
     assigneeEmails,
     scope.operatingPruid,
   );
-  if (!assignees.length) {
-    throw archiveError("At least one same-province assignee is required.", {
-      statusCode: 400,
-      code: "INVALID_ASSIGNEES",
-    });
-  }
+  const assignees = await includeStoredRequester(supabase, requestedAssignees, request);
+  const previousAssigneeIds = [...(request.assignee_ids ?? [])];
 
   const keepVoterIds = [request.requester_id, ...assignees.map((profile) => profile.id)];
   await repo.deleteVotesNotIn(supabase, request.id, keepVoterIds);
@@ -515,7 +551,12 @@ export async function updateArchiveRequestAssignees({
     eligibilityPruids: scope.eligibilityPruids,
     operatingPruid: scope.operatingPruid,
     resourceVersion: updated.resource_version,
-    hints: { submissionId: updated.submission_id, state: updated.state },
+    hints: {
+      submissionId: updated.submission_id,
+      state: updated.state,
+      assigneeIds: assignees.map((profile) => profile.id),
+      previousAssigneeIds,
+    },
   });
 
   const readModel = await serializeArchiveRequestReadModel(supabase, updated, {

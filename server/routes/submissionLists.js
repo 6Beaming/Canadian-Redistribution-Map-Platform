@@ -11,6 +11,7 @@ import {
   normalizeSubmissionListFilters,
   serializeLightweightSubmission,
 } from "../lib/submissions/submissionListQuery.js";
+import { projectArchiveRequestVisibility } from "../lib/archiveRequests/visibilityProjection.js";
 
 const router = Router();
 
@@ -36,10 +37,13 @@ async function loadProfilesById(supabase, rows) {
   return new Map((data ?? []).map((profile) => [profile.id, profile]));
 }
 
-async function presentRows(supabase, rows, { includeProfiles }) {
+async function presentRows(supabase, rows, { includeProfiles, actorProfileId = null }) {
   const enriched = await enrichSubmissionsWithDaMetadata(rows);
-  const profilesById = includeProfiles ? await loadProfilesById(supabase, enriched) : new Map();
-  return enriched.map((row) => serializeLightweightSubmission(row, profilesById.get(row.user_id)));
+  const projected = actorProfileId
+    ? await projectArchiveRequestVisibility(supabase, enriched, actorProfileId)
+    : enriched;
+  const profilesById = includeProfiles ? await loadProfilesById(supabase, projected) : new Map();
+  return projected.map((row) => serializeLightweightSubmission(row, profilesById.get(row.user_id)));
 }
 
 async function listRows(req, res, {
@@ -66,7 +70,10 @@ async function listRows(req, res, {
       scopedRows = await filterSubmissionsForCommissionerScope(scopedRows, req.profile);
     }
 
-    const rows = await presentRows(supabase, scopedRows, { includeProfiles });
+    const rows = await presentRows(supabase, scopedRows, {
+      includeProfiles,
+      actorProfileId: scopeToCommissioner ? req.profile?.id ?? req.user?.id : null,
+    });
     return res.json({
       items: filterAndSortSubmissionRows(rows, filters),
       appliedFilters: filters,
@@ -104,7 +111,7 @@ router.get("/table-row/:submissionId", requireCommissioner, async (req, res) => 
         scope_pruids: scope.eligibilityPruids,
         operating_pruid: scope.operatingPruid,
         cross_province_warning: scope.crossProvinceWarning,
-      }], { includeProfiles: true });
+      }], { includeProfiles: true, actorProfileId: req.profile?.id ?? req.user?.id });
       return res.json({ item });
     } catch (scopeError) {
       return res.status(scopeError.statusCode || 500).json({

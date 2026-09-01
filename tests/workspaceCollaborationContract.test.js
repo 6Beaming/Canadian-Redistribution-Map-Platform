@@ -40,3 +40,22 @@ test("Workspace browser service has no browser-authoritative shared-state storag
   assert.doesNotMatch(legacyRouter, /router\.(get|post)\("\/comments/);
   assert.doesNotMatch(legacyRouter, /router\.(get|post)\("\/label-catalog/);
 });
+
+test("Workspace review comments stay editable in every sub-workspace status", () => {
+  const panel = fs.readFileSync("src/components/non_prebuilt/WorkspaceReviewPanel.jsx", "utf8");
+  const router = fs.readFileSync("server/routes/workspaceCollaboration.js", "utf8");
+
+  assert.doesNotMatch(panel, /read-only in the current workflow/i);
+  assert.doesNotMatch(panel, /readOnly=\{submission\.status/);
+  assert.match(panel, /workspace-comment-form/);
+  assert.match(router, /router\.post\("\/comments"/);
+  assert.match(router, /\.eq\("author_id", req\.user\.id\)/);
+});
+
+test("Archive Request UI pins the requester and blocks hidden-status decisions", () => {
+  const panel = fs.readFileSync("src/components/non_prebuilt/WorkspaceReviewPanel.jsx", "utf8");
+  assert.match(panel, /isRequiredRequester/);
+  assert.match(panel, /disabled=\{isAssigneePending \|\| isRequiredRequester\}/);
+  assert.match(panel, /archive_request_status_hidden/);
+  assert.match(panel, /Status changes are currently unavailable/);
+});

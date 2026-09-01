@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, MapPinned } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   WorkflowActionFooter,
@@ -140,6 +140,11 @@ export default function UserMakeObjection({
   const first = getDaDisplay(profilesByDguid, workflow?.firstDguid);
   const second = getDaDisplay(profilesByDguid, workflow?.secondDguid);
   const textFieldMessage = isSignedIn ? "" : SIGN_IN_NOTICE;
+
+  useEffect(() => {
+    setTitle("");
+    setObjectionText("");
+  }, [workflow?.firstDguid, workflow?.secondDguid, step]);
 
   function handleTitleChange(event) {
     setTitle(event.target.value);

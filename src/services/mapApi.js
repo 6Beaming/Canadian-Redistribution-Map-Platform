@@ -72,6 +72,14 @@ export const mapApi = {
     return request("/releases/current", { signal: options.signal });
   },
 
+  getReleaseAdjacency(releaseId, { signal } = {}) {
+    const key = `adjacency:${releaseId}`;
+    const promise = rememberImmutable(key, () => request(
+      `/releases/${encodeURIComponent(releaseId)}/adjacency`,
+    ));
+    return withAbort(promise, signal);
+  },
+
   getReleaseDa(releaseId, dguid, { representation = "display", signal } = {}) {
     const key = `da:${releaseId}:${dguid}:${representation}`;
     const promise = rememberImmutable(key, () => request(

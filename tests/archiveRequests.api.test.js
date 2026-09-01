@@ -255,6 +255,51 @@ test("archive request create seals source, claims province, and writes outbox de
   assert.equal(admin.state.realtime_scope_deliveries.length, 1);
   assert.equal(admin.state.realtime_scope_deliveries[0].pruid, "46");
   assert.equal(admin.state.workspace_archive_request_votes.length, 1);
+  assert.deepEqual(
+    new Set(response.body.assignees),
+    new Set([requester.email, assignee.email]),
+  );
+  assert.deepEqual(
+    new Set(admin.state.workspace_archive_requests[0].assignee_ids),
+    new Set([requester.id, assignee.id]),
+  );
+  assert.deepEqual(
+    new Set(admin.state.realtime_outbox[0].projection_hints.assigneeIds),
+    new Set([requester.id, assignee.id]),
+  );
+});
+
+test("requester remains the required assignee when an update removes every optional assignee", async () => {
+  const admin = makeAdmin();
+  auth(requester, admin);
+
+  const created = await request("/api/workspace/archive-requests", {
+    method: "POST",
+    body: {
+      submissionId: "submission-1",
+      assignees: [assignee.email],
+      expectedVersion: 1,
+    },
+  });
+  const updated = await request(`/api/workspace/archive-requests/${created.body.id}/assignees`, {
+    method: "PATCH",
+    body: { assignees: [], expectedVersion: created.body.version },
+  });
+
+  assert.equal(updated.status, 200);
+  assert.equal(JSON.stringify(updated.body.assignees), JSON.stringify([requester.email]));
+  assert.equal(
+    JSON.stringify(admin.state.workspace_archive_requests[0].assignee_ids),
+    JSON.stringify([requester.id]),
+  );
+  assert.equal(
+    JSON.stringify(admin.state.realtime_outbox[1].projection_hints.previousAssigneeIds),
+    JSON.stringify([requester.id, assignee.id]),
+  );
+  assert.equal(
+    JSON.stringify(admin.state.realtime_outbox[1].projection_hints.assigneeIds),
+    JSON.stringify([requester.id]),
+  );
 });
 
 test("counter-proposal Archive Request identifies its requester", async () => {

@@ -124,7 +124,21 @@ export function CommissionerSubmissionCollections({
   const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
-    if (selection?.type !== "da") return undefined;
+    if (selection?.type !== "da") {
+      setCollections({ comments: [], objections: [], counterProposals: [] });
+      setRelationship("in_scope");
+      setInScopeNeighbors([]);
+      setIsLoading(false);
+      setLoadError("");
+      return undefined;
+    }
+
+    setCollections({ comments: [], objections: [], counterProposals: [] });
+    setRelationship("in_scope");
+    setInScopeNeighbors([]);
+    setIsLoading(true);
+    setLoadError("");
+
     const controller = new AbortController();
     let requestId = 0;
 

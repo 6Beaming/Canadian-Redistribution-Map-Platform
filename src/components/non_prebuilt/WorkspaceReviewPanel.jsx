@@ -643,7 +643,6 @@ function CommentThread({
   onCommentsChange,
   onSuppressEcho,
   onLocalMutation,
-  readOnly = false,
 }) {
   const [draft, setDraft] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -821,7 +820,7 @@ function CommentThread({
                   </div>
                 </div>
               ) : <p>{comment.content}</p>}
-              {!readOnly && !comment.isClosing && comment.email === reviewerEmail && editingCommentId !== comment.id ? (
+              {!comment.isClosing && comment.email === reviewerEmail && editingCommentId !== comment.id ? (
                 <div className="workspace-comment-actions">
                   <button
                     type="button"
@@ -846,22 +845,18 @@ function CommentThread({
           );
         }) : <p className="workspace-review-empty">No commissioner comments yet.</p>}
       </div>
-      {readOnly ? (
-        <p className="workspace-comment-readonly">This comment thread is read-only in the current workflow.</p>
-      ) : (
-        <form className="workspace-comment-form" onSubmit={submitComment}>
-          <textarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="Leave a review comment..."
-            rows={3}
-          />
-          <button type="submit" disabled={!draft.trim() || isSubmitting}>
-            <Send aria-hidden="true" />{isSubmitting ? "Submitting…" : "Submit Comment"}
-          </button>
-          {error ? <p className="workspace-decision-error" role="alert">{error}</p> : null}
-        </form>
-      )}
+      <form className="workspace-comment-form" onSubmit={submitComment}>
+        <textarea
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          placeholder="Leave a review comment..."
+          rows={3}
+        />
+        <button type="submit" disabled={!draft.trim() || isSubmitting}>
+          <Send aria-hidden="true" />{isSubmitting ? "Submitting…" : "Submit Comment"}
+        </button>
+        {error ? <p className="workspace-decision-error" role="alert">{error}</p> : null}
+      </form>
     </section>
   );
 }
@@ -975,6 +970,7 @@ function DecisionControls({
 
   async function toggleAssignee(email, checked) {
     if (!request?.id || pendingAssigneeEmails.has(email)) return;
+    if (!checked && String(email).trim().toLowerCase() === requesterEmail) return;
     const previousAssignees = assigneesRef.current;
     const nextAssignees = checked
       ? [...new Set([...assigneesRef.current, email])]
@@ -1048,22 +1044,27 @@ function DecisionControls({
           <legend>Archive request assignees</legend>
           {reviewerEmails.map((email) => {
             const isAssigneePending = pendingAssigneeEmails.has(email);
+            const isRequiredRequester = String(email).trim().toLowerCase() === requesterEmail;
             return (
               <label key={email}>
                 <input
                   type="checkbox"
                   checked={assignees.includes(email)}
-                  disabled={isAssigneePending}
+                  disabled={isAssigneePending || isRequiredRequester}
                   aria-busy={isAssigneePending}
                   onChange={(event) => void toggleAssignee(email, event.target.checked)}
                 />
-                {email}
+                {email}{isRequiredRequester ? " (requester)" : ""}
               </label>
             );
           })}
         </fieldset>
       ) : null}
-      <label className="workspace-commit-message">
+      {submission.archive_request_status_hidden ? (
+        <p className="workspace-decision-note" role="status">
+          Status changes are currently unavailable for this submission.
+        </p>
+      ) : <label className="workspace-commit-message">
         <span>Commit message <strong>Required</strong></span>
         <textarea
           rows={4}
@@ -1071,9 +1072,9 @@ function DecisionControls({
           onChange={(event) => setMessage(event.target.value)}
           placeholder="Explain the decision and its reasoning..."
         />
-      </label>
+      </label>}
       {error ? <p className="workspace-decision-error" role="alert">{error}</p> : null}
-      <div className="workspace-decision-actions workflow-action-stack">
+      {!submission.archive_request_status_hidden ? <div className="workspace-decision-actions workflow-action-stack">
         {displayedStatus === WORKSPACE_STATUS.PENDING ? <>
           <button type="button" className="is-accept" disabled={isSubmitting} onClick={() => runAction("accept")}><Check />Accept</button>
           <button type="button" className="is-reject" disabled={isSubmitting} onClick={() => runAction("reject")}><X />Reject</button>
@@ -1097,7 +1098,7 @@ function DecisionControls({
             <ArchiveRestore />Merge into the Archive Tree
           </button>
         </> : null}
-      </div>
+      </div> : null}
       {displayedStatus === WORKSPACE_STATUS.ARCHIVE_REQUEST && !request ? (
         <p className="workspace-decision-note" role="status">
           {archiveRequestLoading
@@ -1472,7 +1473,6 @@ export function WorkspaceReviewPanel({
             onCommentsChange={updateComments}
             onSuppressEcho={markEchoSuppressed}
             onLocalMutation={localMutationGuardRef.current}
-            readOnly={submission.status !== WORKSPACE_STATUS.PENDING}
           />
           <SubmissionDetails submission={submission} />
           <CounterProposalImpact submission={submission} />

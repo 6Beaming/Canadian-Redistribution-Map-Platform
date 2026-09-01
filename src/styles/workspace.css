@@ -267,6 +267,7 @@
 .workspace-tree {
   position: relative;
   margin-top: clamp(1.5rem, 3vw, 2.8rem);
+  padding-right: calc(24rem + 1rem);
 }
 
 .workspace-tree__top-row {
@@ -447,8 +448,7 @@
   gap: 0.45rem;
   padding: 0.1rem 0;
   font-weight: 650;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .workspace-status-key__item svg {
@@ -928,15 +928,6 @@
   .workspace-canvas {
     min-width: 1280px;
     padding: 1rem;
-  }
-
-  .workspace-status-key {
-    inline-size: min(100%, 24rem);
-    min-inline-size: min(100%, 18rem);
-  }
-
-  .workspace-status-key__items {
-    grid-template-columns: 1fr;
   }
 
   .workspace-action-bar {

@@ -22,14 +22,15 @@ test("Workspace status key keeps all four status labels inside a reliable deskto
   const card = rule(".workspace-status-key");
   const items = rule(".workspace-status-key__items");
   const item = rule(".workspace-status-key__item");
+  const tree = rule(".workspace-tree");
 
   assert.match(card, /box-sizing:\s*border-box/);
   assert.match(card, /inline-size:\s*24rem/);
   assert.match(card, /min-inline-size:\s*24rem/);
   assert.match(items, /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
   assert.match(item, /min-inline-size:\s*0/);
-  assert.match(item, /white-space:\s*normal/);
-  assert.match(item, /overflow-wrap:\s*anywhere/);
+  assert.match(item, /white-space:\s*nowrap/);
+  assert.match(tree, /padding-right:\s*calc\(24rem \+ 1rem\)/);
 
   ["Pending Submissions", "Archive Request", "Accepted", "Rejected"].forEach((label) => {
     assert.match(workspace, new RegExp(`"${label}"`));
@@ -37,10 +38,9 @@ test("Workspace status key keeps all four status labels inside a reliable deskto
   assert.match(workspace, /<aside className="workspace-status-key" aria-label="Status key">/);
 });
 
-test("Workspace status key becomes one column at the true mobile breakpoint", () => {
+test("Workspace status key keeps two columns at the mobile breakpoint", () => {
   const mobile = styles.match(/@media \(max-width:\s*700px\)\s*\{([\s\S]*?)\n\}/);
   assert.ok(mobile, "Missing Workspace mobile breakpoint");
-  assert.match(mobile[1], /\.workspace-status-key\s*\{[\s\S]*?inline-size:\s*min\(100%,\s*24rem\)/);
-  assert.match(mobile[1], /min-inline-size:\s*min\(100%,\s*18rem\)/);
-  assert.match(mobile[1], /\.workspace-status-key__items\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
+  assert.doesNotMatch(mobile[1], /\.workspace-status-key__items\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
+  assert.match(mobile[1], /\.workspace-canvas\s*\{[\s\S]*?min-width:\s*1280px/);
 });
