@@ -567,3 +567,4 @@ revoke all on function public.reinitialize_archive_branch_v2(uuid, uuid, bigint,
 grant execute on function public.commit_archive_merge_v2(uuid, uuid, jsonb, jsonb) to service_role;
 grant execute on function public.revert_archive_version_v2(uuid, uuid, bigint, bigint, jsonb) to service_role;
 grant execute on function public.reinitialize_archive_branch_v2(uuid, uuid, bigint, jsonb) to service_role;
+

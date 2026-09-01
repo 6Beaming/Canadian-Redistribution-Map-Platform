@@ -14,7 +14,6 @@ import { exportArchivedTreeJson } from "@/services/exportApi.js";
 import {
   deleteArchiveBranch,
   getArchiveTreeRecords,
-  revertArchiveBranch,
 } from "@/services/workspaceApi.js";
 import "@/styles/archive-tree.css";
 
@@ -156,6 +155,10 @@ export default function ArchivedTree() {
         <ArchivedTreePanel
           selection={selection}
           onClose={clearSelection}
+          onOpenMap={(_category, branch, version) => navigate(
+            `/dashboard/archivedTree/${encodeURIComponent(version.id)}/difference?branch=${encodeURIComponent(branch.key)}&mode=open`,
+            { state: location.state },
+          )}
           onViewDifference={(_category, branch, version) => navigate(
             `/dashboard/archivedTree/${encodeURIComponent(version.id)}/difference?branch=${encodeURIComponent(branch.key)}`,
             { state: location.state },
@@ -166,13 +169,6 @@ export default function ArchivedTree() {
               expectedBranchVersion: branch.resourceVersion,
             });
             clearSelection();
-            setReloadVersion((current) => current + 1);
-          }}
-          onRevertVersion={async (branch, version) => {
-            await revertArchiveBranch(branch.key, version.id, {
-              versionId: version.versionId,
-              expectedBranchVersion: branch.resourceVersion,
-            });
             setReloadVersion((current) => current + 1);
           }}
         />

@@ -670,6 +670,14 @@ export async function getArchiveTreeRecords() {
         .sort((left, right) => new Date(right.mergedAt) - new Date(left.mergedAt));
 }
 
+export async function getArchiveVersionGeometry(versionId, { signal } = {}) {
+    const response = await fetch(
+        `/api/workspace/archive-tree/versions/${encodeURIComponent(versionId)}/geometry?representation=display`,
+        { credentials: "include", signal },
+    );
+    return handleResponse(response);
+}
+
 async function mutateArchiveTree(path, method, body) {
     const response = await fetch(path, {
         method,
@@ -678,7 +686,12 @@ async function mutateArchiveTree(path, method, body) {
         body: JSON.stringify(body),
     });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || "Archived Tree update failed.");
+    if (!response.ok) {
+        const error = new Error(payload.error || "Archived Tree update failed.");
+        error.code = payload.code ?? null;
+        error.status = response.status;
+        throw error;
+    }
     return payload;
 }
 
@@ -691,25 +704,27 @@ export function deleteArchiveBranch(branchKey, { branchId, expectedBranchVersion
             { expectedBranchVersion },
         );
     }
-    return mutateArchiveTree("/api/workspace/archive/branch", "DELETE", { branchKey });
+    const error = new Error(`Archive branch ${branchKey} has not been migrated to archive v2.`);
+    error.code = "ARCHIVE_V2_MIGRATION_REQUIRED";
+    return Promise.reject(error);
 }
 
 /** Durable Archive Tree latest-version mutation via the commissioner-only API. */
 export function revertArchiveBranch(branchKey, submissionId, {
     versionId,
     expectedBranchVersion,
+    expectedMapRevision,
 } = {}) {
     if (versionId && expectedBranchVersion) {
         return mutateArchiveTree(
             `/api/workspace/archive/versions/${encodeURIComponent(versionId)}/revert`,
             "POST",
-            { expectedBranchVersion },
+            { expectedBranchVersion, expectedMapRevision },
         );
     }
-    return mutateArchiveTree("/api/workspace/archive/branch/latest", "PATCH", {
-        branchKey,
-        submissionId,
-    });
+    const error = new Error(`Archive version ${submissionId} has not been migrated to archive v2.`);
+    error.code = "ARCHIVE_V2_MIGRATION_REQUIRED";
+    return Promise.reject(error);
 }
 
 export async function getArchivedMapProjections(dguid, { signal } = {}) {

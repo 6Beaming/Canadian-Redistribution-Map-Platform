@@ -3,7 +3,7 @@ import {
   AlertTriangle,
   ArrowLeftRight,
   CheckCircle2,
-  RotateCcw,
+  MapPinned,
   Trash2,
   X,
 } from "lucide-react";
@@ -14,20 +14,11 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? "Unknown" : date.toLocaleString();
 }
 
-function ConfirmationModal({ mode, version, onCancel, onConfirm }) {
+function ConfirmationModal({ onCancel, onConfirm }) {
   const [confirmation, setConfirmation] = useState("");
-  const [seconds, setSeconds] = useState(mode === "revert" ? 5 : 0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (mode !== "revert" || seconds <= 0) return undefined;
-    const timer = window.setTimeout(() => setSeconds((current) => current - 1), 1000);
-    return () => window.clearTimeout(timer);
-  }, [mode, seconds]);
-
-  const isDelete = mode === "delete";
-  const canConfirm = !isSubmitting && (isDelete ? confirmation === "I confirm" : seconds === 0);
+  const canConfirm = !isSubmitting && confirmation === "I confirm";
 
   async function confirm() {
     if (!canConfirm) return;
@@ -44,42 +35,32 @@ function ConfirmationModal({ mode, version, onCancel, onConfirm }) {
   return (
     <div className="archive-modal-backdrop" role="presentation" onMouseDown={onCancel}>
       <section
-        className={`archive-modal archive-modal--${mode}`}
+        className="archive-modal archive-modal--delete"
         role="dialog"
         aria-modal="true"
         aria-labelledby="archive-modal-title"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <span className="archive-modal__icon">
-          {isDelete ? <AlertTriangle aria-hidden="true" /> : <RotateCcw aria-hidden="true" />}
+          <AlertTriangle aria-hidden="true" />
         </span>
-        <h2 id="archive-modal-title">{isDelete ? "Delete this branch forever?" : `Revert to ${version?.label}?`}</h2>
-        <p>
-          {isDelete
-            ? "All versions of DA changes stored in this branch will be cleared. All related submissions will be initialized as new (pending) submissions."
-            : "This historical version will become the branch's Latest Version in this local milestone."}
-        </p>
-        {isDelete ? (
-          <label>
-            <span style={{ textAlign: "center", display: "block" }}>Type <strong>'I confirm'</strong> to continue</span>
-            <input
-              autoFocus
-              value={confirmation}
-              onChange={(event) => setConfirmation(event.target.value)}
-              placeholder="I confirm"
-            />
-          </label>
-        ) : (
-          <p className="archive-modal__countdown" aria-live="polite">
-            {seconds > 0 ? `Confirmation unlocks in ${seconds} second${seconds === 1 ? "" : "s"}.` : "Revert is ready."}
-          </p>
-        )}
+        <h2 id="archive-modal-title">Delete this branch forever?</h2>
+        <p>All archive-only versions in this branch will be cleared. Its source submissions will return to Pending and retain their original submission geometry operations.</p>
+        <label>
+          <span style={{ textAlign: "center", display: "block" }}>Type <strong>'I confirm'</strong> to continue</span>
+          <input
+            autoFocus
+            value={confirmation}
+            onChange={(event) => setConfirmation(event.target.value)}
+            placeholder="I confirm"
+          />
+        </label>
         {error ? <p className="archive-modal__error" role="alert">{error}</p> : null}
         <div className="archive-modal__actions">
           <button type="button" className="is-secondary" disabled={isSubmitting} onClick={onCancel}>Cancel</button>
-          <button type="button" className={isDelete ? "is-delete" : "is-revert"} disabled={!canConfirm} onClick={confirm}>
-            {isDelete ? <Trash2 aria-hidden="true" /> : <RotateCcw aria-hidden="true" />}
-            {isSubmitting ? "Saving..." : isDelete ? "Delete Forever" : "Confirm Revert"}
+          <button type="button" className="is-delete" disabled={!canConfirm} onClick={confirm}>
+            <Trash2 aria-hidden="true" />
+            {isSubmitting ? "Saving..." : "Delete Forever"}
           </button>
         </div>
       </section>
@@ -87,7 +68,7 @@ function ConfirmationModal({ mode, version, onCancel, onConfirm }) {
   );
 }
 
-export function ArchivedTreePanel({ selection, onClose, onDeleteBranch, onRevertVersion, onViewDifference }) {
+export function ArchivedTreePanel({ selection, onClose, onDeleteBranch, onOpenMap, onViewDifference }) {
   const [modal, setModal] = useState(null);
 
   useEffect(() => setModal(null), [selection?.branch?.key]);
@@ -129,7 +110,7 @@ export function ArchivedTreePanel({ selection, onClose, onDeleteBranch, onRevert
         <dt>Updated By</dt><dd>{version.mergedBy}</dd>
       </dl>
 
-      <button type="button" className="archive-delete-button" onClick={() => setModal({ mode: "delete" })}>
+      <button type="button" className="archive-delete-button" onClick={() => setModal(true)}>
         <AlertTriangle aria-hidden="true" /> Delete Forever
       </button>
 
@@ -146,12 +127,15 @@ export function ArchivedTreePanel({ selection, onClose, onDeleteBranch, onRevert
                   <small>Updated by {entry.mergedBy}</small>
                 </div>
                 <div className="archive-version-history__actions">
-                  <button type="button" onClick={() => onViewDifference(category, branch, entry)}>
-                    <ArrowLeftRight aria-hidden="true" /> View Difference
-                  </button>
-                  <button type="button" disabled={entryIsLatest} onClick={() => setModal({ mode: "revert", version: entry })}>
-                    <RotateCcw aria-hidden="true" /> Revert
-                  </button>
+                  {entryIsLatest ? (
+                    <button type="button" onClick={() => onOpenMap(category, branch, entry)}>
+                      <MapPinned aria-hidden="true" /> Open the map view
+                    </button>
+                  ) : (
+                    <button type="button" onClick={() => onViewDifference(category, branch, entry)}>
+                      <ArrowLeftRight aria-hidden="true" /> View difference and revert
+                    </button>
+                  )}
                 </div>
               </article>
             );
@@ -159,21 +143,12 @@ export function ArchivedTreePanel({ selection, onClose, onDeleteBranch, onRevert
         </div>
       </section>
 
-      {!isLatest ? (
-        <button type="button" className="archive-panel-revert" onClick={() => setModal({ mode: "revert", version })}>
-          <RotateCcw aria-hidden="true" /> Revert to {version.label}
-        </button>
-      ) : null}
-
       {modal ? (
         <ConfirmationModal
-          key={`${modal.mode}:${modal.version?.id ?? branch.key}`}
-          mode={modal.mode}
-          version={modal.version}
+          key={branch.key}
           onCancel={() => setModal(null)}
           onConfirm={async () => {
-            if (modal.mode === "delete") await onDeleteBranch(branch);
-            else await onRevertVersion(branch, modal.version);
+            await onDeleteBranch(branch);
             setModal(null);
           }}
         />

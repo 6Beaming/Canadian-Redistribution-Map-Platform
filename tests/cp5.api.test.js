@@ -415,6 +415,12 @@ test("Archived Tree JSON exports complete ordered snapshots and is Commissioner-
           maybeSingle() { return Promise.resolve({ data: { sequence: 3, release_id: "statscan-da-2021-r1" }, error: null }); },
         };
       }
+      if (table === "archive_map_da_heads") {
+        return {
+          select() { return this; },
+          eq() { return Promise.resolve({ data: [], error: null }); },
+        };
+      }
       if (table === "profiles") {
         return {
           select() { return this; },

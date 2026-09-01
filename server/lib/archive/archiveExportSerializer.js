@@ -22,7 +22,7 @@ async function loadVersionGeometry(supabase, versionId) {
 export async function streamArchiveTreeExport(res, supabase) {
   const release = loadCurrentCanonicalRelease();
   const { records } = await listArchiveTreeRecords(supabase);
-  const snapshot = await getArchivedMapSnapshot(supabase, { dguids: [] });
+  const snapshot = await getArchivedMapSnapshot(supabase, { dguids: [], includeAllHeads: true });
   const branchesByKey = new Map();
 
   for (const record of records) {
@@ -99,28 +99,22 @@ export async function streamArchiveTreeExport(res, supabase) {
       };
 
       if (branch.submissionType === "comment") {
-        try {
-          const { feature } = await readExactDaFeature(release, branch.primaryDguid);
-          exportVersion.baseFeature = feature;
-        } catch {
-          exportVersion.baseFeature = null;
-        }
+        const { feature } = await readExactDaFeature(release, branch.primaryDguid);
+        exportVersion.baseFeature = feature;
       } else if (branch.submissionType === "objection") {
-        try {
-          const pair = await readCanonicalDaPair(
-            release,
-            branch.primaryDguid,
-            branch.secondaryDguid,
-            { representation: "display" },
-          );
-          exportVersion.basePair = pair.features;
-          exportVersion.sharedBoundary = pair.sharedBoundary;
-        } catch {
-          exportVersion.basePair = null;
-          exportVersion.sharedBoundary = null;
-        }
+        const pair = await readCanonicalDaPair(
+          release,
+          branch.primaryDguid,
+          branch.secondaryDguid,
+          { representation: "display" },
+        );
+        exportVersion.basePair = pair.features;
+        exportVersion.sharedBoundary = pair.sharedBoundary;
       } else if (branch.submissionType === "counter_proposal" && version.versionId) {
         const geometry = await loadVersionGeometry(supabase, version.versionId);
+        if (!geometry?.result_geometry) {
+          throw new Error(`Archived Counter-Proposal version ${version.versionId} has no exact geometry snapshot.`);
+        }
         exportVersion.resultGeometry = geometry?.result_geometry ?? null;
         exportVersion.displayGeometry = geometry?.display_geometry ?? null;
         exportVersion.validationReport = geometry?.validation_report ?? null;

@@ -5,6 +5,7 @@ import {
   geometryDigest,
   normalizeArchiveSubmissionType,
 } from "../server/lib/archive/archiveMaterializer.js";
+import fs from "node:fs";
 
 test("buildArchiveBranchKey canonicalizes comment and pair branches", () => {
   assert.equal(
@@ -39,4 +40,28 @@ test("geometryDigest is stable for equivalent object key order", () => {
   const right = geometryDigest({ a: 1, b: 2 });
   assert.equal(left, right);
   assert.match(left, /^sha256:[a-f0-9]{64}$/);
+});
+
+test("archive v2 transitions persist vertex state and preserve unrelated DA head geometry", () => {
+  const migration = fs.readFileSync(
+    "supabase/migrations/20260901100000_archive_v2_transition_rpcs.sql",
+    "utf8",
+  );
+  assert.match(migration, /insert into public\.archive_vertex_state/);
+  assert.match(migration, /branchVertexSnapshot'->'vertices'/);
+  assert.match(migration, /message = 'STALE_ARCHIVE_MAP'/);
+  assert.match(migration, /else cp_payload->'headGeometry'->affected_dguid/);
+  assert.doesNotMatch(migration, /where release_id = release_id/);
+});
+
+test("Delete Forever reinitializes sources and writes a Workspace system note", () => {
+  const migration = fs.readFileSync(
+    "supabase/migrations/20260901100000_archive_v2_transition_rpcs.sql",
+    "utf8",
+  );
+  assert.match(migration, /status = 'pending'/);
+  assert.match(migration, /archive_branch_reinitialized/);
+  assert.match(migration, /delete from public\.workspace_archive_requests/);
+  assert.match(migration, /delete from public\.archive_source_revisions/);
+  assert.match(migration, /delete from public\.archive_branches/);
 });

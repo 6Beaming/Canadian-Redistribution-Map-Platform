@@ -9,6 +9,7 @@ function parseDguidList(values) {
 export async function getArchivedMapSnapshot(supabase, {
   dguids: requestedDguids,
   expectedRevision,
+  includeAllHeads = false,
 } = {}) {
   const release = loadCurrentCanonicalRelease();
   const releaseId = release.manifest.releaseId;
@@ -41,12 +42,13 @@ export async function getArchivedMapSnapshot(supabase, {
   }
 
   let heads = [];
-  if (dguids.length) {
-    const { data, error } = await supabase
+  if (dguids.length || includeAllHeads) {
+    let query = supabase
       .from("archive_map_da_heads")
       .select("dguid, uses_base, display_geometry, geometry_digest, resource_version, last_map_revision_sequence")
-      .eq("release_id", releaseId)
-      .in("dguid", dguids);
+      .eq("release_id", releaseId);
+    if (dguids.length) query = query.in("dguid", dguids);
+    const { data, error } = await query;
     if (error) {
       throw archiveError(error.message || "Unable to load archived map heads.", {
         code: "ARCHIVE_MAP_HEADS_FAILED",

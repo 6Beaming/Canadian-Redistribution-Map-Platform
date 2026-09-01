@@ -87,16 +87,6 @@ router.get("/archive", async (_req, res) => {
   })));
 });
 
-function archiveRpcError(res, error, fallbackMessage) {
-  const migrationMissing = ["PGRST202", "42883"].includes(error?.code);
-  const notFound = error?.code === "P0002";
-  return res.status(migrationMissing ? 503 : notFound ? 404 : 500).json({
-    error: migrationMissing
-      ? "Archived Tree version functions are not installed. Apply supabase/migrations/20260719180000_archive_tree_supabase_versions.sql."
-      : error?.message || fallbackMessage,
-  });
-}
-
 // Atomic Supabase merge: snapshot, version ordering, Latest state, Workspace
 // cleanup, and submission status change happen in one PostgreSQL transaction.
 router.post("/archive", async (req, res) => {
@@ -130,50 +120,26 @@ router.post("/archive", async (req, res) => {
     }
   }
 
-  const { data: archived, error: archiveError } = await supabase.rpc(
-    "merge_submission_into_archive",
-    {
-      target_submission_id: submissionId,
-      target_merged_by: req.user.id,
-      target_closing_comment: req.body?.closingComment ?? null,
-    },
-  );
-
-  if (archiveError) return archiveRpcError(res, archiveError, "Unable to merge the submission.");
-  return res.status(201).json(archived);
+  return res.status(409).json({
+    error: "An approved Archive Request with a sealed source revision is required.",
+    code: "ARCHIVE_REQUEST_NOT_APPROVED",
+  });
 });
 
-// Durable Revert action: the PostgreSQL RPC atomically replaces the branch's
-// single latest version and writes its revert audit fields.
+// Fail closed for pre-v2 clients; v2 reverts require an immutable version ID.
 router.patch("/archive/branch/latest", async (req, res) => {
-  const branchKey = String(req.body?.branchKey ?? "").trim();
-  const submissionId = String(req.body?.submissionId ?? "").trim();
-  if (!branchKey || !submissionId) {
-    return res.status(400).json({ error: "branchKey and submissionId are required." });
-  }
-
-  const supabase = getSupabaseAdminDataClient();
-  const { data, error } = await supabase.rpc("revert_archive_branch", {
-    target_branch_key: branchKey,
-    target_submission_id: submissionId,
-    target_reverted_by: req.user.id,
+  return res.status(410).json({
+    error: "The legacy branch revert route has been retired. Use an archive v2 version ID.",
+    code: "ARCHIVE_V2_REQUIRED",
   });
-  if (error) return archiveRpcError(res, error, "Unable to revert the archived branch.");
-  return res.json(data);
 });
 
-// Durable destructive Delete Forever action. The RPC deletes the complete
-// archived branch and its source submissions; introduce soft delete for production.
+// Fail closed for pre-v2 clients; v2 reinitialization requires a branch UUID.
 router.delete("/archive/branch", async (req, res) => {
-  const branchKey = String(req.body?.branchKey ?? "").trim();
-  if (!branchKey) return res.status(400).json({ error: "branchKey is required." });
-
-  const supabase = getSupabaseAdminDataClient();
-  const { data, error } = await supabase.rpc("delete_archive_branch", {
-    target_branch_key: branchKey,
+  return res.status(410).json({
+    error: "The legacy branch delete route has been retired. Use an archive v2 branch ID.",
+    code: "ARCHIVE_V2_REQUIRED",
   });
-  if (error) return archiveRpcError(res, error, "Unable to delete the archived branch.");
-  return res.json({ deletedSubmissionIds: data ?? [] });
 });
 
 router.use(archiveTreeRouter);

@@ -85,6 +85,26 @@ async function loadGeometryRevisionBundle(supabase, submissionId) {
   return { revision, operations: operations ?? [] };
 }
 
+async function authorizeArchivedSubmission(supabase, submissionId, actorProfile) {
+  const { data: submission, error } = await supabase
+    .from("submissions")
+    .select("id,type,status,dguid,neighboring_dguid,user_id")
+    .eq("id", submissionId)
+    .maybeSingle();
+  if (error || !submission) {
+    throw archiveError("The archived source submission was not found.", {
+      statusCode: 404,
+      code: "NOT_FOUND",
+    });
+  }
+  await authorizeSubmissionScope(supabase, {
+    submission,
+    commissionerProfile: actorProfile,
+    requireClaim: false,
+  });
+  return submission;
+}
+
 export async function mergeApprovedArchiveRequest(supabase, {
   archiveRequestId,
   closingComment,
@@ -131,10 +151,17 @@ export async function mergeApprovedArchiveRequest(supabase, {
   if (submissionType === "counter_proposal") {
     const { revision, operations } = await loadGeometryRevisionBundle(supabase, submission.id);
     assertCounterProposalGeometryReady(revision);
+    if (revision.release_id !== release.manifest.releaseId) {
+      throw archiveError("Counter-Proposal geometry belongs to a different immutable map release.", {
+        statusCode: 409,
+        code: "ARCHIVE_SOURCE_RELEASE_MISMATCH",
+      });
+    }
     payload.counterProposal = await buildCounterProposalMergePayload(supabase, {
       releaseId: release.manifest.releaseId,
       primaryDguid: revision.primary_dguid,
       secondaryDguid: revision.secondary_dguid,
+      branchKey,
       geometryRevision: revision,
       operations,
     });
@@ -178,24 +205,21 @@ export async function revertArchiveVersion(supabase, {
 
   const branch = version.archive_branches;
   assertExpectedBranchVersion(branch, expectedBranchVersion);
+  await authorizeArchivedSubmission(supabase, version.source_submission_id, actorProfile);
 
   let payload = {};
   if (branch.submission_type === "counter_proposal") {
     const targetSnapshot = version.branch_vertex_snapshot;
-    const { revision, operations } = await loadGeometryRevisionBundle(
-      supabase,
-      version.source_submission_id,
-    );
-    assertCounterProposalGeometryReady(revision);
     payload.counterProposal = await buildCounterProposalRevertPayload(supabase, {
       releaseId: branch.release_id,
       primaryDguid: branch.primary_dguid,
       secondaryDguid: branch.secondary_dguid,
+      branchId: branch.id,
+      branchKey: branch.branch_key,
       targetVertexSnapshot: targetSnapshot,
-      geometryRevision: revision,
-      operations,
     });
     validateCounterProposalDigests(payload.counterProposal);
+    expectedMapRevision ??= payload.counterProposal.expectedMapRevision;
   }
 
   const { data, error } = await supabase.rpc("revert_archive_version_v2", {
@@ -208,7 +232,11 @@ export async function revertArchiveVersion(supabase, {
   if (error) {
     throw archiveError(error.message || "Unable to revert archive version.", {
       statusCode: 409,
-      code: "ARCHIVE_REVERT_FAILED",
+      code: error.message?.includes("STALE_ARCHIVE_MAP")
+        ? "STALE_ARCHIVE_MAP"
+        : error.message?.includes("STALE_ARCHIVE_BRANCH")
+          ? "STALE_ARCHIVE_BRANCH"
+          : "ARCHIVE_REVERT_FAILED",
     });
   }
   return data;
@@ -233,13 +261,31 @@ export async function reinitializeArchiveBranch(supabase, {
   }
   assertExpectedBranchVersion(branch, expectedBranchVersion);
 
+  const { data: sourceVersion, error: sourceVersionError } = await supabase
+    .from("archive_versions")
+    .select("source_submission_id")
+    .eq("branch_id", branch.id)
+    .not("source_submission_id", "is", null)
+    .limit(1)
+    .maybeSingle();
+  if (sourceVersionError || !sourceVersion?.source_submission_id) {
+    throw archiveError("Archive branch has no source submission.", {
+      statusCode: 409,
+      code: "ARCHIVE_SOURCE_MISSING",
+    });
+  }
+  await authorizeArchivedSubmission(supabase, sourceVersion.source_submission_id, actorProfile);
+
   let payload = {};
   if (branch.submission_type === "counter_proposal") {
     payload.counterProposal = await buildCounterProposalDeletePayload(supabase, {
       releaseId: branch.release_id,
       primaryDguid: branch.primary_dguid,
       secondaryDguid: branch.secondary_dguid,
+      branchId: branch.id,
+      branchKey: branch.branch_key,
     });
+    validateCounterProposalDigests(payload.counterProposal);
   }
 
   const { data, error } = await supabase.rpc("reinitialize_archive_branch_v2", {
@@ -251,7 +297,11 @@ export async function reinitializeArchiveBranch(supabase, {
   if (error) {
     throw archiveError(error.message || "Unable to reinitialize archive branch.", {
       statusCode: 409,
-      code: "ARCHIVE_DELETE_FAILED",
+      code: error.message?.includes("STALE_ARCHIVE_MAP")
+        ? "STALE_ARCHIVE_MAP"
+        : error.message?.includes("STALE_ARCHIVE_BRANCH")
+          ? "STALE_ARCHIVE_BRANCH"
+          : "ARCHIVE_DELETE_FAILED",
     });
   }
   return data;

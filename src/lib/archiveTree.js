@@ -89,7 +89,8 @@ export function buildArchiveTree(records, profilesByDguid = new Map(), latestOve
     };
 
     existing.versions.push({
-      id: String(submission.id),
+      id: String(record.versionId ?? submission.id),
+      sourceSubmissionId: String(submission.id),
       versionId: record.versionId ?? null,
       branchId: record.branchId ?? null,
       resourceVersion: record.resourceVersion ?? 1,

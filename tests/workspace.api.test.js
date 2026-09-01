@@ -159,7 +159,7 @@ test("a missing archive table is exposed as an empty archive tree", async () => 
   assert.equal(JSON.stringify(response.body), "[]");
 });
 
-test("a commissioner archive merge uses the atomic Supabase function", async () => {
+test("archive merge rejects a submission without an approved sealed Archive Request", async () => {
   let called;
   setSupabaseTestDoubles({
     getSupabaseClient: () => ({
@@ -189,12 +189,12 @@ test("a commissioner archive merge uses the atomic Supabase function", async () 
     body: { submissionId: "00000000-0000-4000-8000-000000000001", closingComment: { content: "Merged" } },
   });
 
-  assert.equal(response.status, 201);
-  assert.equal(called.name, "merge_submission_into_archive");
-  assert.equal(called.values.target_merged_by, commissioner.id);
+  assert.equal(response.status, 409);
+  assert.equal(response.body.code, "ARCHIVE_REQUEST_NOT_APPROVED");
+  assert.equal(called, undefined);
 });
 
-test("a commissioner can persist an Archived Tree revert", async () => {
+test("legacy branch-key Archived Tree revert is retired", async () => {
   let called;
   setSupabaseTestDoubles({
     getSupabaseClient: () => ({
@@ -214,12 +214,12 @@ test("a commissioner can persist an Archived Tree revert", async () => {
     body: { branchKey: "feedback:60010001", submissionId: "00000000-0000-4000-8000-000000000001" },
   });
 
-  assert.equal(response.status, 200);
-  assert.equal(called.name, "revert_archive_branch");
-  assert.equal(called.values.target_reverted_by, commissioner.id);
+  assert.equal(response.status, 410);
+  assert.equal(response.body.code, "ARCHIVE_V2_REQUIRED");
+  assert.equal(called, undefined);
 });
 
-test("a commissioner can permanently delete an Archived Tree branch", async () => {
+test("legacy branch-key Archived Tree delete is retired", async () => {
   let called;
   setSupabaseTestDoubles({
     getSupabaseClient: () => ({
@@ -239,7 +239,7 @@ test("a commissioner can permanently delete an Archived Tree branch", async () =
     body: { branchKey: "feedback:60010001" },
   });
 
-  assert.equal(response.status, 200);
-  assert.equal(called.name, "delete_archive_branch");
-  assert.equal(response.body.deletedSubmissionIds.length, 1);
+  assert.equal(response.status, 410);
+  assert.equal(response.body.code, "ARCHIVE_V2_REQUIRED");
+  assert.equal(called, undefined);
 });
