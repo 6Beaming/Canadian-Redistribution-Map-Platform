@@ -6,6 +6,7 @@ export const MAP_INTERACTION_MODE = Object.freeze({
   OBJECTION_FOCUS: "objection-focus",
   COUNTER_EDIT: "counter-edit",
   COUNTER_REVIEW: "counter-review",
+  SUBMISSION_READONLY: "submission-readonly",
 });
 
 export function isMapFeatureInteractionLocked(mode) {
@@ -13,6 +14,7 @@ export function isMapFeatureInteractionLocked(mode) {
     MAP_INTERACTION_MODE.OBJECTION_FOCUS,
     MAP_INTERACTION_MODE.COUNTER_EDIT,
     MAP_INTERACTION_MODE.COUNTER_REVIEW,
+    MAP_INTERACTION_MODE.SUBMISSION_READONLY,
   ].includes(mode);
 }
 

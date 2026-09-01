@@ -39,10 +39,22 @@
   position: fixed;
   inset: 0;
   z-index: 1000;
-  padding: 16px;
+  padding: 0;
   background: rgba(241, 246, 254, 0.96);
   backdrop-filter: blur(16px);
   height: 100dvh;
+}
+
+.app-route-content--fullscreen .map-page {
+  height: 100dvh;
+  padding: 0;
+}
+
+.map-dashboard--fullscreen .map-canvas,
+.map-dashboard--fullscreen .map-canvas::before,
+.map-dashboard--fullscreen .map-canvas__viewport,
+.map-dashboard--fullscreen > .map-info-panel {
+  border-radius: 0;
 }
 
 .map-dashboard__main {

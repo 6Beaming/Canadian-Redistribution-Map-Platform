@@ -131,7 +131,7 @@ test("CP5 navigation, readiness loading, and export entry points remain wired", 
   assert.equal(dashboard.includes("RouteLoadingOverlay"), false);
 });
 
-test("Shared loading UI overlays and blocks page content while leaving the header active", () => {
+test("Shared loading UI blocks page content and fullscreen owns Header visibility", () => {
   const app = read("src/App.jsx");
   const header = read("src/pages/Header.jsx");
   const overlay = read("src/components/non_prebuilt/RouteLoadingOverlay.jsx");
@@ -141,7 +141,7 @@ test("Shared loading UI overlays and blocks page content while leaving the heade
   const globals = read("src/styles/globals.css");
   const archivedStyles = read("src/styles/archive-tree.css");
 
-  assert.match(app, /<Header[\s\S]*<div className="app-route-content">[\s\S]*<RouteLoadingOverlay \/>/);
+  assert.match(app, /!isFullscreen \? <Header[\s\S]*app-route-content--fullscreen[\s\S]*<RouteLoadingOverlay \/>/);
   assert.ok(app.indexOf("<Header") < app.indexOf("<RouteLoadingOverlay />"));
   assert.match(overlay, /aria-label="Loading"[\s\S]*<span>Loading\.\.\.<\/span>/);
   assert.match(loadingPage, /<span>\{error \|\| "Loading\.\.\."\}<\/span>/);

@@ -165,6 +165,7 @@ function createFullscreenControl(buttonRef, getIsFullscreen, onToggle) {
         "aria-label",
         getIsFullscreen() ? "Exit fullscreen map" : "Expand map to fullscreen"
       );
+      button.setAttribute("aria-pressed", String(getIsFullscreen()));
       button.title = getIsFullscreen() ? "Exit fullscreen" : "Fullscreen";
       button.addEventListener("click", onToggle);
 
@@ -552,6 +553,7 @@ export function MapCanvas({
   workflowFocusDguids = [],
   focusGeoJson = null,
   focusMaxZoom = 15,
+  loadSubmissionCount = true,
 }) {
   const [heatmapEnabled, setHeatmapEnabled] = useState(false);
   const [archivedMapEnabled, setArchivedMapEnabled] = useState(initialArchivedMapEnabled);
@@ -682,6 +684,8 @@ export function MapCanvas({
   }
 
   useEffect(() => {
+    if (!loadSubmissionCount) return undefined;
+
     async function fetchTotalSubmissions() {
       try {
         const data = await getTotalComments();
@@ -694,7 +698,8 @@ export function MapCanvas({
     }
 
     fetchTotalSubmissions();
-  }, [heatmap, totalSubmissions]);
+    return undefined;
+  }, [heatmap, loadSubmissionCount, totalSubmissions]);
 
   useEffect(() => {
     const button = fullscreenBtnRef.current;
@@ -706,6 +711,7 @@ export function MapCanvas({
       "aria-label",
       isFullscreen ? "Exit fullscreen map" : "Expand map to fullscreen"
     );
+    button.setAttribute("aria-pressed", String(isFullscreen));
   }, [isFullscreen]);
 
   useEffect(() => {
@@ -903,6 +909,21 @@ export function MapCanvas({
 
     return () => cancelAnimationFrame(frame);
   }, [isFullscreen]);
+
+  useEffect(() => {
+    const resizeMap = () => {
+      const map = mapRef.current;
+      if (!map) return;
+      window.requestAnimationFrame(() => map.resize());
+    };
+
+    window.addEventListener("resize", resizeMap);
+    window.addEventListener("orientationchange", resizeMap);
+    return () => {
+      window.removeEventListener("resize", resizeMap);
+      window.removeEventListener("orientationchange", resizeMap);
+    };
+  }, []);
 
   useEffect(() => {
     const map = mapRef.current;

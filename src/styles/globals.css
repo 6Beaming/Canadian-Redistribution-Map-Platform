@@ -162,6 +162,10 @@ button:disabled {
   isolation: isolate;
 }
 
+.app-route-content--fullscreen {
+  min-height: 100dvh;
+}
+
 .route-loading-overlay,
 .route-loading-page {
   position: fixed;
