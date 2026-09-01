@@ -570,15 +570,22 @@ export async function getSubmissionHeatmap() {
     return { countsByDguid };
 }
 
-/** Hybrid DA-card query used by the Dashboard InfoPanel. */
-export async function getDashboardSubmissionsForDguid(dguid) {
+/** Dashboard-only DA-card query; the server filters DGUID and scope in SQL. */
+export async function getDashboardSubmissionsForDguid(dguid, { signal } = {}) {
     const target = String(dguid ?? "");
     if (!target) return { comments: [], objections: [], counterProposals: [] };
-    const submissions = await getWorkspaceSubmissions({ includeArchived: false });
-    const active = submissions.filter((submission) =>
-        [WORKSPACE_STATUS.PENDING, WORKSPACE_STATUS.ARCHIVE_REQUEST].includes(submission.status) &&
-        [submission.dguid, submission.neighboring_dguid].some((value) => String(value ?? "") === target),
-    );
+    const response = await fetch(`/api/workspace/dashboard/areas/${encodeURIComponent(target)}`, {
+        credentials: "include",
+        signal,
+    });
+    const payload = await handleResponse(response);
+    const active = Array.isArray(payload?.submissions)
+        ? payload.submissions.map((submission) => ({
+            ...submission,
+            authorEmail: submission.author?.email ?? "Unknown submitter",
+            status: normalizeWorkspaceStatus(submission.status),
+        }))
+        : [];
 
     return {
         comments: active.filter((submission) => ["feedback", "comment"].includes(normalizeType(submission.type))),

@@ -4,6 +4,7 @@ import {
   getSupabaseProfileEmailsAsAdmin,
 } from "../lib/supabase.js";
 import { requireAuth } from "../middleware/requireAuth.js";
+import { queryDashboardAreaSubmissions } from "../lib/submissions/dashboardAreaQuery.js";
 
 const router = Router();
 function requireCommissioner(req, res, next) {
@@ -16,6 +17,21 @@ function requireCommissioner(req, res, next) {
 }
 
 router.use(requireAuth, requireCommissioner);
+
+router.get("/dashboard/areas/:dguid", async (req, res) => {
+  try {
+    const result = await queryDashboardAreaSubmissions(getSupabaseAdminDataClient(), {
+      dguid: req.params.dguid,
+      commissionerProfile: req.profile,
+    });
+    return res.json(result);
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.message || "Unable to load Dashboard submissions.",
+      ...(error.code ? { code: error.code } : {}),
+    });
+  }
+});
 
 // REUSED DATA: commissioner identities already live in public.profiles. This
 // lightweight endpoint exposes only email addresses needed by archive voting.

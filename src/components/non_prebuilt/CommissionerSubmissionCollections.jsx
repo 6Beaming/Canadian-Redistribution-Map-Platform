@@ -82,25 +82,38 @@ export function CommissionerSubmissionCollections({ panelView, selection, profil
     counterProposals: [],
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
-    let isMounted = true;
     if (selection?.type !== "da") return undefined;
+    const controller = new AbortController();
+    let requestId = 0;
 
     const load = () => {
+      const activeRequestId = ++requestId;
       setIsLoading(true);
-      return getDashboardSubmissionsForDguid(selection.dguid)
+      setLoadError("");
+      return getDashboardSubmissionsForDguid(selection.dguid, { signal: controller.signal })
         .then((nextCollections) => {
-          if (isMounted) setCollections(nextCollections);
+          if (!controller.signal.aborted && activeRequestId === requestId) {
+            setCollections(nextCollections);
+          }
+        })
+        .catch((error) => {
+          if (error?.name !== "AbortError" && !controller.signal.aborted && activeRequestId === requestId) {
+            setLoadError(error.message || "Unable to load submissions.");
+            setCollections({ comments: [], objections: [], counterProposals: [] });
+          }
         })
         .finally(() => {
-          if (isMounted) setIsLoading(false);
+          if (!controller.signal.aborted && activeRequestId === requestId) setIsLoading(false);
         });
     };
-    load();
-    const unsubscribe = subscribeWorkspaceState(load);
+    void load();
+    const unsubscribe = subscribeWorkspaceState(() => void load());
     return () => {
-      isMounted = false;
+      requestId += 1;
+      controller.abort();
       unsubscribe();
     };
   }, [selection?.dguid, selection?.type]);
@@ -131,7 +144,10 @@ export function CommissionerSubmissionCollections({ panelView, selection, profil
 
         <div className="map-info-panel__collection-stack">
           {isLoading ? <p className="map-info-panel__empty">Loading submissions...</p> : null}
-          {!isLoading && !submissions.length ? (
+          {!isLoading && loadError ? (
+            <p className="map-info-panel__empty" role="alert">{loadError}</p>
+          ) : null}
+          {!isLoading && !loadError && !submissions.length ? (
             <p className="map-info-panel__empty">No Submission Found</p>
           ) : null}
           {submissions.map((submission) => (
