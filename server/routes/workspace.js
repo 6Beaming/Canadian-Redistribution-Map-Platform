@@ -6,6 +6,7 @@ import {
 import { requireAuth } from "../middleware/requireAuth.js";
 import { resolveCommissionerFedContext } from "../lib/authorization/commissionerAreaContext.js";
 import { queryDashboardAreaSubmissions } from "../lib/submissions/dashboardAreaQuery.js";
+import archiveTreeRouter from "./archiveTree.js";
 
 const router = Router();
 function requireCommissioner(req, res, next) {
@@ -149,5 +150,7 @@ router.delete("/archive/branch", async (req, res) => {
   if (error) return archiveRpcError(res, error, "Unable to delete the archived branch.");
   return res.json({ deletedSubmissionIds: data ?? [] });
 });
+
+router.use(archiveTreeRouter);
 
 export default router;

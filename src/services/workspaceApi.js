@@ -613,26 +613,53 @@ export async function getDashboardSubmissionsForDguid(dguid, { signal } = {}) {
 }
 
 async function getRemoteArchiveTreeRecords() {
-    const response = await fetch("/api/workspace/archive", { credentials: "include" });
+    const response = await fetch("/api/workspace/archive-tree", { credentials: "include" });
     if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
         throw new Error(payload.error || "Unable to load the Archived Tree from Supabase.");
     }
-    const records = await response.json();
-    return Array.isArray(records) ? records.map((record) => ({
+    const payload = await response.json();
+    const records = Array.isArray(payload?.records) ? payload.records : [];
+    return records.map((record) => ({
         submission: {
-            ...(record.submission_snapshot ?? {}),
+            ...(record.submission ?? {}),
             status: WORKSPACE_STATUS.ARCHIVED,
         },
-        branchKey: record.branch_key ?? null,
-        versionNumber: Number(record.version_number) || null,
-        isLatest: Boolean(record.is_latest),
-        revertedAt: record.reverted_at ?? null,
-        revertedBy: record.reverted_by_email ?? record.reverted_by ?? null,
-        mergedBy: record.merged_by_email ?? record.merged_by ?? "Unknown commissioner",
-        mergedAt: record.merged_at,
-        closingComment: record.closing_comment ?? null,
-    })) : [];
+        branchKey: record.branchKey ?? null,
+        versionNumber: Number(record.versionNumber) || null,
+        isLatest: Boolean(record.isLatest),
+        revertedAt: record.revertedAt ?? null,
+        revertedBy: record.revertedBy ?? null,
+        mergedBy: record.mergedBy ?? "Unknown commissioner",
+        mergedAt: record.mergedAt,
+        closingComment: record.closingComment ?? null,
+        versionId: record.versionId ?? null,
+        branchId: record.branchId ?? null,
+        releaseId: record.releaseId ?? null,
+    }));
+}
+
+/** Latest archived map overlay from archive_map_da_heads when available. */
+export async function getArchivedMapSnapshot(dguids = [], { expectedRevision, signal } = {}) {
+    const params = new URLSearchParams();
+    if (Array.isArray(dguids) && dguids.length) {
+        params.set("dguids", dguids.join(","));
+    }
+    if (expectedRevision !== undefined && expectedRevision !== null && expectedRevision !== "") {
+        params.set("expectedRevision", String(expectedRevision));
+    }
+    const query = params.toString();
+    const response = await fetch(`/api/workspace/archive-map${query ? `?${query}` : ""}`, {
+        credentials: "include",
+        signal,
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        const error = new Error(payload.error || "Unable to load the archived map.");
+        error.code = payload.code ?? null;
+        throw error;
+    }
+    return payload;
 }
 
 /** Durable Archived Tree read. This path intentionally does not use localStorage. */
