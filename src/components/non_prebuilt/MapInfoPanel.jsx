@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart3,
   ChevronDown,
+  ChevronLeft,
   Flag,
   GitCompareArrows,
   MessageSquareText,
@@ -12,6 +13,7 @@ import UserMakeComments from "@/pages/UserMakeComments.jsx";
 import UserMakeObjection from "@/pages/UserMakeObjection.jsx";
 import UserMakeCounterProposal from "@/pages/UserMakeCounterProposal.jsx";
 import { CommissionerSubmissionCollections } from "@/components/non_prebuilt/CommissionerSubmissionCollections.jsx";
+import { PanelErrorBoundary } from "@/components/non_prebuilt/PanelErrorBoundary.jsx";
 import { MVP_FED_NUM } from "@/lib/map/constants.js";
 import { getDaPanelTitle } from "@/lib/map/profileUtils.js";
 import {
@@ -98,10 +100,10 @@ function PanelModeSelector({ activeView, onViewChange, variant, workflowLocked =
 
   return (
     <div className="map-info-panel__mode-selector">
-      <div ref={selectorRef} className="map-info-panel__mode-control relative">
+      <div ref={selectorRef} className="map-info-panel__mode-control panel-select relative">
         <button
           type="button"
-          className="map-info-panel__mode-trigger"
+          className="map-info-panel__mode-trigger panel-select__trigger"
           aria-haspopup="menu"
           aria-expanded={isOpen}
           aria-label={workflowLocked ? "Workflow selector is locked until you return to step 1" : undefined}
@@ -119,7 +121,7 @@ function PanelModeSelector({ activeView, onViewChange, variant, workflowLocked =
 
         {isOpen && !workflowLocked ? (
           <div
-            className="map-info-panel__mode-menu absolute left-0 top-full z-20 w-full"
+            className="map-info-panel__mode-menu panel-select__menu absolute left-0 top-full z-20 w-full"
             role="menu"
             aria-label="Choose workflow mode"
           >
@@ -132,7 +134,7 @@ function PanelModeSelector({ activeView, onViewChange, variant, workflowLocked =
                     key={view.id}
                     type="button"
                     role="menuitem"
-                    className="map-info-panel__mode-option"
+                    className="map-info-panel__mode-option panel-select__option"
                     onClick={() => handleSelect(view.id)}
                   >
                     <Icon className="map-info-panel__mode-icon" aria-hidden="true" />
@@ -571,12 +573,14 @@ export function MapInfoPanel({
 
     if (rolloutEnabled && rolloutCategoryId) {
       return (
-        <RolloutCategoryPanel
-          categoryId={rolloutCategoryId}
-          profilesByDguid={profilesByDguid}
-          onHoverTargetChange={onRolloutHoverChange}
-          onSelectTarget={onRolloutSelect}
-        />
+        <PanelErrorBoundary resetKey={rolloutCategoryId}>
+          <RolloutCategoryPanel
+            categoryId={rolloutCategoryId}
+            profilesByDguid={profilesByDguid}
+            onHoverTargetChange={onRolloutHoverChange}
+            onSelectTarget={onRolloutSelect}
+          />
+        </PanelErrorBoundary>
       );
     }
 

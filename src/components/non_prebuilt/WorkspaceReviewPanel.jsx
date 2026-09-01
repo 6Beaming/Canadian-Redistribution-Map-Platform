@@ -91,10 +91,11 @@ function SubmissionSelector({ submissions, activeId, onSelect }) {
   }, [isOpen]);
 
   return (
-    <div className="workspace-review-selector" ref={selectorRef}>
+    <div className="workspace-review-selector panel-select" ref={selectorRef}>
       <button
         type="button"
-        className="workspace-review-selector__trigger"
+        className="workspace-review-selector__trigger panel-select__trigger"
+        aria-haspopup="menu"
         aria-expanded={isOpen}
         onClick={() => setIsOpen((current) => !current)}
       >
@@ -103,11 +104,12 @@ function SubmissionSelector({ submissions, activeId, onSelect }) {
         <ChevronDown className={isOpen ? "is-open" : ""} aria-hidden="true" />
       </button>
       {isOpen ? (
-        <div className="workspace-review-selector__menu">
+        <div className="workspace-review-selector__menu panel-select__menu" role="menu">
           {submissions.map((submission) => (
             <button
               type="button"
-              className={String(submission.id) === String(activeId) ? "is-active" : ""}
+              className={`panel-select__option${String(submission.id) === String(activeId) ? " is-active" : ""}`}
+              role="menuitem"
               key={submission.id}
               onClick={() => {
                 setIsOpen(false);
@@ -597,10 +599,11 @@ function MemberCommentSelector({ activeAuthor, authors, onChange }) {
   }, [isOpen]);
 
   return (
-    <div className="workspace-review-selector workspace-member-selector" ref={selectorRef}>
+    <div className="workspace-review-selector workspace-member-selector panel-select" ref={selectorRef}>
       <button
         type="button"
-        className="workspace-review-selector__trigger workspace-member-selector__trigger"
+        className="workspace-review-selector__trigger workspace-member-selector__trigger panel-select__trigger"
+        aria-haspopup="menu"
         aria-expanded={isOpen}
         onClick={() => setIsOpen((current) => !current)}
       >
@@ -609,13 +612,14 @@ function MemberCommentSelector({ activeAuthor, authors, onChange }) {
         <ChevronDown className={isOpen ? "is-open" : ""} aria-hidden="true" />
       </button>
       {isOpen ? (
-        <div className="workspace-review-selector__menu workspace-member-selector__menu">
+        <div className="workspace-review-selector__menu workspace-member-selector__menu panel-select__menu" role="menu">
           {["all", ...authors].map((author) => {
             const optionLabel = author === "all" ? "All Members" : author;
             return (
               <button
                 type="button"
-                className={author === activeAuthor ? "is-active" : ""}
+                className={`panel-select__option${author === activeAuthor ? " is-active" : ""}`}
+                role="menuitem"
                 key={author}
                 onClick={() => {
                   onChange(author);
@@ -1069,7 +1073,7 @@ function DecisionControls({
         />
       </label>
       {error ? <p className="workspace-decision-error" role="alert">{error}</p> : null}
-      <div className="workspace-decision-actions">
+      <div className="workspace-decision-actions workflow-action-stack">
         {displayedStatus === WORKSPACE_STATUS.PENDING ? <>
           <button type="button" className="is-accept" disabled={isSubmitting} onClick={() => runAction("accept")}><Check />Accept</button>
           <button type="button" className="is-reject" disabled={isSubmitting} onClick={() => runAction("reject")}><X />Reject</button>

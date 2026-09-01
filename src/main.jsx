@@ -4,6 +4,7 @@ import App from "./App.jsx";
 import "./styles/globals.css"
 import "./styles/auth.css";
 import "./styles/media.css";
+import "./styles/panel-select.css";
 import { BrowserRouter } from "react-router-dom";
 
 createRoot(document.getElementById("root")).render(
