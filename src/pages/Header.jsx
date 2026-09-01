@@ -127,7 +127,7 @@ export default function Header({ onPlaceSelect }) {
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             <span>{isWorkspaceReview ? "Back to Workspace" : isArchivedDifference ? "Back to Archived Tree" : backRoute === "/dashboard/workspace" ? "Back to Workspace" : backRoute === "/dashboard/submissionsTable" ? "Back to User Submissions" : "Back to Map"}</span>
           </Button>
-        ) : backRoute && (isPublicProfilePage || pathname === "/submissions") ? (
+        ) : backRoute && (isPublicProfilePage || isPublicSubmissionsPage) ? (
           <Button
             type="button"
             variant="outline"
@@ -136,7 +136,7 @@ export default function Header({ onPlaceSelect }) {
             onClick={navigateBack}
           >
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            <span>Back to Map</span>
+            <span>{pathname.startsWith("/submissions/") ? "Back to My Submissions" : "Back to Map"}</span>
           </Button>
         ) : backRoute ? (
           <Button

@@ -26,7 +26,6 @@ function isWorkspaceOrArchiveMapPath(pathname) {
 
 function isSubmissionListPath(pathname) {
   return pathname === "/submissions"
-    || pathname.startsWith("/submissions/")
     || pathname === "/dashboard/submissionsTable";
 }
 

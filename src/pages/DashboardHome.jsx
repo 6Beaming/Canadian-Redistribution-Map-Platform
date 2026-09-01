@@ -4,6 +4,7 @@ import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
 import { MapInfoPanel, getDefaultPanelView } from "@/components/non_prebuilt/MapInfoPanel.jsx";
 import { MapRegionSelector } from "@/components/non_prebuilt/MapRegionSelector.jsx";
 import { useAuth } from "@/contexts/AuthContext.jsx";
+import { useMapFullscreen } from "@/contexts/MapFullscreenContext.jsx";
 import { DEFAULT_ROLLOUT_CATEGORY_ID } from "@/lib/map/rolloutPlan.js";
 import { WORKSPACE_LIST_INVALIDATION_KEYS } from "@/lib/realtime/workspaceRealtime.js";
 import { getProvinceMapView } from "@/lib/map/provinceView.js";
@@ -17,12 +18,12 @@ import "@/styles/map.css";
 
 export default function DashboardHome({ mapSearchTarget = null }) {
   const { user } = useAuth();
+  const { isFullscreen, toggle: handleToggleFullscreen } = useMapFullscreen();
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState("Loading map...");
   const [selection, setSelection] = useState(null);
   const [rolloutHoverSelection, setRolloutHoverSelection] = useState(null);
   const [profilesByDguid, setProfilesByDguid] = useState(new Map());
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [panelView, setPanelView] = useState(getDefaultPanelView("commissioner"));
   const [isRolloutOpen, setIsRolloutOpen] = useState(false);
   const [rolloutCategoryId, setRolloutCategoryId] = useState(DEFAULT_ROLLOUT_CATEGORY_ID);
@@ -117,28 +118,6 @@ export default function DashboardHome({ mapSearchTarget = null }) {
   }, []);
 
   useEffect(() => {
-    if (!isFullscreen) {
-      return undefined;
-    }
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    function handleKeyDown(event) {
-      if (event.key === "Escape") {
-        setIsFullscreen(false);
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isFullscreen]);
-
-  useEffect(() => {
     if (!isRolloutOpen) {
       setRolloutHoverSelection(null);
     }
@@ -166,10 +145,6 @@ export default function DashboardHome({ mapSearchTarget = null }) {
 
   const handleStatusChange = useCallback((message) => {
     setStatus(message);
-  }, []);
-
-  const handleToggleFullscreen = useCallback(() => {
-    setIsFullscreen((current) => !current);
   }, []);
 
   const handleRolloutHoverChange = useCallback((nextHoverSelection) => {

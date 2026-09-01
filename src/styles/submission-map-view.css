@@ -1,0 +1,178 @@
+.submission-map-page {
+  padding: clamp(0.5rem, 1.2vw, 0.85rem);
+}
+
+.submission-map-dashboard,
+.submission-map-main,
+.submission-map-main .map-dashboard__map-wrap {
+  min-height: 0;
+  height: 100%;
+}
+
+.submission-map-main .map-dashboard__map-wrap {
+  padding: 0;
+}
+
+.submission-map-panel {
+  overflow: hidden;
+}
+
+.submission-map-panel__content {
+  min-height: 0;
+  overflow-y: auto;
+  padding: clamp(1rem, 1.8vw, 1.5rem);
+}
+
+.submission-map-panel__header {
+  display: grid;
+  gap: 0.6rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #d7e6fb;
+}
+
+.submission-map-panel__header p,
+.submission-map-panel__header h1,
+.submission-map-panel__comment p {
+  margin: 0;
+}
+
+.submission-map-panel__header > p {
+  color: #1a73e8;
+  font-size: 0.75rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.submission-map-panel__header h1 {
+  color: #17324d;
+  font-size: clamp(1.15rem, 2vw, 1.5rem);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.submission-map-panel__status {
+  justify-self: start;
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.submission-map-panel__status--pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.submission-map-panel__status--processed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.submission-map-panel__details {
+  display: grid;
+  margin: 0;
+}
+
+.submission-map-panel__details > div {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.8fr) minmax(0, 1.2fr);
+  gap: 0.75rem;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid #e8f0fe;
+}
+
+.submission-map-panel__details dt {
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.submission-map-panel__details dd {
+  min-width: 0;
+  margin: 0;
+  color: #334155;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.submission-map-panel__comment,
+.submission-map-panel__impact {
+  padding-top: 1rem;
+}
+
+.submission-map-panel__comment h2,
+.submission-map-panel__impact h2 {
+  margin: 0 0 0.65rem;
+  color: #17324d;
+  font-size: 0.9rem;
+}
+
+.submission-map-panel__comment p,
+.submission-map-panel__impact pre {
+  color: #475569;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.submission-map-empty {
+  display: grid;
+  place-content: center;
+  gap: 0.65rem;
+  height: 100%;
+  padding: 1.5rem;
+  border: 1px solid #d7e6fb;
+  border-radius: 24px;
+  background: #f5f9ff;
+  color: #475569;
+  text-align: center;
+}
+
+.submission-map-empty button {
+  justify-self: center;
+  border: 0;
+  border-radius: 999px;
+  background: #1a73e8;
+  color: #fff;
+  padding: 0.55rem 0.9rem;
+}
+
+.submission-map-comparison {
+  position: absolute;
+  z-index: 15;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.3rem;
+  border: 1px solid #d7e6fb;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 10px 26px rgba(26, 115, 232, 0.16);
+}
+
+.submission-map-comparison button {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #475569;
+  padding: 0.4rem 0.75rem;
+  font-weight: 650;
+}
+
+.submission-map-comparison button.is-active {
+  background: #1a73e8;
+  color: #fff;
+}
+
+@media (max-width: 576px) {
+  .submission-map-page {
+    padding: 0;
+  }
+
+  .submission-map-main .map-dashboard__map-wrap {
+    height: 100%;
+  }
+}

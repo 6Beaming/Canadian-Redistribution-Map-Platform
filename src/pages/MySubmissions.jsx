@@ -221,9 +221,21 @@ export default function MySubmissions() {
                     return (
                       <Fragment key={row.id}>
                         <TableRow
-                          className="h-14 cursor-default transition-colors hover:bg-gray-50"
+                          className="h-14 cursor-pointer transition-colors hover:bg-gray-50 focus-visible:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500"
+                          role="link"
+                          tabIndex={0}
+                          aria-label={`Open submission ${row.original.id}: ${row.original.title}`}
+                          onClick={() => navigate(`/submissions/${encodeURIComponent(row.original.id)}`)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              navigate(`/submissions/${encodeURIComponent(row.original.id)}`);
+                            }
+                          }}
                           onMouseEnter={() => setHoveredRowId(row.id)}
                           onMouseLeave={() => setHoveredRowId((current) => (current === row.id ? null : current))}
+                          onFocus={() => setHoveredRowId(row.id)}
+                          onBlur={() => setHoveredRowId((current) => (current === row.id ? null : current))}
                         >
                           {row.getVisibleCells().map((cell) => (
                             <TableCell key={cell.id} className="px-3 py-3 text-[15px]">

@@ -31,6 +31,7 @@ import { MAP_INTERACTION_MODE } from "@/lib/map/interactionMode.js";
 import { mapApi } from "@/services/mapApi.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
 import { useAuth } from "@/contexts/AuthContext.jsx";
+import { useMapFullscreen } from "@/contexts/MapFullscreenContext.jsx";
 import { RouteLoadingPage } from "@/components/non_prebuilt/RouteLoadingPage.jsx";
 import "@/styles/map.css";
 
@@ -47,6 +48,7 @@ function createInitialObjectionWorkflow(overrides = {}) {
 
 export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarget }) {
   const { sessionStatus, user } = useAuth();
+  const { isFullscreen, toggle: handleToggleFullscreen } = useMapFullscreen();
   const [status, setStatus] = useState("Loading map...");
   const [selection, setSelection] = useState(null);
   const [rolloutHoverSelection, setRolloutHoverSelection] = useState(null);
@@ -59,7 +61,6 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
   const [counterProposalWorkflow, setCounterProposalWorkflow] = useState(() =>
     createInitialCounterProposalWorkflow(),
   );
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [panelView, setPanelView] = useState(getDefaultPanelView("user"));
   const [isRolloutOpen, setIsRolloutOpen] = useState(false);
   const [rolloutCategoryId, setRolloutCategoryId] = useState(DEFAULT_ROLLOUT_CATEGORY_ID);
@@ -160,28 +161,6 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
     if (!client || !counterProposalWorkflow.cache || counterProposalDraggingRef.current) return;
     counterProposalWorkerInitRef.current = client.init(counterProposalWorkflow.cache).catch(() => undefined);
   }, [counterProposalWorkflow.cache]);
-
-  useEffect(() => {
-    if (!isFullscreen) {
-      return undefined;
-    }
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    function handleKeyDown(event) {
-      if (event.key === "Escape") {
-        setIsFullscreen(false);
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isFullscreen]);
 
   useEffect(() => {
     if (!isRolloutOpen) {
@@ -558,10 +537,6 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
     setPanelView(nextView);
     setIsRolloutOpen(false);
   }, [counterProposalWorkflow.step, getFedNumForDguid, objectionWorkflow.step, panelView, selection]);
-
-  const handleToggleFullscreen = useCallback(() => {
-    setIsFullscreen((current) => !current);
-  }, []);
 
   const handleRolloutHoverChange = useCallback((nextHoverSelection) => {
     setRolloutHoverSelection(nextHoverSelection);
