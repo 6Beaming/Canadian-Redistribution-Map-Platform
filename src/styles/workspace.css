@@ -272,6 +272,7 @@
 .workspace-tree__top-row {
   position: relative;
   display: flex;
+  min-inline-size: max-content;
   min-height: 7.6rem;
   justify-content: center;
 }
@@ -414,7 +415,9 @@
   position: absolute;
   top: 0.45rem;
   right: 0;
-  width: 20rem;
+  box-sizing: border-box;
+  inline-size: 24rem;
+  min-inline-size: 24rem;
   border: 1px solid #d9e3e8;
   border-radius: 0.7rem;
   background: rgba(255, 255, 255, 0.95);
@@ -431,8 +434,7 @@
 
 .workspace-status-key__items {
   display: grid;
-  grid-template-columns: repeat(2, max-content);
-  justify-content: space-between;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem 1.25rem;
   padding: 0.1rem 0.2rem 0.15rem;
   font-size: 0.76rem;
@@ -440,12 +442,13 @@
 
 .workspace-status-key__item {
   display: flex;
-  min-width: 0;
+  min-inline-size: 0;
   align-items: center;
   gap: 0.45rem;
   padding: 0.1rem 0;
   font-weight: 650;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .workspace-status-key__item svg {
@@ -914,10 +917,6 @@
   .workspace-canvas {
     min-width: 1320px;
   }
-
-  .workspace-status-key {
-    width: 18rem;
-  }
 }
 
 @media (max-width: 700px) {
@@ -929,6 +928,15 @@
   .workspace-canvas {
     min-width: 1280px;
     padding: 1rem;
+  }
+
+  .workspace-status-key {
+    inline-size: min(100%, 24rem);
+    min-inline-size: min(100%, 18rem);
+  }
+
+  .workspace-status-key__items {
+    grid-template-columns: 1fr;
   }
 
   .workspace-action-bar {
