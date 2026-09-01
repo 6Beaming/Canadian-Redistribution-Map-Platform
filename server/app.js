@@ -96,7 +96,8 @@ app.use((request, res) => {
 app.use((err, _req, res, _next) => {
   console.error(err);
   res.status(err.statusCode || 500).json({
-    error: err.publicMessage || "Something went wrong. Please try again."
+    error: err.publicMessage || "Something went wrong. Please try again.",
+    ...(err.code ? { code: err.code } : {}),
   });
 });
 

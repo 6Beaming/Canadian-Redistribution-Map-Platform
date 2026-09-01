@@ -1,4 +1,30 @@
 const MAP_API_BASE = "/api/map";
+const immutableRequestCache = new Map();
+const MAX_IMMUTABLE_CACHE_ENTRIES = 12;
+
+function rememberImmutable(key, factory) {
+  if (immutableRequestCache.has(key)) return immutableRequestCache.get(key);
+  const promise = factory().catch((error) => {
+    immutableRequestCache.delete(key);
+    throw error;
+  });
+  immutableRequestCache.set(key, promise);
+  while (immutableRequestCache.size > MAX_IMMUTABLE_CACHE_ENTRIES) {
+    immutableRequestCache.delete(immutableRequestCache.keys().next().value);
+  }
+  return promise;
+}
+
+function withAbort(promise, signal) {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      signal.addEventListener("abort", () => reject(signal.reason ?? new DOMException("Aborted", "AbortError")), { once: true });
+    }),
+  ]);
+}
 
 async function request(path, options = {}) {
   const response = await fetch(`${MAP_API_BASE}${path}`, {
@@ -12,7 +38,10 @@ async function request(path, options = {}) {
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.error || `Map API request failed (${response.status}).`);
+    const error = new Error(data.error || `Map API request failed (${response.status}).`);
+    error.code = data.code ?? null;
+    error.status = response.status;
+    throw error;
   }
 
   if (response.status === 204) {
@@ -37,6 +66,36 @@ export const mapApi = {
 
   getDaAssetManifest() {
     return this.fetchAssetJson("manifests/da_asset_manifest.json");
+  },
+
+  getCurrentRelease(options = {}) {
+    return request("/releases/current", { signal: options.signal });
+  },
+
+  getReleaseDa(releaseId, dguid, { representation = "display", signal } = {}) {
+    const key = `da:${releaseId}:${dguid}:${representation}`;
+    const promise = rememberImmutable(key, () => request(
+      `/releases/${encodeURIComponent(releaseId)}/das/${encodeURIComponent(dguid)}?representation=${encodeURIComponent(representation)}`,
+    ));
+    return withAbort(promise, signal);
+  },
+
+  getReleaseDaPair(releaseId, primaryDguid, secondaryDguid, {
+    representation = "display",
+    lod = "auto",
+    signal,
+  } = {}) {
+    const pair = [String(primaryDguid), String(secondaryDguid)].sort();
+    const key = `pair:${releaseId}:${pair.join("|")}:${representation}:${lod}`;
+    const promise = rememberImmutable(key, () => request(
+      `/releases/${encodeURIComponent(releaseId)}/da-pairs/${encodeURIComponent(pair[0])}/${encodeURIComponent(pair[1])}`
+        + `?representation=${encodeURIComponent(representation)}&lod=${encodeURIComponent(lod)}`,
+    ));
+    return withAbort(promise, signal);
+  },
+
+  clearImmutableReleaseCache() {
+    immutableRequestCache.clear();
   },
 
   getAssignments() {

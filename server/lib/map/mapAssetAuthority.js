@@ -6,6 +6,10 @@ import {
   buildDaObjectionIndex,
   areDaNeighbours,
 } from "../../../src/lib/map/objectionWorkflow.js";
+import {
+  loadCurrentCanonicalRelease,
+  readExactDaFeature,
+} from "./canonicalReleaseStore.js";
 
 let profileIndexPromise = null;
 let assetManifestPromise = null;
@@ -103,10 +107,17 @@ export async function loadPairObjectionIndex(primaryDguid, secondaryDguid) {
     throw new MapAssetValidationError("A counter-proposal must target two distinct DAs.");
   }
 
-  const [firstProfile, secondProfile] = await Promise.all([
-    getProfileForDguid(firstDguid),
-    getProfileForDguid(secondDguid),
+  const release = loadCurrentCanonicalRelease();
+  const [firstRecord, secondRecord] = await Promise.all([
+    readExactDaFeature(release, firstDguid),
+    readExactDaFeature(release, secondDguid),
   ]);
+  const firstProfile = firstRecord.descriptor.profile ?? null;
+  const secondProfile = secondRecord.descriptor.profile ?? null;
+
+  if (!firstRecord.descriptor.enabled || !secondRecord.descriptor.enabled) {
+    throw new MapAssetValidationError("Counter-Proposals require two Enabled dissemination areas.");
+  }
 
   if (!firstProfile) {
     throw new MapAssetValidationError(`Unknown or unavailable DA: ${firstDguid}.`);
@@ -124,10 +135,9 @@ export async function loadPairObjectionIndex(primaryDguid, secondaryDguid) {
     throw new MapAssetValidationError("Unable to resolve the FED context for the selected DA pair.");
   }
 
-  const featureCollections = await Promise.all(fedNums.map(loadMetadataGeoJsonForFed));
   const index = buildDaObjectionIndex({
     type: "FeatureCollection",
-    features: featureCollections.flatMap((collection) => collection?.features ?? []),
+    features: [firstRecord.feature, secondRecord.feature],
   });
 
   if (!index.featureByDguid.has(firstDguid)) {
@@ -142,7 +152,7 @@ export async function loadPairObjectionIndex(primaryDguid, secondaryDguid) {
     throw new MapAssetValidationError("The selected DAs are not adjacent.");
   }
 
-  const baselineRevision = await buildBaselineRevision(fedNums);
+  const baselineRevision = release.manifest.geometryRevision;
 
   return {
     index,
@@ -155,6 +165,8 @@ export async function loadPairObjectionIndex(primaryDguid, secondaryDguid) {
       [firstDguid, firstProfile],
       [secondDguid, secondProfile],
     ]),
+    releaseId: release.manifest.releaseId,
+    topologyRevision: release.manifest.topologyRevision,
     baselineRevision,
   };
 }

@@ -1,0 +1,793 @@
+{
+  "artifactCatalogSha256": "sha256:7f8dbc9b53ee887570cc4fd19e5483bc5a47bbeb24648d0cd2b9a096b0a9d3a8",
+  "artifacts": [
+    {
+      "bytes": 2587933,
+      "path": "exact/shards/fed_10001.geojson",
+      "records": 158,
+      "sha256": "sha256:75563168bdc9334add1f827411d49d30f3143a0e32282a84526e2fa2022a4fab"
+    },
+    {
+      "bytes": 542352,
+      "path": "exact/shards/fed_10002.geojson",
+      "records": 140,
+      "sha256": "sha256:9fee1c475a1dbd8f2fe42f7142baf447a2b656d35b5398cf76565adc6614a86f"
+    },
+    {
+      "bytes": 10372588,
+      "path": "exact/shards/fed_10003.geojson",
+      "records": 183,
+      "sha256": "sha256:cd3da38ef5ad32dc14cd49bfdb798344c4706154d83bfa80f6a61361bf85a6bd"
+    },
+    {
+      "bytes": 24103554,
+      "path": "exact/shards/fed_10004.geojson",
+      "records": 63,
+      "sha256": "sha256:52ac4861dfd19a18013ce97626ebeb0f74473cd0a1acd8adfb7b81bdc82b96a8"
+    },
+    {
+      "bytes": 8722676,
+      "path": "exact/shards/fed_10005.geojson",
+      "records": 195,
+      "sha256": "sha256:e807be3baa248cd3fab5b13fe59e9c880edb34c57156cda09be5bd598ec2f10a"
+    },
+    {
+      "bytes": 824414,
+      "path": "exact/shards/fed_10006.geojson",
+      "records": 140,
+      "sha256": "sha256:71a2ef84c6f7212cf7ecbd5c516ea933c0316ad8669b3f9ed746e3e369b8bbee"
+    },
+    {
+      "bytes": 9091749,
+      "path": "exact/shards/fed_10007.geojson",
+      "records": 203,
+      "sha256": "sha256:c80c1d34835df91860f05e136f578adfdfeb3f4264b1d7681a8609808cd9b96c"
+    },
+    {
+      "bytes": 1100609,
+      "path": "exact/shards/fed_11001.geojson",
+      "records": 77,
+      "sha256": "sha256:704080a7997dd241816d6c4095731bcea306606c220d7e0a4be1c80079cc54ca"
+    },
+    {
+      "bytes": 239917,
+      "path": "exact/shards/fed_11002.geojson",
+      "records": 65,
+      "sha256": "sha256:4d856e39ea3f9ebc5c9de2f7b044f7fd4869feb30b6951f9bad3cdeb8b4499e8"
+    },
+    {
+      "bytes": 1037635,
+      "path": "exact/shards/fed_11003.geojson",
+      "records": 85,
+      "sha256": "sha256:8265df939a91f91d2e8c59ae7ab6013791cde50e20f61a00297d062ee2f9d065"
+    },
+    {
+      "bytes": 1014149,
+      "path": "exact/shards/fed_11004.geojson",
+      "records": 92,
+      "sha256": "sha256:d3c276cc56530ccdbda9bc8e7640a01f0321598edcb09659b6e129105d3fcbbb"
+    },
+    {
+      "bytes": 1020250,
+      "path": "exact/shards/fed_46001.geojson",
+      "records": 163,
+      "sha256": "sha256:51e7226f81e40da09c0b32705b9a4bc64124d654c54c8afa6c8093857eb72867"
+    },
+    {
+      "bytes": 8857354,
+      "path": "exact/shards/fed_46002.geojson",
+      "records": 218,
+      "sha256": "sha256:8ce0ad834f14a8c7f6a47e0bcb97054682ebe6deab6d2331e4981e58e7cd625a"
+    },
+    {
+      "bytes": 308187,
+      "path": "exact/shards/fed_46003.geojson",
+      "records": 144,
+      "sha256": "sha256:648da4fdff0b19b4c0e4ed1ea5d4e3160e5dd89afd2cc0731a2ceeaa62c677cb"
+    },
+    {
+      "bytes": 333593,
+      "path": "exact/shards/fed_46004.geojson",
+      "records": 136,
+      "sha256": "sha256:ffa56bff4e28a943f4c403ada6eff7a2f86d20194c6e3da8944c98a1880b7e05"
+    },
+    {
+      "bytes": 1225496,
+      "path": "exact/shards/fed_46005.geojson",
+      "records": 148,
+      "sha256": "sha256:48272c6b81a1ddb1fc5ddde53a87630a7a78d49a729e47c22309570264ce4580"
+    },
+    {
+      "bytes": 1191497,
+      "path": "exact/shards/fed_46006.geojson",
+      "records": 141,
+      "sha256": "sha256:5abc84bb0742c9cc23914b5bbc579364a73cb26f42d817772c0059cdee6a5cc0"
+    },
+    {
+      "bytes": 3796695,
+      "path": "exact/shards/fed_46007.geojson",
+      "records": 209,
+      "sha256": "sha256:8f578802676a552857636c91927927514577ab72f360094fd941838184f6e9f2"
+    },
+    {
+      "bytes": 421032,
+      "path": "exact/shards/fed_46008.geojson",
+      "records": 148,
+      "sha256": "sha256:73981c4282abf542c9619f04f51a352c1f411b69323b94df0729381bcbf38dc4"
+    },
+    {
+      "bytes": 5760158,
+      "path": "exact/shards/fed_46009.geojson",
+      "records": 179,
+      "sha256": "sha256:a1c39b88ff79ffe6792c0942c3d873b6843ef6a009aed9d5681ecc5ecfc391ea"
+    },
+    {
+      "bytes": 323343,
+      "path": "exact/shards/fed_46010.geojson",
+      "records": 164,
+      "sha256": "sha256:9ebe73073661f702160447a2046a57bff2c5abcae5573e42c334d40c015cf44c"
+    },
+    {
+      "bytes": 257961,
+      "path": "exact/shards/fed_46011.geojson",
+      "records": 134,
+      "sha256": "sha256:5ad20b1b271c56e5178b5fc4bba4123fae6c33b6ccf31de3223308a8526f0a56"
+    },
+    {
+      "bytes": 298292,
+      "path": "exact/shards/fed_46012.geojson",
+      "records": 113,
+      "sha256": "sha256:dd662844a413e2dc6b22d5095a08aca69f27079bea46d14fb2dffbb31943498b"
+    },
+    {
+      "bytes": 387930,
+      "path": "exact/shards/fed_46013.geojson",
+      "records": 158,
+      "sha256": "sha256:d81fe5f363c4db89d9b0f33df659f5afe4f4973a2f2361b589e7c6f2ea4bc582"
+    },
+    {
+      "bytes": 392605,
+      "path": "exact/shards/fed_46014.geojson",
+      "records": 168,
+      "sha256": "sha256:c53458c3ae524c39ed8f31cc5f2b8e5027f718c2284706867c67fe1fa1404721"
+    },
+    {
+      "bytes": 2062180,
+      "path": "exact/shards/fed_47001.geojson",
+      "records": 248,
+      "sha256": "sha256:aa9e7778ee3994bf71a5b7fc06cdf204a1c4e3676d4b6dd4ca086c53324a8d63"
+    },
+    {
+      "bytes": 1177171,
+      "path": "exact/shards/fed_47002.geojson",
+      "records": 196,
+      "sha256": "sha256:8b656ce2dd6ec6a83befdfe5b0ac1b3d5781c256757d8e772830f2cfa92fec2d"
+    },
+    {
+      "bytes": 2284056,
+      "path": "exact/shards/fed_47003.geojson",
+      "records": 166,
+      "sha256": "sha256:222e972baf56b0afa4fe11853d14db808e24fbceb6bcf0defed56d3ec8a30501"
+    },
+    {
+      "bytes": 1897800,
+      "path": "exact/shards/fed_47004.geojson",
+      "records": 226,
+      "sha256": "sha256:f110d6f9d8df30d617612871eb5d361964dee44cbffff7b45a056676f87e2b4d"
+    },
+    {
+      "bytes": 1346735,
+      "path": "exact/shards/fed_47005.geojson",
+      "records": 182,
+      "sha256": "sha256:2a54aec8c4149582ae14fed09bec75af26795e83b8b88e0f3e649c6329f948ec"
+    },
+    {
+      "bytes": 351162,
+      "path": "exact/shards/fed_47006.geojson",
+      "records": 140,
+      "sha256": "sha256:ff5077d830cd113115d9da14b84ee6950e5e3b0544853b04c055bd295561f922"
+    },
+    {
+      "bytes": 1203308,
+      "path": "exact/shards/fed_47007.geojson",
+      "records": 251,
+      "sha256": "sha256:8045801a234f0f926d05adda1e02c9f6c615e2941d9890beec96810bd0c43752"
+    },
+    {
+      "bytes": 338832,
+      "path": "exact/shards/fed_47008.geojson",
+      "records": 147,
+      "sha256": "sha256:fb303d68156b4b1eaef482a82ce15949b67f416e3531d13e3f221d93b523ff36"
+    },
+    {
+      "bytes": 264257,
+      "path": "exact/shards/fed_47009.geojson",
+      "records": 108,
+      "sha256": "sha256:ba192573512cec0fc9f849587ad6d994264f0978e5463611c77c2eef3bb8fd56"
+    },
+    {
+      "bytes": 297024,
+      "path": "exact/shards/fed_47010.geojson",
+      "records": 120,
+      "sha256": "sha256:dc5af3d3ef9f685c46fc5787a71d0b1aa0af2827c95822736510d54a6a21a211"
+    },
+    {
+      "bytes": 375530,
+      "path": "exact/shards/fed_47011.geojson",
+      "records": 143,
+      "sha256": "sha256:4b45ab6ae1ef0c2da465388dc7bb82c27b56ced7c398d5e5bf5986ce7b6b76f5"
+    },
+    {
+      "bytes": 2479999,
+      "path": "exact/shards/fed_47012.geojson",
+      "records": 227,
+      "sha256": "sha256:0d4b9a5008ec00852d6aa25cbe2edb181f217f1e3733d952c3b0ceb00f528888"
+    },
+    {
+      "bytes": 2680804,
+      "path": "exact/shards/fed_47013.geojson",
+      "records": 233,
+      "sha256": "sha256:6eafc374bcb2fe668e644d5b98903eea8f9b607aa2ff10cf7085a8467230f1ac"
+    },
+    {
+      "bytes": 1885001,
+      "path": "exact/shards/fed_47014.geojson",
+      "records": 238,
+      "sha256": "sha256:822332f2055841adcc171b83d9f66cacee27d702e2f71de21735a4f12ea3bd4a"
+    },
+    {
+      "bytes": 522416,
+      "path": "exact/shards/fed_48001.geojson",
+      "records": 140,
+      "sha256": "sha256:aa8856d3c0cf82114bfefba77793240a8395ae51d8e2132424d7dff27a270790"
+    },
+    {
+      "bytes": 4036081,
+      "path": "exact/shards/fed_48002.geojson",
+      "records": 235,
+      "sha256": "sha256:31ae006d4d26734b27fd99920b719e2d7ff3f93b67c64d334608c25ba10f197d"
+    },
+    {
+      "bytes": 1697911,
+      "path": "exact/shards/fed_48003.geojson",
+      "records": 162,
+      "sha256": "sha256:6ea18ae5419f2a04b0a028eed6715bf87ec6e44fadc9b672e8bc389f1f4d9bdd"
+    },
+    {
+      "bytes": 345680,
+      "path": "exact/shards/fed_48004.geojson",
+      "records": 168,
+      "sha256": "sha256:752c06c30513f5d5ec36059a30adc7c0bed69d9c2818719c6e6213436fd7a413"
+    },
+    {
+      "bytes": 440736,
+      "path": "exact/shards/fed_48005.geojson",
+      "records": 196,
+      "sha256": "sha256:d05d95cd930e63b9493cf0a5856f8dbc4b39003502db9c2f1b5dcabf23fb5acb"
+    },
+    {
+      "bytes": 384506,
+      "path": "exact/shards/fed_48006.geojson",
+      "records": 132,
+      "sha256": "sha256:96106facb1aecb46cd0d5b0b66904642cea51cf933953a11052af7cc47b0ce6f"
+    },
+    {
+      "bytes": 445423,
+      "path": "exact/shards/fed_48007.geojson",
+      "records": 206,
+      "sha256": "sha256:45a132014bb1cc0d2ae65ee13e86b359b30ceed0aa8459d6d44c6995022589c4"
+    },
+    {
+      "bytes": 467609,
+      "path": "exact/shards/fed_48008.geojson",
+      "records": 191,
+      "sha256": "sha256:48628860350189e3c8a2faf973f4547ec84758a7cc1fa3c04c3379a2c2a1cb4a"
+    },
+    {
+      "bytes": 375669,
+      "path": "exact/shards/fed_48009.geojson",
+      "records": 168,
+      "sha256": "sha256:7f6e7bfdd58d2ef5e4eb6ad8a1b44ce9dc746e3b3800e8628de8cd0a01a6152a"
+    },
+    {
+      "bytes": 440614,
+      "path": "exact/shards/fed_48010.geojson",
+      "records": 153,
+      "sha256": "sha256:05e83e07f7dcd8b7e3eb067fff421a20e63d9dc1ab8bb12eb837d3e9a3bb2500"
+    },
+    {
+      "bytes": 475694,
+      "path": "exact/shards/fed_48011.geojson",
+      "records": 192,
+      "sha256": "sha256:a671325b02a1e3c7b784d7ba8c9841a1c45c506027c944ac897b80b3fc74e4a6"
+    },
+    {
+      "bytes": 269350,
+      "path": "exact/shards/fed_48012.geojson",
+      "records": 72,
+      "sha256": "sha256:c36bd2060099db7a387d528ad5e6945e538b6be15adc9a83e2cfcd53e6fd845e"
+    },
+    {
+      "bytes": 390395,
+      "path": "exact/shards/fed_48013.geojson",
+      "records": 145,
+      "sha256": "sha256:3c5e382496e2efb738f0ae9d2881617547ebfec72fa0c364aa6e0d520b39623a"
+    },
+    {
+      "bytes": 194549,
+      "path": "exact/shards/fed_48014.geojson",
+      "records": 51,
+      "sha256": "sha256:63708239097e3752c303d51d55b1d47ecac97822890fca1cb6e5f10a3d6887f4"
+    },
+    {
+      "bytes": 381280,
+      "path": "exact/shards/fed_48015.geojson",
+      "records": 198,
+      "sha256": "sha256:ee822b599787a45dbec672af1298f53d78edf47f997e18a032bb241c3cb9932d"
+    },
+    {
+      "bytes": 300136,
+      "path": "exact/shards/fed_48016.geojson",
+      "records": 106,
+      "sha256": "sha256:bf0472f51ccc83ec8c905b3e30d19114e0333afda356afa3c7656d042ea74329"
+    },
+    {
+      "bytes": 399584,
+      "path": "exact/shards/fed_48017.geojson",
+      "records": 200,
+      "sha256": "sha256:24e6ed19aa2443d0eb34f129328e5546a35407a6423bf0730a16104d4d75026d"
+    },
+    {
+      "bytes": 355786,
+      "path": "exact/shards/fed_48018.geojson",
+      "records": 135,
+      "sha256": "sha256:51ea9e2a0178a1d0e0e7a83e35626bda4b19274a18f93fca4d68326ef5579074"
+    },
+    {
+      "bytes": 327445,
+      "path": "exact/shards/fed_48019.geojson",
+      "records": 123,
+      "sha256": "sha256:4f5ce0d1a5ed8dcebf9cce3bcf65455a812f63bea709d83a489c8db72d669ef1"
+    },
+    {
+      "bytes": 395438,
+      "path": "exact/shards/fed_48020.geojson",
+      "records": 119,
+      "sha256": "sha256:0777c18725dd408480b7e7bf6b15b7ec309ac14871eb54c4f41bf365cefb6e6d"
+    },
+    {
+      "bytes": 325084,
+      "path": "exact/shards/fed_48021.geojson",
+      "records": 132,
+      "sha256": "sha256:8ce2e0fe67612265048b18fb70554f4949544d9649f4ba9aefdab9b0ce886a21"
+    },
+    {
+      "bytes": 469478,
+      "path": "exact/shards/fed_48022.geojson",
+      "records": 201,
+      "sha256": "sha256:85cc602dcf444c7a79a14c13751dadab763a53897360af53a3c78a79cb12da79"
+    },
+    {
+      "bytes": 362292,
+      "path": "exact/shards/fed_48023.geojson",
+      "records": 138,
+      "sha256": "sha256:050bcf729ca34568f5b59789569cf2d7ab04e0143b10f560b8ca3e29a1ea34c7"
+    },
+    {
+      "bytes": 3188584,
+      "path": "exact/shards/fed_48024.geojson",
+      "records": 202,
+      "sha256": "sha256:0cb2085954d4b7cadac8dcad7d7caab161933e37d306b0c2b0b7c3151a22668b"
+    },
+    {
+      "bytes": 2747887,
+      "path": "exact/shards/fed_48025.geojson",
+      "records": 222,
+      "sha256": "sha256:be2e6c2127c90a2c86c13a3e9b1dea754608f7fa8cd973e7ddc9ddb33acc9fc8"
+    },
+    {
+      "bytes": 1732294,
+      "path": "exact/shards/fed_48026.geojson",
+      "records": 177,
+      "sha256": "sha256:9a39b0208c4c57c767a103da5d7fafa92efd50f32c797fd97a56928b0813b67b"
+    },
+    {
+      "bytes": 2171595,
+      "path": "exact/shards/fed_48027.geojson",
+      "records": 211,
+      "sha256": "sha256:1b4bbca2dc4275ebd44e249d50e0cce9309dd312eb25e864ac292f562bd97b28"
+    },
+    {
+      "bytes": 1018421,
+      "path": "exact/shards/fed_48028.geojson",
+      "records": 155,
+      "sha256": "sha256:7f95ababbf507251ff590ef2c93e8c7819b6f8605e41a12f915d05fbd3655f50"
+    },
+    {
+      "bytes": 736570,
+      "path": "exact/shards/fed_48029.geojson",
+      "records": 182,
+      "sha256": "sha256:2b421a714b452d73d75d03b8aaff8eb529be08e3a19e337ef9d73594bfa7ce4b"
+    },
+    {
+      "bytes": 1603780,
+      "path": "exact/shards/fed_48030.geojson",
+      "records": 169,
+      "sha256": "sha256:e1662762bc3c1072d4541b49797cfa7da8cb56723d5210f36fbf28edf49e4e7c"
+    },
+    {
+      "bytes": 1632615,
+      "path": "exact/shards/fed_48031.geojson",
+      "records": 153,
+      "sha256": "sha256:3fee887200d78a060520e347ff8881ec7437332ff0e2fa48a0aa7bb5c3a7e8f9"
+    },
+    {
+      "bytes": 3519998,
+      "path": "exact/shards/fed_48032.geojson",
+      "records": 247,
+      "sha256": "sha256:61e95a58f892666d9b3cd92023e3fd48b7dee1597f1d4eee45a8cccf81af0dc9"
+    },
+    {
+      "bytes": 1289506,
+      "path": "exact/shards/fed_48033.geojson",
+      "records": 188,
+      "sha256": "sha256:ee5986cc61f8c4a715ea53bc30172967c45d81f8777ef00d8ad0f04d6b89fa57"
+    },
+    {
+      "bytes": 699882,
+      "path": "exact/shards/fed_48034.geojson",
+      "records": 177,
+      "sha256": "sha256:bdca5f51a1abe266551ece6931e1e3591bd293ff64682e352dafcd292955a053"
+    },
+    {
+      "bytes": 668697,
+      "path": "exact/shards/fed_48035.geojson",
+      "records": 162,
+      "sha256": "sha256:06c76354c245f8b2743011420f3f94c482fd67e6b6dbe57e25811d0153e2e3a0"
+    },
+    {
+      "bytes": 1345814,
+      "path": "exact/shards/fed_48036.geojson",
+      "records": 189,
+      "sha256": "sha256:f94981f99ff94a13f324731853dccce9b53c886a28b44fa870f6658ef36ea169"
+    },
+    {
+      "bytes": 3624213,
+      "path": "exact/shards/fed_48037.geojson",
+      "records": 206,
+      "sha256": "sha256:bde1ae08ef9f36c18be171c4b4b9dc9c0464efc3c3bf72254811417c01c2ed97"
+    },
+    {
+      "bytes": 507327,
+      "path": "exact/shards/fed_59001.geojson",
+      "records": 181,
+      "sha256": "sha256:5ac46010eea603e93b58ea32fc5d343f090c7264a364f28d21d269f49e770466"
+    },
+    {
+      "bytes": 343687,
+      "path": "exact/shards/fed_59002.geojson",
+      "records": 143,
+      "sha256": "sha256:742562da8a8cc4de0ad0220bb41cc2d74855fd4aa36fa1d377ada621e1eb73d0"
+    },
+    {
+      "bytes": 610783,
+      "path": "exact/shards/fed_59003.geojson",
+      "records": 172,
+      "sha256": "sha256:7e62002d261d6aa08843bc37d1d875bd54cecb584668aefb225cd2ba05fc8886"
+    },
+    {
+      "bytes": 4660742,
+      "path": "exact/shards/fed_59004.geojson",
+      "records": 284,
+      "sha256": "sha256:bdd7ca0f6e588ea703f004b1aa7e0c2490504457af1ebbd89a204524f967f16a"
+    },
+    {
+      "bytes": 1225381,
+      "path": "exact/shards/fed_59005.geojson",
+      "records": 216,
+      "sha256": "sha256:94c7e212e61911dcc11146b6a9673cb7a13e2cd2100a5da4e3672186e0682ff3"
+    },
+    {
+      "bytes": 336921,
+      "path": "exact/shards/fed_59006.geojson",
+      "records": 143,
+      "sha256": "sha256:936e885cf10ef8b42353a14bbae7291fef9578d70ebe1d24a2f8054eb1daf449"
+    },
+    {
+      "bytes": 3691111,
+      "path": "exact/shards/fed_59007.geojson",
+      "records": 215,
+      "sha256": "sha256:2adae74027baf25266aa220285c226cfb5687e5dc2af08d5c911302184068c89"
+    },
+    {
+      "bytes": 525857,
+      "path": "exact/shards/fed_59008.geojson",
+      "records": 135,
+      "sha256": "sha256:559c017d2402a41927f734395fcc254082247a53e36746ef274422b3023b050f"
+    },
+    {
+      "bytes": 9883249,
+      "path": "exact/shards/fed_59009.geojson",
+      "records": 216,
+      "sha256": "sha256:207b4f413a4a3f6dd77b7df62a093c9b20ce898774bc8ce7bdfa543de63b3a88"
+    },
+    {
+      "bytes": 2279300,
+      "path": "exact/shards/fed_59010.geojson",
+      "records": 173,
+      "sha256": "sha256:87aaf243dea31e27de35f91b58e59cbe6bc5399c3bb8fd5f0e2f1c1907533a33"
+    },
+    {
+      "bytes": 658451,
+      "path": "exact/shards/fed_59011.geojson",
+      "records": 181,
+      "sha256": "sha256:5988931b93a6bd05dc3d71677b0e2d3664fe262b07443286b31bb3eda74bf1de"
+    },
+    {
+      "bytes": 1290414,
+      "path": "exact/shards/fed_59012.geojson",
+      "records": 174,
+      "sha256": "sha256:958acd00d589eaf6c0ec5718459251c3cfd78e749eac416cf94f4927994cabee"
+    },
+    {
+      "bytes": 283749,
+      "path": "exact/shards/fed_59013.geojson",
+      "records": 130,
+      "sha256": "sha256:9a562dec982e9501d501885ae2a0bcf02baacd994ca0ca97616310953f021e62"
+    },
+    {
+      "bytes": 2984729,
+      "path": "exact/shards/fed_59014.geojson",
+      "records": 187,
+      "sha256": "sha256:2bbe60a8fa076179aa7093a1e0b55be1853a6e18b021b117a51c7ba06b4ad02a"
+    },
+    {
+      "bytes": 3517917,
+      "path": "exact/shards/fed_59015.geojson",
+      "records": 290,
+      "sha256": "sha256:1c0b887cf0e569a343b247fa06dbb82b8422aa7a4fa3c9731c66063ebf7aed63"
+    },
+    {
+      "bytes": 556017,
+      "path": "exact/shards/fed_59016.geojson",
+      "records": 119,
+      "sha256": "sha256:f54f578bcc6ec8095c17cdd9c276072e78684d47756cb91a085a205101fd22ae"
+    },
+    {
+      "bytes": 470304,
+      "path": "exact/shards/fed_59017.geojson",
+      "records": 128,
+      "sha256": "sha256:c560629ddd297b3a324282a3721f9a4c65f54fe4ff6a908d0509f29ef32fda07"
+    },
+    {
+      "bytes": 883277,
+      "path": "exact/shards/fed_59018.geojson",
+      "records": 197,
+      "sha256": "sha256:39a4b32469ddecbcbcf330e1e0382d9d48f7d68584528bc9493deb5b103877eb"
+    },
+    {
+      "bytes": 1689139,
+      "path": "exact/shards/fed_59019.geojson",
+      "records": 193,
+      "sha256": "sha256:79da69d4c7afd9ee0811247a87df5e5f4c8e6a61e22e19c35bb5644f490181f9"
+    },
+    {
+      "bytes": 325090,
+      "path": "exact/shards/fed_59020.geojson",
+      "records": 141,
+      "sha256": "sha256:c02080dfaffe4ce8e4983c826943054fa21c534aa692fcd7300d0629ece1d199"
+    },
+    {
+      "bytes": 44124958,
+      "path": "exact/shards/fed_59021.geojson",
+      "records": 270,
+      "sha256": "sha256:712bc49f0a8ab51ce936c19dd5749138f12733c2235967b0376ac6d705dea284"
+    },
+    {
+      "bytes": 453085,
+      "path": "exact/shards/fed_59022.geojson",
+      "records": 175,
+      "sha256": "sha256:0354dbb84fdfcd99b2d20edace8906c1249f48e6c6818f2acf351354c5413173"
+    },
+    {
+      "bytes": 908736,
+      "path": "exact/shards/fed_59023.geojson",
+      "records": 156,
+      "sha256": "sha256:089033756c066acd659024db20bdf52e55f32e15b73749ebacad466837554de5"
+    },
+    {
+      "bytes": 648774,
+      "path": "exact/shards/fed_59024.geojson",
+      "records": 161,
+      "sha256": "sha256:f1bb4aa7d43a1e0146106a543438c019cf4acf41be9c4d0db8d28b8f4b3f1857"
+    },
+    {
+      "bytes": 568523,
+      "path": "exact/shards/fed_59025.geojson",
+      "records": 169,
+      "sha256": "sha256:52275f49b57672d4df11e66890ea085d94be40619ebd593aa6b1f6bc3a842672"
+    },
+    {
+      "bytes": 3429213,
+      "path": "exact/shards/fed_59026.geojson",
+      "records": 237,
+      "sha256": "sha256:8d1039e85257d7cbecad32ade73aa2763a4b23bea67ceee08c80a4f382b71d41"
+    },
+    {
+      "bytes": 403804,
+      "path": "exact/shards/fed_59027.geojson",
+      "records": 146,
+      "sha256": "sha256:a104bcb9017289d0c60aef01c631549956f249c49bb67d0a5bc2b661bb389121"
+    },
+    {
+      "bytes": 490499,
+      "path": "exact/shards/fed_59028.geojson",
+      "records": 150,
+      "sha256": "sha256:9f30fe0f50bc9a2528768c336839f12226de7abe1cf1247c6c6d22fc1fe40aeb"
+    },
+    {
+      "bytes": 2687970,
+      "path": "exact/shards/fed_59029.geojson",
+      "records": 188,
+      "sha256": "sha256:74d2d54cf26fb9134e92424a7f7862141b8fd7d53824fb48f34d163070b801e0"
+    },
+    {
+      "bytes": 2448707,
+      "path": "exact/shards/fed_59030.geojson",
+      "records": 200,
+      "sha256": "sha256:cd35cdf4479e1b4cf825033493e3463b6f607cd7a018927c0040e598b666b7a3"
+    },
+    {
+      "bytes": 44974619,
+      "path": "exact/shards/fed_59031_part01.geojson",
+      "records": 126,
+      "sha256": "sha256:0833c41f6919f9d2ee505cfb3078e33e3e0603978e2626780d1edec3fe0e1269"
+    },
+    {
+      "bytes": 15213059,
+      "path": "exact/shards/fed_59031_part02.geojson",
+      "records": 155,
+      "sha256": "sha256:0ab9480a8ef68e4ba9c8b5982570fb5442506aa8d43e8d1a01bfc586eb3b7783"
+    },
+    {
+      "bytes": 452302,
+      "path": "exact/shards/fed_59032.geojson",
+      "records": 156,
+      "sha256": "sha256:1bc26d1027ddbf89dc33db90a2dea8845e5dc6f96ded9475a814b17e0f06734b"
+    },
+    {
+      "bytes": 312037,
+      "path": "exact/shards/fed_59033.geojson",
+      "records": 148,
+      "sha256": "sha256:8d3eb71723f053148b422ff10cbf362a8329ca028093351f8b71399a6da489ae"
+    },
+    {
+      "bytes": 262502,
+      "path": "exact/shards/fed_59034.geojson",
+      "records": 132,
+      "sha256": "sha256:2bcd8e8394308cd1e7799e0f711e83a4db07d4152d27afaeb7e6b080299d9aec"
+    },
+    {
+      "bytes": 231708,
+      "path": "exact/shards/fed_59035.geojson",
+      "records": 126,
+      "sha256": "sha256:a09cd7f0881af95be8b847ea00274350ce17800fdb6853bf6a8bf2446508b5b0"
+    },
+    {
+      "bytes": 378175,
+      "path": "exact/shards/fed_59036.geojson",
+      "records": 200,
+      "sha256": "sha256:5f4518bfd37290ce8e65a0b14eb6c40734b294ca6c58a710bfbb88e8f7be0fdd"
+    },
+    {
+      "bytes": 365887,
+      "path": "exact/shards/fed_59037.geojson",
+      "records": 166,
+      "sha256": "sha256:c322eecd602565b30700289d1665f974a61ab7d33fab524c79bd027f1afc0f67"
+    },
+    {
+      "bytes": 357774,
+      "path": "exact/shards/fed_59038.geojson",
+      "records": 180,
+      "sha256": "sha256:ecfeaa9d37074e3dd0c00a33b927f7c2cd202fe9f87116ec09f49904efac1afb"
+    },
+    {
+      "bytes": 329526,
+      "path": "exact/shards/fed_59039.geojson",
+      "records": 183,
+      "sha256": "sha256:059063d62def9476b6199db6a63dc8b7e3eeae12ad3fbcf08df782a69caa53c7"
+    },
+    {
+      "bytes": 458593,
+      "path": "exact/shards/fed_59040.geojson",
+      "records": 211,
+      "sha256": "sha256:c2ab16dc675e109980279115b64aaa1b210c7f47e8eacee053079fa72875460c"
+    },
+    {
+      "bytes": 2266354,
+      "path": "exact/shards/fed_59041.geojson",
+      "records": 170,
+      "sha256": "sha256:4db83ab64ea701bde045567be972b7adef34f802034a6c1209ad6ca4832500c4"
+    },
+    {
+      "bytes": 718394,
+      "path": "exact/shards/fed_59042.geojson",
+      "records": 204,
+      "sha256": "sha256:c65dd2cc69da9f91e83aa6bf3bdfd2e0db357473c793e7ebc3c1a51dea486441"
+    },
+    {
+      "bytes": 4149143,
+      "path": "exact/shards/fed_59043.geojson",
+      "records": 221,
+      "sha256": "sha256:b017df4597d080173e271796f86fc52bb41dd213957ea07559bfcd7430a7ddf9"
+    },
+    {
+      "bytes": 1767592,
+      "path": "exact/shards/fed_60001.geojson",
+      "records": 74,
+      "sha256": "sha256:f3c29806f6208513c8616470db0baa3c19c786e7227962162b8a5768724c3e10"
+    },
+    {
+      "bytes": 20236353,
+      "path": "indexes/dguids.json",
+      "records": 20374,
+      "sha256": "sha256:5a82fa99b6269e20680d1026d906352be3333dc219da4caba95a0a2ad0bd1ef7"
+    },
+    {
+      "bytes": 408714,
+      "path": "indexes/feds.json",
+      "records": 120,
+      "sha256": "sha256:3623221afcc49ac339409dd50516d8b643b839a9f0352d975f2b12fc9d3578be"
+    },
+    {
+      "bytes": 407563,
+      "path": "indexes/pruids.json",
+      "records": 7,
+      "sha256": "sha256:1a520ff3b3428e65e724fadce21e3f2fcdaae4bf62864af4646d3a5e3228eb49"
+    },
+    {
+      "bytes": 2533408,
+      "path": "indexes/adjacency.json",
+      "records": 20357,
+      "sha256": "sha256:53577a884f7d4f6cb4c0f8168676795d2ec84352a7346df4dd0c0f10848bfc39"
+    },
+    {
+      "bytes": 66959732,
+      "path": "topology/shared-arcs-000.ndjson",
+      "records": 30192,
+      "sha256": "sha256:4d206f8e107852f4167f94b8091117c88abcf217b7d02052297f481068abeea6"
+    },
+    {
+      "bytes": 42861028,
+      "path": "topology/shared-arcs-001.ndjson",
+      "records": 21946,
+      "sha256": "sha256:5b25aaee6f296a3d690fa73290744b4ec80ff0c87df28dec3ac6ebb8ee37782d"
+    },
+    {
+      "bytes": 10231401,
+      "path": "topology/shared-arcs.index.json",
+      "records": 52138,
+      "sha256": "sha256:aeda1a9dcc4ae94217062e81fb29568597f40d4b7dc0adc9ebc59bc8cd26cb30"
+    }
+  ],
+  "counts": {
+    "adjacentPairs": 52138,
+    "dguids": 20374,
+    "feds": 120,
+    "pruids": 7
+  },
+  "geometryRevision": "sha256:24bc2f71ac17271fbca2c648eb4e2c53d2de6509f5fbcb35769aeb7ec1368904",
+  "lodLevels": {
+    "coarse": 0.0005,
+    "fine": 2.5e-05,
+    "medium": 0.0001
+  },
+  "lodSchemaVersion": "shared-arc-index-dp-v1",
+  "manifestSha256": "sha256:f89bd52d02ce9226e8f486943431f82590a3ed81279711108b7c63118d342052",
+  "normalizationVersion": "wgs84-8dp-v1",
+  "releaseId": "statscan-da-2021-r1",
+  "schemaVersion": "1.0",
+  "sourceManifestGeneratedAt": "2026-07-08T11:59:33.185361+00:00",
+  "topologyRevision": "sha256:edf7d614b4a45db1f92bfe189018f6fafefdbc50838c200952fdb6baa70cc2e7",
+  "vertexSchemaVersion": "shared-array-v1"
+}

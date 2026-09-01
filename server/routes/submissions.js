@@ -9,6 +9,12 @@ import {
   MapAssetValidationError,
   prepareCounterProposalSubmission,
 } from "../lib/map/counterProposalSubmission.js";
+import {
+  deriveCounterProposalOperations,
+  persistSubmissionGeometryRevision,
+  materializeGeometryOperations,
+} from "../lib/map/geometryOperations.js";
+import { assertActiveMapRelease } from "../lib/map/mapReleaseGate.js";
 
 const router = Router();
 
@@ -54,56 +60,16 @@ async function attachAuthorProfiles(records) {
 
 router.post("/counter-proposals", requirePublicUser, async (req, res, next) => {
   try {
+    await assertActiveMapRelease();
     const prepared = await prepareCounterProposalSubmission(req.body);
+    const compactGeometry = await deriveCounterProposalOperations({
+      primaryDguid: prepared.revision.primary_dguid,
+      secondaryDguid: prepared.revision.secondary_dguid,
+      originalGeometry: prepared.revision.original_geometry,
+      proposedGeometry: prepared.revision.proposed_geometry,
+    });
     const supabase = getSupabaseAdminDataClient();
     const now = new Date().toISOString();
-
-    const primaryDguid = prepared.submission.dguid;
-    const neighboringDguid = prepared.submission.neighboring_dguid;
-
-    // Ensure neighboring DA exists for FK constraint
-    if (neighboringDguid) {
-      const { error: daError } = await supabase
-        .from("dissemination_areas")
-        .upsert(
-          {
-            dguid: neighboringDguid,
-            status: "ok",
-            source_label: "counter_proposal",
-          },
-          {
-            onConflict: "dguid",
-          }
-        );
-
-      if (daError) {
-        return res.status(500).json({
-          error: `Failed to register neighboring DA: ${daError.message}`,
-        });
-      }
-    }
-
-    // Ensure primary DA exists too
-    if (primaryDguid) {
-      const { error: daError } = await supabase
-        .from("dissemination_areas")
-        .upsert(
-          {
-            dguid: primaryDguid,
-            status: "ok",
-            source_label: "counter_proposal",
-          },
-          {
-            onConflict: "dguid",
-          }
-        );
-
-      if (daError) {
-        return res.status(500).json({
-          error: `Failed to register primary DA: ${daError.message}`,
-        });
-      }
-    }
 
     const { data: submission, error: submissionError } = await supabase
       .from("submissions")
@@ -138,11 +104,24 @@ router.post("/counter-proposals", requirePublicUser, async (req, res, next) => {
       });
     }
 
-    return res.status(201).json(
-      (await attachAuthorProfiles([
-        normalizeCounterProposalRecord(submission, revision),
-      ]))[0],
-    );
+    let geometryRevision;
+    try {
+      geometryRevision = await persistSubmissionGeometryRevision(supabase, {
+        submission,
+        submissionType: "counter_proposal",
+        compact: compactGeometry,
+        validationReport: prepared.revision.validation_report,
+        legacyRevisionId: revision.id,
+      });
+    } catch (geometryRevisionError) {
+      await supabase.from("submissions").delete().eq("id", submission.id);
+      return res.status(500).json({ error: geometryRevisionError.message });
+    }
+
+    const response = (await attachAuthorProfiles([
+      normalizeCounterProposalRecord(submission, revision),
+    ]))[0];
+    return res.status(201).json({ ...response, geometry_revision: geometryRevision });
 
   } catch (error) {
     if (
@@ -247,6 +226,65 @@ router.get("/counter-proposals/:submissionId", async (req, res) => {
     normalizeCounterProposalRecord(submission, revision),
   ]);
   return res.json(record);
+});
+
+router.get("/:submissionId/geometry", async (req, res, next) => {
+  try {
+    const supabase = getSupabaseAdminDataClient();
+    const isCommissioner = req.profile?.role === "commissioner";
+    const { data: submission, error: submissionError } = await supabase
+      .from("submissions")
+      .select("id,user_id,type,release_id,dguid,neighboring_dguid,status")
+      .eq("id", req.params.submissionId)
+      .maybeSingle();
+    if (submissionError) throw submissionError;
+    if (!submission) {
+      res.status(404).json({ error: "Submission geometry was not found." });
+      return;
+    }
+    if (!isCommissioner && submission.user_id !== req.user.id) {
+      res.status(403).json({ error: "You can only view your own submission geometry." });
+      return;
+    }
+    const { data: descriptor, error: descriptorError } = await supabase
+      .from("submission_geometry_revisions")
+      .select("id,submission_id,submission_type,revision_number,release_id,base_revision,primary_dguid,secondary_dguid,geometry_digest,validation_report,migration_state,created_at")
+      .eq("submission_id", submission.id)
+      .order("revision_number", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (descriptorError) throw descriptorError;
+    if (!descriptor || descriptor.migration_state !== "ready") {
+      res.status(409).json({
+        code: "SUBMISSION_GEOMETRY_NOT_READY",
+        error: "Submission geometry migration is not ready.",
+      });
+      return;
+    }
+    const { data: operations, error: operationError } = await supabase
+      .from("submission_geometry_operations")
+      .select("operation_index,vertex_id,operation_type,base_lng,base_lat,to_lng,to_lat")
+      .eq("revision_id", descriptor.id)
+      .order("operation_index", { ascending: true });
+    if (operationError) throw operationError;
+    const response = {
+      submissionId: submission.id,
+      type: descriptor.submission_type,
+      releaseId: descriptor.release_id,
+      baseRevision: descriptor.base_revision,
+      primaryDguid: descriptor.primary_dguid,
+      secondaryDguid: descriptor.secondary_dguid,
+      geometryDigest: descriptor.geometry_digest,
+      impactSummary: descriptor.validation_report?.impact_summary ?? null,
+      operations: operations ?? [],
+    };
+    if (req.query.materialize === "1") {
+      response.geometry = await materializeGeometryOperations(descriptor, operations ?? []);
+    }
+    res.json(response);
+  } catch (error) {
+    next(error);
+  }
 });
 
 export default router;

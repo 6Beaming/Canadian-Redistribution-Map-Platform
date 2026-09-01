@@ -5,6 +5,12 @@ import {
   getSupabaseProfileEmailsAsAdmin,
 } from "../lib/supabase.js";
 import { getProfileForDguid } from "../lib/map/mapAssetAuthority.js";
+import { loadCurrentCanonicalRelease } from "../lib/map/canonicalReleaseStore.js";
+import {
+  buildZeroOperationGeometryDescriptor,
+  persistSubmissionGeometryRevision,
+} from "../lib/map/geometryOperations.js";
+import { assertActiveMapRelease } from "../lib/map/mapReleaseGate.js";
 import { enrichSubmissionsWithDaMetadata } from "../lib/map/submissionPresentation.js";
 import { serializeLightweightSubmission } from "../lib/submissions/submissionListQuery.js";
 import { requirePublicUser } from "../middleware/requireAuth.js";
@@ -151,6 +157,8 @@ router.post("/", requirePublicUser, async (req, res) => {
   const secondaryDguid = String(neighboring_dguid ?? "").trim() || null;
   const normalizedTitle = String(title ?? "").trim();
   const normalizedComment = String(comment ?? "").trim();
+  let currentRelease;
+  let compactGeometry = null;
 
   if (!["feedback", "objection"].includes(normalizedType)) {
     return res.status(400).json({
@@ -171,6 +179,8 @@ router.post("/", requirePublicUser, async (req, res) => {
   }
 
   try {
+    await assertActiveMapRelease();
+    currentRelease = loadCurrentCanonicalRelease();
     const primaryProfile = await getProfileForDguid(primaryDguid);
     if (!primaryProfile) {
       return res.status(400).json({ error: `Unknown or unavailable DA: ${primaryDguid}.` });
@@ -189,9 +199,10 @@ router.post("/", requirePublicUser, async (req, res) => {
       if (!secondaryProfile) {
         return res.status(400).json({ error: `Unknown or unavailable DA: ${secondaryDguid}.` });
       }
+      compactGeometry = buildZeroOperationGeometryDescriptor({ primaryDguid, secondaryDguid });
     }
   } catch (validationError) {
-    return res.status(500).json({
+    return res.status(validationError.statusCode || 500).json({
       error: validationError.message || "Unable to validate the selected dissemination area.",
     });
   }
@@ -214,33 +225,6 @@ router.post("/", requirePublicUser, async (req, res) => {
     || (await getProfileForDguid(primaryDguid))?.fed_num
     || null;
 
-  // Mirror counter-proposal writes: register both DAs so legacy
-  // dissemination_areas FKs (if still present) do not block the insert.
-  const dguidsToRegister = normalizedType === "objection"
-    ? [primaryDguid, secondaryDguid]
-    : [primaryDguid];
-
-  for (const dguidToRegister of dguidsToRegister.filter(Boolean)) {
-    const { error: daInsertError } = await supabase
-      .from("dissemination_areas")
-      .upsert(
-        {
-          dguid: dguidToRegister,
-          status: "ok",
-          source_label: "submission_validation",
-        },
-        {
-          onConflict: "dguid",
-        }
-      );
-
-    if (daInsertError) {
-      return res.status(500).json({
-        error: `Failed to register dissemination area: ${daInsertError.message}`,
-      });
-    }
-  }
-
   const { data, error } = await supabase
     .from("submissions")
     .insert([{
@@ -253,11 +237,28 @@ router.post("/", requirePublicUser, async (req, res) => {
       title: normalizedTitle,
       type: normalizedType,
       status: "pending",
+      release_id: currentRelease.manifest.releaseId,
     }])
     .select()
     .single();
 
   if (error) return res.status(500).json({ error: error.message });
+  if (normalizedType === "objection") {
+    try {
+      const geometryRevision = await persistSubmissionGeometryRevision(supabase, {
+        submission: data,
+        submissionType: "objection",
+        compact: compactGeometry,
+        validationReport: { operationCount: 0, immutableBase: true },
+      });
+      res.status(201).json({ ...data, geometry_revision: geometryRevision });
+      return;
+    } catch (geometryError) {
+      await supabase.from("submissions").delete().eq("id", data.id);
+      res.status(500).json({ error: geometryError.message });
+      return;
+    }
+  }
   res.status(201).json(data);
 });
 
