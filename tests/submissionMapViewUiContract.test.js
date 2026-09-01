@@ -36,7 +36,10 @@ test("submission map API adapter preserves an immutable-release seam", () => {
   const source = read("src/services/submissionMapViewApi.js");
   assert.match(source, /\/api\/submissions\/\$\{encodeURIComponent\(submissionId\)\}\/map-view/);
   assert.match(source, /hydrateSubmissionMapView/);
-  assert.match(source, /hydrateWorkspaceSubmission/);
+  assert.match(source, /mapApi\.getReleaseDa/);
+  assert.match(source, /mapApi\.getReleaseDaPair/);
+  assert.match(source, /\/geometry\?materialize=1/);
+  assert.doesNotMatch(source, /hydrateWorkspaceSubmission/);
 });
 
 test("route-scoped fullscreen hides Header and restores global state", () => {

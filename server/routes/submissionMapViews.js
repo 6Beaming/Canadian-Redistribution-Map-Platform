@@ -16,24 +16,23 @@ const MAP_VIEW_SUBMISSION_COLUMNS = [
   "updated_at",
   "dguid",
   "neighboring_dguid",
+  "release_id",
 ].join(",");
 
 const MAP_VIEW_REVISION_COLUMNS = [
   "id",
   "primary_dguid",
   "secondary_dguid",
-  "baseline_revision",
+  "release_id",
+  "base_revision",
+  "geometry_digest",
   "validation_report",
+  "migration_state",
 ].join(",");
 
-function normalizeOperations(validationReport) {
-  const operations = validationReport?.operations;
-  return Array.isArray(operations) ? operations : [];
-}
-
-function serializeMapView(submission, revision, user) {
+function serializeMapView(submission, revision, operations, user) {
   const type = normalizeSubmissionType(submission.type);
-  const baseRevision = revision?.baseline_revision ?? null;
+  const baseRevision = revision?.base_revision ?? null;
 
   return {
     submission: {
@@ -50,15 +49,22 @@ function serializeMapView(submission, revision, user) {
       updatedAt: submission.updated_at,
     },
     map: {
-      // Until the immutable release migration lands, a persisted CP baseline
-      // is the only authoritative release descriptor available on this branch.
-      releaseId: baseRevision,
+      releaseId: revision?.release_id ?? submission.release_id ?? null,
       baseRevision,
       primaryDguid: revision?.primary_dguid ?? submission.dguid ?? null,
       secondaryDguid:
         revision?.secondary_dguid ?? submission.neighboring_dguid ?? null,
       geometryRevisionId: revision?.id ?? null,
-      operations: normalizeOperations(revision?.validation_report),
+      geometryDigest: revision?.geometry_digest ?? null,
+      operations: (operations ?? []).map((operation) => ({
+        operation_index: operation.operation_index,
+        vertex_id: operation.vertex_id,
+        operation_type: operation.operation_type,
+        base_lng: operation.base_lng,
+        base_lat: operation.base_lat,
+        to_lng: operation.to_lng,
+        to_lat: operation.to_lat,
+      })),
       impactSummary: revision?.validation_report?.impact_summary ?? null,
     },
   };
@@ -86,9 +92,10 @@ router.get("/:submissionId/map-view", requirePublicUser, async (req, res) => {
     }
 
     let revision = null;
-    if (normalizeSubmissionType(submission.type) === "counter-proposal") {
+    let operations = [];
+    if (["objection", "counter-proposal"].includes(normalizeSubmissionType(submission.type))) {
       const { data, error: revisionError } = await supabase
-        .from("counter_proposal_revisions")
+        .from("submission_geometry_revisions")
         .select(MAP_VIEW_REVISION_COLUMNS)
         .eq("submission_id", submission.id)
         .order("revision_number", { ascending: false })
@@ -100,9 +107,32 @@ router.get("/:submissionId/map-view", requirePublicUser, async (req, res) => {
       }
 
       revision = data ?? null;
+      if (!revision || revision.migration_state !== "ready") {
+        return res.status(409).json({
+          code: "SUBMISSION_GEOMETRY_NOT_READY",
+          error: "Submission geometry migration is not ready.",
+        });
+      }
+
+      const { data: operationRows, error: operationError } = await supabase
+        .from("submission_geometry_operations")
+        .select("operation_index,vertex_id,operation_type,base_lng,base_lat,to_lng,to_lat")
+        .eq("revision_id", revision.id)
+        .order("operation_index", { ascending: true });
+      if (operationError) {
+        return res.status(500).json({ error: operationError.message });
+      }
+      operations = operationRows ?? [];
     }
 
-    return res.json(serializeMapView(submission, revision, req.user));
+    if (!revision && !submission.release_id) {
+      return res.status(409).json({
+        code: "SUBMISSION_RELEASE_NOT_READY",
+        error: "Submission map release migration is not ready.",
+      });
+    }
+
+    return res.json(serializeMapView(submission, revision, operations, req.user));
   } catch (error) {
     return res.status(500).json({
       error: error.message || "Unable to load submission map view.",

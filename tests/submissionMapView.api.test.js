@@ -29,6 +29,7 @@ const submissions = [
     fed_num: "60001",
     dguid: "2021S051260010251",
     neighboring_dguid: null,
+    release_id: "statscan-da-2021-r1",
     geometry: { secret: true },
   },
   {
@@ -43,6 +44,7 @@ const submissions = [
     fed_num: "60001",
     dguid: "2021S051260010251",
     neighboring_dguid: "2021S051260010269",
+    release_id: "statscan-da-2021-r1",
   },
   {
     id: "counter-1",
@@ -56,6 +58,7 @@ const submissions = [
     fed_num: "60001",
     dguid: "2021S051260010251",
     neighboring_dguid: "2021S051260010269",
+    release_id: "statscan-da-2021-r1",
   },
   {
     id: "other-owner",
@@ -69,28 +72,53 @@ const submissions = [
     fed_num: "60001",
     dguid: "2021S051260010251",
     neighboring_dguid: null,
+    release_id: "statscan-da-2021-r1",
   },
 ];
 
 const revisions = [{
   id: "revision-1",
   submission_id: "counter-1",
+  submission_type: "counter-proposal",
   revision_number: 2,
   primary_dguid: "2021S051260010251",
   secondary_dguid: "2021S051260010269",
-  baseline_revision: "release-2026-08",
+  release_id: "statscan-da-2021-r1",
+  base_revision: "statscan-da-2021-r1",
+  geometry_digest: "counter-digest",
+  migration_state: "ready",
   validation_report: {
     impact_summary: { availability: "available", population_delta: 12 },
-    operations: [{ vertexId: "v-1", coordinate: [-135, 60] }],
   },
-  original_geometry: { secret: "exact base" },
-  proposed_geometry: { secret: "exact proposal" },
+}, {
+  id: "revision-objection-1",
+  submission_id: "objection-1",
+  submission_type: "objection",
+  revision_number: 1,
+  primary_dguid: "2021S051260010251",
+  secondary_dguid: "2021S051260010269",
+  release_id: "statscan-da-2021-r1",
+  base_revision: "statscan-da-2021-r1",
+  geometry_digest: "objection-digest",
+  migration_state: "ready",
+  validation_report: {},
+}];
+
+const operations = [{
+  revision_id: "revision-1",
+  operation_index: 0,
+  vertex_id: "v-1",
+  operation_type: "set-coordinate",
+  base_lng: -135.1,
+  base_lat: 60.1,
+  to_lng: -135,
+  to_lat: 60,
 }];
 
 function createMaybeSingleQuery(rows, selectedColumns) {
   const filters = [];
   let limit = null;
-  return {
+  const query = {
     eq(column, value) {
       filters.push([column, value]);
       return this;
@@ -107,7 +135,13 @@ function createMaybeSingleQuery(rows, selectedColumns) {
       if (limit) matches = matches.slice(0, limit);
       return { data: matches[0] ?? null, error: null, selectedColumns };
     },
+    then(resolve, reject) {
+      let matches = rows.filter((row) => filters.every(([column, value]) => row[column] === value));
+      if (limit) matches = matches.slice(0, limit);
+      return Promise.resolve({ data: matches, error: null, selectedColumns }).then(resolve, reject);
+    },
   };
+  return query;
 }
 
 function authenticate(profile = PUBLIC_USER) {
@@ -126,9 +160,11 @@ function authenticate(profile = PUBLIC_USER) {
       from(table) {
         const rows = table === "submissions"
           ? submissions
-          : table === "counter_proposal_revisions"
+          : table === "submission_geometry_revisions"
             ? revisions
-            : [];
+            : table === "submission_geometry_operations"
+              ? operations
+              : [];
         return {
           select(columns) {
             selects.push({ table, columns });
@@ -182,9 +218,9 @@ test("non-owned and missing submissions both return 404", async () => {
 });
 
 test.each([
-  ["comment-1", "feedback", null],
-  ["objection-1", "objection", "2021S051260010269"],
-])("map-view returns a geometry-free projection for %s", async (id, type, secondaryDguid) => {
+  ["comment-1", "feedback", null, null],
+  ["objection-1", "objection", "2021S051260010269", "revision-objection-1"],
+])("map-view returns a geometry-free projection for %s", async (id, type, secondaryDguid, revisionId) => {
   const selects = authenticate();
   const response = await request(`/api/submissions/${id}/map-view`);
 
@@ -192,7 +228,7 @@ test.each([
   assert.equal(response.body.submission.type, type);
   assert.equal(response.body.submission.author.email, PUBLIC_USER.email);
   assert.equal(response.body.map.secondaryDguid, secondaryDguid);
-  assert.equal(response.body.map.geometryRevisionId, null);
+  assert.equal(response.body.map.geometryRevisionId, revisionId);
   assert.equal(Object.hasOwn(response.body.submission, "geometry"), false);
   assert.equal(Object.hasOwn(response.body.map, "originalGeometry"), false);
   assert.equal(Object.hasOwn(response.body.map, "proposedGeometry"), false);
@@ -205,11 +241,11 @@ test("counter-proposal map-view returns only its descriptor, sparse operations a
 
   assert.equal(response.status, 200);
   assert.equal(response.body.submission.type, "counter-proposal");
-  assert.equal(response.body.map.releaseId, "release-2026-08");
+  assert.equal(response.body.map.releaseId, "statscan-da-2021-r1");
   assert.equal(response.body.map.geometryRevisionId, "revision-1");
   assert.equal(
     JSON.stringify(response.body.map.operations),
-    JSON.stringify(revisions[0].validation_report.operations),
+    JSON.stringify(operations.map(({ revision_id: _revisionId, ...operation }) => operation)),
   );
   assert.equal(
     JSON.stringify(response.body.map.impactSummary),
@@ -220,28 +256,14 @@ test("counter-proposal map-view returns only its descriptor, sparse operations a
   assert.equal(selects.some(({ columns }) => columns.includes("proposed_geometry")), false);
 });
 
-test("legacy counter-proposals without a geometry revision fail closed to a null descriptor", async () => {
+test("legacy counter-proposals without a migrated geometry revision fail closed", async () => {
   authenticate();
-  revisions.splice(0, 1);
+  const revision = revisions.shift();
   try {
     const missingRevision = await request("/api/submissions/counter-1/map-view");
-    assert.equal(missingRevision.status, 200);
-    assert.equal(missingRevision.body.map.geometryRevisionId, null);
-    assert.equal(missingRevision.body.map.operations.length, 0);
+    assert.equal(missingRevision.status, 409);
+    assert.equal(missingRevision.body.code, "SUBMISSION_GEOMETRY_NOT_READY");
   } finally {
-    revisions.push({
-      id: "revision-1",
-      submission_id: "counter-1",
-      revision_number: 2,
-      primary_dguid: "2021S051260010251",
-      secondary_dguid: "2021S051260010269",
-      baseline_revision: "release-2026-08",
-      validation_report: {
-        impact_summary: { availability: "available", population_delta: 12 },
-        operations: [{ vertexId: "v-1", coordinate: [-135, 60] }],
-      },
-      original_geometry: { secret: "exact base" },
-      proposed_geometry: { secret: "exact proposal" },
-    });
+    revisions.unshift(revision);
   }
 });

@@ -1,4 +1,9 @@
-import { hydrateWorkspaceSubmission } from "@/services/tempCounterProposal.js";
+import { mapApi } from "@/services/mapApi.js";
+import {
+  buildDaObjectionIndex,
+  getPairOuterBoundaryFeatureCollection,
+  getSharedBoundaryFeatureCollection,
+} from "@/lib/map/objectionWorkflow.js";
 
 async function requestJson(url) {
   const response = await fetch(url, { credentials: "include" });
@@ -20,32 +25,74 @@ export function getSubmissionMapView(submissionId) {
   );
 }
 
-function toLegacyHydrationInput(payload) {
+function normalizedSubmission(payload) {
   return {
     ...payload.submission,
-    type: payload.submission.type,
     created_at: payload.submission.createdAt,
     updated_at: payload.submission.updatedAt,
     dguid: payload.map.primaryDguid,
     neighboring_dguid: payload.map.secondaryDguid,
     authorEmail: payload.submission.author?.email ?? null,
     source: "supabase",
+    mapDescriptor: payload.map,
+    submissionProjection: payload.submission,
   };
 }
 
-/**
- * Adapter seam for the immutable release API. The page consumes the normalized
- * result only; when the release routes are ready this function can replace its
- * legacy local-metadata hydration without changing routing or presentation.
- */
 export async function hydrateSubmissionMapView(payload) {
-  const hydrated = await hydrateWorkspaceSubmission(
-    toLegacyHydrationInput(payload),
+  const submission = normalizedSubmission(payload);
+  const type = String(payload.submission.type ?? "feedback").replaceAll("_", "-");
+  const { releaseId, primaryDguid, secondaryDguid } = payload.map;
+  if (!releaseId || !primaryDguid) {
+    return { ...submission, geometry: null, geometryError: "Submission release metadata is unavailable." };
+  }
+
+  if (type === "feedback" || type === "comment") {
+    const display = await mapApi.getReleaseDa(releaseId, primaryDguid);
+    const index = buildDaObjectionIndex({ type: "FeatureCollection", features: [display.feature] });
+    return {
+      ...submission,
+      geometry: {
+        featureCollection: { type: "FeatureCollection", features: [display.feature] },
+        boundaryGeoJson: { type: "FeatureCollection", features: [] },
+        outerBoundaryGeoJson: getPairOuterBoundaryFeatureCollection(index, [primaryDguid]),
+      },
+    };
+  }
+
+  const basePair = await mapApi.getReleaseDaPair(releaseId, primaryDguid, secondaryDguid, {
+    representation: "display",
+  });
+  const baseIndex = buildDaObjectionIndex(basePair.features);
+  if (type === "objection") {
+    return {
+      ...submission,
+      geometry: {
+        featureCollection: basePair.features,
+        boundaryGeoJson: basePair.sharedBoundary,
+        outerBoundaryGeoJson: getPairOuterBoundaryFeatureCollection(baseIndex, [primaryDguid, secondaryDguid]),
+      },
+    };
+  }
+
+  const detail = await requestJson(
+    `/api/submissions/${encodeURIComponent(payload.submission.id)}/geometry?materialize=1`,
   );
+  const proposed = detail.geometry;
+  const proposedIndex = buildDaObjectionIndex(proposed);
 
   return {
-    ...hydrated,
-    mapDescriptor: payload.map,
-    submissionProjection: payload.submission,
+    ...submission,
+    geometry: {
+      originalFeatureCollection: basePair.features,
+      proposedFeatureCollection: proposed,
+      originalBoundaryGeoJson: getSharedBoundaryFeatureCollection(baseIndex, primaryDguid, secondaryDguid),
+      originalOuterBoundaryGeoJson: getPairOuterBoundaryFeatureCollection(baseIndex, [primaryDguid, secondaryDguid]),
+      boundaryGeoJson: getSharedBoundaryFeatureCollection(proposedIndex, primaryDguid, secondaryDguid),
+      outerBoundaryGeoJson: getPairOuterBoundaryFeatureCollection(proposedIndex, [primaryDguid, secondaryDguid]),
+      impacts: detail.impactSummary ?? payload.map.impactSummary ?? null,
+      impactsSource: "compact-revision",
+      baselineRevision: payload.map.baseRevision,
+    },
   };
 }
