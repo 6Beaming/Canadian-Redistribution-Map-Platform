@@ -89,6 +89,7 @@ export async function prepareCounterProposalSubmission(body = {}) {
     firstFedNum,
     profilesByDguid,
     baselineRevision,
+    releaseId,
   } = pairContext;
 
   if (requestedFedNum && requestedFedNum !== firstFedNum) {
@@ -170,6 +171,7 @@ export async function prepareCounterProposalSubmission(body = {}) {
       comment,
       geometry: proposedGeometry,
       status: "pending",
+      release_id: releaseId,
     },
     revision: {
       revision_number: 1,

@@ -6,6 +6,8 @@ import { afterEach, jest, test } from "@jest/globals";
 import app from "../server/app.js";
 import { prepareCounterProposalSubmission } from "../server/lib/map/counterProposalSubmission.js";
 import { setSupabaseTestDoubles } from "../server/lib/supabase.js";
+import { loadCurrentCanonicalRelease } from "../server/lib/map/canonicalReleaseStore.js";
+import { clearMapReleaseGateCacheForTests } from "../server/lib/map/mapReleaseGate.js";
 import {
   buildCounterProposalCache,
   previewCounterProposalHandleMove,
@@ -50,7 +52,10 @@ function buildEditedProposedGeometry() {
   };
 }
 
-afterEach(() => setSupabaseTestDoubles(null));
+afterEach(() => {
+  setSupabaseTestDoubles(null);
+  clearMapReleaseGateCacheForTests();
+});
 
 async function request(method, path, { body, cookie } = {}) {
   const server = http.createServer(app);
@@ -91,6 +96,35 @@ function authenticate(profile) {
 
         if (table === "counter_proposal_revisions") {
           return createRevisionStore();
+        }
+
+        if (table === "submission_geometry_revisions") {
+          return createGeometryRevisionStore();
+        }
+
+        if (table === "submission_geometry_operations") {
+          return { insert: async (values) => ({ data: values, error: null }) };
+        }
+
+        if (table === "map_data_releases") {
+          const manifest = loadCurrentCanonicalRelease().manifest;
+          return {
+            select() { return this; },
+            eq() { return this; },
+            maybeSingle: async () => ({
+              data: {
+                release_id: manifest.releaseId,
+                geometry_revision: manifest.geometryRevision,
+                manifest_sha256: manifest.manifestSha256,
+                topology_revision: manifest.topologyRevision,
+                normalization_version: manifest.normalizationVersion,
+                vertex_schema_version: manifest.vertexSchemaVersion,
+                lod_schema_version: manifest.lodSchemaVersion,
+                state: "active",
+              },
+              error: null,
+            }),
+          };
         }
 
         if (table === "dissemination_areas") {
@@ -160,6 +194,19 @@ function createRevisionStore() {
           return {
             single: async () => ({ data: row, error: null }),
           };
+        },
+      };
+    },
+  };
+}
+
+function createGeometryRevisionStore() {
+  return {
+    insert(payload) {
+      const row = { id: "geometry-revision-1", ...payload };
+      return {
+        select() {
+          return { single: async () => ({ data: row, error: null }) };
         },
       };
     },
@@ -242,4 +289,5 @@ test("a public user can submit a validated counter-proposal", async () => {
   assert.equal(response.body.revision.revision_number, 1);
   assert.equal(response.body.revision.primary_dguid, FIRST_DGUID);
   assert.equal(response.body.revision.validation_report.impact_summary.version, 1);
+  assert.equal(response.body.geometry_revision.migration_state, "ready");
 });
