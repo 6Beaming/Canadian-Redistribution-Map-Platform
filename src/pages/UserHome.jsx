@@ -4,14 +4,12 @@ import { CounterProposalMapToolbar } from "@/components/non_prebuilt/CounterProp
 import { MapInfoPanel, getDefaultPanelView } from "@/components/non_prebuilt/MapInfoPanel.jsx";
 import { MapRegionSelector } from "@/components/non_prebuilt/MapRegionSelector.jsx";
 import {
-  areDaNeighbours,
   buildDaObjectionIndex,
   emptyBoundaryFeatureCollection,
   getPairOuterBoundaryFeatureCollection,
   getSharedBoundaryFeatureCollection,
 } from "@/lib/map/objectionWorkflow.js";
 import {
-  buildCounterProposalCache,
   clearCounterProposalStorage,
   createInitialCounterProposalWorkflow,
   emptyCounterProposalFeatureCollection,
@@ -20,12 +18,13 @@ import {
   selectCounterProposalHandle,
   writeCounterProposalStorage,
 } from "@/lib/map/counterProposalWorkflow.js";
-import { createCounterProposalWorkerClient } from "@/services/counterProposalWorkerClient.js";
 import {
-  getMetadataGeojsonPathsForFed,
-  getFallbackDaAssetManifest,
-  normalizeDaAssetManifest,
-} from "@/lib/map/daAssetManifest.js";
+  areReleaseDaNeighbours,
+  loadCounterProposalPair,
+  loadDisplayDaIndex,
+  loadDisplayPairIndex,
+} from "@/lib/map/releasePairLoader.js";
+import { createCounterProposalWorkerClient } from "@/services/counterProposalWorkerClient.js";
 import { DEFAULT_ROLLOUT_CATEGORY_ID } from "@/lib/map/rolloutPlan.js";
 import { MAP_INTERACTION_MODE } from "@/lib/map/interactionMode.js";
 import { mapApi } from "@/services/mapApi.js";
@@ -53,7 +52,6 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
   const [status, setStatus] = useState("Loading map...");
   const [selection, setSelection] = useState(null);
   const [rolloutHoverSelection, setRolloutHoverSelection] = useState(null);
-  const [assetManifest, setAssetManifest] = useState(() => getFallbackDaAssetManifest());
   const [profilesByDguid, setProfilesByDguid] = useState(new Map());
   const [objectionGeometryIndex, setObjectionGeometryIndex] = useState(null);
   const [objectionWorkflow, setObjectionWorkflow] = useState(() =>
@@ -66,7 +64,6 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
   const [isRolloutOpen, setIsRolloutOpen] = useState(false);
   const [rolloutCategoryId, setRolloutCategoryId] = useState(DEFAULT_ROLLOUT_CATEGORY_ID);
   const [initialLoad, setInitialLoad] = useState({ ready: false, error: "" });
-  const metadataIndexCacheRef = useRef(new Map());
   const pendingCounterProposalDragRef = useRef(null);
   const counterProposalDragTimerRef = useRef(0);
   const counterProposalWorkerRef = useRef(null);
@@ -103,18 +100,14 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
   useEffect(() => {
     let isMounted = true;
 
-    Promise.all([
-      mapApi.getDaProfiles(),
-      mapApi.getDaAssetManifest().catch(() => getFallbackDaAssetManifest()),
-    ])
-      .then(([payload, assetManifestPayload]) => {
+    mapApi
+      .getDaProfiles()
+      .then((payload) => {
         if (!isMounted) {
           return;
         }
 
-        const normalizedManifest = normalizeDaAssetManifest(assetManifestPayload);
         const { index } = buildProfileIndex(payload);
-        setAssetManifest(normalizedManifest);
         setProfilesByDguid(index);
         setInitialLoad({ ready: true, error: "" });
       })
@@ -181,83 +174,15 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
     [profilesByDguid],
   );
 
-  const ensureMetadataIndexForFed = useCallback(
-    async (fedNum) => {
-      const normalizedFedNum = String(fedNum ?? "").trim();
-
-      if (!normalizedFedNum) {
-        return null;
-      }
-
-      if (metadataIndexCacheRef.current.has(normalizedFedNum)) {
-        return metadataIndexCacheRef.current.get(normalizedFedNum);
-      }
-
-      const metadataGeojsonPaths = getMetadataGeojsonPathsForFed(
-        assetManifest,
-        normalizedFedNum,
-      );
-
-      if (!metadataGeojsonPaths.length) {
-        throw new Error(`No metadata GeoJSON is available for FED ${normalizedFedNum}.`);
-      }
-
-      const metadataGeojsons = await Promise.all(
-        metadataGeojsonPaths.map((path) => mapApi.fetchAssetJson(path)),
-      );
-      const mergedMetadataGeojson = {
-        type: "FeatureCollection",
-        features: metadataGeojsons.flatMap((payload) => payload?.features ?? []),
-      };
-      const nextIndex = buildDaObjectionIndex(mergedMetadataGeojson);
-      metadataIndexCacheRef.current.set(normalizedFedNum, nextIndex);
-      return nextIndex;
-    },
-    [assetManifest],
-  );
-
-  const ensureMetadataIndexForFeds = useCallback(
-    async (fedNums) => {
-      const normalizedFedNums = [...new Set(
-        (fedNums ?? []).map((fedNum) => String(fedNum ?? "").trim()).filter(Boolean),
-      )].sort();
-      const cacheKey = `pair:${normalizedFedNums.join("|")}`;
-
-      if (!normalizedFedNums.length) {
-        return null;
-      }
-
-      if (metadataIndexCacheRef.current.has(cacheKey)) {
-        return metadataIndexCacheRef.current.get(cacheKey);
-      }
-
-      const indexes = await Promise.all(
-        normalizedFedNums.map((fedNum) => ensureMetadataIndexForFed(fedNum)),
-      );
-      const merged = buildDaObjectionIndex({
-        type: "FeatureCollection",
-        features: indexes.flatMap((index) => Array.from(index.featureByDguid.values())),
-      });
-      metadataIndexCacheRef.current.set(cacheKey, merged);
-      return merged;
-    },
-    [ensureMetadataIndexForFed],
-  );
-
   useEffect(() => {
     const draft = counterProposalDraftRef.current;
     if (!draft || !initialLoad.ready || !profilesByDguid.size) return undefined;
     let cancelled = false;
     const firstDguid = String(draft.firstDguid ?? "");
     const secondDguid = String(draft.secondDguid ?? "");
-    const firstFed = getFedNumForDguid(firstDguid);
-    const secondFed = getFedNumForDguid(secondDguid);
 
-    ensureMetadataIndexForFeds([firstFed, secondFed]).then((index) => {
-      if (cancelled || !index || !areDaNeighbours(index, firstDguid, secondDguid)) {
-        throw new Error("The saved Counter-Proposal baseline is no longer available.");
-      }
-      const baseCache = buildCounterProposalCache(index, profilesByDguid, firstDguid, secondDguid);
+    loadCounterProposalPair(firstDguid, secondDguid, profilesByDguid).then(({ index, cache: baseCache }) => {
+      if (cancelled) return;
       const cache = restoreCounterProposalCacheFromDraft(baseCache, draft);
       if (cache === baseCache && draft.cache?.history?.length) {
         throw new Error("The saved Counter-Proposal baseline has changed.");
@@ -286,8 +211,6 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
 
     return () => { cancelled = true; };
   }, [
-    ensureMetadataIndexForFeds,
-    getFedNumForDguid,
     initialLoad.ready,
     profilesByDguid,
   ]);
@@ -312,7 +235,7 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
       return;
     }
 
-    if (!activeFirstDguid || !activeFedNum) {
+    if (!activeFirstDguid) {
       setObjectionGeometryIndex(null);
       return;
     }
@@ -320,7 +243,7 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
     let isCancelled = false;
     setObjectionGeometryIndex(null);
 
-    ensureMetadataIndexForFed(activeFedNum)
+    loadDisplayDaIndex(activeFirstDguid)
       .then((nextIndex) => {
         if (isCancelled) {
           return;
@@ -343,7 +266,6 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
   }, [
     counterProposalWorkflow.firstDguid,
     counterProposalWorkflow.step,
-    ensureMetadataIndexForFed,
     getFedNumForDguid,
     objectionWorkflow.firstDguid,
     objectionWorkflow.step,
@@ -373,14 +295,14 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
 
       setSelection({ type: "da", dguid });
       const firstDguid = objectionWorkflow.firstDguid;
-      const firstFedNum = getFedNumForDguid(firstDguid);
 
       try {
-        const pairIndex = await ensureMetadataIndexForFeds([firstFedNum, currentFedNum]);
+        const isNeighbour = await areReleaseDaNeighbours(firstDguid, dguid);
+        const pairIndex = await loadDisplayPairIndex(firstDguid, dguid);
         setObjectionGeometryIndex(pairIndex);
         setObjectionWorkflow((current) => {
           if (current.step !== 2 || current.firstDguid !== firstDguid) return current;
-          if (!areDaNeighbours(pairIndex, firstDguid, dguid)) {
+          if (!isNeighbour) {
             return createInitialObjectionWorkflow({
               error: "The second DA must be adjacent to the first one. Please select the first DA again.",
             });
@@ -396,7 +318,7 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
         setObjectionWorkflow((current) => createInitialObjectionWorkflow({
           step: 2,
           firstDguid: current.firstDguid,
-          error: `Could not load the neighbouring FED geometry: ${error.message}`,
+          error: `Could not load the neighbouring DA geometry: ${error.message}`,
         }));
       }
       return;
@@ -422,19 +344,22 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
 
       setSelection({ type: "da", dguid });
       const firstDguid = counterProposalWorkflow.firstDguid;
-      const firstFedNum = getFedNumForDguid(firstDguid);
 
       try {
-        const pairIndex = await ensureMetadataIndexForFeds([firstFedNum, currentFedNum]);
+        const isNeighbour = await areReleaseDaNeighbours(firstDguid, dguid);
+        const { index: pairIndex, cache } = await loadCounterProposalPair(
+          firstDguid,
+          dguid,
+          profilesByDguid,
+        );
         setObjectionGeometryIndex(pairIndex);
         setCounterProposalWorkflow((current) => {
           if (current.step !== 2 || current.firstDguid !== firstDguid) return current;
-          if (!areDaNeighbours(pairIndex, firstDguid, dguid)) {
+          if (!isNeighbour) {
             return createInitialCounterProposalWorkflow({
               error: "The second DA must be adjacent to the first one. Please select the first DA again.",
             });
           }
-          const cache = buildCounterProposalCache(pairIndex, profilesByDguid, firstDguid, dguid);
 
           if (!cache || cache.sourceGeometryIssues?.length) {
             const issue = cache?.sourceGeometryIssues?.[0]?.reason ?? "The selected DA geometry is unavailable.";
@@ -459,7 +384,7 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
           step: 2,
           firstDguid: current.firstDguid,
           previewMode: "proposal",
-          error: `Could not load the neighbouring FED geometry: ${error.message}`,
+          error: `Could not load the neighbouring DA geometry: ${error.message}`,
         }));
       }
       return;
@@ -478,7 +403,6 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
     objectionWorkflow.step,
     panelView,
     profilesByDguid,
-    ensureMetadataIndexForFeds,
   ]);
 
   const handleFedSelect = useCallback((fedNum, fedName) => {
