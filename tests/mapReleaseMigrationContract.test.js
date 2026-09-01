@@ -30,6 +30,10 @@ const archiveSql = fs.readFileSync(
   new URL("../supabase/migrations/20260901091000_archive_v2_expand.sql", import.meta.url),
   "utf8",
 );
+const inventorySql = fs.readFileSync(
+  new URL("../supabase/migrations/20260901093000_supabase_contract_inventory.sql", import.meta.url),
+  "utf8",
+);
 
 test("map release expand migration freezes immutable identity and sparse operations", () => {
   for (const table of [
@@ -95,4 +99,21 @@ test("database cutover audit checks release identity, migration gaps, RLS, and b
   }
   assert.match(sql, /grant execute on function public\.audit_final_refactor_database\(\) to service_role/);
   assert.match(sql, /revoke all on function public\.audit_final_refactor_database\(\) from public, anon, authenticated/);
+});
+
+test("cleanup inventory is read-only, service-role-only, and paired with source reference auditing", () => {
+  assert.match(inventorySql, /inventory_final_refactor_database/);
+  assert.match(inventorySql, /pg_total_relation_size/);
+  assert.match(inventorySql, /pg_get_constraintdef/);
+  assert.match(inventorySql, /from pg_policies/);
+  assert.match(inventorySql, /grant execute on function public\.inventory_final_refactor_database\(\)\s+to service_role/);
+  assert.doesNotMatch(inventorySql, /drop table|drop column|delete from|truncate/);
+
+  const auditScript = fs.readFileSync(
+    new URL("../scripts/one-time/audit_supabase_contract.mjs", import.meta.url),
+    "utf8",
+  );
+  assert.match(auditScript, /SOURCE_ROOTS = \["server", "src"\]/);
+  assert.match(auditScript, /liveLegacyConsumers/);
+  assert.match(auditScript, /cleanupReady/);
 });
