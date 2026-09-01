@@ -527,6 +527,7 @@ function buildWorkflowFocusExclusionFilter(dguids) {
 
 export function MapCanvas({
   isFullscreen = false,
+  cameraCommand = null,
   mapSearchTarget = null,
   recenterTarget,
   highlightedProvincePrUid = null,
@@ -623,6 +624,8 @@ export function MapCanvas({
   const [isPostalAreaMarkerVisible, setIsPostalAreaMarkerVisible] = useState(true);
   const [isSearchMarkerVisible, setIsSearchMarkerVisible] = useState(true);
   const lastAppliedSearchTargetRef = useRef(null);
+  const consumedCameraRequestIdRef = useRef(null);
+  const cameraCommandRef = useRef(cameraCommand);
   const [totalSubmissions, setTotalSubmissions] = useState(0);
   const totalSubmissionsRef = useRef(0);
 
@@ -639,6 +642,7 @@ export function MapCanvas({
   onPostalAreaActivateRef.current = onPostalAreaActivate;
   onStatusChangeRef.current = onStatusChange;
   recenterTargetRef.current = recenterTarget;
+  cameraCommandRef.current = cameraCommand;
   rolloutCategoryIdRef.current = rolloutCategoryId;
   postalAreaTargetRef.current = postalAreaTarget;
   boundariesVisibleRef.current = boundariesVisible;
@@ -927,40 +931,45 @@ export function MapCanvas({
 
   useEffect(() => {
     const map = mapRef.current;
-    const coordinates = getMapTargetCoordinates(mapSearchTarget);
-    const viewport = getMapTargetViewport(mapSearchTarget);
+    const command = cameraCommandRef.current;
+    const target = command?.target ?? mapSearchTarget;
 
-    if (mapSearchTarget !== lastAppliedSearchTargetRef.current) {
+    if (command?.requestId && command.requestId === consumedCameraRequestIdRef.current) {
+      return;
+    }
+
+    if (!command && mapSearchTarget !== lastAppliedSearchTargetRef.current) {
       setIsSearchMarkerVisible(true);
       lastAppliedSearchTargetRef.current = mapSearchTarget;
     }
 
     if (skipNextPostalTargetSyncRef.current) {
-      // Clearing the app-level Places result exposes the postal target again.
-      // The postal button already started that exact camera move, so avoid a
-      // second transition that could retain the searched location's zoom.
-      const matchesPostalTarget = mapSearchTarget === postalAreaTargetRef.current;
+      const matchesPostalTarget = target === postalAreaTargetRef.current;
       skipNextPostalTargetSyncRef.current = false;
-
       if (matchesPostalTarget) {
         return;
       }
     }
 
+    const coordinates = getMapTargetCoordinates(target);
+    const viewport = getMapTargetViewport(target);
+
     if (!map || !isMapReadyRef.current || (!coordinates && !viewport)) {
       return;
     }
 
+    if (command?.requestId) {
+      consumedCameraRequestIdRef.current = command.requestId;
+      setIsSearchMarkerVisible(command.source === "search");
+    }
+
     if (viewport) {
       map.fitBounds(viewport, {
-        ...getMapTargetFitBoundsOptions(mapSearchTarget),
+        ...getMapTargetFitBoundsOptions(target),
         duration: 700,
       });
     } else {
-      const targetZoom = Number.isFinite(mapSearchTarget?.zoom)
-        ? mapSearchTarget.zoom
-        : 14;
-
+      const targetZoom = Number.isFinite(target?.zoom) ? target.zoom : 14;
       map.flyTo({
         center: coordinates,
         zoom: Math.max(map.getZoom(), targetZoom),
@@ -968,11 +977,11 @@ export function MapCanvas({
       });
     }
 
-    if (
-      !isSearchMarkerVisible
-      || mapSearchTarget?.showMarker === false
-      || !coordinates
-    ) {
+    const showSearchMarker = command
+      ? command.source === "search"
+      : isSearchMarkerVisible;
+
+    if (!showSearchMarker || target?.showMarker === false || !coordinates) {
       searchMarkerRef.current?.remove();
       searchMarkerRef.current = null;
     } else {
@@ -981,12 +990,11 @@ export function MapCanvas({
           color: "#1a73e8",
         });
       }
-
       searchMarkerRef.current.setLngLat(coordinates).addTo(map);
     }
 
-    onStatusChangeRef.current?.(`Map moved to ${mapSearchTarget.label || "the selected place"}.`);
-  }, [isSearchMarkerVisible, mapReadyTick, mapSearchTarget]);
+    onStatusChangeRef.current?.(`Map moved to ${target?.label || "the selected place"}.`);
+  }, [cameraCommand, isSearchMarkerVisible, mapReadyTick, mapSearchTarget]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1113,18 +1121,19 @@ export function MapCanvas({
     const protocol = new Protocol();
     maplibregl.addProtocol("pmtiles", protocol.tile);
 
-    const initialCoordinates = getMapTargetCoordinates(mapSearchTarget);
-    const initialViewport = getMapTargetViewport(mapSearchTarget);
+    const initialTarget = cameraCommandRef.current?.target ?? mapSearchTarget;
+    const initialCoordinates = getMapTargetCoordinates(initialTarget);
+    const initialViewport = getMapTargetViewport(initialTarget);
     const initialView = initialViewport
       ? {
           bounds: initialViewport,
-          fitBoundsOptions: getMapTargetFitBoundsOptions(mapSearchTarget),
+          fitBoundsOptions: getMapTargetFitBoundsOptions(initialTarget),
         }
       : initialCoordinates
         ? {
             center: initialCoordinates,
-            zoom: Number.isFinite(mapSearchTarget?.zoom)
-              ? mapSearchTarget.zoom
+            zoom: Number.isFinite(initialTarget?.zoom)
+              ? initialTarget.zoom
               : 14,
           }
         : {

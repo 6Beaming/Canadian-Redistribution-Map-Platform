@@ -825,6 +825,53 @@
   border-top: 1px solid #e8edf3;
 }
 
+.map-info-panel__scope-notice {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid #f1c40f;
+  border-radius: 0 8px 8px 0;
+  background: #fff8de;
+  color: #5f6368;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.map-info-panel__scope-notice--adjacent {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.map-info-panel__neighbor-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.map-info-panel__neighbor-list button {
+  display: grid;
+  gap: 0.15rem;
+  width: 100%;
+  border: 1px solid #d8e6fb;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.map-info-panel__neighbor-list button:hover {
+  border-color: #b7d0f8;
+  background: #f5f9ff;
+}
+
+.map-info-panel__neighbor-list code {
+  font-size: 11px;
+  color: #5f6368;
+}
+
 .map-info-panel__footnote {
   margin: 12px 0 0;
   padding-top: 12px;

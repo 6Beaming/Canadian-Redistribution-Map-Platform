@@ -1,4 +1,4 @@
-import { resolveCommissionerPruid } from "../authorization/provinceCatalog.js";
+import { resolveCommissionerDguidContext } from "../authorization/commissionerAreaContext.js";
 import { normalizeSubmissionStatus, normalizeSubmissionType } from "./submissionListQuery.js";
 
 export const DASHBOARD_AREA_SUBMISSION_COLUMNS = [
@@ -50,24 +50,7 @@ async function loadAuthorsById(supabase, rows) {
   return new Map((data ?? []).map((profile) => [profile.id, profile]));
 }
 
-/**
- * Dashboard-only projection. DGUID, active-status, and Commissioner scope are
- * all applied by PostgREST before rows leave the database. Geometry and review
- * collaboration state are intentionally absent from this contract.
- */
-export async function queryDashboardAreaSubmissions(supabase, {
-  dguid: requestedDguid,
-  commissionerProfile,
-} = {}) {
-  const dguid = normalizeDguid(requestedDguid);
-  const commissionerPruid = resolveCommissionerPruid(commissionerProfile);
-  if (!commissionerPruid) {
-    throw dashboardAreaError("Commissioner province registration is required.", {
-      statusCode: 403,
-      code: "MISSING_COMMISSIONER_PROVINCE",
-    });
-  }
-
+async function queryInScopeSubmissions(supabase, dguid, commissionerPruid) {
   const { data, error } = await supabase
     .from("submissions")
     .select(DASHBOARD_AREA_SUBMISSION_COLUMNS)
@@ -84,14 +67,45 @@ export async function queryDashboardAreaSubmissions(supabase, {
 
   const rows = data ?? [];
   const authorsById = await loadAuthorsById(supabase, rows);
+  return rows.map((row) => ({
+    id: row.id,
+    type: normalizeSubmissionType(row.type),
+    title: row.title ?? "",
+    comment: row.comment ?? "",
+    author: authorsById.get(row.user_id) ?? { id: row.user_id ?? null, email: null },
+    status: normalizeSubmissionStatus(row.status),
+  }));
+}
+
+/**
+ * Dashboard-only projection. DGUID, active-status, and Commissioner scope are
+ * all applied by PostgREST before rows leave the database. Geometry and review
+ * collaboration state are intentionally absent from this contract.
+ */
+export async function queryDashboardAreaSubmissions(supabase, {
+  dguid: requestedDguid,
+  commissionerProfile,
+} = {}) {
+  const dguid = normalizeDguid(requestedDguid);
+  const scope = resolveCommissionerDguidContext(dguid, commissionerProfile);
+
+  if (scope.relationship !== "in_scope") {
+    return {
+      selectedArea: scope.selectedArea,
+      inScopeNeighbors: scope.inScopeNeighbors,
+      submissions: [],
+    };
+  }
+
+  const submissions = await queryInScopeSubmissions(
+    supabase,
+    dguid,
+    scope.operatingPruid,
+  );
+
   return {
-    submissions: rows.map((row) => ({
-      id: row.id,
-      type: normalizeSubmissionType(row.type),
-      title: row.title ?? "",
-      comment: row.comment ?? "",
-      author: authorsById.get(row.user_id) ?? { id: row.user_id ?? null, email: null },
-      status: normalizeSubmissionStatus(row.status),
-    })),
+    selectedArea: scope.selectedArea,
+    inScopeNeighbors: scope.inScopeNeighbors,
+    submissions,
   };
 }

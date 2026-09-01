@@ -555,6 +555,7 @@ export function MapInfoPanel({
   onCounterProposalSubmitSuccess,
   onRolloutHoverChange,
   onRolloutSelect,
+  onSelectDguid,
 }) {
   const hasSelection = Boolean(selection?.type);
   const isDataBlockedFedSelection =
@@ -657,6 +658,7 @@ export function MapInfoPanel({
         panelView={panelView}
         selection={selection}
         profilesByDguid={profilesByDguid}
+        onSelectDguid={onSelectDguid}
       />
     );
   }

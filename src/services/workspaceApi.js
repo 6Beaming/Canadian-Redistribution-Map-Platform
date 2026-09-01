@@ -571,9 +571,16 @@ export async function getSubmissionHeatmap() {
 }
 
 /** Dashboard-only DA-card query; the server filters DGUID and scope in SQL. */
-export async function getDashboardSubmissionsForDguid(dguid, { signal } = {}) {
+export async function getDashboardAreaContext(dguid, { signal } = {}) {
     const target = String(dguid ?? "");
-    if (!target) return { comments: [], objections: [], counterProposals: [] };
+    if (!target) {
+        return {
+            selectedArea: null,
+            relationship: "out_of_scope",
+            inScopeNeighbors: [],
+            submissions: { comments: [], objections: [], counterProposals: [] },
+        };
+    }
     const response = await fetch(`/api/workspace/dashboard/areas/${encodeURIComponent(target)}`, {
         credentials: "include",
         signal,
@@ -588,10 +595,21 @@ export async function getDashboardSubmissionsForDguid(dguid, { signal } = {}) {
         : [];
 
     return {
-        comments: active.filter((submission) => ["feedback", "comment"].includes(normalizeType(submission.type))),
-        objections: active.filter((submission) => normalizeType(submission.type) === "objection"),
-        counterProposals: active.filter((submission) => normalizeType(submission.type) === "counter-proposal"),
+        selectedArea: payload?.selectedArea ?? null,
+        relationship: payload?.selectedArea?.relationship ?? payload?.relationship ?? "out_of_scope",
+        inScopeNeighbors: Array.isArray(payload?.inScopeNeighbors) ? payload.inScopeNeighbors : [],
+        submissions: {
+            comments: active.filter((submission) => ["feedback", "comment"].includes(normalizeType(submission.type))),
+            objections: active.filter((submission) => normalizeType(submission.type) === "objection"),
+            counterProposals: active.filter((submission) => normalizeType(submission.type) === "counter-proposal"),
+        },
     };
+}
+
+/** @deprecated Use getDashboardAreaContext for scope-aware dashboard cards. */
+export async function getDashboardSubmissionsForDguid(dguid, { signal } = {}) {
+    const context = await getDashboardAreaContext(dguid, { signal });
+    return context.submissions;
 }
 
 async function getRemoteArchiveTreeRecords() {

@@ -11,16 +11,21 @@ test("Dashboard cards use the dedicated DGUID API and reject stale responses", (
   const cards = read("src/components/non_prebuilt/CommissionerSubmissionCollections.jsx");
 
   const dashboardFunction = api.slice(
-    api.indexOf("export async function getDashboardSubmissionsForDguid"),
-    api.indexOf("async function getRemoteArchiveTreeRecords"),
+    api.indexOf("export async function getDashboardAreaContext"),
+    api.indexOf("/** @deprecated Use getDashboardAreaContext"),
   );
   assert.match(dashboardFunction, /\/api\/workspace\/dashboard\/areas\//);
   assert.match(dashboardFunction, /signal/);
+  assert.match(dashboardFunction, /relationship/);
+  assert.match(dashboardFunction, /inScopeNeighbors/);
   assert.doesNotMatch(dashboardFunction, /getWorkspaceSubmissions/);
+  assert.match(cards, /getDashboardAreaContext/);
   assert.match(cards, /new AbortController\(\)/);
   assert.match(cards, /activeRequestId === requestId/);
   assert.match(cards, /controller\.abort\(\)/);
   assert.match(cards, /role="alert"/);
+  assert.match(cards, /map-info-panel__scope-notice/);
+  assert.match(cards, /relationship !== "in_scope"/);
 });
 
 test("Workspace actions stack and panel selectors share styling", () => {

@@ -4,6 +4,7 @@ import {
   getSupabaseProfileEmailsAsAdmin,
 } from "../lib/supabase.js";
 import { requireAuth } from "../middleware/requireAuth.js";
+import { resolveCommissionerFedContext } from "../lib/authorization/commissionerAreaContext.js";
 import { queryDashboardAreaSubmissions } from "../lib/submissions/dashboardAreaQuery.js";
 
 const router = Router();
@@ -28,6 +29,18 @@ router.get("/dashboard/areas/:dguid", async (req, res) => {
   } catch (error) {
     return res.status(error.statusCode || 500).json({
       error: error.message || "Unable to load Dashboard submissions.",
+      ...(error.code ? { code: error.code } : {}),
+    });
+  }
+});
+
+router.get("/dashboard/feds/:fedNum/scope-context", async (req, res) => {
+  try {
+    const scope = resolveCommissionerFedContext(req.params.fedNum, req.profile);
+    return res.json(scope);
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.message || "Unable to resolve FED scope context.",
       ...(error.code ? { code: error.code } : {}),
     });
   }

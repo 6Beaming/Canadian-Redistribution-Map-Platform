@@ -5,6 +5,7 @@ import { MapInfoPanel, getDefaultPanelView } from "@/components/non_prebuilt/Map
 import { MapRegionSelector } from "@/components/non_prebuilt/MapRegionSelector.jsx";
 import { useAuth } from "@/contexts/AuthContext.jsx";
 import { useMapFullscreen } from "@/contexts/MapFullscreenContext.jsx";
+import { useMapCameraCommands } from "@/hooks/useMapCameraCommands.js";
 import { DEFAULT_ROLLOUT_CATEGORY_ID } from "@/lib/map/rolloutPlan.js";
 import { WORKSPACE_LIST_INVALIDATION_KEYS } from "@/lib/realtime/workspaceRealtime.js";
 import { getProvinceMapView } from "@/lib/map/provinceView.js";
@@ -35,7 +36,14 @@ export default function DashboardHome({ mapSearchTarget = null }) {
     () => getProvinceMapView(user?.province),
     [user?.province],
   );
-  const activeMapTarget = mapSearchTarget ?? commissionerProvinceView?.mapTarget ?? null;
+  const { cameraCommand, search: searchCamera } = useMapCameraCommands({
+    initialTarget: commissionerProvinceView?.mapTarget ?? null,
+  });
+
+  useEffect(() => {
+    if (!mapSearchTarget) return;
+    searchCamera(mapSearchTarget);
+  }, [mapSearchTarget, searchCamera]);
 
   useEffect(() => {
     let isMounted = true;
@@ -180,7 +188,7 @@ export default function DashboardHome({ mapSearchTarget = null }) {
               />
               <MapCanvas
                 isFullscreen={isFullscreen}
-                mapSearchTarget={activeMapTarget}
+                cameraCommand={cameraCommand}
                 recenterTarget={commissionerProvinceView?.mapTarget ?? null}
                 highlightedProvincePrUid={commissionerProvinceView?.pruid ?? null}
                 selection={selection}
@@ -208,6 +216,7 @@ export default function DashboardHome({ mapSearchTarget = null }) {
             rolloutCategoryId={rolloutCategoryId}
             onRolloutHoverChange={handleRolloutHoverChange}
             onRolloutSelect={handleRolloutSelect}
+            onSelectDguid={handleDaSelect}
           />
         </div>
       </div>

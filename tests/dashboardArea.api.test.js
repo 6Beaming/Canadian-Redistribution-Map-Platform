@@ -14,6 +14,10 @@ const commissioner = {
   province: "YT",
 };
 
+const IN_SCOPE_DGUID = "2021S051260010118";
+const ADJACENT_DGUID = "2021S051259570228";
+const OUT_OF_SCOPE_DGUID = "2021S051210010165";
+
 afterEach(() => setSupabaseTestDoubles(null));
 
 async function request(path) {
@@ -42,7 +46,7 @@ function authenticate(profile = commissioner, admin = null) {
   });
 }
 
-function dashboardAdmin(calls) {
+function dashboardAdmin(calls, targetDguid = IN_SCOPE_DGUID) {
   const fixtureRows = [
     {
       id: "primary-match",
@@ -51,7 +55,7 @@ function dashboardAdmin(calls) {
       comment: "Visible primary content",
       user_id: "author-1",
       status: "pending",
-      dguid: "target-da",
+      dguid: targetDguid,
       neighboring_dguid: null,
       scope_pruid: "60",
     },
@@ -63,7 +67,7 @@ function dashboardAdmin(calls) {
       user_id: "author-1",
       status: "archive-request",
       dguid: "other-da",
-      neighboring_dguid: "target-da",
+      neighboring_dguid: targetDguid,
       scope_pruid: "60",
     },
     {
@@ -84,7 +88,7 @@ function dashboardAdmin(calls) {
       comment: "Must not leave the database",
       user_id: "author-3",
       status: "pending",
-      dguid: "target-da",
+      dguid: targetDguid,
       neighboring_dguid: null,
       scope_pruid: "35",
     },
@@ -104,7 +108,7 @@ function dashboardAdmin(calls) {
             const [, scopePruid] = calls.scopeFilter;
             const data = fixtureRows
               .filter((row) => row.scope_pruid === scopePruid)
-              .filter((row) => row.dguid === "target-da" || row.neighboring_dguid === "target-da")
+              .filter((row) => row.dguid === targetDguid || row.neighboring_dguid === targetDguid)
               .map(({ scope_pruid: _scopePruid, ...row }) => row);
             return { data, error: null };
           },
@@ -128,10 +132,11 @@ test("Dashboard DGUID endpoint filters in the database and batches authors", asy
   const calls = { tables: [] };
   authenticate(commissioner, dashboardAdmin(calls));
 
-  const response = await request("/api/workspace/dashboard/areas/target-da");
+  const response = await request(`/api/workspace/dashboard/areas/${IN_SCOPE_DGUID}`);
 
   assert.equal(response.status, 200);
-  assert.deepEqual(calls.dguidFilter, "dguid.eq.target-da,neighboring_dguid.eq.target-da");
+  assert.equal(response.body.selectedArea.relationship, "in_scope");
+  assert.deepEqual(calls.dguidFilter, `dguid.eq.${IN_SCOPE_DGUID},neighboring_dguid.eq.${IN_SCOPE_DGUID}`);
   assert.deepEqual(calls.scopeFilter, ["submission_scope_pruids.pruid", "60"]);
   assert.deepEqual(calls.statusFilter, ["status", ["pending", "archive-request"]]);
   assert.deepEqual(calls.profileBatch, ["id", ["author-1"]]);
@@ -144,6 +149,29 @@ test("Dashboard DGUID endpoint filters in the database and batches authors", asy
   assert.equal(response.body.submissions[0].comment, "Visible primary content");
   assert.equal(response.body.submissions[0].author.id, "author-1");
   assert.equal(response.body.submissions[0].author.email, "author@example.com");
+});
+
+test("Dashboard DGUID endpoint skips submission queries outside commissioner scope", async () => {
+  const calls = { tables: [] };
+  authenticate(commissioner, {
+    from(table) {
+      calls.tables.push(table);
+      throw new Error(`database must not be queried for ${table}`);
+    },
+  });
+
+  const adjacent = await request(`/api/workspace/dashboard/areas/${ADJACENT_DGUID}`);
+  assert.equal(adjacent.status, 200);
+  assert.equal(adjacent.body.selectedArea.relationship, "adjacent_to_scope");
+  assert.equal(adjacent.body.submissions.length, 0);
+  assert.ok(adjacent.body.inScopeNeighbors.length > 0);
+
+  const outOfScope = await request(`/api/workspace/dashboard/areas/${OUT_OF_SCOPE_DGUID}`);
+  assert.equal(outOfScope.status, 200);
+  assert.equal(outOfScope.body.selectedArea.relationship, "out_of_scope");
+  assert.equal(outOfScope.body.submissions.length, 0);
+  assert.equal((outOfScope.body.inScopeNeighbors ?? []).length, 0);
+  assert.equal(calls.tables.length, 0);
 });
 
 test("Dashboard projection is isolated from generic lists and excludes geometry", () => {
@@ -168,7 +196,7 @@ test("Dashboard DGUID endpoint remains Commissioner-only", async () => {
     postal_code: "Y1A 1A1",
     phone: "8675550100",
   });
-  const response = await request("/api/workspace/dashboard/areas/target-da");
+  const response = await request(`/api/workspace/dashboard/areas/${IN_SCOPE_DGUID}`);
   assert.equal(response.status, 403);
   assert.equal(response.body.error, "Commissioner access is required.");
 });

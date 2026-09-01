@@ -12,7 +12,7 @@ import {
 import { MISSING_DA_POPULATION, MVP_FED_NUM } from "@/lib/map/constants.js";
 import { getDaPanelTitle, getDaPopulationDisplay } from "@/lib/map/profileUtils.js";
 import {
-  getDashboardSubmissionsForDguid,
+  getDashboardAreaContext,
   subscribeWorkspaceState,
 } from "@/services/workspaceApi.js";
 
@@ -33,6 +33,38 @@ function formatPopulation(value) {
     return MISSING_DA_POPULATION;
   }
   return Number(value).toLocaleString();
+}
+
+function ScopeNotice({ relationship, inScopeNeighbors = [], onSelectDguid }) {
+  if (relationship === "out_of_scope") {
+    return (
+      <p className="map-info-panel__scope-notice" role="status">
+        This area is outside your operating province. Submissions are not shown for this location.
+      </p>
+    );
+  }
+
+  if (relationship === "adjacent_to_scope") {
+    return (
+      <div className="map-info-panel__scope-notice map-info-panel__scope-notice--adjacent" role="status">
+        <p>This area is outside your operating province. Select a neighbouring dissemination area in your province to review submissions.</p>
+        {inScopeNeighbors.length ? (
+          <ul className="map-info-panel__neighbor-list">
+            {inScopeNeighbors.map((neighbor) => (
+              <li key={neighbor.dguid}>
+                <button type="button" onClick={() => onSelectDguid?.(neighbor.dguid)}>
+                  <strong>{neighbor.communityName}</strong>
+                  <span><code>{neighbor.dguid}</code></span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+    );
+  }
+
+  return null;
 }
 
 function FedSummary({ fedNum, fedName }) {
@@ -75,12 +107,19 @@ function WorkspaceCardButton({ submissionId }) {
   );
 }
 
-export function CommissionerSubmissionCollections({ panelView, selection, profilesByDguid }) {
+export function CommissionerSubmissionCollections({
+  panelView,
+  selection,
+  profilesByDguid,
+  onSelectDguid,
+}) {
   const [collections, setCollections] = useState({
     comments: [],
     objections: [],
     counterProposals: [],
   });
+  const [relationship, setRelationship] = useState("in_scope");
+  const [inScopeNeighbors, setInScopeNeighbors] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
 
@@ -93,16 +132,20 @@ export function CommissionerSubmissionCollections({ panelView, selection, profil
       const activeRequestId = ++requestId;
       setIsLoading(true);
       setLoadError("");
-      return getDashboardSubmissionsForDguid(selection.dguid, { signal: controller.signal })
-        .then((nextCollections) => {
+      return getDashboardAreaContext(selection.dguid, { signal: controller.signal })
+        .then((context) => {
           if (!controller.signal.aborted && activeRequestId === requestId) {
-            setCollections(nextCollections);
+            setCollections(context.submissions);
+            setRelationship(context.relationship);
+            setInScopeNeighbors(context.inScopeNeighbors);
           }
         })
         .catch((error) => {
           if (error?.name !== "AbortError" && !controller.signal.aborted && activeRequestId === requestId) {
             setLoadError(error.message || "Unable to load submissions.");
             setCollections({ comments: [], objections: [], counterProposals: [] });
+            setRelationship("in_scope");
+            setInScopeNeighbors([]);
           }
         })
         .finally(() => {
@@ -129,6 +172,7 @@ export function CommissionerSubmissionCollections({ panelView, selection, profil
   const panelTitle = getDaPanelTitle(profile);
   const population = getDaPopulationDisplay(profile);
   const submissions = collections[PANEL_COLLECTION_KEYS[panelView] ?? "comments"] ?? [];
+  const showScopeNotice = !isLoading && !loadError && relationship !== "in_scope";
 
   return (
     <>
@@ -147,10 +191,17 @@ export function CommissionerSubmissionCollections({ panelView, selection, profil
           {!isLoading && loadError ? (
             <p className="map-info-panel__empty" role="alert">{loadError}</p>
           ) : null}
-          {!isLoading && !loadError && !submissions.length ? (
+          {showScopeNotice ? (
+            <ScopeNotice
+              relationship={relationship}
+              inScopeNeighbors={inScopeNeighbors}
+              onSelectDguid={onSelectDguid}
+            />
+          ) : null}
+          {!isLoading && !loadError && relationship === "in_scope" && !submissions.length ? (
             <p className="map-info-panel__empty">No Submission Found</p>
           ) : null}
-          {submissions.map((submission) => (
+          {relationship === "in_scope" ? submissions.map((submission) => (
             <Card
               key={submission.id}
               size="sm"
@@ -176,7 +227,7 @@ export function CommissionerSubmissionCollections({ panelView, selection, profil
                 <p className="text-sm leading-5 text-gray-700">{submission.comment || "No submission content."}</p>
               </CardContent>
             </Card>
-          ))}
+          )) : null}
         </div>
       </div>
     </>

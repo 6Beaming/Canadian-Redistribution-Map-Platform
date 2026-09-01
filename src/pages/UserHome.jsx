@@ -32,6 +32,7 @@ import { mapApi } from "@/services/mapApi.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
 import { useAuth } from "@/contexts/AuthContext.jsx";
 import { useMapFullscreen } from "@/contexts/MapFullscreenContext.jsx";
+import { useMapCameraCommands } from "@/hooks/useMapCameraCommands.js";
 import { RouteLoadingPage } from "@/components/non_prebuilt/RouteLoadingPage.jsx";
 import "@/styles/map.css";
 
@@ -90,7 +91,14 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
       zoom: 12,
     };
   }, [user?.mapCenter?.latitude, user?.mapCenter?.longitude]);
-  const effectiveMapSearchTarget = mapSearchTarget || profileMapTarget;
+  const { cameraCommand, search: searchCamera, recenter: recenterCamera } = useMapCameraCommands({
+    initialTarget: profileMapTarget,
+  });
+
+  useEffect(() => {
+    if (!mapSearchTarget) return;
+    searchCamera(mapSearchTarget);
+  }, [mapSearchTarget, searchCamera]);
 
   useEffect(() => {
     let isMounted = true;
@@ -673,15 +681,15 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
   }, [handleSubmissionComplete]);
 
   const handlePostalAreaActivate = useCallback(() => {
-    // A postal-code center is not a DA selection. Clear the previous DA so the
-    // InfoPanel immediately returns to its neutral Statistics state instead
-    // of presenting stale details for the area the user just left.
     onClearMapSearchTarget?.();
     setSelection(null);
     setPanelView(getDefaultPanelView("user"));
     setRolloutHoverSelection(null);
     setIsRolloutOpen(false);
-  }, [onClearMapSearchTarget]);
+    if (profileMapTarget) {
+      recenterCamera(profileMapTarget);
+    }
+  }, [onClearMapSearchTarget, profileMapTarget, recenterCamera]);
 
   const handleCounterProposalSelectHandle = useCallback((handleId) => {
     setCounterProposalWorkflow((current) => {
@@ -1048,7 +1056,7 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
               />
               <MapCanvas
                 isFullscreen={isFullscreen}
-                mapSearchTarget={effectiveMapSearchTarget}
+                cameraCommand={cameraCommand}
                 recenterTarget={sessionStatus === "signed-out" ? null : undefined}
                 postalAreaTarget={profileMapTarget}
                 onPostalAreaActivate={handlePostalAreaActivate}
