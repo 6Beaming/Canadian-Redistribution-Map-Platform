@@ -1,0 +1,2 @@
+/src/data/map/current-release.json -text
+/src/data/map/releases/** -text
