@@ -2,10 +2,30 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { test } from "@jest/globals";
 
+const baselineSql = fs.readFileSync(
+  new URL("../supabase/migrations/20260719000000_baseline_application_schema.sql", import.meta.url),
+  "utf8",
+);
 const geometrySql = fs.readFileSync(
   new URL("../supabase/migrations/20260901090000_map_release_geometry_expand.sql", import.meta.url),
   "utf8",
 );
+
+test("fresh databases reconstruct the pre-migration application baseline", () => {
+  for (const table of [
+    "profiles",
+    "pending_invites",
+    "dissemination_areas",
+    "map_proposals",
+    "submissions",
+    "comment_tags",
+  ]) {
+    assert.match(baselineSql, new RegExp(`create table if not exists public\\.${table}`));
+  }
+  assert.match(baselineSql, /constraint submissions_user_id_fkey/);
+  assert.match(baselineSql, /references auth\.users \(id\)/);
+  assert.doesNotMatch(baselineSql, /insert into|drop table|drop column/);
+});
 const archiveSql = fs.readFileSync(
   new URL("../supabase/migrations/20260901091000_archive_v2_expand.sql", import.meta.url),
   "utf8",
