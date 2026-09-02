@@ -108,7 +108,7 @@ function mapVersionCards(view) {
 async function hydrateActiveSubmission(submission) {
   if (!submission) return null;
   try {
-    return await hydrateWorkspaceSubmission(submission, new Map());
+    return await hydrateWorkspaceSubmission(submission);
   } catch {
     return submission;
   }

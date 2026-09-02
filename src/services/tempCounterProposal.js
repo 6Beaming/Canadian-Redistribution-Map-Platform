@@ -513,7 +513,7 @@ export async function getTemporaryCounterProposalSubmissions() {
 export async function hydrateWorkspaceSubmission(submission, profilesByDguid) {
   // Always prefer the full DA profile index so cross-FED / cross-province
   // neighbours resolve to the correct metadata shard.
-  const profiles = profilesByDguid instanceof Map
+  const profiles = profilesByDguid instanceof Map && profilesByDguid.size > 0
     ? profilesByDguid
     : await getProfilesByDguid();
   const type = normalizeSubmissionType(submission?.type);

@@ -92,6 +92,8 @@ test("Archived Counter-Proposal maps retain comparison styling and fullscreen co
   const css = fs.readFileSync("src/styles/archive-tree.css", "utf8");
   const difference = fs.readFileSync("src/pages/ArchivedDifference.jsx", "utf8");
 
+  assert.match(difference, /hydrateWorkspaceSubmission\(submission\)/);
+  assert.doesNotMatch(difference, /hydrateWorkspaceSubmission\([^)]*new Map\(\)/);
   assert.match(difference, /buildDaObjectionIndex/);
   assert.match(difference, /getSharedBoundaryFeatureCollection/);
   assert.match(difference, /getPairOuterBoundaryFeatureCollection/);
