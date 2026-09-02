@@ -80,12 +80,17 @@ export default function ArchivedTree() {
     0,
   );
 
+  const navigationState = useMemo(
+    () => ({ ...location.state, profilesByDguid }),
+    [location.state, profilesByDguid],
+  );
+
   function selectVersion(_category, _branch, version) {
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
       next.set("selected", version.id);
       return next;
-    }, { replace: true, state: location.state });
+    }, { replace: true, state: navigationState });
   }
 
   function clearSelection() {
@@ -93,7 +98,7 @@ export default function ArchivedTree() {
       const next = new URLSearchParams(current);
       next.delete("selected");
       return next;
-    }, { replace: true, state: location.state });
+    }, { replace: true, state: navigationState });
   }
 
   return (
@@ -158,11 +163,11 @@ export default function ArchivedTree() {
           onClose={clearSelection}
           onOpenMap={(_category, branch, version) => navigate(
             `/dashboard/archivedTree/${encodeURIComponent(getArchiveVersionRouteId(version))}/difference?branch=${encodeURIComponent(branch.key)}&mode=open`,
-            { state: location.state },
+            { state: navigationState },
           )}
           onViewDifference={(_category, branch, version) => navigate(
             `/dashboard/archivedTree/${encodeURIComponent(getArchiveVersionRouteId(version))}/difference?branch=${encodeURIComponent(branch.key)}`,
-            { state: location.state },
+            { state: navigationState },
           )}
           onDeleteBranch={async (branch) => {
             await deleteArchiveBranch(branch.key, {

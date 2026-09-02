@@ -1,9 +1,9 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { useRouteLoading } from "@/contexts/RouteLoadingContext.jsx";
 
-// Fixed transition durations. Keep the full scale explicit so route timings can
-// be tuned without coupling the animation to API, MapLibre, or React render
-// completion.
+// Fixed transition durations. MAP_HANDOFF uses a max cap but dismisses as soon as
+// the destination page signals route readiness.
 const ROUTE_LOADING_DURATION_MS = Object.freeze({
   INSTANT: 100,
   BRIEF: 300,
@@ -56,12 +56,12 @@ function getRouteLoadingDuration(fromPathname, toPathname) {
 }
 
 /**
- * Fixed-duration navigation feedback for explicitly selected data-heavy
- * transitions. It deliberately has no relationship with data fetch or map
- * readiness so page loading cannot extend or shorten the animation.
+ * Navigation feedback for data-heavy transitions. MAP_HANDOFF routes dismiss as
+ * soon as the destination signals readiness, with MAP_HANDOFF ms as a fallback cap.
  */
 export function RouteLoadingOverlay() {
   const location = useLocation();
+  const routeLoading = useRouteLoading();
   const [isVisible, setIsVisible] = useState(false);
   const previousPathnameRef = useRef(location.pathname);
   const hasObservedInitialLocationRef = useRef(false);
@@ -86,13 +86,27 @@ export function RouteLoadingOverlay() {
     }
 
     setIsVisible(true);
-    timerRef.current = window.setTimeout(() => {
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
       setIsVisible(false);
       timerRef.current = null;
-    }, duration);
+    };
 
-    return () => window.clearTimeout(timerRef.current);
-  }, [location.key, location.pathname]);
+    const isMapHandoff = duration === ROUTE_LOADING_DURATION_MS.MAP_HANDOFF;
+    const unsubscribe = isMapHandoff && routeLoading?.subscribeRouteReady
+      ? routeLoading.subscribeRouteReady(finish)
+      : () => {};
+
+    timerRef.current = window.setTimeout(finish, duration);
+
+    return () => {
+      finished = true;
+      unsubscribe();
+      window.clearTimeout(timerRef.current);
+    };
+  }, [location.key, location.pathname, routeLoading]);
 
   if (!isVisible) return null;
 

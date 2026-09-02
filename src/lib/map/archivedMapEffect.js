@@ -74,6 +74,12 @@ export async function loadArchivedMapEffect(profilesByDguid = new Map(), { enabl
   try {
     const snapshot = await getArchivedMapSnapshot([], { includeAllHeads: true });
     if (snapshot?.hasV2Branches) {
+      const snapshotDguids = snapshot.dguids?.length
+        ? snapshot.dguids
+        : (snapshot.heads ?? []).map((head) => head.dguid).filter(Boolean);
+      if (snapshotDguids.length) {
+        return snapshotToArchivedMap(snapshot, snapshotDguids);
+      }
       const { dguids } = collectDguidsFromRecords(await getArchiveTreeRecords(), profilesByDguid);
       return snapshotToArchivedMap(snapshot, dguids);
     }

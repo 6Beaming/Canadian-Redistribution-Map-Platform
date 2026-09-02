@@ -26,6 +26,7 @@ import UserProfile from "./pages/UserProfile.jsx";
 import UserResumeSubmission from "./pages/UserResumeSubmission.jsx";
 import RealtimeHarness from "./pages/RealtimeHarness.jsx";
 import { RouteLoadingOverlay } from "./components/non_prebuilt/RouteLoadingOverlay.jsx";
+import { RouteLoadingProvider } from "./contexts/RouteLoadingContext.jsx";
 import { RouteLoadingPage } from "./components/non_prebuilt/RouteLoadingPage.jsx";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -146,7 +147,9 @@ function App() {
     <AuthProvider>
       <RealtimeProvider>
         <MapFullscreenProvider>
-          <AppRoutes />
+          <RouteLoadingProvider>
+            <AppRoutes />
+          </RouteLoadingProvider>
         </MapFullscreenProvider>
       </RealtimeProvider>
     </AuthProvider>

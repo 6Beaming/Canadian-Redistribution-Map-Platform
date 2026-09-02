@@ -1,6 +1,6 @@
 import { archiveError } from "./archiveErrors.js";
 import { getProfileForDguid } from "../map/mapAssetAuthority.js";
-import { getArchivedMapSnapshot } from "./archivedMapRepository.js";
+import { getArchiveMapRevisionSequence } from "./archivedMapRepository.js";
 
 const ARCHIVE_VERSION_SUMMARY_COLUMNS = [
   "id",
@@ -486,19 +486,36 @@ async function resolveBranchCommunityName(primaryDguid, secondaryDguid = null) {
   return primaryName ?? secondaryName ?? "Unknown community";
 }
 
-async function loadArchiveVersionDisplayGeometries(supabase, versionIds) {
+async function loadArchiveVersionViewGeometries(supabase, versionIds) {
   const uniqueIds = [...new Set((versionIds ?? []).filter(Boolean).map(String))];
   if (!uniqueIds.length) return new Map();
   const { data, error } = await supabase
     .from("archive_versions")
-    .select(`id, display_geometry, geometry_digest`)
+    .select("id, display_geometry, geometry_digest")
     .in("id", uniqueIds);
   if (error) {
     throw archiveError(error.message || "Unable to load archive version geometry.", {
       code: "ARCHIVE_VERSION_READ_FAILED",
     });
   }
-  return new Map((data ?? []).map((row) => [String(row.id), row]));
+  return new Map((data ?? []).map((row) => [
+    String(row.id),
+    {
+      displayGeometry: row.display_geometry ?? null,
+    },
+  ]));
+}
+
+function geometryPayloadFromRow(row) {
+  if (!row) {
+    return { displayGeometry: null, originalGeometry: null };
+  }
+  return {
+    displayGeometry: row.displayGeometry ?? null,
+    // Original CP boundaries live in canonical release assets, not in
+    // submission_geometry_revisions or archive_versions columns.
+    originalGeometry: null,
+  };
 }
 
 export async function getArchiveBranchView(supabase, {
@@ -514,43 +531,115 @@ export async function getArchiveBranchView(supabase, {
     });
   }
 
-  const versionPayload = await getArchiveVersion(supabase, normalizedVersionId, {
-    includeGeometry: false,
-  });
-  const { branch, versions } = await getArchiveBranch(supabase, versionPayload.branchId);
-  // Version id is authoritative; branchKey in the query may use a legacy client
-  // format (without release id) from older tree grouping. Skip strict rejection.
-  const latestVersion = versions.find((version) => version.isLatest) ?? versions[0] ?? null;
-  const selectedVersion = versions.find((version) => (
+  const { data: anchorVersion, error: anchorError } = await supabase
+    .from("archive_versions")
+    .select(`
+      id,
+      branch_id,
+      version_number,
+      merge_sequence,
+      version_kind,
+      submission_projection,
+      geometry_digest,
+      validation_report,
+      closing_comment,
+      merged_by,
+      merged_at,
+      archive_branches!branch_id!inner (
+        id,
+        branch_key,
+        submission_type,
+        release_id,
+        primary_dguid,
+        secondary_dguid,
+        head_version_id,
+        head_version_number,
+        resource_version,
+        scope_pruids,
+        created_at,
+        updated_at
+      )
+    `)
+    .eq("id", normalizedVersionId)
+    .maybeSingle();
+  if (anchorError) {
+    throw archiveError(anchorError.message || "Unable to load archive version.", {
+      code: "ARCHIVE_VERSION_READ_FAILED",
+    });
+  }
+  if (!anchorVersion) {
+    throw archiveError("Archive version was not found.", {
+      statusCode: 404,
+      code: "ARCHIVE_VERSION_NOT_FOUND",
+    });
+  }
+
+  const branch = anchorVersion.archive_branches;
+  const { data: versions, error: versionError } = await supabase
+    .from("archive_versions")
+    .select(ARCHIVE_VERSION_SUMMARY_COLUMNS)
+    .eq("branch_id", branch.id)
+    .order("version_number", { ascending: false });
+  if (versionError) {
+    throw archiveError(versionError.message || "Unable to load archive branch versions.", {
+      code: "ARCHIVE_VERSION_READ_FAILED",
+    });
+  }
+
+  const emailsById = await loadProfileEmails(
+    supabase,
+    (versions ?? []).flatMap((version) => [
+      version.merged_by,
+      version.submission_projection?.user_id,
+    ]),
+  );
+  const mappedVersions = (versions ?? []).map((version) => mapVersionRecord(branch, version, emailsById));
+  const latestVersion = mappedVersions.find((version) => version.isLatest) ?? mappedVersions[0] ?? null;
+  const selectedVersion = mappedVersions.find((version) => (
     String(version.versionId) === normalizedVersionId
     || String(version.submission?.id) === normalizedVersionId
-  )) ?? versionPayload;
+  )) ?? mapVersionRecord(branch, anchorVersion, emailsById);
 
   let selectedDisplayGeometry = null;
   let latestDisplayGeometry = null;
-  if (branch.submission_type === "counter_proposal") {
-    const geometryIds = [selectedVersion.versionId];
-    if (
-      includeLatestGeometry
-      && latestVersion?.versionId
-      && latestVersion.versionId !== selectedVersion.versionId
-    ) {
-      geometryIds.push(latestVersion.versionId);
+  let selectedOriginalGeometry = null;
+  let latestOriginalGeometry = null;
+
+  const geometryIds = [];
+  if (selectedVersion?.versionId) {
+    geometryIds.push(selectedVersion.versionId);
+  }
+  if (
+    includeLatestGeometry
+    && latestVersion?.versionId
+    && latestVersion.versionId !== selectedVersion?.versionId
+  ) {
+    geometryIds.push(latestVersion.versionId);
+  }
+
+  if (geometryIds.length) {
+    const geometriesById = await loadArchiveVersionViewGeometries(supabase, geometryIds);
+    const selectedRow = geometriesById.get(String(selectedVersion.versionId));
+    const selectedPayload = geometryPayloadFromRow(selectedRow);
+    selectedDisplayGeometry = selectedPayload.displayGeometry;
+    selectedOriginalGeometry = selectedPayload.originalGeometry;
+
+    if (latestVersion?.versionId && latestVersion.versionId !== selectedVersion.versionId) {
+      const latestRow = geometriesById.get(String(latestVersion.versionId));
+      const latestPayload = geometryPayloadFromRow(latestRow);
+      latestDisplayGeometry = latestPayload.displayGeometry;
+      latestOriginalGeometry = latestPayload.originalGeometry;
+    } else {
+      latestDisplayGeometry = null;
+      latestOriginalGeometry = selectedOriginalGeometry;
     }
-    const geometriesById = await loadArchiveVersionDisplayGeometries(supabase, geometryIds);
-    selectedDisplayGeometry = geometriesById.get(String(selectedVersion.versionId))?.display_geometry ?? null;
-    latestDisplayGeometry = latestVersion?.versionId === selectedVersion.versionId
-      ? null
-      : geometriesById.get(String(latestVersion?.versionId))?.display_geometry ?? null;
   }
 
   const communityName = await resolveBranchCommunityName(
     branch.primary_dguid,
     branch.secondary_dguid,
   );
-  const mapSnapshot = await getArchivedMapSnapshot(supabase, {
-    includeAllHeads: false,
-  });
+  const archiveMapRevision = await getArchiveMapRevisionSequence(supabase);
 
   return {
     source: "v2",
@@ -567,11 +656,13 @@ export async function getArchiveBranchView(supabase, {
       headVersionId: branch.head_version_id,
       headVersionNumber: Number(branch.head_version_number) || null,
     },
-    versions,
+    versions: mappedVersions,
     selectedVersion,
     latestVersion,
     selectedDisplayGeometry,
     latestDisplayGeometry,
-    archiveMapRevision: mapSnapshot.archiveMapRevision ?? 0,
+    selectedOriginalGeometry,
+    latestOriginalGeometry,
+    archiveMapRevision,
   };
 }

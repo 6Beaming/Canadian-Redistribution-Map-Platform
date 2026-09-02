@@ -13,6 +13,7 @@ import { getSubmissionTableRowById } from "@/services/submissionListsApi.js";
 import { getSubmissionReviewContent } from "@/services/commentsApi.js";
 import { hydrateWorkspaceSubmission } from "@/services/tempCounterProposal.js";
 import { RouteLoadingPage } from "@/components/non_prebuilt/RouteLoadingPage.jsx";
+import { useRouteLoading } from "@/contexts/RouteLoadingContext.jsx";
 import "@/styles/map.css";
 import "@/styles/workspace-review.css";
 
@@ -28,6 +29,7 @@ export default function WorkspaceReview() {
   const { submissionId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { signalRouteReady } = useRouteLoading() ?? {};
   const [submission, setSubmission] = useState(null);
   const [allSubmissions, setAllSubmissions] = useState([]);
   const [reviewerEmails, setReviewerEmails] = useState([]);
@@ -60,22 +62,29 @@ export default function WorkspaceReview() {
         if (isMounted) {
           setSubmission({ ...hydrated, comment: reviewContent?.comment ?? hydrated.comment ?? "" });
           setStatus("Submission map ready.");
+          signalRouteReady?.();
         }
-        const [submissions, reviewers] = await Promise.all([
+        Promise.all([
           getWorkspaceSubmissions({ includeArchived: false }),
           reviewersPromise,
-        ]);
-        if (isMounted) {
-          setAllSubmissions(submissions);
-          setReviewerEmails(reviewers);
-        }
+        ])
+          .then(([submissions, reviewers]) => {
+            if (isMounted) {
+              setAllSubmissions(submissions);
+              setReviewerEmails(reviewers);
+            }
+          })
+          .catch(() => {});
       } catch (loadError) {
-        if (isMounted) setError(loadError.message);
+        if (isMounted) {
+          setError(loadError.message);
+          signalRouteReady?.();
+        }
       }
     }
     load();
     return () => { isMounted = false; };
-  }, [submissionId]);
+  }, [signalRouteReady, submissionId]);
 
   useEffect(() => {
     const previousBodyOverflow = document.body.style.overflow;

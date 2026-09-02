@@ -6,6 +6,24 @@ function parseDguidList(values) {
   return [...new Set(items.map((value) => String(value ?? "").trim()).filter(Boolean))];
 }
 
+export async function getArchiveMapRevisionSequence(supabase) {
+  const release = loadCurrentCanonicalRelease();
+  const releaseId = release.manifest.releaseId;
+  const { data: latestRevision, error: revisionError } = await supabase
+    .from("archive_map_revisions")
+    .select("sequence")
+    .eq("release_id", releaseId)
+    .order("sequence", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (revisionError) {
+    throw archiveError(revisionError.message || "Unable to load archive map revision.", {
+      code: "ARCHIVE_MAP_REVISION_FAILED",
+    });
+  }
+  return Number(latestRevision?.sequence ?? 0);
+}
+
 export async function getArchivedMapSnapshot(supabase, {
   dguids: requestedDguids,
   expectedRevision,
