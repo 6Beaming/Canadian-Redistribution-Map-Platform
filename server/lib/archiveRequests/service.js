@@ -106,44 +106,28 @@ async function sealSourceRevision(supabase, {
   let sharedBoundary = null;
   let outerBoundary = null;
   let validationReport = {};
-  let sourceCounterProposalRevisionId = null;
   let sourceGeometryRevisionId = null;
 
   if (type === "counter-proposal" || type === "counter_proposal") {
-    const latest = await repo.loadLatestCounterProposalRevision(supabase, submission.id);
-    if (latest) {
-      revisionNumber = latest.revision_number;
-      primaryDguid = latest.primary_dguid;
-      secondaryDguid = latest.secondary_dguid;
-      baselineRevision = latest.baseline_revision;
-      originalGeometry = latest.original_geometry;
-      proposedGeometry = latest.proposed_geometry;
-      sharedBoundary = latest.shared_boundary;
-      outerBoundary = latest.outer_boundary;
-      validationReport = latest.validation_report ?? {};
-      sourceCounterProposalRevisionId = latest.id;
-    } else {
-      const geometryRevision = await repo.loadLatestSubmissionGeometryRevision(supabase, submission.id);
-      if (!geometryRevision) {
-        throw archiveError("Counter-Proposal revision is required before archiving.", {
-          statusCode: 409,
-          code: "SOURCE_REVISION_UNAVAILABLE",
-        });
-      }
-      if (geometryRevision.migration_state !== "ready") {
-        throw archiveError("Counter-Proposal geometry revision is not ready.", {
-          statusCode: 409,
-          code: "SOURCE_REVISION_UNAVAILABLE",
-        });
-      }
-      revisionNumber = geometryRevision.revision_number;
-      primaryDguid = geometryRevision.primary_dguid;
-      secondaryDguid = geometryRevision.secondary_dguid;
-      baselineRevision = geometryRevision.base_revision;
-      validationReport = geometryRevision.validation_report ?? {};
-      sourceGeometryRevisionId = geometryRevision.id;
-      sourceCounterProposalRevisionId = geometryRevision.legacy_revision_id ?? null;
+    const geometryRevision = await repo.loadLatestSubmissionGeometryRevision(supabase, submission.id);
+    if (!geometryRevision) {
+      throw archiveError("Counter-Proposal revision is required before archiving.", {
+        statusCode: 409,
+        code: "SOURCE_REVISION_UNAVAILABLE",
+      });
     }
+    if (geometryRevision.migration_state !== "ready") {
+      throw archiveError("Counter-Proposal geometry revision is not ready.", {
+        statusCode: 409,
+        code: "SOURCE_REVISION_UNAVAILABLE",
+      });
+    }
+    revisionNumber = geometryRevision.revision_number;
+    primaryDguid = geometryRevision.primary_dguid;
+    secondaryDguid = geometryRevision.secondary_dguid;
+    baselineRevision = geometryRevision.base_revision;
+    validationReport = geometryRevision.validation_report ?? {};
+    sourceGeometryRevisionId = geometryRevision.id;
   }
 
   if (!primaryDguid) {
@@ -173,7 +157,6 @@ async function sealSourceRevision(supabase, {
     shared_boundary: sharedBoundary,
     outer_boundary: outerBoundary,
     validation_report: validationReport,
-    source_counter_proposal_revision_id: sourceCounterProposalRevisionId,
     source_geometry_revision_id: sourceGeometryRevisionId,
     created_by: actorProfileId,
   });
@@ -186,14 +169,12 @@ function deriveAllowedActions(request, votes, actor) {
   const isAssignee = (request.assignee_ids ?? []).some((id) => String(id) === String(actor.id));
   const state = request.state;
 
-  if (state === OPEN) {
+  if (state === OPEN || state === APPROVED) {
     if (isRequester) {
       actions.push("update-assignees", "cancel");
       if (canApproveFromVotes(request, votes)) actions.push("merge");
     }
     if (isAssignee || isRequester) actions.push("vote");
-  } else if (state === APPROVED && isRequester) {
-    actions.push("cancel", "merge");
   }
   return actions;
 }
@@ -558,7 +539,7 @@ export async function updateArchiveRequestAssignees({
       code: "FORBIDDEN",
     });
   }
-  if (request.state !== OPEN) {
+  if (request.state !== OPEN && request.state !== APPROVED) {
     throw archiveError("Assignees can only be changed while the request is open.", {
       statusCode: 409,
       code: "ILLEGAL_STATE_TRANSITION",
@@ -601,7 +582,17 @@ export async function updateArchiveRequestAssignees({
     });
   }
 
-  const activeRequest = await promoteArchiveRequestIfFullyApproved(supabase, updated);
+  const votes = await repo.listVotes(supabase, updated.id);
+  let activeRequest = updated;
+  if (!canApproveFromVotes(updated, votes) && updated.state === APPROVED) {
+    const reopenedVersion = Number(updated.resource_version) || 1;
+    activeRequest = await repo.updateArchiveRequest(supabase, updated.id, reopenedVersion, {
+      state: OPEN,
+      resource_version: reopenedVersion + 1,
+    }) ?? updated;
+  } else {
+    activeRequest = await promoteArchiveRequestIfFullyApproved(supabase, updated);
+  }
 
   await writeOutbox(supabase, {
     aggregateId: activeRequest.id,

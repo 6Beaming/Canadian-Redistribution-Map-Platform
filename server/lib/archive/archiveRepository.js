@@ -1,7 +1,6 @@
 import { archiveError } from "./archiveErrors.js";
-import { getProfileForDguid, loadProfileIndex } from "../map/mapAssetAuthority.js";
+import { getProfileForDguid } from "../map/mapAssetAuthority.js";
 import { getArchivedMapSnapshot } from "./archivedMapRepository.js";
-import { calculateCounterProposalImpact } from "../../../src/lib/map/counterProposalImpact.js";
 
 const ARCHIVE_VERSION_SUMMARY_COLUMNS = [
   "id",
@@ -154,9 +153,10 @@ async function loadCounterProposalValidationReports(supabase, submissionIds) {
   const uniqueIds = [...new Set((submissionIds ?? []).filter(Boolean).map(String))];
   if (!uniqueIds.length) return new Map();
   const { data, error } = await supabase
-    .from("counter_proposal_revisions")
+    .from("submission_geometry_revisions")
     .select("submission_id,revision_number,validation_report")
     .in("submission_id", uniqueIds)
+    .eq("submission_type", "counter_proposal")
     .order("revision_number", { ascending: false });
   if (error) {
     throw archiveError(error.message || "Unable to load archived Counter-Proposal impact.", {
@@ -171,55 +171,6 @@ async function loadCounterProposalValidationReports(supabase, submissionIds) {
     }
   }
   return reports;
-}
-
-async function loadCounterProposalImpactReports(supabase, submissionIds) {
-  const uniqueIds = [...new Set((submissionIds ?? []).filter(Boolean).map(String))];
-  if (!uniqueIds.length) return new Map();
-  const { data, error } = await supabase
-    .from("counter_proposal_revisions")
-    .select("submission_id,revision_number,primary_dguid,secondary_dguid,original_geometry,proposed_geometry,validation_report")
-    .in("submission_id", uniqueIds)
-    .order("revision_number", { ascending: false });
-  if (error) {
-    throw archiveError(error.message || "Unable to load archived Counter-Proposal impact.", {
-      code: "ARCHIVE_IMPACT_READ_FAILED",
-    });
-  }
-
-  const latestBySubmission = new Map();
-  for (const revision of data ?? []) {
-    const submissionId = String(revision.submission_id ?? "");
-    if (submissionId && !latestBySubmission.has(submissionId)) {
-      latestBySubmission.set(submissionId, revision);
-    }
-  }
-
-  const requiresCalculation = [...latestBySubmission.values()].some(
-    (revision) => !revision.validation_report?.impact_summary
-      && revision.original_geometry
-      && revision.proposed_geometry,
-  );
-  const profilesByDguid = requiresCalculation ? (await loadProfileIndex()).index : new Map();
-  return new Map([...latestBySubmission].map(([submissionId, revision]) => {
-    const existingReport = revision.validation_report ?? {};
-    if (existingReport.impact_summary || !revision.original_geometry || !revision.proposed_geometry) {
-      return [submissionId, existingReport];
-    }
-    const firstDguid = String(revision.primary_dguid ?? "");
-    const secondDguid = String(revision.secondary_dguid ?? "");
-    const impactSummary = calculateCounterProposalImpact({
-      originalFeatures: revision.original_geometry,
-      proposedFeatures: revision.proposed_geometry,
-      firstDguid,
-      secondDguid,
-      populationByDguid: new Map([
-        [firstDguid, profilesByDguid.get(firstDguid)?.population ?? null],
-        [secondDguid, profilesByDguid.get(secondDguid)?.population ?? null],
-      ]),
-    });
-    return [submissionId, { ...existingReport, impact_summary: impactSummary }];
-  }));
 }
 
 async function loadProfileEmails(supabase, ids) {

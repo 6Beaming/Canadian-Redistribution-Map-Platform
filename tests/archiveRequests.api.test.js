@@ -61,7 +61,6 @@ function makeAdmin() {
     }],
     submission_scope_pruids: [{ submission_id: "submission-1", pruid: "46" }],
     profiles: [requester, assignee],
-    counter_proposal_revisions: [],
     submission_geometry_revisions: [],
     archive_source_revisions: [],
     workspace_archive_requests: [],
@@ -270,6 +269,36 @@ test("archive request create seals source, claims province, and writes outbox de
   );
 });
 
+test("requester can add assignees after a sole-assignee request auto-approves", async () => {
+  const admin = makeAdmin();
+  auth(requester, admin);
+
+  const created = await request("/api/workspace/archive-requests", {
+    method: "POST",
+    body: {
+      submissionId: "submission-1",
+      assignees: [],
+      expectedVersion: 1,
+    },
+  });
+
+  assert.equal(created.status, 201);
+  assert.equal(created.body.state, "approved");
+
+  const updated = await request(`/api/workspace/archive-requests/${created.body.id}/assignees`, {
+    method: "PATCH",
+    body: { assignees: [assignee.email], expectedVersion: created.body.version },
+  });
+
+  assert.equal(updated.status, 200);
+  assert.equal(updated.body.state, "open");
+  assert.deepEqual(
+    new Set(updated.body.assignees),
+    new Set([requester.email, assignee.email]),
+  );
+  assert.ok(updated.body.allowedActions.includes("update-assignees"));
+});
+
 test("requester remains the required assignee when an update removes every optional assignee", async () => {
   const admin = makeAdmin();
   auth(requester, admin);
@@ -307,18 +336,19 @@ test("counter-proposal Archive Request identifies its requester", async () => {
   const admin = makeAdmin();
   admin.state.submissions[0].type = "counter-proposal";
   admin.state.submissions[0].neighboring_dguid = "2021S051260010119";
-  admin.state.counter_proposal_revisions.push({
-    id: "counter-revision-1",
+  admin.state.submission_geometry_revisions.push({
+    id: "geometry-revision-1",
     submission_id: "submission-1",
+    submission_type: "counter_proposal",
     revision_number: 1,
+    release_id: "release-1",
+    base_revision: "baseline-1",
     primary_dguid: admin.state.submissions[0].dguid,
     secondary_dguid: admin.state.submissions[0].neighboring_dguid,
-    baseline_revision: "baseline-1",
-    original_geometry: {},
-    proposed_geometry: {},
-    shared_boundary: null,
-    outer_boundary: {},
+    geometry_digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     validation_report: {},
+    migration_state: "ready",
+    created_by: "public-1",
   });
   auth(requester, admin);
 

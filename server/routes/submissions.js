@@ -7,15 +7,17 @@ import { requirePublicUser } from "../middleware/requireAuth.js";
 import {
   CounterProposalValidationError,
   MapAssetValidationError,
-  prepareCounterProposalSubmission,
   prepareCounterProposalSubmissionV2,
 } from "../lib/map/counterProposalSubmission.js";
 import {
   createCounterProposalSubmissionV2,
-  deriveCounterProposalOperations,
-  persistSubmissionGeometryRevision,
   materializeGeometryOperations,
 } from "../lib/map/geometryOperations.js";
+import {
+  geometryRevisionToApiRevision,
+  loadLatestCounterProposalGeometryRevision,
+  loadLatestCounterProposalGeometryRevisions,
+} from "../lib/map/counterProposalRevisionStore.js";
 import { assertActiveMapRelease } from "../lib/map/mapReleaseGate.js";
 
 const router = Router();
@@ -62,111 +64,52 @@ async function attachAuthorProfiles(records) {
 
 router.post("/counter-proposals", requirePublicUser, async (req, res, next) => {
   try {
+    if (String(req.body?.schemaVersion ?? "").trim() !== "2.0") {
+      return res.status(400).json({
+        error: "Counter-Proposal submissions require schemaVersion 2.0.",
+        code: "COUNTER_PROPOSAL_V2_REQUIRED",
+      });
+    }
+
     const activeRelease = await assertActiveMapRelease();
-
-    if (String(req.body?.schemaVersion ?? "").trim() === "2.0") {
-      const prepared = await prepareCounterProposalSubmissionV2(req.body, activeRelease);
-      const supabase = getSupabaseAdminDataClient();
-      const persisted = await createCounterProposalSubmissionV2(supabase, {
-        userId: req.user.id,
-        title: prepared.submission.title,
-        comment: prepared.submission.comment,
-        releaseId: prepared.compact.releaseId,
-        baseRevision: prepared.compact.baseRevision,
-        primaryDguid: prepared.compact.primaryDguid,
-        secondaryDguid: prepared.compact.secondaryDguid,
-        fedNum: prepared.submission.fed_num,
-        geometryDigest: prepared.compact.geometryDigest,
-        validationReport: prepared.validationReport,
-        operations: prepared.compact.operations,
-        scopePruids: prepared.scopePruids,
-      });
-
-      return res.status(201).json({
-        schemaVersion: "2.0",
-        submission: {
-          id: persisted.submission.id,
-          type: "counter-proposal",
-          title: persisted.submission.title,
-          status: persisted.submission.status,
-          created_at: persisted.submission.created_at,
-          resource_version: persisted.submission.resource_version,
-          dguid: persisted.submission.dguid,
-          neighboring_dguid: persisted.submission.neighboring_dguid,
-          release_id: persisted.submission.release_id,
-        },
-        geometryRevision: {
-          id: persisted.geometry_revision.id,
-          revisionNumber: persisted.geometry_revision.revision_number,
-          operationCount: prepared.compact.operations.length,
-          geometryDigest: persisted.geometry_revision.geometry_digest,
-        },
-        impactSummary: prepared.validationReport.impact_summary ?? {},
-      });
-    }
-
-    const prepared = await prepareCounterProposalSubmission(req.body);
-    const compactGeometry = await deriveCounterProposalOperations({
-      primaryDguid: prepared.revision.primary_dguid,
-      secondaryDguid: prepared.revision.secondary_dguid,
-      originalGeometry: prepared.revision.original_geometry,
-      proposedGeometry: prepared.revision.proposed_geometry,
-    });
+    const prepared = await prepareCounterProposalSubmissionV2(req.body, activeRelease);
     const supabase = getSupabaseAdminDataClient();
-    const now = new Date().toISOString();
+    const persisted = await createCounterProposalSubmissionV2(supabase, {
+      userId: req.user.id,
+      title: prepared.submission.title,
+      comment: prepared.submission.comment,
+      releaseId: prepared.compact.releaseId,
+      baseRevision: prepared.compact.baseRevision,
+      primaryDguid: prepared.compact.primaryDguid,
+      secondaryDguid: prepared.compact.secondaryDguid,
+      fedNum: prepared.submission.fed_num,
+      geometryDigest: prepared.compact.geometryDigest,
+      validationReport: prepared.validationReport,
+      operations: prepared.compact.operations,
+      scopePruids: prepared.scopePruids,
+    });
 
-    const { data: submission, error: submissionError } = await supabase
-      .from("submissions")
-      .insert([{
-        ...prepared.submission,
-        user_id: req.user.id,
-        created_at: now,
-        updated_at: now,
-      }])
-      .select("*")
-      .single();
-
-    if (submissionError) {
-      return res.status(500).json({ error: submissionError.message });
-    }
-
-    const { data: revision, error: revisionError } = await supabase
-      .from("counter_proposal_revisions")
-      .insert([{
-        ...prepared.revision,
-        submission_id: submission.id,
-        created_by: req.user.id,
-      }])
-      .select("*")
-      .single();
-
-    if (revisionError) {
-      await supabase.from("submissions").delete().eq("id", submission.id);
-
-      return res.status(500).json({
-        error: revisionError.message,
-      });
-    }
-
-    let geometryRevision;
-    try {
-      geometryRevision = await persistSubmissionGeometryRevision(supabase, {
-        submission,
-        submissionType: "counter_proposal",
-        compact: compactGeometry,
-        validationReport: prepared.revision.validation_report,
-        legacyRevisionId: revision.id,
-      });
-    } catch (geometryRevisionError) {
-      await supabase.from("submissions").delete().eq("id", submission.id);
-      return res.status(500).json({ error: geometryRevisionError.message });
-    }
-
-    const response = (await attachAuthorProfiles([
-      normalizeCounterProposalRecord(submission, revision),
-    ]))[0];
-    return res.status(201).json({ ...response, geometry_revision: geometryRevision });
-
+    return res.status(201).json({
+      schemaVersion: "2.0",
+      submission: {
+        id: persisted.submission.id,
+        type: "counter-proposal",
+        title: persisted.submission.title,
+        status: persisted.submission.status,
+        created_at: persisted.submission.created_at,
+        resource_version: persisted.submission.resource_version,
+        dguid: persisted.submission.dguid,
+        neighboring_dguid: persisted.submission.neighboring_dguid,
+        release_id: persisted.submission.release_id,
+      },
+      geometryRevision: {
+        id: persisted.geometry_revision.id,
+        revisionNumber: persisted.geometry_revision.revision_number,
+        operationCount: prepared.compact.operations.length,
+        geometryDigest: persisted.geometry_revision.geometry_digest,
+      },
+      impactSummary: prepared.validationReport.impact_summary ?? {},
+    });
   } catch (error) {
     if (
       error instanceof CounterProposalValidationError ||
@@ -201,30 +144,14 @@ router.get("/counter-proposals", requireCommissioner, async (req, res) => {
     return res.json([]);
   }
 
-  const { data: revisions, error: revisionError } = await supabase
-    .from("counter_proposal_revisions")
-    .select("*")
-    .in("submission_id", submissionIds)
-    .order("revision_number", { ascending: false });
-
-  if (revisionError) {
-    return res.status(500).json({ error: revisionError.message });
-  }
-
-  const latestRevisionBySubmissionId = new Map();
-
-  (revisions ?? []).forEach((revision) => {
-    if (!latestRevisionBySubmissionId.has(revision.submission_id)) {
-      latestRevisionBySubmissionId.set(revision.submission_id, revision);
-    }
-  });
+  const revisionsBySubmissionId = await loadLatestCounterProposalGeometryRevisions(supabase, submissionIds);
 
   return res.json(
     await attachAuthorProfiles(
       (submissions ?? []).map((submission) =>
         normalizeCounterProposalRecord(
           submission,
-          latestRevisionBySubmissionId.get(submission.id) ?? null,
+          geometryRevisionToApiRevision(revisionsBySubmissionId.get(submission.id) ?? null),
         ),
       ),
     ),
@@ -255,20 +182,20 @@ router.get("/counter-proposals/:submissionId", async (req, res) => {
     return res.status(403).json({ error: "You can only view your own counter-proposals." });
   }
 
-  const { data: revision, error: revisionError } = await supabase
-    .from("counter_proposal_revisions")
-    .select("*")
-    .eq("submission_id", submissionId)
-    .order("revision_number", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const geometryRevision = await loadLatestCounterProposalGeometryRevision(supabase, submissionId);
 
-  if (revisionError) {
-    return res.status(500).json({ error: revisionError.message });
+  if (!geometryRevision || geometryRevision.migration_state !== "ready") {
+    return res.status(409).json({
+      code: "SUBMISSION_GEOMETRY_NOT_READY",
+      error: "Counter-Proposal geometry revision is not ready.",
+    });
   }
 
   const [record] = await attachAuthorProfiles([
-    normalizeCounterProposalRecord(submission, revision),
+    normalizeCounterProposalRecord(
+      submission,
+      geometryRevisionToApiRevision(geometryRevision),
+    ),
   ]);
   return res.json(record);
 });

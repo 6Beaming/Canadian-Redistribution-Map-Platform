@@ -47,6 +47,18 @@ function mapRpcPayload(payload, { includeProfiles = false } = {}) {
   };
 }
 
+async function presentRpcPayload(supabase, payload, {
+  includeProfiles = false,
+  actorProfileId = null,
+} = {}) {
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  const enriched = await enrichSubmissionsWithDaMetadata(items.map(normalizeRpcRow));
+  const projected = actorProfileId
+    ? await projectArchiveRequestVisibility(supabase, enriched, actorProfileId)
+    : enriched;
+  return mapRpcPayload({ ...payload, items: projected }, { includeProfiles });
+}
+
 export async function listMySubmissionRowsV2(supabase, {
   userId,
   query = {},
@@ -62,7 +74,7 @@ export async function listMySubmissionRowsV2(supabase, {
     throw error;
   }
   return {
-    ...mapRpcPayload(data, { includeProfiles: false }),
+    ...(await presentRpcPayload(supabase, data, { includeProfiles: false })),
     appliedFilters: filters,
   };
 }
@@ -89,7 +101,10 @@ export async function listCommissionerSubmissionRowsV2(supabase, {
     throw error;
   }
   return {
-    ...mapRpcPayload(data, { includeProfiles: true }),
+    ...(await presentRpcPayload(supabase, data, {
+      includeProfiles: true,
+      actorProfileId: actorProfile.id,
+    })),
     appliedFilters: filters,
   };
 }

@@ -14,17 +14,6 @@ export async function loadSubmissionForArchive(supabase, submissionId) {
   return data;
 }
 
-export async function loadLatestCounterProposalRevision(supabase, submissionId) {
-  const { data, error } = await supabase
-    .from("counter_proposal_revisions")
-    .select("*")
-    .eq("submission_id", submissionId)
-    .order("revision_number", { ascending: false })
-    .limit(1);
-  if (error) throw error;
-  return data?.[0] ?? null;
-}
-
 export async function loadLatestSubmissionGeometryRevision(supabase, submissionId) {
   const { data, error } = await supabase
     .from("submission_geometry_revisions")

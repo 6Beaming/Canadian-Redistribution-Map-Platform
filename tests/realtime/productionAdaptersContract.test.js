@@ -10,6 +10,10 @@ const insertOperationFix = fs.readFileSync(
   "supabase/migrations/20260804110000_fix_realtime_insert_operations.sql",
   "utf8",
 );
+const cleanupMigration = fs.readFileSync(
+  "supabase/migrations/20260902163000_finalize_legacy_protocol_cleanup.sql",
+  "utf8",
+);
 
 test("Real time adapters write outbox and deliveries in mutation transactions", () => {
   assert.match(migration, /insert into public\.realtime_outbox/i);
@@ -25,6 +29,12 @@ test("Real time adapters cover CP2 submission creates and only its supported del
   assert.match(migration, /new\.type in \('feedback', 'objection'\)/i);
   assert.match(migration, /after insert on public\.counter_proposal_revisions/i);
   assert.match(migration, /if old\.type = 'feedback'/i);
+});
+
+test("Counter-proposal realtime events follow geometry revisions after legacy cleanup", () => {
+  assert.match(cleanupMigration, /after insert on public\.submission_geometry_revisions/i);
+  assert.match(cleanupMigration, /submission_type = 'counter_proposal'/i);
+  assert.match(cleanupMigration, /checkpoint0_counter_proposal_realtime\(\)/i);
 });
 
 test("Real time projection hints contain identifiers, not protected record bodies", () => {

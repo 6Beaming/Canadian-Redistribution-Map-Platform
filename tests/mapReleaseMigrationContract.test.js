@@ -34,6 +34,10 @@ const inventorySql = fs.readFileSync(
   new URL("../supabase/migrations/20260901093000_supabase_contract_inventory.sql", import.meta.url),
   "utf8",
 );
+const cleanupSql = fs.readFileSync(
+  new URL("../supabase/migrations/20260902163000_finalize_legacy_protocol_cleanup.sql", import.meta.url),
+  "utf8",
+);
 
 test("map release expand migration freezes immutable identity and sparse operations", () => {
   for (const table of [
@@ -99,6 +103,26 @@ test("database cutover audit checks release identity, migration gaps, RLS, and b
   }
   assert.match(sql, /grant execute on function public\.audit_final_refactor_database\(\) to service_role/);
   assert.match(sql, /revoke all on function public\.audit_final_refactor_database\(\) from public, anon, authenticated/);
+});
+
+test("legacy protocol cleanup migration drops dormant tables and rewrites list RPCs", () => {
+  assert.doesNotMatch(cleanupSql, /join public\.dissemination_areas/i);
+  assert.match(cleanupSql, /drop table if exists public\.archive_tree cascade/i);
+  assert.match(cleanupSql, /drop table if exists public\.counter_proposal_revisions cascade/i);
+  assert.match(cleanupSql, /drop table if exists public\.dissemination_areas cascade/i);
+  assert.match(cleanupSql, /'legacyArchiveRows', 0/);
+  assert.match(cleanupSql, /drop function if exists public\.merge_submission_into_archive\(uuid, uuid, jsonb\)/i);
+});
+
+test("post-cleanup fix removes archive_tree and dissemination_areas from live scope helpers", () => {
+  const fixSql = fs.readFileSync(
+    new URL("../supabase/migrations/20260902170000_fixup_post_cleanup_function_refs.sql", import.meta.url),
+    "utf8",
+  );
+  assert.doesNotMatch(fixSql, /archive_tree/i);
+  assert.doesNotMatch(fixSql, /dissemination_areas/i);
+  assert.match(fixSql, /checkpoint0_submission_scope/i);
+  assert.match(fixSql, /submission_matches_commissioner_pruid/i);
 });
 
 test("cleanup inventory is read-only, service-role-only, and paired with source reference auditing", () => {

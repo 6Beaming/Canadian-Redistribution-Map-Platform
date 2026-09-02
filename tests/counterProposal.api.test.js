@@ -123,10 +123,6 @@ function authenticate(profile) {
           return createSubmissionStore();
         }
 
-        if (table === "counter_proposal_revisions") {
-          return createRevisionStore();
-        }
-
         if (table === "submission_geometry_revisions") {
           return createGeometryRevisionStore();
         }
@@ -153,17 +149,6 @@ function authenticate(profile) {
               },
               error: null,
             }),
-          };
-        }
-
-        if (table === "dissemination_areas") {
-          return {
-            upsert(values, options) {
-              return Promise.resolve({
-                data: values,
-                error: null,
-              });
-            },
           };
         }
 
@@ -206,24 +191,6 @@ function createSubmissionStore() {
     delete() {
       return {
         eq: async () => ({ error: null }),
-      };
-    },
-  };
-}
-
-function createRevisionStore() {
-  return {
-    insert(payload) {
-      const row = {
-        id: "revision-1",
-        ...payload[0],
-      };
-      return {
-        select() {
-          return {
-            single: async () => ({ data: row, error: null }),
-          };
-        },
       };
     },
   };
@@ -289,7 +256,7 @@ test("counter-proposal writes require a public user", async () => {
   assert.equal(response.status, 403);
 });
 
-test("a public user can submit a validated counter-proposal", async () => {
+test("legacy counter-proposal payloads without schemaVersion 2.0 are rejected", async () => {
   authenticate({
     id: "public-1",
     email: "public@example.com",
@@ -306,20 +273,12 @@ test("a public user can submit a validated counter-proposal", async () => {
     body: {
       title: fixture.title,
       comment: fixture.comment,
-      fed_num: fixture.fed_num,
-      dguid: FIRST_DGUID,
-      neighboring_dguid: SECOND_DGUID,
-      proposed_geometry: buildEditedProposedGeometry(),
     },
   });
 
-  assert.equal(response.status, 201);
-  assert.equal(response.body.type, "counter_proposal");
-  assert.equal(response.body.revision.revision_number, 1);
-  assert.equal(response.body.revision.primary_dguid, FIRST_DGUID);
-  assert.equal(response.body.revision.validation_report.impact_summary.version, 1);
-  assert.equal(response.body.geometry_revision.migration_state, "ready");
-}, 360000);
+  assert.equal(response.status, 400);
+  assert.equal(response.body.code, "COUNTER_PROPOSAL_V2_REQUIRED");
+});
 
 async function buildV2SubmissionBody() {
   if (cachedV2SubmissionBody) {
