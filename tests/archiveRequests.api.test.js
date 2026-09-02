@@ -62,6 +62,7 @@ function makeAdmin() {
     submission_scope_pruids: [{ submission_id: "submission-1", pruid: "46" }],
     profiles: [requester, assignee],
     counter_proposal_revisions: [],
+    submission_geometry_revisions: [],
     archive_source_revisions: [],
     workspace_archive_requests: [],
     workspace_archive_request_votes: [],
@@ -334,6 +335,63 @@ test("counter-proposal Archive Request identifies its requester", async () => {
   assert.equal(response.body.requesterEmail, requester.email);
   assert.ok(response.body.allowedActions.includes("cancel"));
   assert.equal(response.body.allowedActions.includes("merge"), false);
+});
+
+test("counter-proposal Archive Request seals V2 geometry revisions", async () => {
+  const admin = makeAdmin();
+  admin.state.submissions[0].type = "counter-proposal";
+  admin.state.submissions[0].neighboring_dguid = "2021S051260010119";
+  admin.state.submission_geometry_revisions.push({
+    id: "geometry-revision-1",
+    submission_id: "submission-1",
+    submission_type: "counter_proposal",
+    revision_number: 1,
+    release_id: "release-1",
+    base_revision: "baseline-1",
+    primary_dguid: "2021S051246050041",
+    secondary_dguid: "2021S051260010119",
+    geometry_digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    validation_report: { operationCount: 2 },
+    migration_state: "ready",
+    migration_error: null,
+    legacy_revision_id: null,
+    created_by: "public-1",
+  });
+  auth(requester, admin);
+
+  const response = await request("/api/workspace/archive-requests", {
+    method: "POST",
+    body: {
+      submissionId: "submission-1",
+      assignees: [assignee.email],
+      expectedVersion: 1,
+    },
+  });
+
+  assert.equal(response.status, 201);
+  assert.equal(admin.state.archive_source_revisions.length, 1);
+  assert.equal(admin.state.archive_source_revisions[0].source_geometry_revision_id, "geometry-revision-1");
+  assert.equal(admin.state.archive_source_revisions[0].primary_dguid, "2021S051246050041");
+  assert.equal(admin.state.archive_source_revisions[0].secondary_dguid, "2021S051260010119");
+});
+
+test("archive request auto-approves when the requester is the only required voter", async () => {
+  const admin = makeAdmin();
+  auth(requester, admin);
+
+  const response = await request("/api/workspace/archive-requests", {
+    method: "POST",
+    body: {
+      submissionId: "submission-1",
+      assignees: [],
+      expectedVersion: 1,
+    },
+  });
+
+  assert.equal(response.status, 201);
+  assert.equal(response.body.state, "approved");
+  assert.ok(response.body.allowedActions.includes("merge"));
+  assert.equal(admin.state.workspace_archive_requests[0].state, "approved");
 });
 
 test("approved Archive Request keeps requester cancel and merge actions", async () => {

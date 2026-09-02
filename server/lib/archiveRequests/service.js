@@ -107,25 +107,43 @@ async function sealSourceRevision(supabase, {
   let outerBoundary = null;
   let validationReport = {};
   let sourceCounterProposalRevisionId = null;
+  let sourceGeometryRevisionId = null;
 
   if (type === "counter-proposal" || type === "counter_proposal") {
     const latest = await repo.loadLatestCounterProposalRevision(supabase, submission.id);
-    if (!latest) {
-      throw archiveError("Counter-Proposal revision is required before archiving.", {
-        statusCode: 409,
-        code: "SOURCE_REVISION_UNAVAILABLE",
-      });
+    if (latest) {
+      revisionNumber = latest.revision_number;
+      primaryDguid = latest.primary_dguid;
+      secondaryDguid = latest.secondary_dguid;
+      baselineRevision = latest.baseline_revision;
+      originalGeometry = latest.original_geometry;
+      proposedGeometry = latest.proposed_geometry;
+      sharedBoundary = latest.shared_boundary;
+      outerBoundary = latest.outer_boundary;
+      validationReport = latest.validation_report ?? {};
+      sourceCounterProposalRevisionId = latest.id;
+    } else {
+      const geometryRevision = await repo.loadLatestSubmissionGeometryRevision(supabase, submission.id);
+      if (!geometryRevision) {
+        throw archiveError("Counter-Proposal revision is required before archiving.", {
+          statusCode: 409,
+          code: "SOURCE_REVISION_UNAVAILABLE",
+        });
+      }
+      if (geometryRevision.migration_state !== "ready") {
+        throw archiveError("Counter-Proposal geometry revision is not ready.", {
+          statusCode: 409,
+          code: "SOURCE_REVISION_UNAVAILABLE",
+        });
+      }
+      revisionNumber = geometryRevision.revision_number;
+      primaryDguid = geometryRevision.primary_dguid;
+      secondaryDguid = geometryRevision.secondary_dguid;
+      baselineRevision = geometryRevision.base_revision;
+      validationReport = geometryRevision.validation_report ?? {};
+      sourceGeometryRevisionId = geometryRevision.id;
+      sourceCounterProposalRevisionId = geometryRevision.legacy_revision_id ?? null;
     }
-    revisionNumber = latest.revision_number;
-    primaryDguid = latest.primary_dguid;
-    secondaryDguid = latest.secondary_dguid;
-    baselineRevision = latest.baseline_revision;
-    originalGeometry = latest.original_geometry;
-    proposedGeometry = latest.proposed_geometry;
-    sharedBoundary = latest.shared_boundary;
-    outerBoundary = latest.outer_boundary;
-    validationReport = latest.validation_report ?? {};
-    sourceCounterProposalRevisionId = latest.id;
   }
 
   if (!primaryDguid) {
@@ -156,6 +174,7 @@ async function sealSourceRevision(supabase, {
     outer_boundary: outerBoundary,
     validation_report: validationReport,
     source_counter_proposal_revision_id: sourceCounterProposalRevisionId,
+    source_geometry_revision_id: sourceGeometryRevisionId,
     created_by: actorProfileId,
   });
 }
@@ -191,6 +210,34 @@ function canApproveFromVotes(request, votes) {
   if (!assigneeIds.length) return false;
   const byVoter = new Map(votes.map((vote) => [String(vote.voter_id), vote.vote]));
   return assigneeIds.every((id) => byVoter.get(id) === "accepted");
+}
+
+async function promoteArchiveRequestIfFullyApproved(supabase, request) {
+  if (!request || request.state !== OPEN) {
+    return request;
+  }
+  const votes = await repo.listVotes(supabase, request.id);
+  if (!canApproveFromVotes(request, votes)) {
+    return request;
+  }
+  const currentVersion = Number(request.resource_version) || 1;
+  const updated = await repo.updateArchiveRequest(supabase, request.id, currentVersion, {
+    state: APPROVED,
+    resource_version: currentVersion + 1,
+  });
+  return updated ?? request;
+}
+
+export async function resolveMergeableArchiveRequest(supabase, submissionId) {
+  const request = await repo.loadArchiveRequestBySubmissionId(supabase, submissionId);
+  if (!request) {
+    return null;
+  }
+  if (request.state === APPROVED) {
+    return request;
+  }
+  const promoted = await promoteArchiveRequestIfFullyApproved(supabase, request);
+  return promoted?.state === APPROVED ? promoted : null;
 }
 
 export async function serializeArchiveRequestReadModel(supabase, request, {
@@ -442,6 +489,8 @@ export async function createArchiveRequest({
     vote: "accepted",
   });
 
+  const activeRequest = await promoteArchiveRequestIfFullyApproved(supabase, request);
+
   const updatedSubmission = await repo.updateSubmissionArchiveFields(supabase, {
     submissionId,
     expectedVersion: version,
@@ -464,20 +513,20 @@ export async function createArchiveRequest({
   }
 
   await writeOutbox(supabase, {
-    aggregateId: request.id,
+    aggregateId: activeRequest.id,
     operation: "create",
     actorProfileId: actorUser.id,
     eligibilityPruids: scope.eligibilityPruids,
     operatingPruid: scope.operatingPruid,
-    resourceVersion: 1,
+    resourceVersion: Number(activeRequest.resource_version) || 1,
     hints: {
       submissionId,
-      state: OPEN,
+      state: activeRequest.state,
       assigneeIds: assignees.map((profile) => profile.id),
     },
   });
 
-  const readModel = await serializeArchiveRequestReadModel(supabase, request, {
+  const readModel = await serializeArchiveRequestReadModel(supabase, activeRequest, {
     actorProfile,
     eligibilityPruids: scope.eligibilityPruids,
     crossProvinceWarning: scope.crossProvinceWarning,
@@ -552,22 +601,24 @@ export async function updateArchiveRequestAssignees({
     });
   }
 
+  const activeRequest = await promoteArchiveRequestIfFullyApproved(supabase, updated);
+
   await writeOutbox(supabase, {
-    aggregateId: updated.id,
+    aggregateId: activeRequest.id,
     operation: "update",
     actorProfileId: actorUser.id,
     eligibilityPruids: scope.eligibilityPruids,
     operatingPruid: scope.operatingPruid,
-    resourceVersion: updated.resource_version,
+    resourceVersion: activeRequest.resource_version,
     hints: {
-      submissionId: updated.submission_id,
-      state: updated.state,
+      submissionId: activeRequest.submission_id,
+      state: activeRequest.state,
       assigneeIds: assignees.map((profile) => profile.id),
       previousAssigneeIds,
     },
   });
 
-  const readModel = await serializeArchiveRequestReadModel(supabase, updated, {
+  const readModel = await serializeArchiveRequestReadModel(supabase, activeRequest, {
     actorProfile,
     eligibilityPruids: scope.eligibilityPruids,
     crossProvinceWarning: scope.crossProvinceWarning,

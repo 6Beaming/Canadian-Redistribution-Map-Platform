@@ -8,6 +8,7 @@ import { resolveCommissionerFedContext } from "../lib/authorization/commissioner
 import { queryDashboardAreaSubmissions } from "../lib/submissions/dashboardAreaQuery.js";
 import archiveTreeRouter from "./archiveTree.js";
 import { mergeApprovedArchiveRequest } from "../lib/archive/archiveMergeService.js";
+import { resolveMergeableArchiveRequest } from "../lib/archiveRequests/service.js";
 
 const router = Router();
 function requireCommissioner(req, res, next) {
@@ -96,12 +97,7 @@ router.post("/archive", async (req, res) => {
   }
 
   const supabase = getSupabaseAdminDataClient();
-  const { data: approvedRequest } = await supabase
-    .from("workspace_archive_requests")
-    .select("id")
-    .eq("submission_id", submissionId)
-    .eq("state", "approved")
-    .maybeSingle();
+  const approvedRequest = await resolveMergeableArchiveRequest(supabase, submissionId);
 
   if (approvedRequest?.id) {
     try {
