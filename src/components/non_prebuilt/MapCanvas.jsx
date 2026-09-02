@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import { Protocol } from "pmtiles";
 import { mapApi } from "@/services/mapApi.js";
@@ -550,6 +550,8 @@ export function MapCanvas({
   rolloutCategoryId = null,
   heatmap = null,
   archivedMap = null,
+  archivedMapEnabled: controlledArchivedMapEnabled,
+  onArchivedMapEnabledChange,
   initialArchivedMapEnabled = false,
   interactionMode = MAP_INTERACTION_MODE.BROWSE,
   workflowFocusDguids = [],
@@ -558,12 +560,27 @@ export function MapCanvas({
   loadSubmissionCount = true,
 }) {
   const [heatmapEnabled, setHeatmapEnabled] = useState(false);
-  const [archivedMapEnabled, setArchivedMapEnabled] = useState(initialArchivedMapEnabled);
+  const isArchivedMapControlled = controlledArchivedMapEnabled !== undefined;
+  const [uncontrolledArchivedMapEnabled, setUncontrolledArchivedMapEnabled] = useState(initialArchivedMapEnabled);
+  const archivedMapEnabledRef = useRef(initialArchivedMapEnabled);
+  const setArchivedMapEnabledRef = useRef(() => {});
+  const setHeatmapEnabledRef = useRef(() => {});
+  const archivedMapEnabled = isArchivedMapControlled
+    ? controlledArchivedMapEnabled
+    : uncontrolledArchivedMapEnabled;
+  const setArchivedMapEnabled = useCallback((updater) => {
+    const current = archivedMapEnabledRef.current;
+    const next = typeof updater === "function" ? updater(current) : updater;
+    if (isArchivedMapControlled) {
+      onArchivedMapEnabledChange?.(next);
+      return;
+    }
+    setUncontrolledArchivedMapEnabled(next);
+  }, [isArchivedMapControlled, onArchivedMapEnabledChange]);
   const heatmapEnabledRef = useRef(false);
   const heatmapButtonRef = useRef(null);
   const heatmapControlRef = useRef(null);
   const heatmapFillExpressionRef = useRef(null);
-  const archivedMapEnabledRef = useRef(initialArchivedMapEnabled);
   const archivedMapButtonRef = useRef(null);
   const archivedMapControlRef = useRef(null);
   const archivedDaIdsRef = useRef(new Set());
@@ -647,6 +664,13 @@ export function MapCanvas({
   boundariesVisibleRef.current = boundariesVisible;
   heatmapEnabledRef.current = heatmapEnabled;
   archivedMapEnabledRef.current = archivedMapEnabled;
+  setArchivedMapEnabledRef.current = setArchivedMapEnabled;
+  setHeatmapEnabledRef.current = setHeatmapEnabled;
+
+  useEffect(() => {
+    if (isArchivedMapControlled) return;
+    setUncontrolledArchivedMapEnabled(initialArchivedMapEnabled);
+  }, [initialArchivedMapEnabled, isArchivedMapControlled]);
   heatmapFillExpressionRef.current = hasSubmissionHeatmapData(heatmap)
     ? buildSubmissionHeatmapFillExpression(heatmap.countsByDguid)
     : null;
@@ -742,7 +766,7 @@ export function MapCanvas({
         () => heatmapEnabledRef.current,
         () => setHeatmapEnabled((current) => {
           const next = !current;
-          if (next) setArchivedMapEnabled(false);
+          if (next) setArchivedMapEnabledRef.current(false);
           return next;
         }),
       );
@@ -768,9 +792,9 @@ export function MapCanvas({
       const control = createArchivedMapControl(
         archivedMapButtonRef,
         () => archivedMapEnabledRef.current,
-        () => setArchivedMapEnabled((current) => {
+        () => setArchivedMapEnabledRef.current((current) => {
           const next = !current;
-          if (next) setHeatmapEnabled(false);
+          if (next) setHeatmapEnabledRef.current(false);
           return next;
         }),
       );
@@ -783,7 +807,7 @@ export function MapCanvas({
       map.removeControl(archivedMapControlRef.current);
       archivedMapControlRef.current = null;
       archivedMapButtonRef.current = null;
-      setArchivedMapEnabled(false);
+      setArchivedMapEnabledRef.current(false);
     }
   }, [archivedMap, mapReadyTick]);
 

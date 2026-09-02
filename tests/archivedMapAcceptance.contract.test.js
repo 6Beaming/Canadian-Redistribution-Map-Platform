@@ -34,7 +34,9 @@ test("Archived Map InfoPanel exposes four projection modes and loads projections
 
   assert.match(panel, /ARCHIVED_MAP_PANEL_VIEWS = \[[\s\S]*"all"[\s\S]*"comments"[\s\S]*"objections"[\s\S]*"counter-proposals"/);
   assert.match(panel, /getArchivedMapProjections\(selection\.dguid/);
-  assert.match(dashboard, /initialArchivedMapEnabled \? \([\s\S]*<ArchivedMapInfoPanel/);
+  assert.match(dashboard, /archivedMapEnabled \? \([\s\S]*<ArchivedMapInfoPanel/);
+  assert.match(dashboard, /archivedMapEnabled=\{archivedMapEnabled\}/);
+  assert.match(dashboard, /onArchivedMapEnabledChange=\{handleArchivedMapEnabledChange\}/);
   assert.match(api, /\/api\/workspace\/archive-map\/projections\?/);
 });
 

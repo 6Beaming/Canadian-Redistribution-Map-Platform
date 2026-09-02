@@ -12,6 +12,7 @@ import {
 import { MISSING_DA_POPULATION, MVP_FED_NUM } from "@/lib/map/constants.js";
 import { getDaPanelTitle, getDaPopulationDisplay } from "@/lib/map/profileUtils.js";
 import {
+  clearDashboardAreaContextCache,
   getDashboardAreaContext,
   subscribeWorkspaceState,
 } from "@/services/workspaceApi.js";
@@ -167,7 +168,10 @@ export function CommissionerSubmissionCollections({
         });
     };
     void load();
-    const unsubscribe = subscribeWorkspaceState(() => void load());
+    const unsubscribe = subscribeWorkspaceState(() => {
+      clearDashboardAreaContextCache();
+      void load();
+    });
     return () => {
       requestId += 1;
       controller.abort();

@@ -18,6 +18,22 @@ import * as archiveRequestApi from "@/services/archiveRequestApi.js";
 
 const DURABLE_STATUS_WRITES = new Set(["accepted", "rejected"]);
 
+const dashboardAreaContextCache = new Map();
+const archivedMapProjectionCache = new Map();
+
+export function clearDashboardAreaContextCache() {
+    dashboardAreaContextCache.clear();
+}
+
+export function clearArchivedMapProjectionCache() {
+    archivedMapProjectionCache.clear();
+}
+
+export function clearMapPanelCaches() {
+    dashboardAreaContextCache.clear();
+    archivedMapProjectionCache.clear();
+}
+
 export { getWorkspaceSubmissionStatus };
 
 
@@ -594,7 +610,7 @@ export async function getSubmissionHeatmap() {
 }
 
 /** Dashboard-only DA-card query; the server filters DGUID and scope in SQL. */
-export async function getDashboardAreaContext(dguid, { signal } = {}) {
+export async function getDashboardAreaContext(dguid, { signal, bypassCache = false } = {}) {
     const target = String(dguid ?? "");
     if (!target) {
         return {
@@ -603,6 +619,9 @@ export async function getDashboardAreaContext(dguid, { signal } = {}) {
             inScopeNeighbors: [],
             submissions: { comments: [], objections: [], counterProposals: [] },
         };
+    }
+    if (!bypassCache && dashboardAreaContextCache.has(target)) {
+        return dashboardAreaContextCache.get(target);
     }
     const response = await fetch(`/api/workspace/dashboard/areas/${encodeURIComponent(target)}`, {
         credentials: "include",
@@ -617,7 +636,7 @@ export async function getDashboardAreaContext(dguid, { signal } = {}) {
         }))
         : [];
 
-    return {
+    const context = {
         selectedArea: payload?.selectedArea ?? null,
         relationship: payload?.selectedArea?.relationship ?? payload?.relationship ?? "out_of_scope",
         inScopeNeighbors: Array.isArray(payload?.inScopeNeighbors) ? payload.inScopeNeighbors : [],
@@ -627,6 +646,8 @@ export async function getDashboardAreaContext(dguid, { signal } = {}) {
             counterProposals: active.filter((submission) => normalizeType(submission.type) === "counter-proposal"),
         },
     };
+    dashboardAreaContextCache.set(target, context);
+    return context;
 }
 
 /** @deprecated Use getDashboardAreaContext for scope-aware dashboard cards. */
@@ -779,13 +800,21 @@ export function revertArchiveBranch(branchKey, submissionId, {
     return Promise.reject(error);
 }
 
-export async function getArchivedMapProjections(dguid, { signal } = {}) {
-    const params = new URLSearchParams({ dguid: String(dguid ?? "") });
+export async function getArchivedMapProjections(dguid, { signal, bypassCache = false } = {}) {
+    const target = String(dguid ?? "").trim();
+    if (!target) {
+        return { comments: [], objections: [], counterProposals: [] };
+    }
+    if (!bypassCache && archivedMapProjectionCache.has(target)) {
+        return archivedMapProjectionCache.get(target);
+    }
+    const params = new URLSearchParams({ dguid: target });
     const response = await fetch(`/api/workspace/archive-map/projections?${params}`, {
         credentials: "include",
         signal,
     });
     const payload = await handleResponse(response);
+    archivedMapProjectionCache.set(target, payload);
     return payload;
 }
 

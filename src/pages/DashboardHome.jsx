@@ -14,7 +14,11 @@ import { mapApi } from "@/services/mapApi.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
 import { loadSubmissionHeatmap } from "@/lib/map/heatmap.js";
 import { loadArchivedMapEffect } from "@/lib/map/archivedMapEffect.js";
-import { subscribeWorkspaceState } from "@/services/workspaceApi";
+import {
+  clearArchivedMapProjectionCache,
+  clearDashboardAreaContextCache,
+  subscribeWorkspaceState,
+} from "@/services/workspaceApi";
 import { RouteLoadingPage } from "@/components/non_prebuilt/RouteLoadingPage.jsx";
 import "@/styles/map.css";
 
@@ -33,6 +37,7 @@ export default function DashboardHome({ mapSearchTarget = null }) {
   const [archivedMap, setArchivedMap] = useState(null);
   const [initialLoad, setInitialLoad] = useState({ ready: false, error: "" });
   const initialArchivedMapEnabled = searchParams.get("archivedMap") === "1";
+  const [archivedMapEnabled, setArchivedMapEnabled] = useState(initialArchivedMapEnabled);
   const [archivedPanelView, setArchivedPanelView] = useState(ARCHIVED_MAP_PANEL_VIEWS[0].id);
   const commissionerProvinceView = useMemo(
     () => getProvinceMapView(user?.province),
@@ -71,7 +76,11 @@ export default function DashboardHome({ mapSearchTarget = null }) {
   }, []);
 
   useEffect(() => {
-    if (!profilesByDguid.size || !initialArchivedMapEnabled) return undefined;
+    setArchivedMapEnabled(initialArchivedMapEnabled);
+  }, [initialArchivedMapEnabled]);
+
+  useEffect(() => {
+    if (!profilesByDguid.size) return undefined;
     let isMounted = true;
     const load = () => loadArchivedMapEffect(profilesByDguid, { enabled: true })
       .then((nextArchivedMap) => {
@@ -81,12 +90,15 @@ export default function DashboardHome({ mapSearchTarget = null }) {
         if (isMounted) setArchivedMap(null);
       });
     load();
-    const unsubscribe = subscribeWorkspaceState(load, "workspace:archive:*");
+    const unsubscribe = subscribeWorkspaceState(() => {
+      clearArchivedMapProjectionCache();
+      load();
+    }, "workspace:archive:*");
     return () => {
       isMounted = false;
       unsubscribe();
     };
-  }, [initialArchivedMapEnabled, profilesByDguid]);
+  }, [profilesByDguid]);
 
   useEffect(() => {
     let isMounted = true;
@@ -153,6 +165,15 @@ export default function DashboardHome({ mapSearchTarget = null }) {
     setIsRolloutOpen(false);
   }, []);
 
+  const handleArchivedMapEnabledChange = useCallback((enabled) => {
+    setArchivedMapEnabled(enabled);
+    if (enabled) {
+      clearDashboardAreaContextCache();
+    } else {
+      clearArchivedMapProjectionCache();
+    }
+  }, []);
+
   const handleStatusChange = useCallback((message) => {
     setStatus(message);
   }, []);
@@ -203,13 +224,16 @@ export default function DashboardHome({ mapSearchTarget = null }) {
                 rolloutCategoryId={rolloutCategoryId}
                 heatmap={heatmap}
                 archivedMap={archivedMap}
+                archivedMapEnabled={archivedMapEnabled}
+                onArchivedMapEnabledChange={handleArchivedMapEnabledChange}
                 initialArchivedMapEnabled={initialArchivedMapEnabled}
               />
             </div>
           </section>
 
-          {initialArchivedMapEnabled ? (
+          {archivedMapEnabled ? (
             <ArchivedMapInfoPanel
+              key="archived-map-panel"
               selection={selection}
               profilesByDguid={profilesByDguid}
               panelView={archivedPanelView}
@@ -217,6 +241,7 @@ export default function DashboardHome({ mapSearchTarget = null }) {
             />
           ) : (
             <MapInfoPanel
+              key="live-map-panel"
               variant="commissioner"
               selection={selection}
               profilesByDguid={profilesByDguid}
