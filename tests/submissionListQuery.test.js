@@ -3,7 +3,10 @@ import { test } from "@jest/globals";
 import {
   filterAndSortSubmissionRows,
   LIGHTWEIGHT_SUBMISSION_COLUMNS,
+  decodeSubmissionListCursor,
+  encodeSubmissionListCursor,
   normalizeSubmissionListFilters,
+  normalizeSubmissionListPagination,
   serializeLightweightSubmission,
 } from "../server/lib/submissions/submissionListQuery.js";
 import { normalizePublicSubmissionStatus } from "../src/lib/submissions/publicStatus.js";
@@ -55,6 +58,17 @@ test("lightweight serializer does not leak source geometry even when a database 
   assert.equal(Object.hasOwn(serialized, "geometry"), false);
   assert.equal(Object.hasOwn(serialized, "validation_report"), false);
   assert.equal(serialized.profile.email, "person@example.com");
+});
+
+test("submission list pagination normalizes page size bounds", () => {
+  assert.deepEqual(normalizeSubmissionListPagination({ pageSize: "200" }), { pageSize: 100 });
+  assert.deepEqual(normalizeSubmissionListPagination({ pageSize: "0" }), { pageSize: 25 });
+});
+
+test("submission list cursor round-trips through base64url encoding", () => {
+  const cursor = { createdAt: "2026-08-01T10:00:00.000Z", id: "submission-1", title: "Alpha" };
+  const encoded = encodeSubmissionListCursor(cursor);
+  assert.deepEqual(decodeSubmissionListCursor(encoded), cursor);
 });
 
 test("Public status presentation has exactly Pending and Received semantics", () => {

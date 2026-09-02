@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
+import { CounterProposalImpactSummary } from "@/components/non_prebuilt/CounterProposalImpactSummary.jsx";
 import { MapInfoPanelShell } from "@/components/non_prebuilt/MapInfoPanelShell.jsx";
 import { RouteLoadingPage } from "@/components/non_prebuilt/RouteLoadingPage.jsx";
 import { useMapFullscreen } from "@/contexts/MapFullscreenContext.jsx";
 import { MAP_INTERACTION_MODE } from "@/lib/map/interactionMode.js";
+import { buildProfileIndex } from "@/lib/map/profileUtils.js";
 import { normalizePublicSubmissionStatus } from "@/lib/submissions/publicStatus.js";
+import { mapApi } from "@/services/mapApi.js";
 import {
   getSubmissionMapView,
   hydrateSubmissionMapView,
@@ -53,7 +56,7 @@ function buildPresentation(submission, comparisonView) {
   };
 }
 
-function SubmissionDetails({ submission }) {
+function SubmissionDetails({ submission, profilesByDguid }) {
   const projection = submission.submissionProjection;
   const publicStatus = normalizePublicSubmissionStatus(projection.status);
   const impact = submission.geometry?.impacts
@@ -89,7 +92,12 @@ function SubmissionDetails({ submission }) {
         {normalizeType(projection.type) === "counter-proposal" && impact ? (
           <section className="submission-map-panel__impact" aria-labelledby="submission-impact-title">
             <h2 id="submission-impact-title">Proposed boundary impact</h2>
-            <pre>{JSON.stringify(impact, null, 2)}</pre>
+            <CounterProposalImpactSummary
+              impact={impact}
+              primaryDguid={submission.mapDescriptor.primaryDguid}
+              secondaryDguid={submission.mapDescriptor.secondaryDguid}
+              profilesByDguid={profilesByDguid}
+            />
           </section>
         ) : null}
       </div>
@@ -104,8 +112,23 @@ export default function UserResumeSubmission() {
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [submission, setSubmission] = useState(null);
   const [comparisonView, setComparisonView] = useState("proposed");
+  const [profilesByDguid, setProfilesByDguid] = useState(() => new Map());
   const [status, setStatus] = useState("Loading submission map…");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    mapApi.getDaProfiles()
+      .then((payload) => {
+        if (!active) return;
+        const { index } = buildProfileIndex(payload);
+        setProfilesByDguid(index);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -193,7 +216,7 @@ export default function UserResumeSubmission() {
               ) : null}
             </div>
           </section>
-          <SubmissionDetails submission={submission} />
+          <SubmissionDetails submission={submission} profilesByDguid={profilesByDguid} />
         </div>
       </div>
     </main>

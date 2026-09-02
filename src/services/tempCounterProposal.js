@@ -18,6 +18,7 @@ import { mapApi } from "@/services/mapApi.js";
 import {
   getCounterProposal,
   getCounterProposals,
+  getSubmissionMaterializedGeometry,
 } from "@/services/submissionsApi.js";
 import { calculateCounterProposalImpact } from "@/lib/map/counterProposalImpact.js";
 
@@ -324,6 +325,71 @@ async function hydrateFromGeometryEdit(submission, profilesByDguid) {
   };
 }
 
+/** V2 counter-proposals store compact operations in submission_geometry_revisions. */
+async function hydrateFromCompactGeometryRevision(submission) {
+  const normalized = normalizeSubmission(submission, "supabase");
+  if (!normalized.id) return null;
+
+  let detail;
+  try {
+    detail = await getSubmissionMaterializedGeometry(normalized.id);
+  } catch (error) {
+    if (![404, 409].includes(error.status)) {
+      console.warn("Unable to load compact counter-proposal geometry.", error);
+    }
+    return null;
+  }
+
+  const releaseId = detail.releaseId ?? normalized.release_id;
+  const primaryDguid = detail.primaryDguid ?? normalized.dguid;
+  const secondaryDguid = detail.secondaryDguid ?? normalized.neighboring_dguid;
+
+  if (!releaseId || !primaryDguid || !secondaryDguid || !detail.geometry) {
+    return null;
+  }
+
+  try {
+    const basePair = await mapApi.getReleaseDaPair(releaseId, primaryDguid, secondaryDguid, {
+      representation: "display",
+    });
+    const baseIndex = buildDaObjectionIndex(basePair.features);
+    const proposed = detail.geometry;
+    const proposedIndex = buildDaObjectionIndex(proposed);
+
+    return {
+      ...normalized,
+      geometry: {
+        originalFeatureCollection: basePair.features,
+        proposedFeatureCollection: proposed,
+        originalBoundaryGeoJson: getSharedBoundaryFeatureCollection(
+          baseIndex,
+          primaryDguid,
+          secondaryDguid,
+        ),
+        originalOuterBoundaryGeoJson: getPairOuterBoundaryFeatureCollection(
+          baseIndex,
+          [primaryDguid, secondaryDguid],
+        ),
+        boundaryGeoJson: getSharedBoundaryFeatureCollection(
+          proposedIndex,
+          primaryDguid,
+          secondaryDguid,
+        ),
+        outerBoundaryGeoJson: getPairOuterBoundaryFeatureCollection(
+          proposedIndex,
+          [primaryDguid, secondaryDguid],
+        ),
+        impacts: detail.impactSummary ?? null,
+        impactsSource: "compact-revision",
+        baselineRevision: detail.baseRevision ?? null,
+      },
+    };
+  } catch (error) {
+    console.warn("Unable to rebuild compact counter-proposal geometry.", error);
+    return null;
+  }
+}
+
 async function hydratePersistedCounterProposal(submission, profilesByDguid) {
   let record = submission;
 
@@ -348,6 +414,11 @@ async function hydratePersistedCounterProposal(submission, profilesByDguid) {
 
   if (record.geometry_edit?.operations?.length) {
     return hydrateFromGeometryEdit(record, profilesByDguid);
+  }
+
+  const compactHydrated = await hydrateFromCompactGeometryRevision(record);
+  if (compactHydrated?.geometry) {
+    return compactHydrated;
   }
 
   return {

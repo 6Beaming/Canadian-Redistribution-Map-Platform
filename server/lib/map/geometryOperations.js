@@ -185,11 +185,18 @@ export async function materializeGeometryOperations(descriptor, operations = [])
   ));
   const replacements = new Map();
   for (const operation of operations) {
-    const base = baseByVertex.get(operation.vertex_id);
+    const vertexId = operation.vertex_id ?? operation.vertexId;
+    const base = baseByVertex.get(vertexId);
     if (!base) {
-      throw new CounterProposalValidationError(`Unknown release vertex: ${operation.vertex_id}.`);
+      throw new CounterProposalValidationError(`Unknown release vertex: ${vertexId}.`, {
+        code: "UNKNOWN_OR_LOCKED_VERTEX",
+        statusCode: 422,
+      });
     }
-    replacements.set(coordinateKey(base), [Number(operation.to_lng), Number(operation.to_lat)]);
+    replacements.set(coordinateKey(base), [
+      Number(operation.to_lng ?? operation.toLng),
+      Number(operation.to_lat ?? operation.toLat),
+    ]);
   }
   return {
     type: "FeatureCollection",
@@ -201,4 +208,179 @@ export async function materializeGeometryOperations(descriptor, operations = [])
       },
     })),
   };
+}
+
+const MAX_SUBMISSION_OPERATIONS = 5000;
+
+function normalizeOperationCoordinate(value, fieldName) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    const error = new CounterProposalValidationError(`${fieldName} must be a finite number.`, {
+      code: "INVALID_COUNTER_PROPOSAL",
+      statusCode: 400,
+    });
+    throw error;
+  }
+  if (fieldName.endsWith("Lng") && (number < -180 || number > 180)) {
+    throw new CounterProposalValidationError(`${fieldName} must be between -180 and 180.`, {
+      code: "INVALID_COUNTER_PROPOSAL",
+      statusCode: 400,
+    });
+  }
+  if (fieldName.endsWith("Lat") && (number < -90 || number > 90)) {
+    throw new CounterProposalValidationError(`${fieldName} must be between -90 and 90.`, {
+      code: "INVALID_COUNTER_PROPOSAL",
+      statusCode: 400,
+    });
+  }
+  return Number(number.toFixed(8));
+}
+
+async function loadSharedVertexCatalog(release, primaryDguid, secondaryDguid) {
+  const pair = canonicalPair(primaryDguid, secondaryDguid);
+  const shared = await readSharedArcRecord(release, pair.join("|"));
+  const vertexById = new Map(shared.chains.flatMap((chain) =>
+    chain.vertices.map((vertex) => [vertex[0], {
+      vertexId: vertex[0],
+      base: [vertex[1], vertex[2]],
+      locked: Boolean(vertex[3]),
+    }]),
+  ));
+  return { pair, vertexById };
+}
+
+export async function validateAndNormalizeSubmissionOperations({
+  release,
+  primaryDguid,
+  secondaryDguid,
+  operations = [],
+}) {
+  if (!Array.isArray(operations) || !operations.length) {
+    throw new CounterProposalValidationError("At least one vertex operation is required.", {
+      code: "INVALID_COUNTER_PROPOSAL",
+      statusCode: 400,
+    });
+  }
+  if (operations.length > MAX_SUBMISSION_OPERATIONS) {
+    throw new CounterProposalValidationError("Too many vertex operations were submitted.", {
+      code: "INVALID_COUNTER_PROPOSAL",
+      statusCode: 400,
+    });
+  }
+
+  const { pair, vertexById } = await loadSharedVertexCatalog(release, primaryDguid, secondaryDguid);
+  const normalizedByVertex = new Map();
+
+  for (const operation of operations) {
+    const vertexId = String(operation?.vertexId ?? operation?.vertex_id ?? "").trim();
+    if (!vertexId) {
+      throw new CounterProposalValidationError("Each operation must include vertexId.", {
+        code: "INVALID_COUNTER_PROPOSAL",
+        statusCode: 400,
+      });
+    }
+    if (normalizedByVertex.has(vertexId)) {
+      throw new CounterProposalValidationError("Duplicate vertexId values are not allowed.", {
+        code: "INVALID_COUNTER_PROPOSAL",
+        statusCode: 400,
+      });
+    }
+    const vertex = vertexById.get(vertexId);
+    if (!vertex || vertex.locked) {
+      throw new CounterProposalValidationError("Operation references an unknown or locked vertex.", {
+        code: "UNKNOWN_OR_LOCKED_VERTEX",
+        statusCode: 422,
+      });
+    }
+    const toLng = normalizeOperationCoordinate(operation.toLng ?? operation.to_lng, "toLng");
+    const toLat = normalizeOperationCoordinate(operation.toLat ?? operation.to_lat, "toLat");
+    if (
+      coordinateKey(vertex.base) === coordinateKey([toLng, toLat])
+    ) {
+      continue;
+    }
+    normalizedByVertex.set(vertexId, {
+      vertex_id: vertexId,
+      operation_type: "set_vertex",
+      base_lng: vertex.base[0],
+      base_lat: vertex.base[1],
+      to_lng: toLng,
+      to_lat: toLat,
+    });
+  }
+
+  if (!normalizedByVertex.size) {
+    throw new CounterProposalValidationError("At least one vertex operation is required.", {
+      code: "INVALID_COUNTER_PROPOSAL",
+      statusCode: 400,
+    });
+  }
+
+  return {
+    primaryDguid: pair[0],
+    secondaryDguid: pair[1],
+    operations: [...normalizedByVertex.values()].sort((left, right) =>
+      left.vertex_id.localeCompare(right.vertex_id),
+    ),
+  };
+}
+
+export async function materializeCounterProposalFromOperations({
+  release,
+  primaryDguid,
+  secondaryDguid,
+  operations = [],
+}) {
+  const pair = await readCanonicalDaPair(
+    release,
+    primaryDguid,
+    secondaryDguid,
+    { representation: "edit", lod: "auto" },
+  );
+  const originalFeatures = pair.features.features;
+  const proposedGeometry = await materializeGeometryOperations({
+    release_id: release.manifest.releaseId,
+    primary_dguid: primaryDguid,
+    secondary_dguid: secondaryDguid,
+  }, operations);
+  return {
+    originalFeatures,
+    proposedFeatures: proposedGeometry.features,
+    proposedGeometry,
+    geometryDigest: digest(proposedGeometry.features.map((feature) => feature.geometry)),
+  };
+}
+
+export async function createCounterProposalSubmissionV2(supabase, {
+  userId,
+  title,
+  comment,
+  releaseId,
+  baseRevision,
+  primaryDguid,
+  secondaryDguid,
+  fedNum,
+  geometryDigest,
+  validationReport,
+  operations,
+  scopePruids,
+}) {
+  const { data, error } = await supabase.rpc("create_counter_proposal_submission_v2", {
+    p_user_id: userId,
+    p_title: title,
+    p_comment: comment,
+    p_release_id: releaseId,
+    p_base_revision: baseRevision,
+    p_primary_dguid: primaryDguid,
+    p_secondary_dguid: secondaryDguid,
+    p_fed_num: fedNum,
+    p_geometry_digest: geometryDigest,
+    p_validation_report: validationReport,
+    p_operations: operations,
+    p_scope_pruids: scopePruids,
+  });
+  if (error) {
+    throw error;
+  }
+  return data;
 }

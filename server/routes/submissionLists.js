@@ -11,6 +11,11 @@ import {
   normalizeSubmissionListFilters,
   serializeLightweightSubmission,
 } from "../lib/submissions/submissionListQuery.js";
+import {
+  getCommissionerSubmissionRowV2,
+  listCommissionerSubmissionRowsV2,
+  listMySubmissionRowsV2,
+} from "../lib/submissions/submissionListRepository.js";
 import { projectArchiveRequestVisibility } from "../lib/archiveRequests/visibilityProjection.js";
 
 const router = Router();
@@ -46,7 +51,7 @@ async function presentRows(supabase, rows, { includeProfiles, actorProfileId = n
   return projected.map((row) => serializeLightweightSubmission(row, profilesById.get(row.user_id)));
 }
 
-async function listRows(req, res, {
+async function listRowsLegacy(req, res, {
   ownerId = null,
   includeProfiles = false,
   scopeToCommissioner = false,
@@ -58,27 +63,58 @@ async function listRows(req, res, {
     return res.status(error.statusCode || 400).json({ error: error.message });
   }
 
+  const supabase = getSupabaseAdminDataClient();
+  let query = supabase.from("submissions").select(LIGHTWEIGHT_SUBMISSION_COLUMNS);
+  if (ownerId) query = query.eq("user_id", ownerId);
+  const { data, error } = await query.order("created_at", { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+
+  let scopedRows = data ?? [];
+  if (scopeToCommissioner) {
+    scopedRows = await filterSubmissionsForCommissionerScope(scopedRows, req.profile);
+  }
+
+  const rows = await presentRows(supabase, scopedRows, {
+    includeProfiles,
+    actorProfileId: scopeToCommissioner ? req.profile?.id ?? req.user?.id : null,
+  });
+  return res.json({
+    items: filterAndSortSubmissionRows(rows, filters),
+    appliedFilters: filters,
+    page: {
+      pageSize: rows.length,
+      nextCursor: null,
+      hasMore: false,
+    },
+  });
+}
+
+async function listRows(req, res, {
+  ownerId = null,
+  includeProfiles = false,
+  scopeToCommissioner = false,
+} = {}) {
   try {
     const supabase = getSupabaseAdminDataClient();
-    let query = supabase.from("submissions").select(LIGHTWEIGHT_SUBMISSION_COLUMNS);
-    if (ownerId) query = query.eq("user_id", ownerId);
-    const { data, error } = await query.order("created_at", { ascending: false });
-    if (error) return res.status(500).json({ error: error.message });
-
-    let scopedRows = data ?? [];
-    if (scopeToCommissioner) {
-      scopedRows = await filterSubmissionsForCommissionerScope(scopedRows, req.profile);
+    if (ownerId) {
+      const payload = await listMySubmissionRowsV2(supabase, {
+        userId: ownerId,
+        query: req.query,
+      });
+      return res.json(payload);
     }
-
-    const rows = await presentRows(supabase, scopedRows, {
-      includeProfiles,
-      actorProfileId: scopeToCommissioner ? req.profile?.id ?? req.user?.id : null,
-    });
-    return res.json({
-      items: filterAndSortSubmissionRows(rows, filters),
-      appliedFilters: filters,
-    });
+    if (scopeToCommissioner) {
+      const payload = await listCommissionerSubmissionRowsV2(supabase, {
+        actorProfile: req.profile,
+        query: req.query,
+      });
+      return res.json(payload);
+    }
+    return listRowsLegacy(req, res, { ownerId, includeProfiles, scopeToCommissioner });
   } catch (error) {
+    if (error?.code === "42883" || /function .* does not exist/i.test(String(error?.message ?? ""))) {
+      return listRowsLegacy(req, res, { ownerId, includeProfiles, scopeToCommissioner });
+    }
     return res.status(error.statusCode || 500).json({
       error: error.message || "Unable to load submissions.",
       ...(error.code ? { code: error.code } : {}),
@@ -92,6 +128,21 @@ router.get("/mine", requirePublicUser, (req, res) =>
 router.get("/table-row/:submissionId", requireCommissioner, async (req, res) => {
   try {
     const supabase = getSupabaseAdminDataClient();
+    try {
+      const item = await getCommissionerSubmissionRowV2(supabase, {
+        submissionId: req.params.submissionId,
+        actorProfile: req.profile,
+      });
+      if (!item) {
+        return res.status(404).json({ error: "Submission not found." });
+      }
+      return res.json({ item });
+    } catch (rpcError) {
+      if (rpcError?.code !== "42883" && !/function .* does not exist/i.test(String(rpcError?.message ?? ""))) {
+        throw rpcError;
+      }
+    }
+
     const { data, error } = await supabase
       .from("submissions")
       .select(LIGHTWEIGHT_SUBMISSION_COLUMNS)

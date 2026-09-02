@@ -11,6 +11,32 @@ import {
 } from "../lib/cookies.js";
 import { getSupabaseClient, getSupabaseProfile } from "../lib/supabase.js";
 
+const PROFILE_CACHE_TTL_MS = 60_000;
+const profileCache = new Map();
+
+function profileCacheKey(userId) {
+  return String(userId ?? "").trim();
+}
+
+async function loadCachedProfile(accessToken, userId) {
+  const key = profileCacheKey(userId);
+  const cached = profileCache.get(key);
+  if (cached && Date.now() - cached.loadedAt < PROFILE_CACHE_TTL_MS) {
+    return cached.profile;
+  }
+  const profile = await getSupabaseProfile(accessToken, userId);
+  profileCache.set(key, { profile, loadedAt: Date.now() });
+  return profile;
+}
+
+export function clearAuthProfileCacheForTests(userId = null) {
+  if (userId) {
+    profileCache.delete(profileCacheKey(userId));
+    return;
+  }
+  profileCache.clear();
+}
+
 function hasCompletePublicProfile(user, profile = null) {
   const storedRole = profile?.role || "public_user";
   const role = storedRole === "user" ? "public_user" : storedRole;
@@ -84,7 +110,7 @@ export async function requireAuth(req, res, next) {
       return;
     }
 
-    const profile = await getSupabaseProfile(session.accessToken, session.user.id);
+    const profile = await loadCachedProfile(session.accessToken, session.user.id);
 
     if (!hasCompletePublicProfile(session.user, profile)) {
       clearAuthenticatedSessionCookies(res);
@@ -119,7 +145,7 @@ export async function authenticateWebSocketRequest(req) {
   const { data, error } = await supabase.auth.getUser(accessToken);
   if (error || !data?.user) return null;
 
-  const profile = await getSupabaseProfile(accessToken, data.user.id);
+  const profile = await loadCachedProfile(accessToken, data.user.id);
   if (!hasCompletePublicProfile(data.user, profile)) return null;
 
   return {

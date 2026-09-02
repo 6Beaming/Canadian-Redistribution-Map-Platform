@@ -277,10 +277,9 @@
 
 .workspace-tree__top-row {
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 24rem;
+  display: flex;
+  justify-content: center;
   align-items: start;
-  gap: clamp(0.85rem, 1.8vw, 1.5rem);
   min-inline-size: max-content;
 }
 
@@ -298,7 +297,6 @@
   z-index: 2;
   display: grid;
   width: clamp(22rem, 31vw, 28rem);
-  justify-self: center;
   height: 7rem;
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
@@ -420,14 +418,13 @@
 }
 
 .workspace-status-key {
-  position: static;
-  top: auto;
-  right: auto;
+  position: absolute;
+  top: 0;
+  right: 0;
   box-sizing: border-box;
   inline-size: 24rem;
   min-inline-size: 24rem;
   max-inline-size: 24rem;
-  justify-self: end;
   border: 1px solid #d9e3e8;
   border-radius: 0.7rem;
   background: rgba(255, 255, 255, 0.95);

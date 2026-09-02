@@ -1437,6 +1437,10 @@ export function buildCounterProposalCacheFromReleasePair(
     id: `${String(firstDguid)}:${String(secondDguid)}`,
     createdAt: new Date().toISOString(),
     sourceAsset: "counter-proposal-release-cache",
+    releaseIdentity: {
+      releaseId: String(pairPayload?.releaseId ?? "").trim() || null,
+      baseRevision: String(pairPayload?.baseRevision ?? "").trim() || null,
+    },
     firstDguid: String(firstDguid),
     secondDguid: String(secondDguid),
     originalFeatures,

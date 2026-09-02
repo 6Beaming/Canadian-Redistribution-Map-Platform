@@ -593,7 +593,7 @@ function FilterPanel({ state, onChange, onApply, onReset }) {
 export default function CommissionerWorkspace() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const focusId = searchParams.get("focus");
   const [workspaceSubmissions, setWorkspaceSubmissions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -731,6 +731,11 @@ export default function CommissionerWorkspace() {
   function applyFilter() {
     setExpansion(cloneExpansionState(filterDraft));
     setIsFilterOpen(false);
+    if (focusId) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("focus");
+      setSearchParams(nextParams, { replace: true });
+    }
   }
 
   function resetFilter() {

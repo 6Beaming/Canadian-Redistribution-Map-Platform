@@ -82,6 +82,37 @@ export function normalizeSubmissionListFilters(query = {}) {
   };
 }
 
+export function normalizeSubmissionListPagination(query = {}) {
+  const pageSize = Number.parseInt(String(query.pageSize ?? "25"), 10);
+  if (!Number.isFinite(pageSize) || pageSize <= 0) {
+    return { pageSize: 25 };
+  }
+  return { pageSize: Math.min(pageSize, 100) };
+}
+
+export function decodeSubmissionListCursor(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return null;
+  }
+  try {
+    const decoded = JSON.parse(Buffer.from(raw, "base64url").toString("utf8"));
+    if (!decoded || typeof decoded !== "object") {
+      return null;
+    }
+    return decoded;
+  } catch {
+    return null;
+  }
+}
+
+export function encodeSubmissionListCursor(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  return Buffer.from(JSON.stringify(value)).toString("base64url");
+}
+
 function searchableText(row) {
   return [
     row.id,

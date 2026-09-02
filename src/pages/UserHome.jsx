@@ -810,6 +810,14 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
     }
   }, []);
 
+  const handleCounterProposalExportOperations = useCallback(async () => {
+    await counterProposalWorkerInitRef.current;
+    if (!counterProposalWorkerRef.current) {
+      throw new Error("Counter-Proposal worker is unavailable.");
+    }
+    return counterProposalWorkerRef.current.exportSubmissionOperations();
+  }, []);
+
   useEffect(() => {
     if (panelView !== "counter-proposal" || counterProposalWorkflow.step < 3) {
       return undefined;
@@ -1070,6 +1078,7 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
             onCounterProposalBackStep={handleCounterProposalBackStep}
             onCounterProposalConfirmEdit={handleCounterProposalConfirmEdit}
             onCounterProposalSubmitSuccess={handleCounterProposalSubmitSuccess}
+            exportCounterProposalOperations={handleCounterProposalExportOperations}
             onRolloutHoverChange={handleRolloutHoverChange}
             onRolloutSelect={handleRolloutSelect}
           />

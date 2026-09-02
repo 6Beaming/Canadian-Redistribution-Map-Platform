@@ -40,10 +40,10 @@ function getRouteLoadingDuration(fromPathname, toPathname) {
     return ROUTE_LOADING_DURATION_MS.MAP_HANDOFF;
   }
 
-  // Public My Submissions and Commissioner User Submissions always use the
-  // same explicit list-loading treatment.
+  // Public My Submissions and Commissioner User Submissions rely on the page
+  // loader and real request completion instead of a fixed-duration overlay.
   if (isSubmissionListPath(toPathname)) {
-    return ROUTE_LOADING_DURATION_MS.SUBMISSIONS;
+    return 0;
   }
 
   // Entering the Workspace tree uses a separate, equally long transition. Map

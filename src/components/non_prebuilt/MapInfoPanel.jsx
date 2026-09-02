@@ -553,6 +553,7 @@ export function MapInfoPanel({
   onCounterProposalBackStep,
   onCounterProposalConfirmEdit,
   onCounterProposalSubmitSuccess,
+  exportCounterProposalOperations,
   onRolloutHoverChange,
   onRolloutSelect,
   onSelectDguid,
@@ -637,6 +638,7 @@ export function MapInfoPanel({
                 onBackStep={onCounterProposalBackStep}
                 onConfirmEdit={onCounterProposalConfirmEdit}
                 onSubmitSuccess={onCounterProposalSubmitSuccess}
+                exportSubmissionOperations={exportCounterProposalOperations}
                 profilesByDguid={profilesByDguid}
                 workflow={counterProposalWorkflow}
               />

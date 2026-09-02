@@ -322,6 +322,7 @@ export default function UserMakeCounterProposal({
   onBackStep,
   onConfirmEdit,
   onSubmitSuccess,
+  exportSubmissionOperations,
 }) {
   const { sessionStatus } = useAuth();
   const isSignedIn = sessionStatus === "signed-in";
@@ -377,16 +378,38 @@ export default function UserMakeCounterProposal({
     setIsSubmitting(true);
 
     try {
-      await submitCounterProposalWithDraft({
-        submit: submitCounterProposal,
-        payload: {
+      let payload;
+      if (typeof exportSubmissionOperations === "function") {
+        const exported = await exportSubmissionOperations();
+        if (!exported?.operations?.length) {
+          toast.error("Move at least one shared boundary vertex before submitting.", { duration: 2000 });
+          return;
+        }
+        payload = {
+          schemaVersion: "2.0",
+          title: title.trim(),
+          comment: proposalText.trim(),
+          releaseId: exported.releaseId,
+          baseRevision: exported.baseRevision,
+          primaryDguid: exported.primaryDguid ?? workflow.firstDguid,
+          secondaryDguid: exported.secondaryDguid ?? workflow.secondDguid,
+          operations: exported.operations,
+          clientDiagnostics: exported.clientDiagnostics,
+        };
+      } else {
+        payload = {
           title: title.trim(),
           comment: proposalText.trim(),
           fed_num: fedNum,
           dguid: workflow.firstDguid,
           neighboring_dguid: workflow.secondDguid,
           proposed_geometry: cache.currentFeatureCollection,
-        },
+        };
+      }
+
+      await submitCounterProposalWithDraft({
+        submit: submitCounterProposal,
+        payload,
         onSuccess: () => onSubmitSuccess?.(workflow.secondDguid ?? workflow.firstDguid),
       });
 

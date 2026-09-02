@@ -8,8 +8,10 @@ import {
   CounterProposalValidationError,
   MapAssetValidationError,
   prepareCounterProposalSubmission,
+  prepareCounterProposalSubmissionV2,
 } from "../lib/map/counterProposalSubmission.js";
 import {
+  createCounterProposalSubmissionV2,
   deriveCounterProposalOperations,
   persistSubmissionGeometryRevision,
   materializeGeometryOperations,
@@ -60,7 +62,49 @@ async function attachAuthorProfiles(records) {
 
 router.post("/counter-proposals", requirePublicUser, async (req, res, next) => {
   try {
-    await assertActiveMapRelease();
+    const activeRelease = await assertActiveMapRelease();
+
+    if (String(req.body?.schemaVersion ?? "").trim() === "2.0") {
+      const prepared = await prepareCounterProposalSubmissionV2(req.body, activeRelease);
+      const supabase = getSupabaseAdminDataClient();
+      const persisted = await createCounterProposalSubmissionV2(supabase, {
+        userId: req.user.id,
+        title: prepared.submission.title,
+        comment: prepared.submission.comment,
+        releaseId: prepared.compact.releaseId,
+        baseRevision: prepared.compact.baseRevision,
+        primaryDguid: prepared.compact.primaryDguid,
+        secondaryDguid: prepared.compact.secondaryDguid,
+        fedNum: prepared.submission.fed_num,
+        geometryDigest: prepared.compact.geometryDigest,
+        validationReport: prepared.validationReport,
+        operations: prepared.compact.operations,
+        scopePruids: prepared.scopePruids,
+      });
+
+      return res.status(201).json({
+        schemaVersion: "2.0",
+        submission: {
+          id: persisted.submission.id,
+          type: "counter-proposal",
+          title: persisted.submission.title,
+          status: persisted.submission.status,
+          created_at: persisted.submission.created_at,
+          resource_version: persisted.submission.resource_version,
+          dguid: persisted.submission.dguid,
+          neighboring_dguid: persisted.submission.neighboring_dguid,
+          release_id: persisted.submission.release_id,
+        },
+        geometryRevision: {
+          id: persisted.geometry_revision.id,
+          revisionNumber: persisted.geometry_revision.revision_number,
+          operationCount: prepared.compact.operations.length,
+          geometryDigest: persisted.geometry_revision.geometry_digest,
+        },
+        impactSummary: prepared.validationReport.impact_summary ?? {},
+      });
+    }
+
     const prepared = await prepareCounterProposalSubmission(req.body);
     const compactGeometry = await deriveCounterProposalOperations({
       primaryDguid: prepared.revision.primary_dguid,
@@ -130,6 +174,7 @@ router.post("/counter-proposals", requirePublicUser, async (req, res, next) => {
     ) {
       return res.status(error.statusCode || 400).json({
         error: error.publicMessage || error.message,
+        code: error.code ?? null,
         validation_report: error.validationReport ?? null,
       });
     }

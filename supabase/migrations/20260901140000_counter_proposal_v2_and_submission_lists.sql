@@ -1,0 +1,623 @@
+-- Counter-Proposal v2 atomic submission writes and geometry-free submission list projections.
+
+create or replace function public.province_code_to_pruid(p_code text)
+returns text
+language sql
+immutable
+as $$
+  select case upper(trim(coalesce(p_code, '')))
+    when 'AB' then '48'
+    when 'BC' then '59'
+    when 'MB' then '46'
+    when 'NB' then '13'
+    when 'NL' then '10'
+    when 'NS' then '12'
+    when 'NT' then '61'
+    when 'NU' then '62'
+    when 'ON' then '35'
+    when 'PE' then '11'
+    when 'QC' then '24'
+    when 'SK' then '47'
+    when 'YT' then '60'
+    else null
+  end;
+$$;
+
+create or replace function public.submission_matches_commissioner_pruid(
+  p_submission_id uuid,
+  p_dguid text,
+  p_neighboring_dguid text,
+  p_pruid text
+)
+returns boolean
+language sql
+stable
+as $$
+  select exists (
+    select 1
+    from public.submission_scope_pruids scope
+    where scope.submission_id = p_submission_id
+      and scope.pruid = p_pruid
+  )
+  or exists (
+    select 1
+    from public.dissemination_areas da
+    where da.dguid in (p_dguid, p_neighboring_dguid)
+      and public.province_code_to_pruid(da.province_code) = p_pruid
+  );
+$$;
+
+create or replace function public.create_counter_proposal_submission_v2(
+  p_user_id uuid,
+  p_title text,
+  p_comment text,
+  p_release_id text,
+  p_base_revision text,
+  p_primary_dguid text,
+  p_secondary_dguid text,
+  p_fed_num text,
+  p_geometry_digest text,
+  p_validation_report jsonb,
+  p_operations jsonb,
+  p_scope_pruids text[] default '{}'::text[]
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  submission_row public.submissions%rowtype;
+  revision_row public.submission_geometry_revisions%rowtype;
+  operation_record jsonb;
+  operation_index integer := 0;
+  pair_dguids text[];
+  scope_pruid text;
+begin
+  if p_user_id is null
+    or nullif(trim(p_title), '') is null
+    or nullif(trim(p_comment), '') is null
+    or nullif(trim(p_release_id), '') is null
+    or nullif(trim(p_base_revision), '') is null
+    or nullif(trim(p_primary_dguid), '') is null
+    or nullif(trim(p_secondary_dguid), '') is null
+    or p_geometry_digest !~ '^sha256:[0-9a-f]{64}$'
+  then
+    raise exception 'invalid counter-proposal submission payload' using errcode = '22023';
+  end if;
+
+  pair_dguids := array[
+    least(trim(p_primary_dguid), trim(p_secondary_dguid)),
+    greatest(trim(p_primary_dguid), trim(p_secondary_dguid))
+  ];
+
+  if jsonb_typeof(coalesce(p_operations, '[]'::jsonb)) <> 'array'
+    or jsonb_array_length(coalesce(p_operations, '[]'::jsonb)) = 0
+  then
+    raise exception 'at least one vertex operation is required' using errcode = '22023';
+  end if;
+
+  insert into public.submissions (
+    user_id,
+    type,
+    fed_num,
+    dguid,
+    neighboring_dguid,
+    title,
+    comment,
+    geometry,
+    status,
+    release_id,
+    resource_version,
+    created_at,
+    updated_at
+  ) values (
+    p_user_id,
+    'counter_proposal',
+    nullif(trim(p_fed_num), ''),
+    pair_dguids[1],
+    pair_dguids[2],
+    trim(p_title),
+    trim(p_comment),
+    null,
+    'pending',
+    trim(p_release_id),
+    1,
+    now(),
+    now()
+  )
+  returning * into submission_row;
+
+  insert into public.submission_geometry_revisions (
+    submission_id,
+    submission_type,
+    revision_number,
+    release_id,
+    base_revision,
+    primary_dguid,
+    secondary_dguid,
+    geometry_digest,
+    validation_report,
+    migration_state,
+    migration_error,
+    created_by,
+    created_at
+  ) values (
+    submission_row.id,
+    'counter_proposal',
+    1,
+    trim(p_release_id),
+    trim(p_base_revision),
+    pair_dguids[1],
+    pair_dguids[2],
+    p_geometry_digest,
+    coalesce(p_validation_report, '{}'::jsonb)
+      || jsonb_build_object('operationCount', jsonb_array_length(p_operations)),
+    'ready',
+    null,
+    p_user_id,
+    submission_row.created_at
+  )
+  returning * into revision_row;
+
+  for operation_record in
+    select value
+    from jsonb_array_elements(p_operations) as value
+    order by value->>'vertex_id'
+  loop
+    insert into public.submission_geometry_operations (
+      revision_id,
+      operation_index,
+      vertex_id,
+      operation_type,
+      base_lng,
+      base_lat,
+      to_lng,
+      to_lat
+    ) values (
+      revision_row.id,
+      operation_index,
+      trim(operation_record->>'vertex_id'),
+      coalesce(nullif(trim(operation_record->>'operation_type'), ''), 'set_vertex'),
+      (operation_record->>'base_lng')::double precision,
+      (operation_record->>'base_lat')::double precision,
+      (operation_record->>'to_lng')::double precision,
+      (operation_record->>'to_lat')::double precision
+    );
+    operation_index := operation_index + 1;
+  end loop;
+
+  foreach scope_pruid in array coalesce(p_scope_pruids, '{}'::text[])
+  loop
+    if nullif(trim(scope_pruid), '') is null then
+      continue;
+    end if;
+    insert into public.submission_scope_pruids (submission_id, pruid)
+    values (submission_row.id, trim(scope_pruid))
+    on conflict do nothing;
+  end loop;
+
+  return jsonb_build_object(
+    'submission', to_jsonb(submission_row),
+    'geometry_revision', to_jsonb(revision_row)
+  );
+exception
+  when others then
+    raise;
+end;
+$$;
+
+revoke all on function public.create_counter_proposal_submission_v2(
+  uuid, text, text, text, text, text, text, text, text, jsonb, jsonb, text[]
+) from public, anon, authenticated;
+
+create or replace function public.list_my_submission_rows_v2(
+  p_user_id uuid,
+  p_query text default '',
+  p_created_from date default null,
+  p_created_to date default null,
+  p_type text default '',
+  p_status text default '',
+  p_sort text default 'newest',
+  p_page_size integer default 25,
+  p_cursor jsonb default null
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  normalized_type text := lower(replace(replace(coalesce(p_type, ''), '_', '-'), 'comment', 'feedback'));
+  normalized_status text := lower(replace(replace(coalesce(p_status, ''), '_', '-'), ' ', '-'));
+  effective_page_size integer := greatest(1, least(coalesce(p_page_size, 25), 100));
+  cursor_created_at timestamptz := nullif(p_cursor->>'createdAt', '')::timestamptz;
+  cursor_id uuid := nullif(p_cursor->>'id', '')::uuid;
+  result_items jsonb := '[]'::jsonb;
+  result_count integer := 0;
+  fetched_count integer := 0;
+  next_cursor jsonb := null;
+  has_more boolean := false;
+begin
+  with filtered as (
+    select
+      s.id,
+      s.user_id,
+      s.type,
+      s.fed_num,
+      s.dguid,
+      s.neighboring_dguid,
+      s.title,
+      s.status,
+      s.resource_version,
+      s.created_at,
+      s.updated_at,
+      s.status as visible_status,
+      coalesce(primary_da.community_name, 'Unknown') as community_name,
+      s.fed_num as primary_fed_num,
+      null::text as secondary_fed_num,
+      primary_da.population as primary_population,
+      secondary_da.population as secondary_population
+    from public.submissions s
+    left join public.dissemination_areas primary_da on primary_da.dguid = s.dguid
+    left join public.dissemination_areas secondary_da on secondary_da.dguid = s.neighboring_dguid
+    where s.user_id = p_user_id
+      and (
+        coalesce(p_query, '') = ''
+        or concat_ws(
+          ' ',
+          s.id::text,
+          s.title,
+          s.type,
+          s.status,
+          s.fed_num,
+          s.dguid,
+          s.neighboring_dguid,
+          primary_da.community_name
+        ) ilike '%' || p_query || '%'
+      )
+      and (p_created_from is null or s.created_at >= p_created_from::timestamptz)
+      and (p_created_to is null or s.created_at < (p_created_to + interval '1 day')::timestamptz)
+      and (
+        normalized_type = ''
+        or lower(replace(s.type, '_', '-')) = case
+          when normalized_type = 'feedback' then 'feedback'
+          when normalized_type = 'counter-proposal' then 'counter_proposal'
+          else normalized_type
+        end
+      )
+      and (
+        normalized_status = ''
+        or lower(replace(s.status, '_', '-')) = normalized_status
+      )
+  ),
+  ordered as (
+    select *
+    from filtered
+    order by
+      case when coalesce(p_sort, 'newest') = 'title-asc' then title end asc nulls last,
+      case when coalesce(p_sort, 'newest') = 'title-desc' then title end desc nulls last,
+      case when coalesce(p_sort, 'newest') in ('newest', 'oldest', '') then created_at end desc nulls last,
+      case when coalesce(p_sort, 'newest') = 'oldest' then created_at end asc nulls last,
+      id desc
+  ),
+  paged as (
+    select *
+    from ordered
+    where cursor_id is null
+      or (
+        coalesce(p_sort, 'newest') = 'oldest'
+        and (created_at, id) > (cursor_created_at, cursor_id)
+      )
+      or (
+        coalesce(p_sort, 'newest') <> 'oldest'
+        and (created_at, id) < (cursor_created_at, cursor_id)
+      )
+    limit effective_page_size + 1
+  ),
+  limited as (
+    select * from paged limit effective_page_size
+  ),
+  counts as (
+    select count(*)::integer as total from paged
+  )
+  select
+    coalesce(jsonb_agg(
+      jsonb_build_object(
+        'id', limited.id,
+        'user_id', limited.user_id,
+        'type', limited.type,
+        'fed_num', limited.fed_num,
+        'dguid', limited.dguid,
+        'neighboring_dguid', limited.neighboring_dguid,
+        'title', limited.title,
+        'status', limited.status,
+        'visible_status', limited.visible_status,
+        'resource_version', limited.resource_version,
+        'created_at', limited.created_at,
+        'updated_at', limited.updated_at,
+        'primary_fed_num', limited.primary_fed_num,
+        'secondary_fed_num', limited.secondary_fed_num,
+        'primary_population', limited.primary_population,
+        'secondary_population', limited.secondary_population,
+        'dissemination_areas', jsonb_build_object('community_name', limited.community_name)
+      )
+    ), '[]'::jsonb),
+    count(*)::integer,
+    max(counts.total)
+  into result_items, result_count, fetched_count
+  from limited
+  cross join counts;
+
+  has_more := fetched_count > effective_page_size;
+
+  if has_more and result_count > 0 then
+    next_cursor := jsonb_build_object(
+      'createdAt', result_items->(result_count - 1)->>'created_at',
+      'id', result_items->(result_count - 1)->>'id',
+      'title', result_items->(result_count - 1)->>'title'
+    );
+  end if;
+
+  return jsonb_build_object(
+    'items', result_items,
+    'page', jsonb_build_object(
+      'pageSize', effective_page_size,
+      'nextCursor', next_cursor,
+      'hasMore', has_more
+    )
+  );
+end;
+$$;
+
+create or replace function public.list_commissioner_submission_rows_v2(
+  p_actor_id uuid,
+  p_commissioner_pruid text,
+  p_query text default '',
+  p_created_from date default null,
+  p_created_to date default null,
+  p_type text default '',
+  p_status text default '',
+  p_sort text default 'newest',
+  p_page_size integer default 25,
+  p_cursor jsonb default null
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  normalized_type text := lower(replace(replace(coalesce(p_type, ''), '_', '-'), 'comment', 'feedback'));
+  normalized_status text := lower(replace(replace(coalesce(p_status, ''), '_', '-'), ' ', '-'));
+  effective_page_size integer := greatest(1, least(coalesce(p_page_size, 25), 100));
+  cursor_created_at timestamptz := nullif(p_cursor->>'createdAt', '')::timestamptz;
+  cursor_id uuid := nullif(p_cursor->>'id', '')::uuid;
+  result_items jsonb := '[]'::jsonb;
+  result_count integer := 0;
+  fetched_count integer := 0;
+  next_cursor jsonb := null;
+  has_more boolean := false;
+begin
+  with scoped as (
+    select distinct on (s.id)
+      s.id,
+      s.user_id,
+      s.type,
+      s.fed_num,
+      s.dguid,
+      s.neighboring_dguid,
+      s.title,
+      s.status,
+      s.resource_version,
+      s.created_at,
+      s.updated_at,
+      coalesce(
+        array_agg(distinct scope.pruid) filter (where scope.pruid is not null),
+        '{}'::text[]
+      ) as scope_pruids,
+      s.active_claim_pruid as operating_pruid,
+      primary_da.community_name,
+      s.fed_num as primary_fed_num,
+      null::text as secondary_fed_num,
+      primary_da.population as primary_population,
+      secondary_da.population as secondary_population,
+      author.id as author_id,
+      author.email as author_email,
+      archive_request.id as archive_request_id,
+      archive_request.resource_version as archive_request_version,
+      (
+        archive_request.id is not null
+        and (
+          p_actor_id = archive_request.requester_id
+          or p_actor_id = any(coalesce(archive_request.assignee_ids, '{}'::uuid[]))
+        )
+      ) as archive_request_assigned_to_viewer,
+      case
+        when lower(replace(s.status, '_', '-')) in ('archive-request', 'archive-requested')
+          and archive_request.id is not null
+          and (
+            p_actor_id = archive_request.requester_id
+            or p_actor_id = any(coalesce(archive_request.assignee_ids, '{}'::uuid[]))
+          )
+          then 'archive-request'
+        when lower(replace(s.status, '_', '-')) in ('archive-request', 'archive-requested')
+          then 'accepted'
+        else lower(replace(s.status, '_', '-'))
+      end as visible_status
+    from public.submissions s
+    left join public.submission_scope_pruids scope on scope.submission_id = s.id
+    left join public.dissemination_areas primary_da on primary_da.dguid = s.dguid
+    left join public.dissemination_areas secondary_da on secondary_da.dguid = s.neighboring_dguid
+    left join public.profiles author on author.id = s.user_id
+    left join lateral (
+      select war.id, war.requester_id, war.assignee_ids, war.resource_version
+      from public.workspace_archive_requests war
+      where war.submission_id = s.id
+        and war.state in ('open', 'approved')
+      order by war.created_at desc
+      limit 1
+    ) archive_request on true
+    where public.submission_matches_commissioner_pruid(
+      s.id,
+      s.dguid,
+      s.neighboring_dguid,
+      trim(p_commissioner_pruid)
+    )
+    group by
+      s.id,
+      primary_da.community_name,
+      primary_da.population,
+      secondary_da.population,
+      author.id,
+      author.email,
+      archive_request.id,
+      archive_request.resource_version,
+      archive_request.requester_id,
+      archive_request.assignee_ids
+  ),
+  filtered as (
+    select *
+    from scoped
+    where (
+      coalesce(p_query, '') = ''
+      or concat_ws(
+        ' ',
+        id::text,
+        title,
+        type,
+        visible_status,
+        fed_num,
+        dguid,
+        neighboring_dguid,
+        community_name,
+        author_email
+      ) ilike '%' || p_query || '%'
+    )
+    and (p_created_from is null or created_at >= p_created_from::timestamptz)
+    and (p_created_to is null or created_at < (p_created_to + interval '1 day')::timestamptz)
+    and (
+      normalized_type = ''
+      or lower(replace(type, '_', '-')) = case
+        when normalized_type = 'feedback' then 'feedback'
+        when normalized_type = 'counter-proposal' then 'counter_proposal'
+        else normalized_type
+      end
+    )
+    and (
+      normalized_status = ''
+      or visible_status = normalized_status
+    )
+  ),
+  ordered as (
+    select *
+    from filtered
+    order by
+      case when coalesce(p_sort, 'newest') = 'title-asc' then title end asc,
+      case when coalesce(p_sort, 'newest') = 'title-desc' then title end desc,
+      case when coalesce(p_sort, 'newest') in ('newest', 'oldest', '') then created_at end desc,
+      case when coalesce(p_sort, 'newest') = 'oldest' then created_at end asc,
+      id desc
+  ),
+  paged as (
+    select *
+    from ordered
+    where cursor_id is null
+      or (
+        coalesce(p_sort, 'newest') = 'oldest'
+        and (created_at, id) > (cursor_created_at, cursor_id)
+      )
+      or (
+        coalesce(p_sort, 'newest') <> 'oldest'
+        and (created_at, id) < (cursor_created_at, cursor_id)
+      )
+    limit effective_page_size + 1
+  ),
+  limited as (
+    select * from paged limit effective_page_size
+  ),
+  counts as (
+    select count(*)::integer as total from paged
+  )
+  select
+    coalesce(jsonb_agg(
+      jsonb_build_object(
+        'id', limited.id,
+        'user_id', limited.user_id,
+        'type', limited.type,
+        'fed_num', limited.fed_num,
+        'dguid', limited.dguid,
+        'neighboring_dguid', limited.neighboring_dguid,
+        'title', limited.title,
+        'status', limited.status,
+        'visible_status', limited.visible_status,
+        'archive_request_assigned_to_viewer', limited.archive_request_assigned_to_viewer,
+        'archive_request_id', limited.archive_request_id,
+        'archive_request_version', limited.archive_request_version,
+        'resource_version', limited.resource_version,
+        'created_at', limited.created_at,
+        'updated_at', limited.updated_at,
+        'primary_fed_num', limited.primary_fed_num,
+        'secondary_fed_num', limited.secondary_fed_num,
+        'primary_population', limited.primary_population,
+        'secondary_population', limited.secondary_population,
+        'scope_pruids', limited.scope_pruids,
+        'operating_pruid', limited.operating_pruid,
+        'crossProvinceWarning', case
+          when coalesce(array_length(limited.scope_pruids, 1), 0) > 1 then true
+          else false
+        end,
+        'dissemination_areas', jsonb_build_object(
+          'community_name', coalesce(limited.community_name, 'Unknown')
+        ),
+        'profile', jsonb_build_object(
+          'id', limited.author_id,
+          'email', limited.author_email
+        )
+      )
+    ), '[]'::jsonb),
+    count(*)::integer,
+    max(counts.total)
+  into result_items, result_count, fetched_count
+  from limited
+  cross join counts;
+
+  has_more := fetched_count > effective_page_size;
+
+  if has_more and result_count > 0 then
+    next_cursor := jsonb_build_object(
+      'createdAt', result_items->(result_count - 1)->>'created_at',
+      'id', result_items->(result_count - 1)->>'id',
+      'title', result_items->(result_count - 1)->>'title'
+    );
+  end if;
+
+  return jsonb_build_object(
+    'items', result_items,
+    'page', jsonb_build_object(
+      'pageSize', effective_page_size,
+      'nextCursor', next_cursor,
+      'hasMore', has_more
+    )
+  );
+end;
+$$;
+
+revoke all on function public.list_my_submission_rows_v2(
+  uuid, text, date, date, text, text, text, integer, jsonb
+) from public, anon, authenticated;
+
+revoke all on function public.list_commissioner_submission_rows_v2(
+  uuid, text, text, date, date, text, text, text, integer, jsonb
+) from public, anon, authenticated;
+
+create index if not exists submissions_type_created_id_idx
+  on public.submissions (type, created_at desc, id desc);
+
+create index if not exists submissions_user_created_id_idx
+  on public.submissions (user_id, created_at desc, id desc);
+
+create index if not exists workspace_archive_requests_submission_state_created_idx
+  on public.workspace_archive_requests (submission_id, state, created_at desc);

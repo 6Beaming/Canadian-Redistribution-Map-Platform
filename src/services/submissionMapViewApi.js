@@ -1,4 +1,5 @@
 import { mapApi } from "@/services/mapApi.js";
+import { getSubmissionMaterializedGeometry } from "@/services/submissionsApi.js";
 import {
   buildDaObjectionIndex,
   getPairOuterBoundaryFeatureCollection,
@@ -75,9 +76,7 @@ export async function hydrateSubmissionMapView(payload) {
     };
   }
 
-  const detail = await requestJson(
-    `/api/submissions/${encodeURIComponent(payload.submission.id)}/geometry?materialize=1`,
-  );
+  const detail = await getSubmissionMaterializedGeometry(payload.submission.id);
   const proposed = detail.geometry;
   const proposedIndex = buildDaObjectionIndex(proposed);
 

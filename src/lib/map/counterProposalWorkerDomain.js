@@ -4,6 +4,11 @@ import {
   redoCounterProposalCache,
   undoCounterProposalCache,
 } from "./counterProposalWorkflow.js";
+import {
+  exportSubmissionOperations,
+  initializeWorkerOperationState,
+  syncWorkerOperationState,
+} from "./counterProposalOperations.js";
 
 function movedHandle(cache, handleId) {
   return cache?.handles?.find((handle) => handle.id === handleId || handle.legacyId === handleId) ?? null;
@@ -16,13 +21,18 @@ function coordinatesDiffer(left, right) {
 }
 
 export function createCounterProposalWorkerState() {
-  return { cache: null, latestSequence: 0 };
+  return {
+    cache: null,
+    latestSequence: 0,
+    operationState: null,
+  };
 }
 
 export function processCounterProposalWorkerMessage(state, message) {
   const sequence = Number(message?.sequence) || 0;
   if (message?.type === "INIT") {
     state.cache = message.cache ?? null;
+    state.operationState = state.cache ? initializeWorkerOperationState(state.cache) : null;
     state.latestSequence = Math.max(state.latestSequence, sequence);
     return { type: "READY", sequence };
   }
@@ -60,6 +70,7 @@ export function processCounterProposalWorkerMessage(state, message) {
       message.coordinate,
     );
     state.cache = commitCounterProposalCacheHistory(preview, baseline);
+    syncWorkerOperationState(state.operationState, state.cache);
     const after = movedHandle(state.cache, message.handleId);
     const valid = Boolean(before && after && coordinatesDiffer(before.coordinate, after.coordinate));
     return {
@@ -75,12 +86,23 @@ export function processCounterProposalWorkerMessage(state, message) {
 
   if (message.type === "UNDO") {
     state.cache = undoCounterProposalCache(state.cache);
+    syncWorkerOperationState(state.operationState, state.cache);
     return { type: "COMMIT_RESULT", sequence, cache: state.cache };
   }
 
   if (message.type === "REDO") {
     state.cache = redoCounterProposalCache(state.cache);
+    syncWorkerOperationState(state.operationState, state.cache);
     return { type: "COMMIT_RESULT", sequence, cache: state.cache };
+  }
+
+  if (message.type === "EXPORT_SUBMISSION_OPERATIONS") {
+    const payload = exportSubmissionOperations(state.operationState, state.cache);
+    return {
+      type: "SUBMISSION_OPERATIONS_RESULT",
+      sequence,
+      ...payload,
+    };
   }
 
   return { type: "ERROR", sequence, error: `Unsupported worker message: ${message?.type ?? "unknown"}.` };

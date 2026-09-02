@@ -38,8 +38,15 @@ test("submission map API adapter preserves an immutable-release seam", () => {
   assert.match(source, /hydrateSubmissionMapView/);
   assert.match(source, /mapApi\.getReleaseDa/);
   assert.match(source, /mapApi\.getReleaseDaPair/);
-  assert.match(source, /\/geometry\?materialize=1/);
+  assert.match(source, /getSubmissionMaterializedGeometry/);
   assert.doesNotMatch(source, /hydrateWorkspaceSubmission/);
+});
+
+test("workspace counter-proposal hydration uses compact geometry revisions", () => {
+  const source = read("src/services/tempCounterProposal.js");
+  assert.match(source, /getSubmissionMaterializedGeometry/);
+  assert.match(source, /hydrateFromCompactGeometryRevision/);
+  assert.match(source, /mapApi\.getReleaseDaPair/);
 });
 
 test("route-scoped fullscreen hides Header and restores global state", () => {

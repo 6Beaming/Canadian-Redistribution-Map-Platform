@@ -3,7 +3,7 @@ import { COMMISSIONER_TABLE_INVALIDATION_KEYS } from "@/lib/realtime/workspaceRe
 
 function appendFilters(url, filters = {}) {
   const params = new URLSearchParams();
-  ["query", "createdFrom", "createdTo", "type", "status", "sort"].forEach((key) => {
+  ["query", "createdFrom", "createdTo", "type", "status", "sort", "pageSize", "cursor"].forEach((key) => {
     const value = String(filters[key] ?? "").trim();
     if (value) params.set(key, value);
   });
@@ -38,6 +38,7 @@ export async function getCommissionerSubmissionTableRows(filters = {}) {
       ? payload.items.map(applyCommissionerStatusVisibility)
       : [],
     appliedFilters: payload.appliedFilters ?? {},
+    page: payload.page ?? { pageSize: payload.items?.length ?? 0, nextCursor: null, hasMore: false },
   };
 }
 
@@ -46,6 +47,7 @@ export async function getMySubmissionTableRows(filters = {}) {
   return {
     items: Array.isArray(payload.items) ? payload.items : [],
     appliedFilters: payload.appliedFilters ?? {},
+    page: payload.page ?? { pageSize: payload.items?.length ?? 0, nextCursor: null, hasMore: false },
   };
 }
 

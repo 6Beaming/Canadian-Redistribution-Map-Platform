@@ -55,6 +55,10 @@ export function createCounterProposalWorkerClient({ WorkerClass } = {}) {
     ),
     undo: () => request("UNDO", "COMMIT_RESULT"),
     redo: () => request("REDO", "COMMIT_RESULT"),
+    exportSubmissionOperations: () => request(
+      "EXPORT_SUBMISSION_OPERATIONS",
+      "SUBMISSION_OPERATIONS_RESULT",
+    ),
     terminate() {
       worker.terminate();
       const error = new Error("Counter-Proposal worker terminated.");
