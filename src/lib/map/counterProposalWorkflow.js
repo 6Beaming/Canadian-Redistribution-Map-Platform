@@ -1860,6 +1860,16 @@ export function previewCounterProposalHandleMove(cache, handleId, nextCoordinate
   };
 }
 
+export function applyCounterProposalWorkerCommit(cache, patch) {
+  if (!cache || !patch?.handleId || !Array.isArray(patch.coordinate)) {
+    return cache;
+  }
+  const preview = previewCounterProposalHandleMove(cache, patch.handleId, patch.coordinate);
+  const nextCache = commitCounterProposalCacheHistory(preview, cache.currentFeatures);
+  if (!nextCache) return cache;
+  return patch.impacts ? { ...nextCache, impacts: patch.impacts } : nextCache;
+}
+
 export function commitCounterProposalCacheHistory(cache, baselineSnapshot = null) {
   if (!cache) {
     return cache;

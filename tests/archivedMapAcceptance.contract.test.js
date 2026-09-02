@@ -83,6 +83,16 @@ test("archive-map snapshot route returns revision and head descriptors", async (
             },
           };
         }
+        if (table === "archive_branches") {
+          return {
+            select(_columns, options = {}) {
+              if (options.head) {
+                return Promise.resolve({ count: 1, error: null });
+              }
+              return this;
+            },
+          };
+        }
         if (table === "archive_map_da_heads") {
           return {
             select() { return this; },

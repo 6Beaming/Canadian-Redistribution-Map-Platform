@@ -10,13 +10,16 @@ import {
   getSharedBoundaryFeatureCollection,
 } from "@/lib/map/objectionWorkflow.js";
 import {
+  applyCounterProposalWorkerCommit,
   clearCounterProposalStorage,
   createInitialCounterProposalWorkflow,
   emptyCounterProposalFeatureCollection,
   readCounterProposalStorage,
   restoreCounterProposalCacheFromDraft,
   previewCounterProposalDragState,
+  redoCounterProposalCache,
   selectCounterProposalHandle,
+  undoCounterProposalCache,
   writeCounterProposalStorage,
 } from "@/lib/map/counterProposalWorkflow.js";
 import {
@@ -722,14 +725,15 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
       const result = counterProposalWorkerRef.current
         ? await counterProposalWorkerRef.current.commit(handleId, constrainedCoordinate)
         : null;
-      if (result?.type !== "COMMIT_RESULT" || !result.cache) {
-        throw new Error("Worker commit unavailable.");
+      if (result?.type !== "COMMIT_RESULT" || !result.valid || !result.committedPatch) {
+        throw new Error(result?.rejectionReason || "Worker commit unavailable.");
       }
       counterProposalWorkerSkipSyncRef.current = true;
-      counterProposalCacheRef.current = result.cache;
+      const nextCache = applyCounterProposalWorkerCommit(cache, result.committedPatch);
+      counterProposalCacheRef.current = nextCache;
       startTransition(() => setCounterProposalWorkflow((current) => ({
         ...current,
-        cache: result.cache,
+        cache: nextCache,
         dragBaselineSnapshot: null,
         dragPreviewImpacts: null,
         dragPreviewCoordinate: null,
@@ -766,14 +770,16 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
     try {
       await counterProposalWorkerInitRef.current;
       const result = await counterProposalWorkerRef.current.undo();
-      if (result?.type !== "COMMIT_RESULT" || !result.cache) {
+      if (result?.type !== "COMMIT_RESULT") {
         throw new Error("Worker undo unavailable.");
       }
       counterProposalWorkerSkipSyncRef.current = true;
-      counterProposalCacheRef.current = result.cache;
+      const nextCache = undoCounterProposalCache(currentCache);
+      counterProposalCacheRef.current = nextCache;
       startTransition(() => setCounterProposalWorkflow((current) => ({
         ...current,
-        cache: result.cache,
+        cache: nextCache,
+        impacts: result.impacts ?? nextCache?.impacts ?? null,
         error: "",
       })));
     } catch (error) {
@@ -792,14 +798,16 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
     try {
       await counterProposalWorkerInitRef.current;
       const result = await counterProposalWorkerRef.current.redo();
-      if (result?.type !== "COMMIT_RESULT" || !result.cache) {
+      if (result?.type !== "COMMIT_RESULT") {
         throw new Error("Worker redo unavailable.");
       }
       counterProposalWorkerSkipSyncRef.current = true;
-      counterProposalCacheRef.current = result.cache;
+      const nextCache = redoCounterProposalCache(currentCache);
+      counterProposalCacheRef.current = nextCache;
       startTransition(() => setCounterProposalWorkflow((current) => ({
         ...current,
-        cache: result.cache,
+        cache: nextCache,
+        impacts: result.impacts ?? nextCache?.impacts ?? null,
         error: "",
       })));
     } catch (error) {

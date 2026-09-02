@@ -9,15 +9,26 @@ export function hasArchivedMapData(data) {
   return Boolean(data?.dguids?.length);
 }
 
-async function loadLegacyArchivedMapOverlay(records, profilesByDguid) {
+function collectDguidsFromRecords(records, profilesByDguid) {
   const categories = buildArchiveTree(records, profilesByDguid);
+  return {
+    categories,
+    dguids: [...new Set(categories.flatMap((category) =>
+      category.branches.flatMap((branch) => [
+        ...(branch.dguids ?? []),
+        branch.latestVersion?.submission?.dguid,
+        branch.latestVersion?.submission?.neighboring_dguid,
+      ]),
+    ).filter(Boolean).map(String))],
+    branchCount: categories.reduce((count, category) => count + category.branches.length, 0),
+  };
+}
+
+async function loadLegacyArchivedMapOverlay(records, profilesByDguid) {
+  const { categories, dguids, branchCount } = collectDguidsFromRecords(records, profilesByDguid);
   const latestVersions = categories.flatMap((category) =>
     category.branches.map((branch) => branch.latestVersion).filter(Boolean),
   );
-  const dguids = [...new Set(latestVersions.flatMap((version) => [
-    version.submission?.dguid,
-    version.submission?.neighboring_dguid,
-  ]).filter(Boolean).map(String))];
   const hydrated = await Promise.all(latestVersions.map((version) =>
     hydrateWorkspaceSubmission(version.submission, profilesByDguid).catch(() => null),
   ));
@@ -33,41 +44,59 @@ async function loadLegacyArchivedMapOverlay(records, profilesByDguid) {
     featureCollection: overrideFeatures.length
       ? { type: "FeatureCollection", features: overrideFeatures }
       : EMPTY_FEATURE_COLLECTION,
-    branchCount: latestVersions.length,
+    branchCount,
     source: "legacy",
   };
 }
 
+function snapshotToArchivedMap(snapshot, fallbackDguids = []) {
+  const dguids = snapshot.dguids?.length
+    ? snapshot.dguids
+    : (snapshot.heads ?? []).map((head) => head.dguid).filter(Boolean);
+  return {
+    dguids: dguids.length ? dguids : fallbackDguids,
+    overrideDguids: snapshot.overrideDguids ?? [],
+    featureCollection: snapshot.featureCollection ?? EMPTY_FEATURE_COLLECTION,
+    branchCount: Number(snapshot.branchCount) || 0,
+    archiveMapRevision: snapshot.archiveMapRevision ?? 0,
+    releaseId: snapshot.releaseId ?? null,
+    source: snapshot.source ?? "v2",
+  };
+}
+
 /**
- * Durable Archived Map read. Prefers archive_map_da_heads when materialized,
- * otherwise falls back to the legacy latest-version CP snapshot overlay.
+ * Durable Archived Map read. Prefers archive_map_da_heads when materialized.
+ * Empty V2 snapshots must not trigger legacy hydration when V2 branches exist.
  */
-export async function loadArchivedMapEffect(profilesByDguid = new Map()) {
-  const records = await getArchiveTreeRecords();
-  const categories = buildArchiveTree(records, profilesByDguid);
-  const dguids = [...new Set(categories.flatMap((category) =>
-    category.branches.flatMap((branch) => [
-      ...(branch.dguids ?? []),
-      branch.latestVersion?.submission?.dguid,
-      branch.latestVersion?.submission?.neighboring_dguid,
-    ]),
-  ).filter(Boolean).map(String))];
+export async function loadArchivedMapEffect(profilesByDguid = new Map(), { enabled = true } = {}) {
+  if (!enabled) return null;
 
   try {
-    const snapshot = await getArchivedMapSnapshot(dguids);
+    const snapshot = await getArchivedMapSnapshot([], { includeAllHeads: true });
+    if (snapshot?.hasV2Branches) {
+      const { dguids } = collectDguidsFromRecords(await getArchiveTreeRecords(), profilesByDguid);
+      return snapshotToArchivedMap(snapshot, dguids);
+    }
     if (snapshot?.featureCollection?.features?.length) {
-      return {
-        dguids: snapshot.dguids?.length ? snapshot.dguids : dguids,
-        overrideDguids: snapshot.overrideDguids ?? [],
-        featureCollection: snapshot.featureCollection,
-        branchCount: categories.reduce((count, category) => count + category.branches.length, 0),
-        archiveMapRevision: snapshot.archiveMapRevision ?? 0,
-        releaseId: snapshot.releaseId ?? null,
-        source: snapshot.source ?? "v2",
-      };
+      return snapshotToArchivedMap(snapshot);
     }
   } catch {
-    // Fall back to legacy overlay when archive map heads are unavailable.
+    // Fall through to legacy only when V2 infrastructure is unavailable.
+  }
+
+  const records = await getArchiveTreeRecords();
+  const hasV2Records = records.some((record) => record.branchId);
+  if (hasV2Records) {
+    const { dguids, branchCount } = collectDguidsFromRecords(records, profilesByDguid);
+    return {
+      dguids,
+      overrideDguids: [],
+      featureCollection: EMPTY_FEATURE_COLLECTION,
+      branchCount,
+      archiveMapRevision: 0,
+      releaseId: null,
+      source: "v2-empty-heads",
+    };
   }
 
   return loadLegacyArchivedMapOverlay(records, profilesByDguid);

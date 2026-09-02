@@ -80,20 +80,34 @@ export function processCounterProposalWorkerMessage(state, message) {
       committedCoordinate: after?.coordinate ?? before?.coordinate ?? null,
       impacts: state.cache.impacts ?? null,
       rejectionReason: valid ? null : "No valid movement was available for this handle.",
-      cache: state.cache,
+      committedPatch: valid ? {
+        handleId: after?.id ?? message.handleId,
+        coordinate: after?.coordinate ?? null,
+        impacts: state.cache.impacts ?? null,
+      } : null,
     };
   }
 
   if (message.type === "UNDO") {
     state.cache = undoCounterProposalCache(state.cache);
     syncWorkerOperationState(state.operationState, state.cache);
-    return { type: "COMMIT_RESULT", sequence, cache: state.cache };
+    return {
+      type: "COMMIT_RESULT",
+      sequence,
+      action: "undo",
+      impacts: state.cache?.impacts ?? null,
+    };
   }
 
   if (message.type === "REDO") {
     state.cache = redoCounterProposalCache(state.cache);
     syncWorkerOperationState(state.operationState, state.cache);
-    return { type: "COMMIT_RESULT", sequence, cache: state.cache };
+    return {
+      type: "COMMIT_RESULT",
+      sequence,
+      action: "redo",
+      impacts: state.cache?.impacts ?? null,
+    };
   }
 
   if (message.type === "EXPORT_SUBMISSION_OPERATIONS") {

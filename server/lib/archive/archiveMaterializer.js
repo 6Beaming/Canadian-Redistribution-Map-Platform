@@ -2,11 +2,13 @@ import crypto from "node:crypto";
 import {
   loadCanonicalRelease,
   loadCurrentCanonicalRelease,
-  readCanonicalDaPair,
-  readSharedArcRecord,
 } from "../map/canonicalReleaseStore.js";
 import { validateCounterProposalTopology } from "../../../src/lib/map/counterProposalWorkflow.js";
 import { archiveError } from "./archiveErrors.js";
+import {
+  ArchiveMaterializationContext,
+  loadCanonicalPairLayers,
+} from "./archiveMaterializationContext.js";
 
 function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
@@ -140,43 +142,21 @@ async function loadBranchState(supabase, { branchId, branchKey }) {
   };
 }
 
-async function loadCurrentPair(supabase, release, pair) {
-  const base = await readCanonicalDaPair(release, pair[0], pair[1], { representation: "display" });
-  const { data: heads, error } = await supabase
-    .from("archive_map_da_heads")
-    .select("dguid,uses_base,geometry,display_geometry,geometry_digest,resource_version")
-    .eq("release_id", release.manifest.releaseId)
-    .in("dguid", pair);
-  if (error) throw archiveError(error.message, { code: "ARCHIVE_GEOMETRY_LOOKUP_FAILED" });
-  const headsByDguid = new Map((heads ?? []).map((head) => [String(head.dguid), head]));
-  const exactFeatures = pair.map((dguid) => {
-    const head = headsByDguid.get(dguid);
-    return head && !head.uses_base && head.geometry
-      ? head.geometry
-      : featureByDguid(base.features, dguid);
+async function loadCurrentPair(supabase, release, pair, context = null) {
+  const materializationContext = context ?? new ArchiveMaterializationContext();
+  return loadCanonicalPairLayers(materializationContext, release, pair, {
+    supabase,
+    headsQuery: () => supabase
+      .from("archive_map_da_heads")
+      .select("dguid,uses_base,geometry,display_geometry,geometry_digest,resource_version")
+      .eq("release_id", release.manifest.releaseId)
+      .in("dguid", pair),
   });
-  const displayFeatures = pair.map((dguid) => {
-    const head = headsByDguid.get(dguid);
-    return head && !head.uses_base && head.display_geometry
-      ? head.display_geometry
-      : featureByDguid(base.features, dguid);
-  });
-  return {
-    base: base.features,
-    headsByDguid,
-    exact: { type: "FeatureCollection", features: exactFeatures },
-    display: { type: "FeatureCollection", features: displayFeatures },
-  };
 }
 
-async function loadBaseVertices(release, pair) {
-  const shared = await readSharedArcRecord(release, pair.join("|"));
-  return new Map(shared.chains.flatMap((chain) => chain.vertices.map((vertex) => [vertex[0], {
-    vertexId: vertex[0],
-    lng: Number(vertex[1]),
-    lat: Number(vertex[2]),
-    locked: Boolean(vertex[3]),
-  }])));
+async function loadBaseVertices(release, pair, context = null) {
+  const materializationContext = context ?? new ArchiveMaterializationContext();
+  return materializationContext.getBaseVertices(release, pair);
 }
 
 function snapshotVertices(vertices) {
@@ -244,12 +224,14 @@ async function materializeBranchTransition(supabase, {
   branchKey,
   targetState,
   sourceOperations = [],
+  materializationContext = null,
 }) {
-  const release = loadCanonicalRelease(releaseId);
+  const context = materializationContext ?? new ArchiveMaterializationContext();
+  const release = context.getRelease(releaseId);
   const pair = canonicalPair(primaryDguid, secondaryDguid);
   const [currentPair, baseVertices, branchState, revisionResult] = await Promise.all([
-    loadCurrentPair(supabase, release, pair),
-    loadBaseVertices(release, pair),
+    loadCurrentPair(supabase, release, pair, context),
+    loadBaseVertices(release, pair, context),
     loadBranchState(supabase, { branchId, branchKey }),
     supabase
       .from("archive_map_revisions")
@@ -316,6 +298,7 @@ export async function buildCounterProposalMergePayload(supabase, {
   geometryRevision,
   operations = [],
 }) {
+  const materializationContext = new ArchiveMaterializationContext();
   const { vertices: currentState } = await loadBranchState(supabase, { branchId, branchKey });
   const targetState = new Map(currentState);
   operations.forEach((operation) => {
@@ -333,6 +316,7 @@ export async function buildCounterProposalMergePayload(supabase, {
     branchKey,
     targetState,
     sourceOperations: operations,
+    materializationContext,
   });
   return {
     ...payload,
@@ -365,6 +349,7 @@ export async function buildCounterProposalRevertPayload(supabase, {
     branchId,
     branchKey,
     targetState: normalizeSnapshot(targetVertexSnapshot),
+    materializationContext: new ArchiveMaterializationContext(),
   });
 }
 
@@ -382,6 +367,7 @@ export async function buildCounterProposalDeletePayload(supabase, {
     branchId,
     branchKey,
     targetState: new Map(),
+    materializationContext: new ArchiveMaterializationContext(),
   });
 }
 

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { getSupabaseAdminDataClient } from "../lib/supabase.js";
 import {
   getArchiveBranch,
+  getArchiveBranchView,
   getArchiveVersion,
   listArchiveProjectionsForDguid,
   listArchiveTreeRecords,
@@ -39,6 +40,20 @@ router.get("/archive-tree/branches/:branchId", async (req, res) => {
     return res.json(payload);
   } catch (error) {
     return handleArchiveError(res, error, "Unable to load the archive branch.");
+  }
+});
+
+router.get("/archive-tree/versions/:versionId/view", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdminDataClient();
+    const payload = await getArchiveBranchView(supabase, {
+      selectedVersionId: req.params.versionId,
+      branchKey: req.query.branchKey ?? null,
+      includeLatestGeometry: req.query.includeDifference !== "0",
+    });
+    return res.json(payload);
+  } catch (error) {
+    return handleArchiveError(res, error, "Unable to load the archived branch view.");
   }
 });
 
@@ -81,6 +96,7 @@ router.get("/archive-map", async (req, res) => {
     const payload = await getArchivedMapSnapshot(supabase, {
       dguids: req.query.dguids,
       expectedRevision: req.query.expectedRevision,
+      includeAllHeads: req.query.includeAllHeads === "1" || !req.query.dguids,
     });
     return res.json(payload);
   } catch (error) {

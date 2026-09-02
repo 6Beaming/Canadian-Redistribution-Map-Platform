@@ -29,7 +29,6 @@ import {
 } from "@/lib/map/daAssetManifest.js";
 import {
   buildFedNameLookup,
-  buildProfileIndex
 } from "@/lib/map/profileUtils.js";
 import { emptyBoundaryFeatureCollection } from "@/lib/map/objectionWorkflow.js";
 import {
@@ -2537,14 +2536,12 @@ export function MapCanvas({
 
     map.on("load", async () => {
       try {
-        const [assetManifestPayload, fedLabels, profilePayload] = await Promise.all([
+        const [assetManifestPayload, fedLabels] = await Promise.all([
           mapApi.getDaAssetManifest().catch(() => getFallbackDaAssetManifest()),
           mapApi.fetchAssetJson("reference/fed_labels.geojson"),
-          mapApi.getDaProfiles()
         ]);
 
         const assetManifest = normalizeDaAssetManifest(assetManifestPayload);
-        const { index: profileIndex } = buildProfileIndex(profilePayload);
         fedNameLookupRef.current = buildFedNameLookup(fedLabels);
 
         const fedMode = await addFedBaseLayers();
@@ -2587,7 +2584,6 @@ export function MapCanvas({
             (count, asset) => count + Math.max(0, Number(asset.featureCount ?? 0)),
             0,
           ) ||
-          profileIndex.size ||
           0;
 
         onStatusChangeRef.current?.(

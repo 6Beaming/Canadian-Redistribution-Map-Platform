@@ -19,6 +19,7 @@ import {
   materializeCounterProposalFromOperations,
   validateAndNormalizeSubmissionOperations,
 } from "./geometryOperations.js";
+import { runWithMaterializationContext } from "./materializationContext.js";
 
 export { MapAssetValidationError };
 
@@ -222,114 +223,115 @@ function assertReleaseIdentityMatches(body, activeRelease) {
 }
 
 export async function prepareCounterProposalSubmissionV2(body = {}, activeRelease) {
-  const primaryDguid = String(body.primaryDguid ?? body.dguid ?? "").trim();
-  const secondaryDguid = String(body.secondaryDguid ?? body.neighboring_dguid ?? "").trim();
-  const title = normalizeText(body.title, "title", { maxLength: 200 });
-  const comment = normalizeText(body.comment, "comment");
-  assertReleaseIdentityMatches(body, activeRelease);
+  return runWithMaterializationContext(async () => {
+    const primaryDguid = String(body.primaryDguid ?? body.dguid ?? "").trim();
+    const secondaryDguid = String(body.secondaryDguid ?? body.neighboring_dguid ?? "").trim();
+    const title = normalizeText(body.title, "title", { maxLength: 200 });
+    const comment = normalizeText(body.comment, "comment");
+    assertReleaseIdentityMatches(body, activeRelease);
 
-  const pairContext = await loadPairObjectionIndex(primaryDguid, secondaryDguid);
-  const {
-    index,
-    firstDguid,
-    secondDguid,
-    firstFedNum,
-    profilesByDguid,
-    baselineRevision,
-    releaseId,
-  } = pairContext;
-
-  if (releaseId !== activeRelease.releaseId || baselineRevision !== activeRelease.geometryRevision) {
-    throw new CounterProposalValidationError(
-      "The selected DA pair does not match the active map release.",
-      {
-        code: "STALE_COUNTER_PROPOSAL_DRAFT",
-        statusCode: 409,
-      },
-    );
-  }
-
-  const release = loadCanonicalRelease(releaseId);
-  const normalized = await validateAndNormalizeSubmissionOperations({
-    release,
-    primaryDguid: firstDguid,
-    secondaryDguid: secondDguid,
-    operations: body.operations,
-  });
-  const materialized = await materializeCounterProposalFromOperations({
-    release,
-    primaryDguid: normalized.primaryDguid,
-    secondaryDguid: normalized.secondaryDguid,
-    operations: normalized.operations,
-  });
-
-  const validationReport = validateCounterProposalTopology(
-    materialized.originalFeatures,
-    materialized.proposedFeatures,
-  );
-
-  if (!validationReport.valid) {
-    throw new CounterProposalValidationError(
-      "The proposed boundary geometry failed server topology validation.",
-      {
-        ...validationReport,
-        code: "COUNTER_PROPOSAL_TOPOLOGY_INVALID",
-        statusCode: 422,
-      },
-    );
-  }
-
-  const proposedIndex = buildDaObjectionIndex(createFeatureCollection(materialized.proposedFeatures));
-  const sharedBoundary = getSharedBoundaryFeatureCollection(
-    proposedIndex,
-    firstDguid,
-    secondDguid,
-  );
-  const outerBoundary = getPairOuterBoundaryFeatureCollection(
-    proposedIndex,
-    [firstDguid, secondDguid],
-  );
-  const impactSummary = calculateCounterProposalImpact({
-    originalFeatures: materialized.originalFeatures,
-    proposedFeatures: materialized.proposedFeatures,
-    firstDguid,
-    secondDguid,
-    populationByDguid: Object.fromEntries([
-      [firstDguid, profilesByDguid.get(firstDguid)?.population ?? null],
-      [secondDguid, profilesByDguid.get(secondDguid)?.population ?? null],
-    ]),
-  });
-
-  const scopePruids = await deriveEligibilityPruids(firstDguid, secondDguid);
-
-  return {
-    submission: {
-      user_id: null,
-      type: "counter_proposal",
-      fed_num: firstFedNum,
-      dguid: firstDguid,
-      neighboring_dguid: secondDguid,
-      title,
-      comment,
-      status: "pending",
-      release_id: releaseId,
-    },
-    compact: {
+    const pairContext = await loadPairObjectionIndex(primaryDguid, secondaryDguid);
+    const {
+      firstDguid,
+      secondDguid,
+      firstFedNum,
+      profilesByDguid,
+      baselineRevision,
       releaseId,
-      baseRevision: baselineRevision,
+    } = pairContext;
+
+    if (releaseId !== activeRelease.releaseId || baselineRevision !== activeRelease.geometryRevision) {
+      throw new CounterProposalValidationError(
+        "The selected DA pair does not match the active map release.",
+        {
+          code: "STALE_COUNTER_PROPOSAL_DRAFT",
+          statusCode: 409,
+        },
+      );
+    }
+
+    const release = loadCanonicalRelease(releaseId);
+    const normalized = await validateAndNormalizeSubmissionOperations({
+      release,
+      primaryDguid: firstDguid,
+      secondaryDguid: secondDguid,
+      operations: body.operations,
+    });
+    const materialized = await materializeCounterProposalFromOperations({
+      release,
       primaryDguid: normalized.primaryDguid,
       secondaryDguid: normalized.secondaryDguid,
-      geometryDigest: materialized.geometryDigest,
       operations: normalized.operations,
-    },
-    validationReport: {
-      ...validationReport,
-      impact_summary: impactSummary,
-      baseline_revision: baselineRevision,
-      shared_boundary: sharedBoundary,
-      outer_boundary: outerBoundary,
-      operationCount: normalized.operations.length,
-    },
-    scopePruids,
-  };
+    });
+
+    const validationReport = validateCounterProposalTopology(
+      materialized.originalFeatures,
+      materialized.proposedFeatures,
+    );
+
+    if (!validationReport.valid) {
+      throw new CounterProposalValidationError(
+        "The proposed boundary geometry failed server topology validation.",
+        {
+          ...validationReport,
+          code: "COUNTER_PROPOSAL_TOPOLOGY_INVALID",
+          statusCode: 422,
+        },
+      );
+    }
+
+    const proposedIndex = buildDaObjectionIndex(createFeatureCollection(materialized.proposedFeatures));
+    const sharedBoundary = getSharedBoundaryFeatureCollection(
+      proposedIndex,
+      firstDguid,
+      secondDguid,
+    );
+    const outerBoundary = getPairOuterBoundaryFeatureCollection(
+      proposedIndex,
+      [firstDguid, secondDguid],
+    );
+    const impactSummary = calculateCounterProposalImpact({
+      originalFeatures: materialized.originalFeatures,
+      proposedFeatures: materialized.proposedFeatures,
+      firstDguid,
+      secondDguid,
+      populationByDguid: Object.fromEntries([
+        [firstDguid, profilesByDguid.get(firstDguid)?.population ?? null],
+        [secondDguid, profilesByDguid.get(secondDguid)?.population ?? null],
+      ]),
+    });
+
+    const scopePruids = await deriveEligibilityPruids(firstDguid, secondDguid);
+
+    return {
+      submission: {
+        user_id: null,
+        type: "counter_proposal",
+        fed_num: firstFedNum,
+        dguid: firstDguid,
+        neighboring_dguid: secondDguid,
+        title,
+        comment,
+        status: "pending",
+        release_id: releaseId,
+      },
+      compact: {
+        releaseId,
+        baseRevision: baselineRevision,
+        primaryDguid: normalized.primaryDguid,
+        secondaryDguid: normalized.secondaryDguid,
+        geometryDigest: materialized.geometryDigest,
+        operations: normalized.operations,
+      },
+      validationReport: {
+        ...validationReport,
+        impact_summary: impactSummary,
+        baseline_revision: baselineRevision,
+        shared_boundary: sharedBoundary,
+        outer_boundary: outerBoundary,
+        operationCount: normalized.operations.length,
+      },
+      scopePruids,
+    };
+  });
 }

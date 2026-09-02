@@ -605,6 +605,20 @@ export default function CommissionerWorkspace() {
 
   useEffect(() => {
     let isMounted = true;
+    const abortController = new AbortController();
+
+    const mergeFocusedSubmission = (submissions, focused) => {
+      const merged = new Map(
+        (Array.isArray(submissions) ? submissions : []).map((submission) => [
+          String(submission.id),
+          submission,
+        ]),
+      );
+      merged.set(String(focused.id), focused);
+      return [...merged.values()].sort(
+        (left, right) => new Date(right.created_at) - new Date(left.created_at),
+      );
+    };
 
     const loadSubmissions = async ({ showLoading = false } = {}) => {
       if (showLoading) setIsLoading(true);
@@ -613,17 +627,27 @@ export default function CommissionerWorkspace() {
           const focused = await getWorkspaceSubmission(focusId, { hydrateGeometry: false });
           if (!isMounted) return;
           if (!focused) throw new Error("The focused submission was not found.");
-          const submissions = await getWorkspaceSubmissions({ includeArchived: false });
-          if (!isMounted) return;
-          setWorkspaceSubmissions(Array.isArray(submissions) ? submissions : [focused]);
+          setWorkspaceSubmissions([focused]);
           setExpansion(createFocusedExpansion(focused));
+          if (showLoading) setIsLoading(false);
+
+          const submissions = await getWorkspaceSubmissions({
+            includeArchived: false,
+            signal: abortController.signal,
+          });
+          if (!isMounted) return;
+          setWorkspaceSubmissions(mergeFocusedSubmission(submissions, focused));
         } else {
-          const submissions = await getWorkspaceSubmissions({ includeArchived: false });
+          const submissions = await getWorkspaceSubmissions({
+            includeArchived: false,
+            signal: abortController.signal,
+          });
           if (!isMounted) return;
           setWorkspaceSubmissions(Array.isArray(submissions) ? submissions : []);
         }
         setLoadError("");
       } catch (error) {
+        if (error?.name === "AbortError") return;
         if (isMounted) setLoadError(error.message || "Submissions could not be loaded.");
       } finally {
         if (isMounted && showLoading) setIsLoading(false);
@@ -662,6 +686,7 @@ export default function CommissionerWorkspace() {
 
     return () => {
       isMounted = false;
+      abortController.abort();
       unsubscribe();
     };
   }, [focusId]);

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { getSupabaseAdminDataClient } from "../lib/supabase.js";
+import { getArchiveRequestForSubmission } from "../lib/archiveRequests/service.js";
 
 const router = Router();
 const LABEL_MIGRATION_ERROR = "Workspace label migration is not installed.";
@@ -336,6 +337,60 @@ router.delete("/label-catalog/:labelId", async (req, res) => {
   }
   if (!data) return res.status(404).json({ error: "Custom catalog label not found." });
   return res.json({ deletedId: data.id });
+});
+
+router.get("/submissions/:submissionId/review-state", async (req, res) => {
+  const submissionId = String(req.params.submissionId ?? "").trim();
+  if (!submissionId) return res.status(400).json({ error: "submissionId is required." });
+  const supabase = getSupabaseAdminDataClient();
+
+  const [commentsResult, labelsResult, catalogResult, archiveRequest] = await Promise.all([
+    supabase
+      .from("workspace_comments")
+      .select("id,submission_id,content,action,is_closing,created_at,author_id,profiles!author_id(email)")
+      .eq("submission_id", submissionId)
+      .order("created_at", { ascending: false }),
+    supabase.from("workspace_labels")
+      .select("*")
+      .eq("submission_id", submissionId)
+      .order("updated_at", { ascending: true }),
+    supabase.from("workspace_labels")
+      .select("id,submission_id,name,color,is_custom,created_by,created_at,updated_at")
+      .or(`submission_id.eq.${submissionId},submission_id.is.null`)
+      .order("updated_at", { ascending: true }),
+    getArchiveRequestForSubmission({
+      supabase,
+      submissionId,
+      actorProfile: req.profile,
+    }).catch((error) => {
+      if (error.statusCode === 404) return null;
+      throw error;
+    }),
+  ]);
+
+  if (commentsResult.error) {
+    return res.status(500).json({ error: commentsResult.error.message });
+  }
+  if (labelsResult.error) {
+    if (isLabelMigrationError(labelsResult.error)) {
+      return res.status(503).json({ error: LABEL_MIGRATION_ERROR });
+    }
+    return res.status(500).json({ error: labelsResult.error.message });
+  }
+  if (catalogResult.error) {
+    if (isLabelMigrationError(catalogResult.error)) {
+      return res.status(503).json({ error: LABEL_MIGRATION_ERROR });
+    }
+    return res.status(500).json({ error: catalogResult.error.message });
+  }
+
+  return res.json({
+    comments: (commentsResult.data ?? []).map(serializeComment),
+    labels: (labelsResult.data ?? []).filter((row) => row.is_selected !== false).map(serializeLabel),
+    labelCatalog: (catalogResult.data ?? []).map(serializeCatalog),
+    archiveRequest,
+    collaborationWarning: "",
+  });
 });
 
 export default router;

@@ -4,6 +4,7 @@ import { afterEach, test } from "@jest/globals";
 
 import app from "../server/app.js";
 import { setSupabaseTestDoubles } from "../server/lib/supabase.js";
+import { clearAuthProfileCacheForTests } from "../server/middleware/requireAuth.js";
 
 const cookie = "crmp_access_token=access-token";
 const commissioner = {
@@ -13,7 +14,10 @@ const commissioner = {
   province: "YT",
 };
 
-afterEach(() => setSupabaseTestDoubles(null));
+afterEach(() => {
+  setSupabaseTestDoubles(null);
+  clearAuthProfileCacheForTests();
+});
 
 async function request(path) {
   const server = http.createServer(app);
@@ -109,6 +113,7 @@ test("archive-tree route requires commissioner access", async () => {
     role: "public_user",
     first_name: "Public",
     last_name: "User",
+    province: "YT",
     postal_code: "Y1A 1A1",
     phone: "8675550100",
   });
@@ -196,7 +201,7 @@ test("archive-map projections groups comments and pair branches for a DGUID", as
       if (table === "archive_branches") {
         return {
           select() { return this; },
-          order() {
+          or() {
             return Promise.resolve({
               data: [
                 {

@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
-import { loadCurrentCanonicalRelease, readSharedArcRecord } from "./canonicalReleaseStore.js";
-import { loadCanonicalRelease, readCanonicalDaPair } from "./canonicalReleaseStore.js";
+import { loadCurrentCanonicalRelease, readCanonicalDaPair, readSharedArcRecord } from "./canonicalReleaseStore.js";
+import { loadCanonicalRelease } from "./canonicalReleaseStore.js";
 import { CounterProposalValidationError } from "./counterProposalSubmission.js";
+import { getMaterializationContext } from "./materializationContext.js";
 
 function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
@@ -169,45 +170,23 @@ function replaceCoordinates(value, replacements) {
 
 export async function materializeGeometryOperations(descriptor, operations = []) {
   const release = loadCanonicalRelease(descriptor.release_id);
-  const pair = await readCanonicalDaPair(
+  const pair = await readPairLayer(
     release,
     descriptor.primary_dguid,
     descriptor.secondary_dguid,
     { representation: "display", lod: "auto" },
   );
   if (!operations.length) return pair.features;
-  const shared = await readSharedArcRecord(
+  const { vertexById } = await loadSharedVertexCatalog(
     release,
-    [descriptor.primary_dguid, descriptor.secondary_dguid].sort().join("|"),
+    descriptor.primary_dguid,
+    descriptor.secondary_dguid,
   );
-  const baseByVertex = new Map(shared.chains.flatMap((chain) =>
-    chain.vertices.map((vertex) => [vertex[0], [vertex[1], vertex[2]]]),
-  ));
-  const replacements = new Map();
-  for (const operation of operations) {
-    const vertexId = operation.vertex_id ?? operation.vertexId;
-    const base = baseByVertex.get(vertexId);
-    if (!base) {
-      throw new CounterProposalValidationError(`Unknown release vertex: ${vertexId}.`, {
-        code: "UNKNOWN_OR_LOCKED_VERTEX",
-        statusCode: 422,
-      });
-    }
-    replacements.set(coordinateKey(base), [
-      Number(operation.to_lng ?? operation.toLng),
-      Number(operation.to_lat ?? operation.toLat),
-    ]);
-  }
-  return {
-    type: "FeatureCollection",
-    features: pair.features.features.map((feature) => ({
-      ...feature,
-      geometry: {
-        ...feature.geometry,
-        coordinates: replaceCoordinates(feature.geometry?.coordinates, replacements),
-      },
-    })),
-  };
+  const baseByVertex = new Map([...vertexById.entries()].map(([vertexId, vertex]) => [
+    vertexId,
+    vertex.base,
+  ]));
+  return applyOperationsToFeatureCollection(pair.features, operations, baseByVertex);
 }
 
 const MAX_SUBMISSION_OPERATIONS = 5000;
@@ -237,6 +216,10 @@ function normalizeOperationCoordinate(value, fieldName) {
 }
 
 async function loadSharedVertexCatalog(release, primaryDguid, secondaryDguid) {
+  const context = getMaterializationContext();
+  if (context) {
+    return context.getVertexCatalog(release, primaryDguid, secondaryDguid);
+  }
   const pair = canonicalPair(primaryDguid, secondaryDguid);
   const shared = await readSharedArcRecord(release, pair.join("|"));
   const vertexById = new Map(shared.chains.flatMap((chain) =>
@@ -247,6 +230,43 @@ async function loadSharedVertexCatalog(release, primaryDguid, secondaryDguid) {
     }]),
   ));
   return { pair, vertexById };
+}
+
+function applyOperationsToFeatureCollection(collection, operations, baseByVertex) {
+  if (!operations.length) return collection;
+  const replacements = new Map();
+  for (const operation of operations) {
+    const vertexId = operation.vertex_id ?? operation.vertexId;
+    const base = baseByVertex.get(vertexId);
+    if (!base) {
+      throw new CounterProposalValidationError(`Unknown release vertex: ${vertexId}.`, {
+        code: "UNKNOWN_OR_LOCKED_VERTEX",
+        statusCode: 422,
+      });
+    }
+    replacements.set(coordinateKey(base), [
+      Number(operation.to_lng ?? operation.toLng),
+      Number(operation.to_lat ?? operation.toLat),
+    ]);
+  }
+  return {
+    type: "FeatureCollection",
+    features: collection.features.map((feature) => ({
+      ...feature,
+      geometry: {
+        ...feature.geometry,
+        coordinates: replaceCoordinates(feature.geometry?.coordinates, replacements),
+      },
+    })),
+  };
+}
+
+async function readPairLayer(release, primaryDguid, secondaryDguid, options) {
+  const context = getMaterializationContext();
+  if (context) {
+    return context.getCanonicalDaPair(release, primaryDguid, secondaryDguid, options);
+  }
+  return readCanonicalDaPair(release, primaryDguid, secondaryDguid, options);
 }
 
 export async function validateAndNormalizeSubmissionOperations({
@@ -331,23 +351,30 @@ export async function materializeCounterProposalFromOperations({
   secondaryDguid,
   operations = [],
 }) {
-  const pair = await readCanonicalDaPair(
-    release,
-    primaryDguid,
-    secondaryDguid,
-    { representation: "edit", lod: "auto" },
+  const [editPair, displayPair, { vertexById }] = await Promise.all([
+    readPairLayer(release, primaryDguid, secondaryDguid, { representation: "edit", lod: "auto" }),
+    readPairLayer(release, primaryDguid, secondaryDguid, { representation: "display", lod: "auto" }),
+    loadSharedVertexCatalog(release, primaryDguid, secondaryDguid),
+  ]);
+  const baseByVertex = new Map([...vertexById.entries()].map(([vertexId, vertex]) => [
+    vertexId,
+    vertex.base,
+  ]));
+  const proposedGeometry = applyOperationsToFeatureCollection(
+    displayPair.features,
+    operations,
+    baseByVertex,
   );
-  const originalFeatures = pair.features.features;
-  const proposedGeometry = await materializeGeometryOperations({
-    release_id: release.manifest.releaseId,
-    primary_dguid: primaryDguid,
-    secondary_dguid: secondaryDguid,
-  }, operations);
+  const context = getMaterializationContext();
+  const digestKey = `proposed:${release.manifest.releaseId}:${primaryDguid}|${secondaryDguid}:${operations.length}`;
+  const geometryDigestValue = context
+    ? context.rememberDigest(digestKey, digest(proposedGeometry.features.map((feature) => feature.geometry)))
+    : digest(proposedGeometry.features.map((feature) => feature.geometry));
   return {
-    originalFeatures,
+    originalFeatures: editPair.features.features,
     proposedFeatures: proposedGeometry.features,
     proposedGeometry,
-    geometryDigest: digest(proposedGeometry.features.map((feature) => feature.geometry)),
+    geometryDigest: geometryDigestValue,
   };
 }
 

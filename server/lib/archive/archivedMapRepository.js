@@ -10,18 +10,29 @@ export async function getArchivedMapSnapshot(supabase, {
   dguids: requestedDguids,
   expectedRevision,
   includeAllHeads = false,
+  headsMetadataOnly = false,
 } = {}) {
   const release = loadCurrentCanonicalRelease();
   const releaseId = release.manifest.releaseId;
   const dguids = parseDguidList(requestedDguids);
 
-  const { data: latestRevision, error: revisionError } = await supabase
-    .from("archive_map_revisions")
-    .select("sequence, release_id")
-    .eq("release_id", releaseId)
-    .order("sequence", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const [{ count: branchCount, error: branchCountError }, { data: latestRevision, error: revisionError }] = await Promise.all([
+    supabase
+      .from("archive_branches")
+      .select("id", { count: "exact", head: true }),
+    supabase
+      .from("archive_map_revisions")
+      .select("sequence, release_id")
+      .eq("release_id", releaseId)
+      .order("sequence", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  if (branchCountError) {
+    throw archiveError(branchCountError.message || "Unable to load archive branch count.", {
+      code: "ARCHIVE_BRANCH_READ_FAILED",
+    });
+  }
   if (revisionError) {
     throw archiveError(revisionError.message || "Unable to load archive map revision.", {
       code: "ARCHIVE_MAP_REVISION_FAILED",
@@ -29,6 +40,7 @@ export async function getArchivedMapSnapshot(supabase, {
   }
 
   const archiveMapRevision = Number(latestRevision?.sequence ?? 0);
+  const hasV2Branches = Number(branchCount ?? 0) > 0;
   if (
     expectedRevision !== undefined
     && expectedRevision !== null
@@ -43,9 +55,12 @@ export async function getArchivedMapSnapshot(supabase, {
 
   let heads = [];
   if (dguids.length || includeAllHeads) {
+    const headColumns = headsMetadataOnly
+      ? "dguid, uses_base, geometry_digest, resource_version, last_map_revision_sequence"
+      : "dguid, uses_base, display_geometry, geometry_digest, resource_version, last_map_revision_sequence";
     let query = supabase
       .from("archive_map_da_heads")
-      .select("dguid, uses_base, display_geometry, geometry_digest, resource_version, last_map_revision_sequence")
+      .select(headColumns)
       .eq("release_id", releaseId);
     if (dguids.length) query = query.in("dguid", dguids);
     const { data, error } = await query;
@@ -69,6 +84,8 @@ export async function getArchivedMapSnapshot(supabase, {
   return {
     releaseId,
     archiveMapRevision,
+    branchCount: Number(branchCount ?? 0),
+    hasV2Branches,
     heads: heads.map((head) => ({
       dguid: head.dguid,
       usesBase: Boolean(head.uses_base),
@@ -84,6 +101,8 @@ export async function getArchivedMapSnapshot(supabase, {
       feature?.properties?.DGUID ?? feature?.properties?.dguid ?? feature?.id ?? "",
     )).filter(Boolean))],
     dguids,
-    source: heads.some((head) => !head.uses_base) ? "v2" : "base",
+    source: hasV2Branches
+      ? (heads.length ? "v2" : "v2-empty-heads")
+      : (heads.some((head) => !head.uses_base) ? "v2" : "base"),
   };
 }

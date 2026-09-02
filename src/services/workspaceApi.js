@@ -189,8 +189,21 @@ export async function deleteWorkspaceLabelCatalog(labelId, submissionId) {
  * authenticated GET /api/comments route. Counter-proposals are loaded from the
  * dedicated submissions API so revision geometry is available for review.
  */
-export async function getWorkspaceSubmissions({ includeArchived = true } = {}) {
-    const { items } = await getCommissionerSubmissionTableRows();
+export async function getWorkspaceSubmissions({ includeArchived = true, signal } = {}) {
+    const items = [];
+    let cursor = null;
+    do {
+        const page = await getCommissionerSubmissionTableRows({
+            pageSize: 100,
+            ...(cursor ? { cursor } : {}),
+        });
+        if (signal?.aborted) {
+            throw signal.reason ?? new DOMException("Aborted", "AbortError");
+        }
+        items.push(...(page.items ?? []));
+        cursor = page.page?.hasMore ? page.page.nextCursor : null;
+    } while (cursor);
+
     const submissions = items
         .map((submission) => normalizeSubmission(submission, "supabase"))
         .filter((submission) => includeArchived || submission.status !== WORKSPACE_STATUS.ARCHIVED)
@@ -231,6 +244,13 @@ export async function getWorkspaceSubmission(submissionId, options = {}) {
 
 /** Local-only review draft; not a shared or durable Workspace backend record. */
 export async function getWorkspaceReviewState(submissionId) {
+    const response = await fetch(`/api/workspace/submissions/${encodeURIComponent(submissionId)}/review-state`, {
+        credentials: "include",
+    });
+    if (response.ok) {
+        return response.json();
+    }
+
     let collaborationWarning = "";
     const tolerateMissingLabelMigration = (promise) => promise.catch((error) => {
         if (/workspace label migration is not installed/i.test(error.message)) {
@@ -281,10 +301,24 @@ export function subscribeWorkspaceState(listener, keys = "workspace:*") {
 
 export function subscribeWorkspaceListState({ onInvalidate, onRecover = onInvalidate }) {
     if (typeof window === "undefined") return () => { };
-    const handleFocus = () => onRecover({ event: null, reason: "focus", resync: true });
+    let recoverTimer = null;
+    let recoverInFlight = null;
+
+    const scheduleRecover = (payload) => {
+        if (recoverTimer) window.clearTimeout(recoverTimer);
+        recoverTimer = window.setTimeout(() => {
+            recoverTimer = null;
+            if (recoverInFlight) return;
+            recoverInFlight = Promise.resolve(onRecover(payload))
+                .catch(() => {})
+                .finally(() => { recoverInFlight = null; });
+        }, 150);
+    };
+
+    const handleFocus = () => scheduleRecover({ event: null, reason: "focus", resync: true });
     const handleVisibility = () => {
         if (document.visibilityState === "visible") {
-            onRecover({ event: null, reason: "visibility", resync: true });
+            scheduleRecover({ event: null, reason: "visibility", resync: true });
         }
     };
     const unsubscribeRealtime = subscribeRealtimeInvalidation(
@@ -294,6 +328,7 @@ export function subscribeWorkspaceListState({ onInvalidate, onRecover = onInvali
     window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibility);
     return () => {
+        if (recoverTimer) window.clearTimeout(recoverTimer);
         window.removeEventListener("focus", handleFocus);
         document.removeEventListener("visibilitychange", handleVisibility);
         unsubscribeRealtime();
@@ -647,10 +682,17 @@ async function getRemoteArchiveTreeRecords() {
 }
 
 /** Latest archived map overlay from archive_map_da_heads when available. */
-export async function getArchivedMapSnapshot(dguids = [], { expectedRevision, signal } = {}) {
+export async function getArchivedMapSnapshot(dguids = [], {
+    expectedRevision,
+    signal,
+    includeAllHeads = false,
+} = {}) {
     const params = new URLSearchParams();
     if (Array.isArray(dguids) && dguids.length) {
         params.set("dguids", dguids.join(","));
+    }
+    if (includeAllHeads) {
+        params.set("includeAllHeads", "1");
     }
     if (expectedRevision !== undefined && expectedRevision !== null && expectedRevision !== "") {
         params.set("expectedRevision", String(expectedRevision));
@@ -667,6 +709,22 @@ export async function getArchivedMapSnapshot(dguids = [], { expectedRevision, si
         throw error;
     }
     return payload;
+}
+
+export async function getArchiveBranchView(versionId, {
+    branchKey = null,
+    includeDifference = true,
+    signal,
+} = {}) {
+    const params = new URLSearchParams();
+    if (branchKey) params.set("branchKey", branchKey);
+    if (!includeDifference) params.set("includeDifference", "0");
+    const query = params.toString();
+    const response = await fetch(
+        `/api/workspace/archive-tree/versions/${encodeURIComponent(versionId)}/view${query ? `?${query}` : ""}`,
+        { credentials: "include", signal },
+    );
+    return handleResponse(response);
 }
 
 /** Durable Archived Tree read. This path intentionally does not use localStorage. */

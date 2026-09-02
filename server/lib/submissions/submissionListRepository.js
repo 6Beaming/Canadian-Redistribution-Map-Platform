@@ -1,7 +1,11 @@
 import { resolveCommissionerPruid, formatCrossProvinceWarning } from "../authorization/provinceCatalog.js";
+import { authorizeSubmissionScope } from "../authorization/resourceScopeGuard.js";
+import { enrichSubmissionsWithDaMetadata } from "../map/submissionPresentation.js";
+import { projectArchiveRequestVisibility } from "../archiveRequests/visibilityProjection.js";
 import {
   decodeSubmissionListCursor,
   encodeSubmissionListCursor,
+  LIGHTWEIGHT_SUBMISSION_COLUMNS,
   normalizeSubmissionListFilters,
   normalizeSubmissionListPagination,
   serializeLightweightSubmission,
@@ -94,12 +98,46 @@ export async function getCommissionerSubmissionRowV2(supabase, {
   submissionId,
   actorProfile,
 }) {
-  const { items } = await listCommissionerSubmissionRowsV2(supabase, {
-    actorProfile,
-    query: {
-      pageSize: 100,
-      query: submissionId,
-    },
-  });
-  return items.find((item) => String(item.id) === String(submissionId)) ?? null;
+  const commissionerPruid = resolveCommissionerPruid(actorProfile);
+  if (!commissionerPruid) {
+    const error = new Error("Commissioner province registration is required.");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const { data, error } = await supabase
+    .from("submissions")
+    .select(LIGHTWEIGHT_SUBMISSION_COLUMNS)
+    .eq("id", submissionId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  try {
+    const scope = await authorizeSubmissionScope(supabase, {
+      submission: data,
+      commissionerProfile: actorProfile,
+      requireClaim: false,
+    });
+    const [enriched] = await enrichSubmissionsWithDaMetadata([{
+      ...data,
+      scope_pruids: scope.eligibilityPruids,
+      operating_pruid: scope.operatingPruid,
+      cross_province_warning: scope.crossProvinceWarning,
+    }]);
+    const [projected] = await projectArchiveRequestVisibility(
+      supabase,
+      [enriched],
+      actorProfile.id,
+    );
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id,email")
+      .eq("id", projected.user_id)
+      .maybeSingle();
+    return serializeLightweightSubmission(projected, profile ?? null);
+  } catch (scopeError) {
+    if (scopeError.statusCode === 403 || scopeError.statusCode === 404) return null;
+    throw scopeError;
+  }
 }

@@ -71,9 +71,9 @@ export default function DashboardHome({ mapSearchTarget = null }) {
   }, []);
 
   useEffect(() => {
-    if (!profilesByDguid.size) return undefined;
+    if (!profilesByDguid.size || !initialArchivedMapEnabled) return undefined;
     let isMounted = true;
-    const load = () => loadArchivedMapEffect(profilesByDguid)
+    const load = () => loadArchivedMapEffect(profilesByDguid, { enabled: true })
       .then((nextArchivedMap) => {
         if (isMounted) setArchivedMap(nextArchivedMap);
       })
@@ -86,7 +86,7 @@ export default function DashboardHome({ mapSearchTarget = null }) {
       isMounted = false;
       unsubscribe();
     };
-  }, [profilesByDguid]);
+  }, [initialArchivedMapEnabled, profilesByDguid]);
 
   useEffect(() => {
     let isMounted = true;

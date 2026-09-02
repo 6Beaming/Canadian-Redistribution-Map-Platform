@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "@jest/globals";
 import {
+  applyCounterProposalWorkerCommit,
   buildCounterProposalCache,
-  commitCounterProposalCacheHistory,
   readCounterProposalStorage,
+  redoCounterProposalCache,
   restoreCounterProposalCacheFromDraft,
+  undoCounterProposalCache,
   writeCounterProposalStorage,
 } from "../src/lib/map/counterProposalWorkflow.js";
 import {
@@ -121,15 +123,18 @@ test("worker preview is non-committing and commit/undo/redo use compact operatio
   const committed = processCounterProposalWorkerMessage(state, {
     type: "COMMIT_MOVE", sequence: 3, handleId: handle.id, coordinate,
   });
-  assert.equal(committed.cache.history.length, 1);
-  assert.equal(committed.cache.history[0].type, "move-handle");
-  assert.equal(Object.hasOwn(committed.cache.history[0], "features"), false);
+  const nextCache = applyCounterProposalWorkerCommit(cache, committed.committedPatch);
+  assert.equal(nextCache.history.length, 1);
+  assert.equal(nextCache.history[0].type, "move-handle");
+  assert.equal(Object.hasOwn(nextCache.history[0], "features"), false);
   const undone = processCounterProposalWorkerMessage(state, { type: "UNDO", sequence: 4 });
-  assert.equal(undone.cache.history.length, 0);
-  assert.equal(undone.cache.future.length, 1);
+  const undoneCache = undoCounterProposalCache(nextCache);
+  assert.equal(undoneCache.history.length, 0);
+  assert.equal(undoneCache.future.length, 1);
   const redone = processCounterProposalWorkerMessage(state, { type: "REDO", sequence: 5 });
-  assert.equal(redone.cache.history.length, 1);
-  assert.equal(redone.cache.future.length, 0);
+  const redoneCache = redoCounterProposalCache(undoneCache);
+  assert.equal(redoneCache.history.length, 1);
+  assert.equal(redoneCache.future.length, 0);
 });
 
 test("worker ignores stale requests and reports unsupported messages without changing committed state", () => {
@@ -235,12 +240,13 @@ test("draft storage contains operations only and rejects a changed baseline", ()
       handleId: handle.id,
       coordinate: [handle.coordinate[0] - 0.05, handle.coordinate[1]],
     });
+    const committedCache = applyCounterProposalWorkerCommit(cache, result.committedPatch);
     writeCounterProposalStorage({
       step: 3,
       firstDguid: "first",
       secondDguid: "second",
       previewMode: "proposal",
-      cache: result.cache,
+      cache: committedCache,
     });
     const activeKey = values.get("counter-proposal-active-draft");
     assert.match(activeKey, /^counter-proposal-draft:first:second:fnv1a-/);

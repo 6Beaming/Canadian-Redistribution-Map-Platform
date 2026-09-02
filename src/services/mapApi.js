@@ -61,7 +61,7 @@ export const mapApi = {
   },
 
   getDaProfiles() {
-    return request("/da-profiles");
+    return rememberImmutable("da-profiles", () => request("/da-profiles"));
   },
 
   getDaAssetManifest() {
@@ -118,11 +118,14 @@ export const mapApi = {
   },
 
   async fetchAssetJson(filename) {
-    const response = await fetch(this.assetUrl(filename));
-    if (!response.ok) {
-      throw new Error(`Failed to load ${filename} (${response.status}).`);
-    }
-    return response.json();
+    const promise = rememberImmutable(`asset:${filename}`, async () => {
+      const response = await fetch(this.assetUrl(filename));
+      if (!response.ok) {
+        throw new Error(`Failed to load ${filename} (${response.status}).`);
+      }
+      return response.json();
+    });
+    return promise;
   },
 
   async assetExists(filename) {

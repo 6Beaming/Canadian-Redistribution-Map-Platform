@@ -194,6 +194,7 @@ export function ArchivedTreeCanvas({
   const regionsRef = useRef([]);
   const cameraRef = useRef({ x: 0, y: 0, scale: 1 });
   const dragRef = useRef(null);
+  const frameRef = useRef(null);
   const [viewportVersion, setViewportVersion] = useState(0);
   const [hasRendered, setHasRendered] = useState(false);
   const [expandedBranches, setExpandedBranches] = useState(() => new Set());
@@ -369,6 +370,14 @@ export function ArchivedTreeCanvas({
     return () => observer.disconnect();
   }, [categories, expandedBranches, expandedCategories, isLoading, selectedVersionId, viewportVersion]);
 
+  function scheduleViewportRedraw() {
+    if (frameRef.current) return;
+    frameRef.current = window.requestAnimationFrame(() => {
+      frameRef.current = null;
+      setViewportVersion((value) => value + 1);
+    });
+  }
+
   function changeZoom(nextScale, anchor = null) {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -381,12 +390,12 @@ export function ArchivedTreeCanvas({
     camera.x = point.x - worldX * scale;
     camera.y = point.y - worldY * scale;
     camera.scale = scale;
-    setViewportVersion((value) => value + 1);
+    scheduleViewportRedraw();
   }
 
   function resetViewport() {
     cameraRef.current = { x: 0, y: 0, scale: 1 };
-    setViewportVersion((value) => value + 1);
+    scheduleViewportRedraw();
   }
 
   function handlePointerDown(event) {
@@ -410,7 +419,7 @@ export function ArchivedTreeCanvas({
     if (!drag.moved) return;
     cameraRef.current.x = drag.cameraX + dx;
     cameraRef.current.y = drag.cameraY + dy;
-    setViewportVersion((value) => value + 1);
+    scheduleViewportRedraw();
   }
 
   function handlePointerUp(event) {
