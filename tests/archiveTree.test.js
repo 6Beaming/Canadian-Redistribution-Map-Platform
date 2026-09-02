@@ -85,7 +85,9 @@ test("mapVersionRecord exposes submission id for migrated v2 projections", () =>
 
   assert.equal(mapped.submission.id, "submission-migrated");
   const categories = buildArchiveTree([mapped]);
-  assert.equal(categories.find((entry) => entry.id === "objections").branches.length, 1);
+  const branch = categories.find((entry) => entry.id === "objections").branches[0];
+  assert.equal(branch.key, "objection:r:da-a|da-b");
+  assert.equal(branch.versions.length, 1);
 });
 
 test("Archived Tree routes persistent version identities and can resolve legacy aliases", () => {

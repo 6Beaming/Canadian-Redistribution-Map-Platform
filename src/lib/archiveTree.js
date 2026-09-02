@@ -76,7 +76,7 @@ export function buildArchiveTree(records, profilesByDguid = new Map(), latestOve
     if (!submission?.id) return;
     const categoryId = getArchiveCategoryId(submission.type);
     const category = categoriesById.get(categoryId);
-    const branchKey = getArchiveBranchKey(submission);
+    const branchKey = record.branchKey ?? getArchiveBranchKey(submission);
     const dguids = [submission.dguid, submission.neighboring_dguid]
       .map((value) => String(value ?? "").trim())
       .filter(Boolean);

@@ -722,13 +722,8 @@ export async function getArchiveBranchView(supabase, {
     includeGeometry: false,
   });
   const { branch, versions } = await getArchiveBranch(supabase, versionPayload.branchId);
-  if (branchKey && String(branch.branch_key) !== String(branchKey)) {
-    throw archiveError("The selected archived version is no longer available.", {
-      statusCode: 404,
-      code: "ARCHIVE_VERSION_NOT_FOUND",
-    });
-  }
-
+  // Version id is authoritative; branchKey in the query may use a legacy client
+  // format (without release id) from older tree grouping. Skip strict rejection.
   const latestVersion = versions.find((version) => version.isLatest) ?? versions[0] ?? null;
   const selectedVersion = versions.find((version) => (
     String(version.versionId) === normalizedVersionId
