@@ -11,7 +11,7 @@ test("Dashboard graphs use live table rows for all five status series", () => {
   const chart = read("src/components/non_prebuilt/submissionsGraph.jsx");
   const analytics = read("src/lib/submissions/analytics.js");
 
-  assert.match(page, /getCommissionerSubmissionTableRows/);
+  assert.match(page, /getAllCommissionerSubmissionTableRows/);
   assert.match(page, /buildSubmissionStatusTotals/);
   assert.doesNotMatch(page, /Support: 68%|Oppose: 32%|getTotalComments/);
   assert.match(chart, /buildSubmissionStatusTimeline/);

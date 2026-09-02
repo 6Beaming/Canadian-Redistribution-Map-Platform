@@ -2603,8 +2603,6 @@ export function MapCanvas({
           "FED base;",
           fedLabels.features?.length ?? 0,
           "FED labels;",
-          profileIndex.size,
-          "DA profiles;",
           assetManifest.assets.length,
           "metadata groups;",
           "render minzoom",

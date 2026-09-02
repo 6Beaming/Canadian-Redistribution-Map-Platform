@@ -2,7 +2,7 @@ import {
     hydrateWorkspaceSubmission,
 } from "@/services/tempCounterProposal.js";
 import {
-    getCommissionerSubmissionTableRows,
+    getAllCommissionerSubmissionTableRows,
     getSubmissionTableRowById,
 } from "@/services/submissionListsApi.js";
 import { subscribeRealtimeInvalidation } from "@/lib/realtime/realtimeInvalidation.js";
@@ -190,19 +190,7 @@ export async function deleteWorkspaceLabelCatalog(labelId, submissionId) {
  * dedicated submissions API so revision geometry is available for review.
  */
 export async function getWorkspaceSubmissions({ includeArchived = true, signal } = {}) {
-    const items = [];
-    let cursor = null;
-    do {
-        const page = await getCommissionerSubmissionTableRows({
-            pageSize: 100,
-            ...(cursor ? { cursor } : {}),
-        });
-        if (signal?.aborted) {
-            throw signal.reason ?? new DOMException("Aborted", "AbortError");
-        }
-        items.push(...(page.items ?? []));
-        cursor = page.page?.hasMore ? page.page.nextCursor : null;
-    } while (cursor);
+    const { items } = await getAllCommissionerSubmissionTableRows({}, { signal, pageSize: 100 });
 
     const submissions = items
         .map((submission) => normalizeSubmission(submission, "supabase"))

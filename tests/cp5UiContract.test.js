@@ -12,7 +12,7 @@ test("Public and Commissioner tables use the lightweight service without changin
   assert.match(mine, /getMySubmissionTableRows/);
   assert.match(mine, /normalizePublicSubmissionStatus/);
   assert.doesNotMatch(mine, /rejected:\s*"bg-/);
-  assert.match(commissioner, /getCommissionerSubmissionTableRows/);
+  assert.match(commissioner, /getAllCommissionerSubmissionTableRows/);
   assert.match(commissioner, /<SubmissionsTable/);
 });
 

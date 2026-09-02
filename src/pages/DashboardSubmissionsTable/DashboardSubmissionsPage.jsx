@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import columns, { normalizeCommissionerStatus } from "./SubmissionsColumns";
 import SubmissionsTable from "./SubmissionsTable";
 import {
-  getCommissionerSubmissionTableRows,
+  getAllCommissionerSubmissionTableRows,
   getSubmissionTableRowById,
   subscribeCommissionerSubmissionTable,
 } from "@/services/submissionListsApi";
@@ -49,7 +49,7 @@ export default function DashBoardSubmissionsPage() {
     async function loadSubmissions({ replace = false, showLoading = false } = {}) {
       if (showLoading && isMounted) setLoadState({ loading: true, error: "" });
       try {
-        const { items: data } = await getCommissionerSubmissionTableRows();
+        const { items: data } = await getAllCommissionerSubmissionTableRows();
         if (!isMounted) return;
         const rows = data.map(toTableSubmission);
         setSubmissionView((current) => replace

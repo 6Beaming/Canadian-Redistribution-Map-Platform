@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { SubmissionsGraph } from "@/components/non_prebuilt/submissionsGraph.jsx";
 import { Card, CardAccent, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SUBMISSION_STATUS_SERIES, buildSubmissionStatusTotals } from "@/lib/submissions/analytics.js";
-import { getCommissionerSubmissionTableRows } from "@/services/submissionListsApi.js";
+import { getAllCommissionerSubmissionTableRows } from "@/services/submissionListsApi.js";
 
 function percent(value, total) {
   return total ? `${Math.round((value / total) * 100)}%` : "0%";
@@ -28,7 +28,7 @@ export default function DashboardGraphs() {
 
   useEffect(() => {
     let mounted = true;
-    getCommissionerSubmissionTableRows()
+    getAllCommissionerSubmissionTableRows()
       .then(({ items }) => {
         if (mounted) {
           setSubmissions(items);
