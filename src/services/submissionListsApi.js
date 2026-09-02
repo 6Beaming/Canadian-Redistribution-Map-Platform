@@ -76,6 +76,31 @@ export async function getMySubmissionTableRows(filters = {}) {
   };
 }
 
+export async function getAllMySubmissionTableRows(filters = {}, { signal, pageSize = 100 } = {}) {
+  const items = [];
+  let cursor = null;
+  let appliedFilters = {};
+  do {
+    const page = await getMySubmissionTableRows({
+      ...filters,
+      pageSize,
+      ...(cursor ? { cursor } : {}),
+    });
+    if (signal?.aborted) {
+      throw signal.reason ?? new DOMException("Aborted", "AbortError");
+    }
+    items.push(...(page.items ?? []));
+    appliedFilters = page.appliedFilters ?? appliedFilters;
+    cursor = page.page?.hasMore ? page.page.nextCursor : null;
+  } while (cursor);
+
+  return {
+    items,
+    appliedFilters,
+    page: { pageSize: items.length, nextCursor: null, hasMore: false },
+  };
+}
+
 export async function getSubmissionTableRowById(submissionId) {
   const payload = await requestJson(
     `/api/submissions/table-row/${encodeURIComponent(submissionId)}`,

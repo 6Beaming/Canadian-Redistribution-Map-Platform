@@ -9,7 +9,7 @@ function read(path) {
 test("Public and Commissioner tables use the lightweight service without changing table ownership", () => {
   const mine = read("src/pages/MySubmissions.jsx");
   const commissioner = read("src/pages/DashboardSubmissionsTable/DashboardSubmissionsPage.jsx");
-  assert.match(mine, /getMySubmissionTableRows/);
+  assert.match(mine, /getAllMySubmissionTableRows/);
   assert.match(mine, /normalizePublicSubmissionStatus/);
   assert.doesNotMatch(mine, /rejected:\s*"bg-/);
   assert.match(commissioner, /getAllCommissionerSubmissionTableRows/);

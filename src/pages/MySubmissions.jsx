@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
-import { getMySubmissionTableRows } from "@/services/submissionListsApi";
+import { getAllMySubmissionTableRows } from "@/services/submissionListsApi";
 import { RouteLoadingPage } from "@/components/non_prebuilt/RouteLoadingPage.jsx";
 import { normalizePublicSubmissionStatus } from "@/lib/submissions/publicStatus.js";
 
@@ -151,7 +151,7 @@ export default function MySubmissions() {
       try {
         setIsLoading(true);
         setLoadError("");
-        const { items: data } = await getMySubmissionTableRows();
+        const { items: data } = await getAllMySubmissionTableRows();
 
         setSubmissions(
           data.map((submission) => ({
