@@ -36,6 +36,7 @@ function branchIdentity(snapshot) {
 function projection(row, identity) {
   const snapshot = row.submission_snapshot ?? {};
   return {
+    id: row.submission_id,
     source_submission_id: row.submission_id,
     type: identity.type,
     title: snapshot.title ?? null,
@@ -140,17 +141,32 @@ for (const { identity, rows } of grouped.values()) {
     let geometryDigest = null;
     let branchVertexSnapshot = null;
     if (identity.type === "counter_proposal") {
-      if (geometryRevision?.migration_state !== "ready") {
-        report.unresolved.push({ branchKey: identity.key, submissionId: row.submission_id, reason: "Counter-Proposal compact geometry revision is not ready." });
-        continue;
-      }
       resultGeometry = row.submission_snapshot?.geometry ?? null;
-      if (!resultGeometry) {
-        report.unresolved.push({ branchKey: identity.key, submissionId: row.submission_id, reason: "Legacy Counter-Proposal archive snapshot has no materializable geometry." });
+      if (!resultGeometry?.features?.length) {
+        report.unresolved.push({
+          branchKey: identity.key,
+          submissionId: row.submission_id,
+          reason: "Legacy Counter-Proposal archive snapshot has no materializable geometry.",
+        });
         continue;
       }
-      geometryDigest = sha256(stableJson(resultGeometry));
-      branchVertexSnapshot = { migrationSourceGeometryRevisionId: geometryRevision.id };
+      if (geometryRevision?.migration_state === "ready") {
+        geometryDigest = sha256(stableJson(resultGeometry));
+        branchVertexSnapshot = { migrationSourceGeometryRevisionId: geometryRevision.id };
+      } else {
+        geometryDigest = sha256(stableJson(resultGeometry));
+        branchVertexSnapshot = {
+          migratedFromLegacySnapshot: true,
+          migrationSourceGeometryRevisionId: geometryRevision?.id ?? null,
+        };
+        report.warnings.push({
+          branchKey: identity.key,
+          submissionId: row.submission_id,
+          reason: geometryRevision?.migration_state === "manual_review"
+            ? "Counter-Proposal compact geometry is in manual review; migrated from legacy archive snapshot."
+            : "Counter-Proposal compact geometry revision is missing; migrated from legacy archive snapshot.",
+        });
+      }
     } else if (!geometryRevision && identity.type === "objection") {
       report.unresolved.push({ branchKey: identity.key, submissionId: row.submission_id, reason: "Objection compact geometry descriptor is not ready." });
       continue;

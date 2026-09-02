@@ -19,6 +19,7 @@ function mapLegacyTypeToSubmission(type) {
 function projectionToSubmission(projection, branch, emailsById = new Map()) {
   const submission = {
     ...(projection ?? {}),
+    id: projection?.id ?? projection?.source_submission_id ?? null,
     type: mapLegacyTypeToSubmission(branch?.submission_type ?? projection?.type),
     dguid: branch?.primary_dguid ?? projection?.dguid ?? projection?.primaryDguid ?? null,
     neighboring_dguid: branch?.secondary_dguid ?? projection?.neighboring_dguid ?? projection?.secondaryDguid ?? null,

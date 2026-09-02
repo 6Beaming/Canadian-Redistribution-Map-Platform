@@ -6,6 +6,7 @@ import {
   buildCounterProposalDeletePayload,
   buildCounterProposalMergePayload,
   buildCounterProposalRevertPayload,
+  canonicalArchiveBranchDguids,
   normalizeArchiveSubmissionType,
 } from "./archiveMaterializer.js";
 import {
@@ -132,9 +133,21 @@ export async function mergeApprovedArchiveRequest(supabase, {
   const sourceRevision = await loadSourceRevision(supabase, request.source_revision_id);
   const release = loadCurrentCanonicalRelease();
   const submissionType = normalizeArchiveSubmissionType(sourceRevision.submission_type ?? submission.type);
-  const primaryDguid = sourceRevision.primary_dguid ?? submission.dguid;
-  const secondaryDguid = sourceRevision.secondary_dguid ?? submission.neighboring_dguid ?? null;
+  const { primaryDguid, secondaryDguid } = canonicalArchiveBranchDguids(
+    submissionType,
+    sourceRevision.primary_dguid ?? submission.dguid,
+    sourceRevision.secondary_dguid ?? submission.neighboring_dguid ?? null,
+  );
   const scopePruids = await loadScopePruids(supabase, submission.id);
+  const resolvedScopePruids = scopePruids.length
+    ? scopePruids
+    : [...new Set((sourceRevision.scope_pruids ?? []).map((pruid) => String(pruid)).filter(Boolean))].sort();
+  if (!resolvedScopePruids.length) {
+    throw archiveError("Submission scope is required before archiving.", {
+      statusCode: 409,
+      code: "ARCHIVE_SCOPE_LOOKUP_FAILED",
+    });
+  }
   const branchKey = buildArchiveBranchKey(submissionType, release.manifest.releaseId, primaryDguid, secondaryDguid);
 
   const payload = {
@@ -143,7 +156,7 @@ export async function mergeApprovedArchiveRequest(supabase, {
     releaseId: release.manifest.releaseId,
     primaryDguid,
     secondaryDguid,
-    scopePruids,
+    scopePruids: resolvedScopePruids,
     submissionProjection: buildSubmissionProjection(submission, sourceRevision),
     sourceGeometryRevisionId: sourceRevision.source_geometry_revision_id ?? null,
   };
@@ -159,8 +172,8 @@ export async function mergeApprovedArchiveRequest(supabase, {
     }
     payload.counterProposal = await buildCounterProposalMergePayload(supabase, {
       releaseId: release.manifest.releaseId,
-      primaryDguid: revision.primary_dguid,
-      secondaryDguid: revision.secondary_dguid,
+      primaryDguid,
+      secondaryDguid,
       branchKey,
       geometryRevision: revision,
       operations,

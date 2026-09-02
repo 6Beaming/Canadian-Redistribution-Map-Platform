@@ -6,6 +6,7 @@ import {
   findArchiveVersion,
   getArchiveVersionRouteId,
 } from "../src/lib/archiveTree.js";
+import { mapVersionRecord } from "../server/lib/archive/archiveRepository.js";
 
 function record(id, mergedAt, extra = {}) {
   return {
@@ -56,6 +57,35 @@ test("archive search matches community name and full submission IDs", () => {
   assert.equal(filterArchiveTree(categories, "Whitehorse")[2].branches.length, 1);
   assert.equal(filterArchiveTree(categories, "identifier-123")[2].branches.length, 1);
   assert.equal(filterArchiveTree(categories, "Dawson")[2].branches.length, 0);
+});
+
+test("mapVersionRecord exposes submission id for migrated v2 projections", () => {
+  const mapped = mapVersionRecord(
+    {
+      id: "branch-1",
+      branch_key: "objection:r:da-a|da-b",
+      submission_type: "objection",
+      release_id: "r",
+      primary_dguid: "da-a",
+      secondary_dguid: "da-b",
+      resource_version: 1,
+      head_version_id: "version-1",
+    },
+    {
+      id: "version-1",
+      version_number: 1,
+      submission_projection: {
+        source_submission_id: "submission-migrated",
+        type: "objection",
+      },
+      merged_by: "commissioner-1",
+      merged_at: "2026-01-01T00:00:00.000Z",
+    },
+  );
+
+  assert.equal(mapped.submission.id, "submission-migrated");
+  const categories = buildArchiveTree([mapped]);
+  assert.equal(categories.find((entry) => entry.id === "objections").branches.length, 1);
 });
 
 test("Archived Tree routes persistent version identities and can resolve legacy aliases", () => {

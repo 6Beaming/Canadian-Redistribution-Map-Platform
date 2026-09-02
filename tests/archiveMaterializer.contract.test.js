@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "@jest/globals";
 import {
   buildArchiveBranchKey,
+  canonicalArchiveBranchDguids,
   geometryDigest,
   normalizeArchiveSubmissionType,
 } from "../server/lib/archive/archiveMaterializer.js";
@@ -19,6 +20,21 @@ test("buildArchiveBranchKey canonicalizes comment and pair branches", () => {
   assert.equal(
     buildArchiveBranchKey("counter-proposal", "statscan-da-2021-r1", "da-b", "da-a"),
     "counter-proposal:statscan-da-2021-r1:da-a|da-b",
+  );
+});
+
+test("canonicalArchiveBranchDguids enforces archive_branches pair ordering", () => {
+  assert.deepEqual(
+    canonicalArchiveBranchDguids("objection", "da-b", "da-a"),
+    { primaryDguid: "da-a", secondaryDguid: "da-b" },
+  );
+  assert.deepEqual(
+    canonicalArchiveBranchDguids("counter-proposal", "2021S051260010119", "2021S051260010118"),
+    { primaryDguid: "2021S051260010118", secondaryDguid: "2021S051260010119" },
+  );
+  assert.deepEqual(
+    canonicalArchiveBranchDguids("feedback", "2021S051260010118", "2021S051260010119"),
+    { primaryDguid: "2021S051260010118", secondaryDguid: null },
   );
 });
 
@@ -40,6 +56,17 @@ test("geometryDigest is stable for equivalent object key order", () => {
   const right = geometryDigest({ a: 1, b: 2 });
   assert.equal(left, right);
   assert.match(left, /^sha256:[a-f0-9]{64}$/);
+});
+
+test("archive merge RPC avoids PL/pgSQL variable/column name collisions", () => {
+  const migration = fs.readFileSync(
+    "supabase/migrations/20260901160000_fix_archive_merge_branch_key_ambiguity.sql",
+    "utf8",
+  );
+  assert.match(migration, /v_branch_key text :=/);
+  assert.match(migration, /v_submission_type text :=/);
+  assert.match(migration, /\) values \(\s*v_branch_key, v_submission_type/);
+  assert.match(migration, /on conflict \(branch_key\) do update/);
 });
 
 test("archive v2 transitions persist vertex state and preserve unrelated DA head geometry", () => {

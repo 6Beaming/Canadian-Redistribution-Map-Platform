@@ -305,12 +305,13 @@ test("requester remains the required assignee when an update removes every optio
 test("counter-proposal Archive Request identifies its requester", async () => {
   const admin = makeAdmin();
   admin.state.submissions[0].type = "counter-proposal";
+  admin.state.submissions[0].neighboring_dguid = "2021S051260010119";
   admin.state.counter_proposal_revisions.push({
     id: "counter-revision-1",
     submission_id: "submission-1",
     revision_number: 1,
     primary_dguid: admin.state.submissions[0].dguid,
-    secondary_dguid: null,
+    secondary_dguid: admin.state.submissions[0].neighboring_dguid,
     baseline_revision: "baseline-1",
     original_geometry: {},
     proposed_geometry: {},

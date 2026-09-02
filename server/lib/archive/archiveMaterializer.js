@@ -24,6 +24,28 @@ function canonicalPair(first, second) {
   return [String(first ?? "").trim(), String(second ?? "").trim()].sort();
 }
 
+export function canonicalArchiveBranchDguids(submissionType, primaryDguid, secondaryDguid = null) {
+  const type = normalizeArchiveSubmissionType(submissionType);
+  const primary = String(primaryDguid ?? "").trim();
+  if (!primary) {
+    throw archiveError("Archive branch identity is incomplete.", {
+      statusCode: 400,
+      code: "ARCHIVE_BRANCH_IDENTITY_INVALID",
+    });
+  }
+  if (type === "comment") {
+    return { primaryDguid: primary, secondaryDguid: null };
+  }
+  const pair = canonicalPair(primary, secondaryDguid);
+  if (pair.length !== 2 || !pair[0] || !pair[1] || pair[0] === pair[1]) {
+    throw archiveError("Boundary archive branches require two distinct DGUIDs.", {
+      statusCode: 400,
+      code: "ARCHIVE_BRANCH_IDENTITY_INVALID",
+    });
+  }
+  return { primaryDguid: pair[0], secondaryDguid: pair[1] };
+}
+
 export function buildArchiveBranchKey(submissionType, releaseId, primaryDguid, secondaryDguid = null) {
   const type = String(submissionType ?? "comment").replaceAll("-", "_");
   const release = String(releaseId ?? "").trim();

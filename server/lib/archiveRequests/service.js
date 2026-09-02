@@ -6,6 +6,7 @@ import {
 } from "../authorization/resourceScopeGuard.js";
 import { resolveCommissionerPruid } from "../authorization/provinceCatalog.js";
 import * as repo from "./repository.js";
+import { canonicalArchiveBranchDguids, normalizeArchiveSubmissionType } from "../archive/archiveMaterializer.js";
 
 const OPEN = "open";
 const APPROVED = "approved";
@@ -133,6 +134,13 @@ async function sealSourceRevision(supabase, {
       code: "SOURCE_REVISION_UNAVAILABLE",
     });
   }
+
+  const archiveType = normalizeArchiveSubmissionType(type || submission.type);
+  ({ primaryDguid, secondaryDguid } = canonicalArchiveBranchDguids(
+    archiveType,
+    primaryDguid,
+    secondaryDguid,
+  ));
 
   return repo.insertArchiveSourceRevision(supabase, {
     submission_id: submission.id,
