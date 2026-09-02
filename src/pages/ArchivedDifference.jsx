@@ -280,7 +280,7 @@ export default function ArchivedDifference() {
         ) : null}
         <p className="archive-difference-note">
           {openOnly
-            ? "This is the latest immutable geometry snapshot for this branch."
+            ? "This is the latest immutable version for this branch."
             : "Revert creates a new latest version; it never overwrites historical versions."}
         </p>
         </div>
