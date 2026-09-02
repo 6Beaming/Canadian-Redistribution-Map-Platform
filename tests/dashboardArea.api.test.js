@@ -3,6 +3,7 @@ import http from "node:http";
 import { afterEach, test } from "@jest/globals";
 
 import app from "../server/app.js";
+import { resetApiTestState } from "./helpers/resetApiTestState.js";
 import { setSupabaseTestDoubles } from "../server/lib/supabase.js";
 import { DASHBOARD_AREA_SUBMISSION_COLUMNS } from "../server/lib/submissions/dashboardAreaQuery.js";
 
@@ -18,7 +19,7 @@ const IN_SCOPE_DGUID = "2021S051260010118";
 const ADJACENT_DGUID = "2021S051259570228";
 const OUT_OF_SCOPE_DGUID = "2021S051210010165";
 
-afterEach(() => setSupabaseTestDoubles(null));
+afterEach(() => resetApiTestState());
 
 async function request(path) {
   const server = http.createServer(app);

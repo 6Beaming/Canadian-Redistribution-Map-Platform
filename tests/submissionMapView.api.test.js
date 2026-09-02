@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import { afterEach, test } from "@jest/globals";
 import app from "../server/app.js";
+import { resetApiTestState } from "./helpers/resetApiTestState.js";
 import { setSupabaseTestDoubles } from "../server/lib/supabase.js";
 
 const COOKIE = "crmp_access_token=test-access-token";
@@ -195,7 +196,7 @@ async function request(path, { cookie = COOKIE } = {}) {
   }
 }
 
-afterEach(() => setSupabaseTestDoubles(null));
+afterEach(() => resetApiTestState());
 
 test("submission map view requires authentication", async () => {
   const response = await request("/api/submissions/comment-1/map-view", { cookie: "" });

@@ -5,6 +5,7 @@ import { afterEach, test } from "@jest/globals";
 import app from "../server/app.js";
 import { setGoogleGeocodingTestDouble } from "../server/lib/googleGeocoding.js";
 import { setSupabaseTestDoubles } from "../server/lib/supabase.js";
+import { resetApiTestState } from "./helpers/resetApiTestState.js";
 
 const publicUser = {
   email: "person@example.com",
@@ -51,7 +52,7 @@ const incompletePublicProfile = {
 
 afterEach(() => {
   setGoogleGeocodingTestDouble(null);
-  setSupabaseTestDoubles(null);
+  resetApiTestState();
 });
 
 function sessionCookies(accessToken = "access-token", refreshToken = "refresh-token") {

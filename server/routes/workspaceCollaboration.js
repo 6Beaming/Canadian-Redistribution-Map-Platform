@@ -75,10 +75,29 @@ function serializeCatalog(row) {
     name: row.name,
     color: row.color,
     custom: Boolean(row.is_custom),
-    createdBy: row.created_by ?? null,
-    createdAt: row.created_at,
+    createdBy: row.created_by ?? row.updated_by ?? null,
+    createdAt: row.created_at ?? row.updated_at,
     updatedAt: row.updated_at,
   };
+}
+
+async function loadSubmissionLabelCatalog(supabase, submissionId) {
+  const { data, error } = await supabase.from("workspace_labels")
+    .select("id,submission_id,name,color,is_custom,updated_by,updated_at")
+    .eq("submission_id", submissionId)
+    .eq("is_custom", true)
+    .order("updated_at", { ascending: true });
+  if (error) {
+    throw error;
+  }
+  return [
+    ...STANDARD_WORKSPACE_LABELS,
+    ...(data ?? []).map((row) => serializeCatalog({
+      ...row,
+      created_by: row.updated_by,
+      created_at: row.updated_at,
+    })),
+  ];
 }
 
 function normalizeText(value, { field, max = 5000 }) {
@@ -235,24 +254,13 @@ router.get("/label-catalog", async (req, res) => {
   if (!(await requireSubmission(supabase, submissionId))) {
     return res.status(404).json({ error: "Submission not found." });
   }
-  const { data, error } = await supabase.from("workspace_labels")
-    .select("id,submission_id,name,color,is_custom,updated_by,updated_at")
-    .eq("submission_id", submissionId)
-    .eq("is_custom", true)
-    .order("updated_at", { ascending: true });
-  if (error) {
+  try {
+    return res.json(await loadSubmissionLabelCatalog(supabase, submissionId));
+  } catch (error) {
     return res.status(isLabelMigrationError(error) ? 503 : 500).json({
       error: isLabelMigrationError(error) ? LABEL_MIGRATION_ERROR : error.message,
     });
   }
-  return res.json([
-    ...STANDARD_WORKSPACE_LABELS,
-    ...(data ?? []).map((row) => serializeCatalog({
-      ...row,
-      created_by: row.updated_by,
-      created_at: row.updated_at,
-    })),
-  ]);
 });
 
 router.post("/label-catalog", async (req, res) => {
@@ -344,7 +352,7 @@ router.get("/submissions/:submissionId/review-state", async (req, res) => {
   if (!submissionId) return res.status(400).json({ error: "submissionId is required." });
   const supabase = getSupabaseAdminDataClient();
 
-  const [commentsResult, labelsResult, catalogResult, archiveRequest] = await Promise.all([
+  const [commentsResult, labelsResult, catalogEntries, archiveRequest] = await Promise.all([
     supabase
       .from("workspace_comments")
       .select("id,submission_id,content,action,is_closing,created_at,author_id,profiles!author_id(email)")
@@ -354,12 +362,8 @@ router.get("/submissions/:submissionId/review-state", async (req, res) => {
       .select("*")
       .eq("submission_id", submissionId)
       .order("updated_at", { ascending: true }),
-    supabase.from("workspace_labels")
-      .select("id,submission_id,name,color,is_custom,created_by,created_at,updated_at")
-      .or(`submission_id.eq.${submissionId},submission_id.is.null`)
-      .order("updated_at", { ascending: true }),
+    loadSubmissionLabelCatalog(supabase, submissionId).catch((error) => ({ error })),
     getArchiveRequestForSubmission({
-      supabase,
       submissionId,
       actorProfile: req.profile,
     }).catch((error) => {
@@ -377,17 +381,17 @@ router.get("/submissions/:submissionId/review-state", async (req, res) => {
     }
     return res.status(500).json({ error: labelsResult.error.message });
   }
-  if (catalogResult.error) {
-    if (isLabelMigrationError(catalogResult.error)) {
+  if (catalogEntries?.error) {
+    if (isLabelMigrationError(catalogEntries.error)) {
       return res.status(503).json({ error: LABEL_MIGRATION_ERROR });
     }
-    return res.status(500).json({ error: catalogResult.error.message });
+    return res.status(500).json({ error: catalogEntries.error.message });
   }
 
   return res.json({
     comments: (commentsResult.data ?? []).map(serializeComment),
     labels: (labelsResult.data ?? []).filter((row) => row.is_selected !== false).map(serializeLabel),
-    labelCatalog: (catalogResult.data ?? []).map(serializeCatalog),
+    labelCatalog: catalogEntries,
     archiveRequest,
     collaborationWarning: "",
   });

@@ -6,7 +6,7 @@ import {
   findArchiveVersion,
   getArchiveVersionRouteId,
 } from "../src/lib/archiveTree.js";
-import { mapVersionRecord } from "../server/lib/archive/archiveRepository.js";
+import { mapVersionRecord, normalizeArchiveSubmissionProjection } from "../server/lib/archive/archiveRepository.js";
 
 function record(id, mergedAt, extra = {}) {
   return {
@@ -100,4 +100,18 @@ test("Archived Tree routes persistent version identities and can resolve legacy 
   assert.equal(getArchiveVersionRouteId(version), "archive-version-1");
   assert.equal(findArchiveVersion(categories, "archive-version-1")?.version, version);
   assert.equal(findArchiveVersion(categories, "submission-1")?.version, version);
+});
+
+test("normalizeArchiveSubmissionProjection maps legacy migrated author and timestamp fields", () => {
+  const normalized = normalizeArchiveSubmissionProjection({
+    id: "submission-1",
+    author: { id: "public-1", email: "public@example.com" },
+    submitted_at: "2026-01-01T00:00:00.000Z",
+    title: "Legacy title",
+    comment: "Legacy comment",
+  });
+  assert.equal(normalized.user_id, "public-1");
+  assert.equal(normalized.created_at, "2026-01-01T00:00:00.000Z");
+  assert.equal(normalized.authorEmail, "public@example.com");
+  assert.equal(normalized.profile.email, "public@example.com");
 });

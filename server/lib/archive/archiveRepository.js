@@ -50,23 +50,51 @@ function mapLegacyTypeToSubmission(type) {
   return "counter-proposal";
 }
 
+export function normalizeArchiveSubmissionProjection(projection, {
+  authorEmail = null,
+} = {}) {
+  if (!projection || typeof projection !== "object") {
+    return {};
+  }
+  const author = projection.author && typeof projection.author === "object"
+    ? projection.author
+    : null;
+  const normalized = {
+    ...projection,
+    id: projection.id ?? projection.source_submission_id ?? null,
+    user_id: projection.user_id ?? author?.id ?? null,
+    created_at: projection.created_at ?? projection.submitted_at ?? null,
+    title: projection.title ?? "",
+    comment: projection.comment ?? "",
+    dguid: projection.dguid ?? projection.primaryDguid ?? null,
+    neighboring_dguid: projection.neighboring_dguid ?? projection.secondaryDguid ?? null,
+  };
+  const resolvedAuthorEmail = authorEmail
+    ?? projection.authorEmail
+    ?? author?.email
+    ?? projection.profile?.email
+    ?? null;
+  if (resolvedAuthorEmail) {
+    normalized.authorEmail = resolvedAuthorEmail;
+    normalized.profile = { ...(projection.profile ?? {}), email: resolvedAuthorEmail };
+  }
+  return normalized;
+}
+
 function projectionToSubmission(projection, branch, emailsById = new Map()) {
+  const normalized = normalizeArchiveSubmissionProjection(projection, {
+    authorEmail: emailsById.get(projection?.user_id ?? projection?.author?.id)
+      ?? projection?.authorEmail
+      ?? projection?.profile?.email
+      ?? null,
+  });
   const submission = {
-    ...(projection ?? {}),
-    id: projection?.id ?? projection?.source_submission_id ?? null,
-    type: mapLegacyTypeToSubmission(branch?.submission_type ?? projection?.type),
-    dguid: branch?.primary_dguid ?? projection?.dguid ?? projection?.primaryDguid ?? null,
-    neighboring_dguid: branch?.secondary_dguid ?? projection?.neighboring_dguid ?? projection?.secondaryDguid ?? null,
+    ...normalized,
+    type: mapLegacyTypeToSubmission(branch?.submission_type ?? normalized?.type),
+    dguid: branch?.primary_dguid ?? normalized.dguid ?? null,
+    neighboring_dguid: branch?.secondary_dguid ?? normalized.neighboring_dguid ?? null,
     status: "archived",
   };
-  const authorEmail = emailsById.get(submission.user_id)
-    ?? submission.authorEmail
-    ?? submission.profile?.email
-    ?? null;
-  if (authorEmail) {
-    submission.authorEmail = authorEmail;
-    submission.profile = { ...(submission.profile ?? {}), email: authorEmail };
-  }
   return submission;
 }
 

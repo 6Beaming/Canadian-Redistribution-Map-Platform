@@ -206,10 +206,16 @@ export async function revertArchiveVersion(supabase, {
 }) {
   const { data: version, error: versionError } = await supabase
     .from("archive_versions")
-    .select("*, archive_branches(*)")
+    .select("*, archive_branches!branch_id(*)")
     .eq("id", versionId)
     .maybeSingle();
-  if (versionError || !version) {
+  if (versionError) {
+    throw archiveError(versionError.message || "Unable to load archive version.", {
+      statusCode: 500,
+      code: "ARCHIVE_VERSION_LOOKUP_FAILED",
+    });
+  }
+  if (!version) {
     throw archiveError("Archive version was not found.", {
       statusCode: 404,
       code: "ARCHIVE_VERSION_NOT_FOUND",

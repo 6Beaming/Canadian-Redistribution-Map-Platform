@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import { afterEach, test } from "@jest/globals";
 import app from "../server/app.js";
+import { resetApiTestState } from "./helpers/resetApiTestState.js";
 import { setSupabaseTestDoubles } from "../server/lib/supabase.js";
 import { setResourceScopeTestDoubles } from "../server/lib/authorization/resourceScopeGuard.js";
 
@@ -20,8 +21,7 @@ const assignee = {
 };
 
 afterEach(() => {
-  setSupabaseTestDoubles(null);
-  setResourceScopeTestDoubles(null);
+  resetApiTestState();
 });
 
 async function request(path, { method = "GET", body, cookie = COOKIE, profile = requester } = {}) {

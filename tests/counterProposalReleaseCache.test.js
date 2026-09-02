@@ -88,10 +88,15 @@ test("release cache commit records undo history from geometry coordinates", () =
     handleId: handle.id,
     coordinate,
   });
-  assert.equal(committed.cache.history.length, 1);
+  assert.equal(committed.valid, true);
+  assert.equal(committed.committedPatch?.handleId, handle.id);
+  assert.deepEqual(committed.committedPatch?.coordinate, coordinate);
+  assert.equal(committed.cache, undefined);
+  assert.equal(state.cache.history.length, 1);
   const undone = processCounterProposalWorkerMessage(state, { type: "UNDO", sequence: 3 });
-  assert.equal(undone.cache.history.length, 0);
-  assert.equal(undone.cache.future.length, 1);
+  assert.equal(undone.action, "undo");
+  assert.equal(state.cache.history.length, 0);
+  assert.equal(state.cache.future.length, 1);
 });
 
 test("buildReleaseEditableHandles maps vertex ids and occurrences", () => {

@@ -3,8 +3,8 @@ import http from "node:http";
 import { afterEach, test } from "@jest/globals";
 
 import app from "../server/app.js";
+import { resetApiTestState } from "./helpers/resetApiTestState.js";
 import { setSupabaseTestDoubles } from "../server/lib/supabase.js";
-import { clearAuthProfileCacheForTests } from "../server/middleware/requireAuth.js";
 
 const cookie = "crmp_access_token=access-token";
 const commissioner = {
@@ -15,8 +15,7 @@ const commissioner = {
 };
 
 afterEach(() => {
-  setSupabaseTestDoubles(null);
-  clearAuthProfileCacheForTests();
+  resetApiTestState();
 });
 
 async function request(path) {

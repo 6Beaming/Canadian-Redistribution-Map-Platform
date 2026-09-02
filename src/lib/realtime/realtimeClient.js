@@ -43,8 +43,8 @@ export class RealtimeClient {
     onStateChange = () => {},
     onUnauthorized = () => {},
     random = Math.random,
-    setTimeoutImpl = setTimeout,
-    clearTimeoutImpl = clearTimeout,
+    setTimeoutImpl = (...args) => globalThis.setTimeout(...args),
+    clearTimeoutImpl = (...args) => globalThis.clearTimeout(...args),
     urlFactory = defaultUrl,
   } = {}) {
     this.WebSocketImpl = WebSocketImpl;

@@ -6,6 +6,7 @@ import { afterEach, jest, test } from "@jest/globals";
 import app from "../server/app.js";
 import { prepareCounterProposalSubmission, prepareCounterProposalSubmissionV2 } from "../server/lib/map/counterProposalSubmission.js";
 import { deriveCounterProposalOperations } from "../server/lib/map/geometryOperations.js";
+import { resetApiTestState } from "./helpers/resetApiTestState.js";
 import { setSupabaseTestDoubles } from "../server/lib/supabase.js";
 import { loadCurrentCanonicalRelease } from "../server/lib/map/canonicalReleaseStore.js";
 import { clearMapReleaseGateCacheForTests } from "../server/lib/map/mapReleaseGate.js";
@@ -55,7 +56,7 @@ function buildEditedProposedGeometry() {
 }
 
 afterEach(() => {
-  setSupabaseTestDoubles(null);
+  resetApiTestState();
   clearMapReleaseGateCacheForTests();
 });
 

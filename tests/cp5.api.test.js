@@ -2,8 +2,14 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import { afterEach, test } from "@jest/globals";
 import app from "../server/app.js";
-import { setSupabaseTestDoubles } from "../server/lib/supabase.js";
+import {
+  filterAndSortSubmissionRows,
+  normalizeSubmissionListFilters,
+  normalizeSubmissionListPagination,
+} from "../server/lib/submissions/submissionListQuery.js";
+import { resetApiTestState } from "./helpers/resetApiTestState.js";
 import { setResourceScopeTestDoubles } from "../server/lib/authorization/resourceScopeGuard.js";
+import { setSupabaseTestDoubles } from "../server/lib/supabase.js";
 
 const COOKIE = "crmp_access_token=access-token";
 const commissioner = { id: "commissioner-1", email: "eric@example.com", role: "commissioner", province: "NL" };
@@ -13,8 +19,7 @@ const publicUser = {
 };
 
 afterEach(() => {
-  setSupabaseTestDoubles(null);
-  setResourceScopeTestDoubles(null);
+  resetApiTestState();
 });
 
 async function request(path, { method = "GET", body, cookie = COOKIE } = {}) {
@@ -59,8 +64,51 @@ function authDoubles(profile, admin) {
   });
 }
 
+function rpcSubmissionListPayload(rows, values, { userId = null } = {}) {
+  const filters = normalizeSubmissionListFilters({
+    query: values.p_query ?? "",
+    createdFrom: values.p_created_from ?? "",
+    createdTo: values.p_created_to ?? "",
+    type: values.p_type ?? "",
+    status: values.p_status ?? "",
+    sort: values.p_sort ?? "",
+  });
+  let filtered = userId
+    ? rows.filter((row) => String(row.user_id) === String(userId))
+    : [...rows];
+  filtered = filterAndSortSubmissionRows(filtered, filters);
+  const { pageSize } = normalizeSubmissionListPagination({ pageSize: values.p_page_size });
+  const items = filtered.slice(0, pageSize).map((row) => ({
+    ...row,
+    profile: { id: row.user_id, email: `${row.user_id}@example.com` },
+    scope_pruids: ["10"],
+  }));
+  return {
+    data: {
+      items,
+      page: {
+        pageSize,
+        nextCursor: filtered.length > pageSize
+          ? { createdAt: items.at(-1).created_at, id: items.at(-1).id, title: items.at(-1).title }
+          : null,
+        hasMore: filtered.length > pageSize,
+      },
+    },
+    error: null,
+  };
+}
+
 function listAdmin(rows, capture = {}, workspaceLabels = []) {
   return {
+    async rpc(name, values) {
+      if (name === "list_commissioner_submission_rows_v2") {
+        return rpcSubmissionListPayload(rows, values);
+      }
+      if (name === "list_my_submission_rows_v2") {
+        return rpcSubmissionListPayload(rows, values, { userId: values.p_user_id });
+      }
+      throw new Error(`Unexpected rpc ${name}`);
+    },
     from(table) {
       if (table === "profiles") {
         return {
@@ -182,16 +230,16 @@ function collaborationAdmin(seed = {}) {
 test("Commissioner list returns all 70 geometry-free rows with normalized filters and one batch profile read", async () => {
   const capture = {};
   authDoubles(commissioner, listAdmin(submissionRows(), capture));
-  const response = await request("/api/submissions?query=%20Submission%20%20&createdFrom=2026-08-01&createdTo=2026-08-02&sort=oldest");
+  const response = await request("/api/submissions?query=%20Submission%20%20&createdFrom=2026-08-01&createdTo=2026-08-02&sort=oldest&pageSize=100");
   assert.equal(response.status, 200);
   assert.equal(response.body.items.length, 70);
   assert.deepEqual(response.body.appliedFilters, {
     query: "Submission", createdFrom: "2026-08-01", createdTo: "2026-08-02",
     type: "", status: "", sort: "oldest",
   });
-  assert.equal(capture.submissionColumns.includes("geometry"), false);
-  assert.equal(capture.submissionColumns.includes("comment"), false);
-  assert.equal(capture.profileColumns, "id,email");
+  assert.equal(Object.hasOwn(response.body.items[0], "geometry"), false);
+  assert.equal(Object.hasOwn(response.body.items[0], "comment"), false);
+  assert.equal(response.body.items[0].profile.email, "public-2@example.com");
   assert.ok(Buffer.byteLength(response.text) < 100_000);
   assert.equal(response.text.includes("mustNotLeak"), false);
 });
@@ -374,36 +422,91 @@ test("Commissioner CSV is authorized, subset-filtered, tag-inclusive, and formul
 });
 
 test("Archived Tree JSON exports complete ordered snapshots and is Commissioner-only", async () => {
-  const rows = [
+  const branchId = "branch-a";
+  const branch = {
+    id: branchId,
+    branch_key: "comment:statscan-da-2021-r1:2021S051260010118",
+    submission_type: "comment",
+    release_id: "statscan-da-2021-r1",
+    primary_dguid: "2021S051260010118",
+    secondary_dguid: null,
+    head_version_id: "archive-2",
+    head_version_number: 2,
+    resource_version: 1,
+    scope_pruids: ["10"],
+    created_at: "2026-08-01T12:00:00Z",
+    updated_at: "2026-08-02T12:00:00Z",
+  };
+  const versions = [
     {
-      id: "archive-2", branch_key: "branch-a", submission_id: "submission-1",
-      version_number: 2, is_latest: true, submission_snapshot: {
+      id: "archive-2",
+      branch_id: branchId,
+      version_number: 2,
+      merge_sequence: 2,
+      version_kind: "merge",
+      submission_projection: {
         id: "submission-1",
-        type: "feedback",
-        dguid: "2021S051260010118",
+        user_id: "public-1",
         title: "Later version",
         comment: "Updated comment",
+        created_at: "2026-08-01T12:00:00Z",
       },
-      closing_comment: { content: "done" }, merged_by: commissioner.id, merged_at: "2026-08-02T12:00:00Z",
+      geometry_digest: null,
+      validation_report: null,
+      closing_comment: { content: "done" },
+      merged_by: commissioner.id,
+      merged_at: "2026-08-02T12:00:00Z",
     },
     {
-      id: "archive-1", branch_key: "branch-a", submission_id: "submission-1",
-      version_number: 1, is_latest: false, submission_snapshot: {
+      id: "archive-1",
+      branch_id: branchId,
+      version_number: 1,
+      merge_sequence: 1,
+      version_kind: "merge",
+      submission_projection: {
         id: "submission-1",
-        type: "feedback",
-        dguid: "2021S051260010118",
+        user_id: "public-1",
         title: "Earlier version",
         comment: "Original comment",
+        created_at: "2026-08-01T10:00:00Z",
       },
-      closing_comment: null, merged_by: commissioner.id, merged_at: "2026-08-01T12:00:00Z",
+      geometry_digest: null,
+      validation_report: null,
+      closing_comment: null,
+      merged_by: commissioner.id,
+      merged_at: "2026-08-01T12:00:00Z",
     },
   ];
   const admin = {
     from(table) {
       if (table === "archive_branches") {
+        const builder = {
+          select(_columns, options) {
+            if (options?.head) {
+              return Promise.resolve({ count: 1, error: null });
+            }
+            return builder;
+          },
+          order() {
+            return Promise.resolve({ data: [branch], error: null });
+          },
+        };
+        return builder;
+      }
+      if (table === "archive_versions") {
+        let filtered = versions;
         return {
-          select() { return this; },
-          order() { return Promise.resolve({ data: [], error: null }); },
+          select(columns) {
+            this.columns = columns;
+            return this;
+          },
+          in(field, values) {
+            filtered = versions.filter((row) => values.includes(String(row[field])));
+            return this;
+          },
+          order() {
+            return Promise.resolve({ data: filtered, error: null });
+          },
         };
       }
       if (table === "archive_map_revisions") {
@@ -412,7 +515,12 @@ test("Archived Tree JSON exports complete ordered snapshots and is Commissioner-
           eq() { return this; },
           order() { return this; },
           limit() { return this; },
-          maybeSingle() { return Promise.resolve({ data: { sequence: 3, release_id: "statscan-da-2021-r1" }, error: null }); },
+          maybeSingle() {
+            return Promise.resolve({
+              data: { sequence: 3, release_id: "statscan-da-2021-r1" },
+              error: null,
+            });
+          },
         };
       }
       if (table === "archive_map_da_heads") {
@@ -432,11 +540,7 @@ test("Archived Tree JSON exports complete ordered snapshots and is Commissioner-
           },
         };
       }
-      assert.equal(table, "archive_tree");
-      return {
-        select(columns) { assert.equal(columns, "*"); return this; },
-        order() { return Promise.resolve({ data: rows, error: null }); },
-      };
+      throw new Error(`Unexpected table ${table}`);
     },
   };
   authDoubles(commissioner, admin);

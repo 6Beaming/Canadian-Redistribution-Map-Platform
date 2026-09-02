@@ -3,6 +3,7 @@ import http from "node:http";
 import { afterEach, test } from "@jest/globals";
 
 import app from "../server/app.js";
+import { resetApiTestState } from "./helpers/resetApiTestState.js";
 import { setSupabaseTestDoubles } from "../server/lib/supabase.js";
 
 const commissioner = {
@@ -11,7 +12,7 @@ const commissioner = {
   role: "commissioner",
 };
 
-afterEach(() => setSupabaseTestDoubles(null));
+afterEach(() => resetApiTestState());
 
 async function request(method, path, { body, cookie } = {}) {
   const server = http.createServer(app);
@@ -169,11 +170,17 @@ test("archive merge rejects a submission without an approved sealed Archive Requ
     getSupabaseAdminDataClient: () => ({
       from(table) {
         if (table === "workspace_archive_requests") {
-          return {
-            select() { return this; },
-            eq() { return this; },
-            maybeSingle: async () => ({ data: null, error: null }),
+          const builder = {
+            select() { return builder; },
+            eq() { return builder; },
+            in() { return builder; },
+            order() { return builder; },
+            limit() { return builder; },
+            then(resolve, reject) {
+              return Promise.resolve({ data: [], error: null }).then(resolve, reject);
+            },
           };
+          return builder;
         }
         throw new Error(`Unexpected table ${table}`);
       },
@@ -242,4 +249,87 @@ test("legacy branch-key Archived Tree delete is retired", async () => {
   assert.equal(response.status, 410);
   assert.equal(response.body.code, "ARCHIVE_V2_REQUIRED");
   assert.equal(called, undefined);
+});
+
+test("workspace review-state uses submission-local labels without legacy catalog columns", async () => {
+  setSupabaseTestDoubles({
+    getSupabaseClient: () => ({
+      auth: { getUser: async () => ({ data: { user: commissioner }, error: null }) },
+    }),
+    getSupabaseProfile: async () => commissioner,
+    getSupabaseAdminDataClient: () => ({
+      from(table) {
+        if (table === "workspace_comments") {
+          return {
+            select() { return this; },
+            eq() { return this; },
+            order: async () => ({
+              data: [{
+                id: "comment-1",
+                submission_id: "submission-1",
+                content: "Review note",
+                action: null,
+                is_closing: false,
+                created_at: "2026-08-02T12:00:00.000Z",
+                author_id: commissioner.id,
+                profiles: { email: commissioner.email },
+              }],
+              error: null,
+            }),
+          };
+        }
+        if (table === "workspace_labels") {
+          return {
+            select(columns) {
+              assert.equal(columns.includes("created_by"), false);
+              return this;
+            },
+            eq() { return this; },
+            order: async () => ({
+              data: [{
+                id: "label-1",
+                submission_id: "submission-1",
+                catalog_id: "catalog-1",
+                name: "Constructive",
+                color: "green",
+                is_custom: false,
+                is_selected: true,
+                updated_by: commissioner.id,
+                updated_at: "2026-08-02T12:00:00.000Z",
+              }, {
+                id: "label-2",
+                submission_id: "submission-1",
+                catalog_id: "catalog-custom",
+                name: "Local Label",
+                color: "#112233",
+                is_custom: true,
+                is_selected: true,
+                updated_by: commissioner.id,
+                updated_at: "2026-08-02T12:01:00.000Z",
+              }],
+              error: null,
+            }),
+          };
+        }
+        if (table === "submissions") {
+          return {
+            select() { return this; },
+            eq() { return this; },
+            maybeSingle: async () => ({ data: null, error: null }),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    }),
+  });
+
+  const response = await request("GET", "/api/workspace/submissions/submission-1/review-state", {
+    cookie: "crmp_access_token=access-token",
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.comments.length, 1);
+  assert.equal(response.body.labels.length, 2);
+  assert.equal(response.body.labelCatalog.some((entry) => entry.name === "Local Label"), true);
+  assert.equal(response.body.archiveRequest, null);
 });

@@ -35,15 +35,21 @@ function branchIdentity(snapshot) {
 
 function projection(row, identity) {
   const snapshot = row.submission_snapshot ?? {};
+  const userId = snapshot.user_id ?? null;
+  const createdAt = snapshot.created_at ?? row.merged_at ?? null;
   return {
     id: row.submission_id,
     source_submission_id: row.submission_id,
+    user_id: userId,
     type: identity.type,
-    title: snapshot.title ?? null,
-    comment: snapshot.comment ?? null,
-    author: { id: snapshot.user_id ?? null },
-    submitted_at: snapshot.created_at ?? null,
+    title: snapshot.title ?? "",
+    comment: snapshot.comment ?? "",
+    authorEmail: snapshot.authorEmail ?? snapshot.profile?.email ?? null,
+    created_at: createdAt,
+    submitted_at: createdAt,
     merged_at: row.merged_at,
+    dguid: identity.primary,
+    neighboring_dguid: identity.secondary,
     primaryDguid: identity.primary,
     secondaryDguid: identity.secondary,
     releaseId: release.manifest.releaseId,

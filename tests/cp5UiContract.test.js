@@ -36,7 +36,8 @@ test("Workspace waits behind the shared full-page loading UI before rendering it
   const full = workspace.indexOf("await getWorkspaceSubmissions", exact);
   assert.ok(exact >= 0 && full > exact);
   assert.match(workspace, /if \(isLoading\) \{[\s\S]*return <RouteLoadingPage \/>/);
-  assert.doesNotMatch(workspace, /setWorkspaceSubmissions\(\[focused\]\)/);
+  assert.match(workspace, /setWorkspaceSubmissions\(\[focused\]\)/);
+  assert.match(workspace, /mergeFocusedSubmission\(submissions, focused\)/);
 });
 
 test("Map pages render during profile hydration and Archived Tree waits for its canvas", () => {
