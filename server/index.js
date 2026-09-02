@@ -5,10 +5,16 @@ dotenv.config({ override: true });
 import http from "node:http";
 import app from "./app.js";
 import {
+  installProcessDiagnostics,
+  recordProcessDiagnostic,
+} from "./lib/processDiagnostics.js";
+import {
   ensureActiveMapReleaseRegistered,
   ensureSubmissionReleaseBackfill,
 } from "./lib/map/mapReleaseGate.js";
 import { attachRealtimeRuntime } from "./realtime/runtime.js";
+
+installProcessDiagnostics();
 
 const port = Number(process.env.PORT) || 3000;
 const server = http.createServer(app);
@@ -23,6 +29,10 @@ async function boot() {
   }
 
   server.listen(port, () => {
+    recordProcessDiagnostic("server.listening", {
+      address: server.address(),
+      port,
+    });
     console.log(`CRMP API listening on port ${port}`);
   });
 }
