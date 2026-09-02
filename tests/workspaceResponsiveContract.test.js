@@ -12,9 +12,10 @@ function rule(selector, source = styles) {
   return match[1];
 }
 
-test("Workspace owns horizontal overflow instead of creating a second body scrollbar", () => {
+test("Workspace owns scroll inside the page shell instead of creating a second body scrollbar", () => {
   assert.match(rule(".commissioner-workspace.workspace-page"), /overflow:\s*hidden/);
   assert.match(rule(".workspace-scroll-region"), /overflow:\s*auto/);
+  assert.match(rule(".workspace-canvas"), /--workspace-canvas-min-width:\s*86\.25rem/);
   assert.match(rule(".workspace-tree__top-row"), /min-inline-size:\s*max-content/);
 });
 
@@ -22,7 +23,8 @@ test("Workspace status key keeps all four status labels inside a reliable deskto
   const card = rule(".workspace-status-key");
   const items = rule(".workspace-status-key__items");
   const item = rule(".workspace-status-key__item");
-  const tree = rule(".workspace-tree");
+  const categoryGrid = rule(".workspace-tree__category-grid");
+  const categoryTrack = rule(".workspace-category-track");
 
   assert.match(card, /box-sizing:\s*border-box/);
   assert.match(card, /inline-size:\s*24rem/);
@@ -30,7 +32,8 @@ test("Workspace status key keeps all four status labels inside a reliable deskto
   assert.match(items, /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
   assert.match(item, /min-inline-size:\s*0/);
   assert.match(item, /white-space:\s*nowrap/);
-  assert.match(tree, /padding-right:\s*calc\(24rem \+ 1rem\)/);
+  assert.match(categoryGrid, /grid-template-columns:\s*repeat\(3,\s*minmax\(24rem,\s*1fr\)\)/);
+  assert.match(categoryTrack, /min-width:\s*24rem/);
 
   ["Pending Submissions", "Archive Request", "Accepted", "Rejected"].forEach((label) => {
     assert.match(workspace, new RegExp(`"${label}"`));
@@ -38,9 +41,12 @@ test("Workspace status key keeps all four status labels inside a reliable deskto
   assert.match(workspace, /<aside className="workspace-status-key" aria-label="Status key">/);
 });
 
-test("Workspace status key keeps two columns at the mobile breakpoint", () => {
+test("Workspace keeps the tree grid fixed at narrow breakpoints", () => {
+  assert.doesNotMatch(styles, /@media \(max-width:\s*900px\)/);
+  assert.doesNotMatch(styles, /@container category-track/);
+
   const mobile = styles.match(/@media \(max-width:\s*700px\)\s*\{([\s\S]*?)\n\}/);
   assert.ok(mobile, "Missing Workspace mobile breakpoint");
-  assert.doesNotMatch(mobile[1], /\.workspace-status-key__items\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
-  assert.match(mobile[1], /\.workspace-canvas\s*\{[\s\S]*?min-width:\s*1280px/);
+  assert.doesNotMatch(mobile[1], /\.workspace-tree__category-grid/);
+  assert.doesNotMatch(mobile[1], /grid-template-columns:\s*minmax\(0,\s*1fr\)/);
 });

@@ -15,7 +15,13 @@ const AUTH_PATHS = new Set([
 ]);
 
 function getBackRoute(location, isCommissioner) {
-  const { pathname, state } = location;
+  const { pathname, search, state } = location;
+  if (
+    pathname === "/dashboard"
+    && new URLSearchParams(search).get("archivedMap") === "1"
+  ) {
+    return "/dashboard/archivedTree";
+  }
   if (pathname.startsWith("/dashboard/archivedTree/") && pathname.endsWith("/difference")) {
     return "/dashboard/archivedTree";
   }
@@ -73,6 +79,8 @@ export default function Header({ onPlaceSelect }) {
   const isWorkspaceReview = pathname.startsWith("/dashboard/workspace/");
   const isArchivedTree = pathname === "/dashboard/archivedTree";
   const isArchivedDifference = pathname.startsWith("/dashboard/archivedTree/") && pathname.endsWith("/difference");
+  const isArchivedMap = pathname === "/dashboard"
+    && new URLSearchParams(location.search).get("archivedMap") === "1";
   const isPublicProfilePage = pathname === "/users/profile";
   const isPublicSubmissionsPage =
     pathname === "/submissions" || pathname.startsWith("/submissions/");
@@ -125,7 +133,7 @@ export default function Header({ onPlaceSelect }) {
             onClick={navigateBack}
           >
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            <span>{isWorkspaceReview ? "Back to Workspace" : isArchivedDifference ? "Back to Archived Tree" : backRoute === "/dashboard/workspace" ? "Back to Workspace" : backRoute === "/dashboard/submissionsTable" ? "Back to User Submissions" : "Back to Map"}</span>
+            <span>{isWorkspaceReview ? "Back to Workspace" : isArchivedDifference || isArchivedMap ? "Back to Archived Tree" : backRoute === "/dashboard/workspace" ? "Back to Workspace" : backRoute === "/dashboard/submissionsTable" ? "Back to User Submissions" : "Back to Map"}</span>
           </Button>
         ) : backRoute && (isPublicProfilePage || isPublicSubmissionsPage) ? (
           <Button

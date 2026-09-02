@@ -47,6 +47,18 @@ test("Archived Tree Super Root opens latest Archived Map with return state", () 
   assert.match(archived, /from: "\/dashboard\/archivedTree"/);
 });
 
+test("Archived Map keeps its category menu populated and always returns to Archived Tree", () => {
+  const panel = read("src/components/non_prebuilt/ArchivedMapInfoPanel.jsx");
+  const header = read("src/pages/Header.jsx");
+
+  assert.match(panel, /All Archived Submissions/);
+  assert.match(panel, /Comments/);
+  assert.match(panel, /Boundary Objections/);
+  assert.match(panel, /Counter-Proposals/);
+  assert.match(panel, /aria-label="Choose archived submission category"/);
+  assert.match(header, /pathname === "\/dashboard"[\s\S]*archivedMap"\) === "1"[\s\S]*return "\/dashboard\/archivedTree"/);
+});
+
 test("archive-map snapshot route returns revision and head descriptors", async () => {
   setSupabaseTestDoubles({
     getSupabaseClient: () => ({

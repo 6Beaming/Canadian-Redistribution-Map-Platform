@@ -7,6 +7,7 @@ import {
   buildArchiveTree,
   filterArchiveTree,
   findArchiveVersion,
+  getArchiveVersionRouteId,
 } from "@/lib/archiveTree.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
 import { mapApi } from "@/services/mapApi.js";
@@ -156,11 +157,11 @@ export default function ArchivedTree() {
           selection={selection}
           onClose={clearSelection}
           onOpenMap={(_category, branch, version) => navigate(
-            `/dashboard/archivedTree/${encodeURIComponent(version.id)}/difference?branch=${encodeURIComponent(branch.key)}&mode=open`,
+            `/dashboard/archivedTree/${encodeURIComponent(getArchiveVersionRouteId(version))}/difference?branch=${encodeURIComponent(branch.key)}&mode=open`,
             { state: location.state },
           )}
           onViewDifference={(_category, branch, version) => navigate(
-            `/dashboard/archivedTree/${encodeURIComponent(version.id)}/difference?branch=${encodeURIComponent(branch.key)}`,
+            `/dashboard/archivedTree/${encodeURIComponent(getArchiveVersionRouteId(version))}/difference?branch=${encodeURIComponent(branch.key)}`,
             { state: location.state },
           )}
           onDeleteBranch={async (branch) => {

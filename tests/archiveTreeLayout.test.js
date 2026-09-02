@@ -70,3 +70,35 @@ test("Archived Tree version actions expose one plan-compliant action per version
   assert.doesNotMatch(panel, /disabled=\{entryIsLatest\}/);
   assert.doesNotMatch(panel, /archive-panel-revert/);
 });
+
+test("Archived Tree and archived map panels use responsive widths and floating mobile panels", () => {
+  const css = fs.readFileSync("src/styles/archive-tree.css", "utf8");
+  const difference = fs.readFileSync("src/pages/ArchivedDifference.jsx", "utf8");
+  const treePanel = fs.readFileSync("src/components/non_prebuilt/ArchivedTreePanel.jsx", "utf8");
+
+  assert.doesNotMatch(css, /minmax\(42rem,\s*1fr\)/);
+  assert.match(css, /archive-node-panel\.map-info-panel--floating/);
+  assert.match(css, /archive-difference-panel\.map-info-panel--floating/);
+  assert.match(css, /archive-submission-card__metadata/);
+  assert.match(css, /archive-submission-card__impact/);
+  assert.match(css, /archive-node-panel__scroll[\s\S]*overflow-y:\s*auto/);
+  assert.match(css, /archive-difference-panel__content[\s\S]*overflow-y:\s*auto/);
+  assert.match(treePanel, /archive-node-panel__scroll/);
+  assert.match(difference, /selectedEntry\.branch\.versions/);
+  assert.match(difference, /versionLabel=\{versionRole\(entry\)\}/);
+});
+
+test("Archived Counter-Proposal maps retain comparison styling and fullscreen controls", () => {
+  const css = fs.readFileSync("src/styles/archive-tree.css", "utf8");
+  const difference = fs.readFileSync("src/pages/ArchivedDifference.jsx", "utf8");
+
+  assert.match(difference, /buildDaObjectionIndex/);
+  assert.match(difference, /getSharedBoundaryFeatureCollection/);
+  assert.match(difference, /getPairOuterBoundaryFeatureCollection/);
+  assert.match(difference, /Boundary comparison/);
+  assert.match(difference, />Proposed<\/button>/);
+  assert.match(difference, />Original<\/button>/);
+  assert.match(difference, /isFullscreen=\{isFullscreen\}/);
+  assert.match(difference, /onToggleFullscreen=\{toggleFullscreen\}/);
+  assert.match(css, /archive-difference-page\.map-dashboard--fullscreen/);
+});

@@ -635,8 +635,14 @@ async function getRemoteArchiveTreeRecords() {
         closingComment: record.closingComment ?? null,
         versionId: record.versionId ?? null,
         branchId: record.branchId ?? null,
+        submissionType: record.submissionType ?? null,
+        primaryDguid: record.primaryDguid ?? record.submission?.dguid ?? null,
+        secondaryDguid: record.secondaryDguid ?? record.submission?.neighboring_dguid ?? null,
         releaseId: record.releaseId ?? null,
         resourceVersion: record.resourceVersion ?? 1,
+        geometryDigest: record.geometryDigest ?? null,
+        hasGeometry: Boolean(record.hasGeometry),
+        validationReport: record.validationReport ?? null,
     }));
 }
 

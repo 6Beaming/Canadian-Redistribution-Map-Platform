@@ -4,6 +4,7 @@ import {
   buildArchiveTree,
   filterArchiveTree,
   findArchiveVersion,
+  getArchiveVersionRouteId,
 } from "../src/lib/archiveTree.js";
 
 function record(id, mergedAt, extra = {}) {
@@ -55,4 +56,16 @@ test("archive search matches community name and full submission IDs", () => {
   assert.equal(filterArchiveTree(categories, "Whitehorse")[2].branches.length, 1);
   assert.equal(filterArchiveTree(categories, "identifier-123")[2].branches.length, 1);
   assert.equal(filterArchiveTree(categories, "Dawson")[2].branches.length, 0);
+});
+
+test("Archived Tree routes persistent version identities and can resolve legacy aliases", () => {
+  const categories = buildArchiveTree([{
+    ...record("submission-1", "2026-07-20T10:00:00.000Z"),
+    versionId: "archive-version-1",
+  }]);
+  const version = categories[2].branches[0].versions[0];
+
+  assert.equal(getArchiveVersionRouteId(version), "archive-version-1");
+  assert.equal(findArchiveVersion(categories, "archive-version-1")?.version, version);
+  assert.equal(findArchiveVersion(categories, "submission-1")?.version, version);
 });

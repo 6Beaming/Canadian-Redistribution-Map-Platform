@@ -196,7 +196,7 @@ export default function WorkspaceReview() {
   return (
     <main className="workspace-review-page map-page">
       <div className="map-workspace map-workspace--single-column">
-        <div className="map-dashboard workspace-review-dashboard">
+        <div className="map-dashboard map-dashboard--user workspace-review-dashboard">
           <section className="map-dashboard__main workspace-review-map" aria-label="Read-only submission map">
             <div className="map-dashboard__map-wrap">
               <div className="sr-only" aria-live="polite">{status}</div>

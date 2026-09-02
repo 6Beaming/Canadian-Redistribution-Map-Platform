@@ -1,4 +1,6 @@
 import { archiveError } from "./archiveErrors.js";
+import { calculateCounterProposalImpact } from "../../../src/lib/map/counterProposalImpact.js";
+import { loadProfileIndex } from "../map/mapAssetAuthority.js";
 
 function normalizeSubmissionType(value) {
   const type = String(value ?? "comment").trim().toLowerCase().replaceAll("-", "_");
@@ -14,7 +16,7 @@ function mapLegacyTypeToSubmission(type) {
   return "counter-proposal";
 }
 
-function projectionToSubmission(projection, branch) {
+function projectionToSubmission(projection, branch, emailsById = new Map()) {
   const submission = {
     ...(projection ?? {}),
     type: mapLegacyTypeToSubmission(branch?.submission_type ?? projection?.type),
@@ -22,6 +24,14 @@ function projectionToSubmission(projection, branch) {
     neighboring_dguid: branch?.secondary_dguid ?? projection?.neighboring_dguid ?? projection?.secondaryDguid ?? null,
     status: "archived",
   };
+  const authorEmail = emailsById.get(submission.user_id)
+    ?? submission.authorEmail
+    ?? submission.profile?.email
+    ?? null;
+  if (authorEmail) {
+    submission.authorEmail = authorEmail;
+    submission.profile = { ...(submission.profile ?? {}), email: authorEmail };
+  }
   return submission;
 }
 
@@ -42,16 +52,26 @@ export function mapVersionRecord(branch, version, emailsById = new Map()) {
     isLatest: branch.head_version_id === version.id,
     geometryDigest: version.geometry_digest ?? null,
     hasGeometry: Boolean(version.display_geometry || version.result_geometry),
-    submission: projectionToSubmission(version.submission_projection, branch),
+    submission: projectionToSubmission(version.submission_projection, branch, emailsById),
     mergedBy: emailsById.get(mergedBy) ?? mergedBy ?? "Unknown commissioner",
     mergedAt: version.merged_at,
     closingComment: version.closing_comment ?? null,
+    validationReport: version.validation_report ?? null,
     revertedAt: null,
     revertedBy: null,
   };
 }
 
-export function mapLegacyArchiveRecord(record, emailsById = new Map()) {
+export function mapLegacyArchiveRecord(
+  record,
+  emailsById = new Map(),
+  validationReportsBySubmissionId = new Map(),
+) {
+  const submission = projectionToSubmission(record.submission_snapshot, {
+    submission_type: normalizeSubmissionType(record.submission_snapshot?.type),
+    primary_dguid: record.submission_snapshot?.dguid ?? null,
+    secondary_dguid: record.submission_snapshot?.neighboring_dguid ?? null,
+  }, emailsById);
   return {
     branchId: null,
     branchKey: record.branch_key ?? null,
@@ -67,16 +87,89 @@ export function mapLegacyArchiveRecord(record, emailsById = new Map()) {
     isLatest: Boolean(record.is_latest),
     geometryDigest: null,
     hasGeometry: Boolean(record.submission_snapshot?.geometry),
-    submission: {
-      ...(record.submission_snapshot ?? {}),
-      status: "archived",
-    },
+    submission,
     mergedBy: emailsById.get(record.merged_by) ?? record.merged_by_email ?? record.merged_by ?? "Unknown commissioner",
     mergedAt: record.merged_at,
     closingComment: record.closing_comment ?? null,
+    validationReport:
+      validationReportsBySubmissionId.get(String(submission.id))
+      ?? submission.validation_report
+      ?? null,
     revertedAt: record.reverted_at ?? null,
     revertedBy: emailsById.get(record.reverted_by) ?? record.reverted_by_email ?? record.reverted_by ?? null,
   };
+}
+
+async function loadCounterProposalValidationReports(supabase, submissionIds) {
+  const uniqueIds = [...new Set((submissionIds ?? []).filter(Boolean).map(String))];
+  if (!uniqueIds.length) return new Map();
+  const { data, error } = await supabase
+    .from("counter_proposal_revisions")
+    .select("submission_id,revision_number,validation_report")
+    .in("submission_id", uniqueIds)
+    .order("revision_number", { ascending: false });
+  if (error) {
+    throw archiveError(error.message || "Unable to load archived Counter-Proposal impact.", {
+      code: "ARCHIVE_IMPACT_READ_FAILED",
+    });
+  }
+  const reports = new Map();
+  for (const revision of data ?? []) {
+    const submissionId = String(revision.submission_id ?? "");
+    if (submissionId && !reports.has(submissionId)) {
+      reports.set(submissionId, revision.validation_report ?? null);
+    }
+  }
+  return reports;
+}
+
+async function loadCounterProposalImpactReports(supabase, submissionIds) {
+  const uniqueIds = [...new Set((submissionIds ?? []).filter(Boolean).map(String))];
+  if (!uniqueIds.length) return new Map();
+  const { data, error } = await supabase
+    .from("counter_proposal_revisions")
+    .select("submission_id,revision_number,primary_dguid,secondary_dguid,original_geometry,proposed_geometry,validation_report")
+    .in("submission_id", uniqueIds)
+    .order("revision_number", { ascending: false });
+  if (error) {
+    throw archiveError(error.message || "Unable to load archived Counter-Proposal impact.", {
+      code: "ARCHIVE_IMPACT_READ_FAILED",
+    });
+  }
+
+  const latestBySubmission = new Map();
+  for (const revision of data ?? []) {
+    const submissionId = String(revision.submission_id ?? "");
+    if (submissionId && !latestBySubmission.has(submissionId)) {
+      latestBySubmission.set(submissionId, revision);
+    }
+  }
+
+  const requiresCalculation = [...latestBySubmission.values()].some(
+    (revision) => !revision.validation_report?.impact_summary
+      && revision.original_geometry
+      && revision.proposed_geometry,
+  );
+  const profilesByDguid = requiresCalculation ? (await loadProfileIndex()).index : new Map();
+  return new Map([...latestBySubmission].map(([submissionId, revision]) => {
+    const existingReport = revision.validation_report ?? {};
+    if (existingReport.impact_summary || !revision.original_geometry || !revision.proposed_geometry) {
+      return [submissionId, existingReport];
+    }
+    const firstDguid = String(revision.primary_dguid ?? "");
+    const secondDguid = String(revision.secondary_dguid ?? "");
+    const impactSummary = calculateCounterProposalImpact({
+      originalFeatures: revision.original_geometry,
+      proposedFeatures: revision.proposed_geometry,
+      firstDguid,
+      secondDguid,
+      populationByDguid: new Map([
+        [firstDguid, profilesByDguid.get(firstDguid)?.population ?? null],
+        [secondDguid, profilesByDguid.get(secondDguid)?.population ?? null],
+      ]),
+    });
+    return [submissionId, { ...existingReport, impact_summary: impactSummary }];
+  }));
 }
 
 async function loadProfileEmails(supabase, ids) {
@@ -107,9 +200,23 @@ async function listLegacyArchiveRecords(supabase) {
   }
   const emailsById = await loadProfileEmails(
     supabase,
-    (data ?? []).flatMap((record) => [record.merged_by, record.reverted_by]),
+    (data ?? []).flatMap((record) => [
+      record.merged_by,
+      record.reverted_by,
+      record.submission_snapshot?.user_id,
+    ]),
   );
-  return (data ?? []).map((record) => mapLegacyArchiveRecord(record, emailsById));
+  const validationReports = await loadCounterProposalValidationReports(
+    supabase,
+    (data ?? [])
+      .filter((record) => normalizeSubmissionType(record.submission_snapshot?.type) === "counter_proposal")
+      .map((record) => record.submission_snapshot?.id),
+  );
+  return (data ?? []).map((record) => mapLegacyArchiveRecord(
+    record,
+    emailsById,
+    validationReports,
+  ));
 }
 
 async function listV2ArchiveRecords(supabase) {
@@ -127,7 +234,7 @@ async function listV2ArchiveRecords(supabase) {
   const branchIds = branches.map((branch) => branch.id);
   const { data: versions, error: versionError } = await supabase
     .from("archive_versions")
-    .select("id, branch_id, version_number, merge_sequence, version_kind, submission_projection, geometry_digest, display_geometry, result_geometry, closing_comment, merged_by, merged_at")
+    .select("id, branch_id, version_number, merge_sequence, version_kind, submission_projection, geometry_digest, display_geometry, result_geometry, validation_report, closing_comment, merged_by, merged_at")
     .in("branch_id", branchIds)
     .order("version_number", { ascending: false });
   if (versionError) {
@@ -138,7 +245,10 @@ async function listV2ArchiveRecords(supabase) {
 
   const emailsById = await loadProfileEmails(
     supabase,
-    (versions ?? []).map((version) => version.merged_by),
+    (versions ?? []).flatMap((version) => [
+      version.merged_by,
+      version.submission_projection?.user_id,
+    ]),
   );
   const branchesById = new Map(branches.map((branch) => [branch.id, branch]));
   return (versions ?? []).map((version) => mapVersionRecord(
@@ -177,7 +287,7 @@ export async function getArchiveBranch(supabase, branchId) {
 
   const { data: versions, error: versionError } = await supabase
     .from("archive_versions")
-    .select("id, branch_id, version_number, merge_sequence, version_kind, submission_projection, geometry_digest, display_geometry, result_geometry, closing_comment, merged_by, merged_at")
+    .select("id, branch_id, version_number, merge_sequence, version_kind, submission_projection, geometry_digest, display_geometry, result_geometry, validation_report, closing_comment, merged_by, merged_at")
     .eq("branch_id", branchId)
     .order("version_number", { ascending: false });
   if (versionError) {
@@ -188,7 +298,10 @@ export async function getArchiveBranch(supabase, branchId) {
 
   const emailsById = await loadProfileEmails(
     supabase,
-    (versions ?? []).map((version) => version.merged_by),
+    (versions ?? []).flatMap((version) => [
+      version.merged_by,
+      version.submission_projection?.user_id,
+    ]),
   );
   return {
     branch,
@@ -199,7 +312,7 @@ export async function getArchiveBranch(supabase, branchId) {
 export async function getArchiveVersion(supabase, versionId, { includeGeometry = false } = {}) {
   const columns = includeGeometry
     ? "id, branch_id, version_number, merge_sequence, version_kind, submission_projection, geometry_digest, display_geometry, result_geometry, branch_vertex_snapshot, validation_report, closing_comment, merged_by, merged_at"
-    : "id, branch_id, version_number, merge_sequence, version_kind, submission_projection, geometry_digest, closing_comment, merged_by, merged_at";
+    : "id, branch_id, version_number, merge_sequence, version_kind, submission_projection, geometry_digest, validation_report, closing_comment, merged_by, merged_at";
   const { data: version, error } = await supabase
     .from("archive_versions")
     .select(columns)
@@ -211,10 +324,44 @@ export async function getArchiveVersion(supabase, versionId, { includeGeometry =
     });
   }
   if (!version) {
-    throw archiveError("Archive version was not found.", {
-      statusCode: 404,
-      code: "ARCHIVE_VERSION_NOT_FOUND",
-    });
+    const { data: legacyVersion, error: legacyError } = await supabase
+      .from("archive_tree")
+      .select("*")
+      .eq("id", versionId)
+      .maybeSingle();
+    if (legacyError) {
+      throw archiveError(legacyError.message || "Unable to load the legacy archive version.", {
+        code: "ARCHIVE_VERSION_READ_FAILED",
+      });
+    }
+    if (!legacyVersion) {
+      throw archiveError("Archive version was not found.", {
+        statusCode: 404,
+        code: "ARCHIVE_VERSION_NOT_FOUND",
+      });
+    }
+    const submissionId = legacyVersion.submission_snapshot?.id;
+    const [emailsById, validationReports] = await Promise.all([
+      loadProfileEmails(supabase, [
+        legacyVersion.merged_by,
+        legacyVersion.reverted_by,
+        legacyVersion.submission_snapshot?.user_id,
+      ].filter(Boolean)),
+      loadCounterProposalValidationReports(
+        supabase,
+        normalizeSubmissionType(legacyVersion.submission_snapshot?.type) === "counter_proposal"
+          ? [submissionId]
+          : [],
+      ),
+    ]);
+    const mapped = mapLegacyArchiveRecord(legacyVersion, emailsById, validationReports);
+    return {
+      ...mapped,
+      displayGeometry: includeGeometry ? legacyVersion.submission_snapshot?.geometry ?? null : undefined,
+      resultGeometry: includeGeometry ? legacyVersion.submission_snapshot?.geometry ?? null : undefined,
+      branchVertexSnapshot: includeGeometry ? null : undefined,
+      validationReport: mapped.validationReport,
+    };
   }
 
   const { data: branch, error: branchError } = await supabase
@@ -229,13 +376,16 @@ export async function getArchiveVersion(supabase, versionId, { includeGeometry =
     });
   }
 
-  const emailsById = await loadProfileEmails(supabase, [version.merged_by]);
+  const emailsById = await loadProfileEmails(supabase, [
+    version.merged_by,
+    version.submission_projection?.user_id,
+  ]);
   return {
     ...mapVersionRecord(branch, version, emailsById),
     displayGeometry: includeGeometry ? version.display_geometry ?? null : undefined,
     resultGeometry: includeGeometry ? version.result_geometry ?? null : undefined,
     branchVertexSnapshot: includeGeometry ? version.branch_vertex_snapshot ?? null : undefined,
-    validationReport: includeGeometry ? version.validation_report ?? null : undefined,
+    validationReport: version.validation_report ?? null,
   };
 }
 
@@ -255,6 +405,12 @@ export async function listArchiveProjectionsForDguid(supabase, dguid) {
     const secondary = String(record.secondaryDguid ?? record.submission?.neighboring_dguid ?? "");
     return primary === normalized || secondary === normalized;
   });
+  const counterProposalImpactReports = await loadCounterProposalImpactReports(
+    supabase,
+    relevant
+      .filter((record) => record.submissionType === "counter_proposal")
+      .map((record) => record.submission?.id),
+  );
 
   const comments = relevant
     .filter((record) => record.submissionType === "comment")
@@ -324,7 +480,10 @@ export async function listArchiveProjectionsForDguid(supabase, dguid) {
         geometryDigest: record.geometryDigest,
         hasGeometry: record.hasGeometry,
         submission: record.submission,
-        validationReport: record.submission?.validation_report ?? null,
+        validationReport: counterProposalImpactReports.get(String(record.submission?.id))
+          ?? record.validationReport
+          ?? record.submission?.validation_report
+          ?? null,
       });
       counterProposalsByNeighbor.set(key, bucket);
     });

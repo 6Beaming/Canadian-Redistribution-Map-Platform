@@ -8,6 +8,7 @@ import {
   X,
 } from "lucide-react";
 import { archiveSubmissionIcon } from "@/lib/archiveTree.js";
+import { MapInfoPanelShell } from "@/components/non_prebuilt/MapInfoPanelShell.jsx";
 
 function formatDate(value) {
   const date = new Date(value);
@@ -45,9 +46,9 @@ function ConfirmationModal({ onCancel, onConfirm }) {
           <AlertTriangle aria-hidden="true" />
         </span>
         <h2 id="archive-modal-title">Delete this branch forever?</h2>
-        <p>All archive-only versions in this branch will be cleared. Its source submissions will return to Pending and retain their original submission geometry operations.</p>
+        <span style={{ textAlign: "left" }}><p> <br />All archive-only versions in this branch will be cleared. Its source submissions will return to Pending and retain their original submission geometry operations.</p><br /></span>
         <label>
-          <span style={{ textAlign: "center", display: "block" }}>Type <strong>'I confirm'</strong> to continue</span>
+          <span style={{ textAlign: "left", display: "block" }}>Type <strong>I confirm</strong> to continue</span>
           <input
             autoFocus
             value={confirmation}
@@ -75,11 +76,13 @@ export function ArchivedTreePanel({ selection, onClose, onDeleteBranch, onOpenMa
 
   if (!selection) {
     return (
-      <aside className="archive-node-panel archive-node-panel--empty">
-        <CheckCircle2 aria-hidden="true" />
-        <h2>Select an archived branch</h2>
-        <p>Choose a DA branch or version in the canvas to inspect its immutable snapshot.</p>
-      </aside>
+      <MapInfoPanelShell className="archive-node-panel" ariaLabel="Archived Tree selection">
+        <div className="archive-node-panel__scroll archive-node-panel--empty">
+          <CheckCircle2 aria-hidden="true" />
+          <h2>Select an archived branch</h2>
+          <p>Choose a DA branch or version in the canvas to inspect its immutable snapshot.</p>
+        </div>
+      </MapInfoPanelShell>
     );
   }
 
@@ -88,7 +91,8 @@ export function ArchivedTreePanel({ selection, onClose, onDeleteBranch, onOpenMa
   const isLatest = version.id === branch.latestVersion?.id;
 
   return (
-    <aside className="archive-node-panel">
+    <MapInfoPanelShell className="archive-node-panel" ariaLabel="Selected Archived Tree node">
+      <div className="archive-node-panel__scroll">
       <header className="archive-node-panel__heading">
         <strong>Selected Node</strong>
         <button type="button" aria-label="Close selected node" onClick={onClose}><X aria-hidden="true" /></button>
@@ -153,6 +157,7 @@ export function ArchivedTreePanel({ selection, onClose, onDeleteBranch, onOpenMa
           }}
         />
       ) : null}
-    </aside>
+      </div>
+    </MapInfoPanelShell>
   );
 }

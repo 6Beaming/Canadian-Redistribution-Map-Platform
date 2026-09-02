@@ -32,12 +32,22 @@ function buildSubmissionCountExpression(countsByDguid = {}) {
   return expression;
 }
 
-export function buildSubmissionHeatmapFillExpression(countsByDguid = {}, totalSubmissions = 1) {
+export function buildSubmissionHeatmapFillExpression(countsByDguid = {}) {
+  const positiveCounts = Object.values(countsByDguid)
+    .map((value) => Number(value) || 0)
+    .filter((value) => value > 0);
 
-  const maxIntensity = Math.max(
-    totalSubmissions * 0.35,
-    1
-  );
+  if (!positiveCounts.length) {
+    return [
+      "rgba",
+      0,
+      0,
+      0,
+      0,
+    ];
+  }
+
+  const maxIntensity = Math.max(Math.max(...positiveCounts), 2);
 
   return [
     "interpolate",

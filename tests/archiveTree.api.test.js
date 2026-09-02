@@ -116,6 +116,80 @@ test("archive-tree route requires commissioner access", async () => {
   assert.equal(response.status, 403);
 });
 
+test("legacy Counter-Proposal archive version geometry remains addressable by archive version ID", async () => {
+  const geometry = { type: "FeatureCollection", features: [] };
+  authenticate(commissioner, {
+    from(table) {
+      if (table === "archive_versions") {
+        return {
+          select() { return this; },
+          eq() { return this; },
+          maybeSingle() { return Promise.resolve({ data: null, error: null }); },
+        };
+      }
+      if (table === "archive_tree") {
+        return {
+          select() { return this; },
+          eq() { return this; },
+          maybeSingle() {
+            return Promise.resolve({
+              data: {
+                id: "legacy-cp-version",
+                branch_key: "counter_proposal:da-1|da-2",
+                version_number: 1,
+                is_latest: true,
+                submission_snapshot: {
+                  id: "submission-cp",
+                  type: "counter_proposal",
+                  dguid: "da-1",
+                  neighboring_dguid: "da-2",
+                  title: "Archived CP",
+                  comment: "Move the shared boundary",
+                  user_id: "public-1",
+                  geometry,
+                },
+                merged_by: "commissioner-1",
+                merged_at: "2026-01-01T00:00:00.000Z",
+              },
+              error: null,
+            });
+          },
+        };
+      }
+      if (table === "profiles") {
+        return {
+          select() { return this; },
+          in() {
+            return Promise.resolve({
+              data: [
+                { id: "commissioner-1", email: "commissioner@example.com" },
+                { id: "public-1", email: "public@example.com" },
+              ],
+              error: null,
+            });
+          },
+        };
+      }
+      if (table === "counter_proposal_revisions") {
+        return {
+          select() { return this; },
+          in() { return this; },
+          order() {
+            return Promise.resolve({ data: [{ submission_id: "submission-cp", revision_number: 1, validation_report: {} }], error: null });
+          },
+        };
+      }
+      throw new Error(`Unexpected table ${table}`);
+    },
+  });
+
+  const response = await request("/api/workspace/archive-tree/versions/legacy-cp-version/geometry?representation=display");
+  assert.equal(response.status, 200);
+  assert.equal(response.body.versionId, "legacy-cp-version");
+  assert.equal(response.body.displayGeometry.type, "FeatureCollection");
+  assert.equal(response.body.displayGeometry.features.length, 0);
+});
+
 test("archive-map projections groups comments and pair branches for a DGUID", async () => {
   authenticate(commissioner, {
     from(table) {

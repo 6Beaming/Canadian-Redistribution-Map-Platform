@@ -96,6 +96,9 @@ export function buildArchiveTree(records, profilesByDguid = new Map(), latestOve
       resourceVersion: record.resourceVersion ?? 1,
       record,
       submission,
+      closingComment: record.closingComment ?? null,
+      validationReport: record.validationReport ?? null,
+      isLatest: Boolean(record.isLatest),
       mergedAt: record.mergedAt ?? submission.updated_at ?? submission.created_at,
       mergedBy: record.mergedBy ?? "Unknown commissioner",
     });
@@ -169,11 +172,19 @@ export function findArchiveVersion(categories, submissionId) {
   const target = String(submissionId ?? "");
   for (const category of categories ?? []) {
     for (const branch of category.branches ?? []) {
-      const version = branch.versions.find((entry) => entry.id === target);
+      const version = branch.versions.find((entry) => [
+        entry.id,
+        entry.versionId,
+        entry.sourceSubmissionId,
+      ].some((candidate) => String(candidate ?? "") === target));
       if (version) return { category, branch, version };
     }
   }
   return null;
+}
+
+export function getArchiveVersionRouteId(version) {
+  return String(version?.versionId ?? version?.id ?? version?.sourceSubmissionId ?? "");
 }
 
 export function archiveSubmissionIcon(type) {

@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart3,
+  ChevronDown,
   Flag,
   GitCompareArrows,
   MessageSquareText,
 } from "lucide-react";
+import { ArchivedSubmissionCard } from "@/components/non_prebuilt/ArchivedSubmissionCard.jsx";
 import { MapInfoPanelShell } from "@/components/non_prebuilt/MapInfoPanelShell.jsx";
 import { getDaPanelTitle, getDaPopulationDisplay } from "@/lib/map/profileUtils.js";
 import { MISSING_DA_POPULATION, MVP_FED_NUM } from "@/lib/map/constants.js";
 import { getArchivedMapProjections } from "@/services/workspaceApi.js";
+import "@/styles/archive-tree.css";
 
 export const ARCHIVED_MAP_PANEL_VIEWS = [
   { id: "all", label: "All Archived Submissions" },
@@ -34,31 +37,58 @@ function formatPopulation(value) {
 
 function ArchivedModeSelector({ activeView, onViewChange }) {
   const [isOpen, setIsOpen] = useState(false);
+  const selectorRef = useRef(null);
   const activeOption = ARCHIVED_MAP_PANEL_VIEWS.find((view) => view.id === activeView)
     ?? ARCHIVED_MAP_PANEL_VIEWS[0];
   const ActiveIcon = PANEL_VIEW_ICONS[activeOption.id];
 
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const closeWhenOutside = (event) => {
+      if (!selectorRef.current?.contains(event.target)) setIsOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setIsOpen(false);
+    };
+    window.addEventListener("pointerdown", closeWhenOutside, true);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", closeWhenOutside, true);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isOpen]);
+
   return (
-    <div className={`map-info-panel__mode-selector${isOpen ? " is-open" : ""}`}>
+    <div className={`map-info-panel__mode-selector archive-map-mode-selector${isOpen ? " is-open" : ""}`}>
+      <div ref={selectorRef} className="map-info-panel__mode-control panel-select relative">
       <button
         type="button"
         className="map-info-panel__mode-trigger panel-select__trigger"
+        aria-haspopup="menu"
         aria-expanded={isOpen}
         onClick={() => setIsOpen((current) => !current)}
       >
         <ActiveIcon aria-hidden="true" className="map-info-panel__mode-icon" />
         <span>{activeOption.label}</span>
+        <ChevronDown
+          className={`map-info-panel__mode-chevron${isOpen ? " map-info-panel__mode-chevron--open" : ""}`}
+          aria-hidden="true"
+        />
       </button>
       {isOpen ? (
-        <div className="map-info-panel__mode-menu" role="menu">
-          {ARCHIVED_MAP_PANEL_VIEWS.map((view) => {
+        <div
+          className="map-info-panel__mode-menu panel-select__menu absolute left-0 top-full z-20 w-full"
+          role="menu"
+          aria-label="Choose archived submission category"
+        >
+          {ARCHIVED_MAP_PANEL_VIEWS.filter((view) => view.id !== activeOption.id).map((view) => {
             const Icon = PANEL_VIEW_ICONS[view.id];
             return (
               <button
                 key={view.id}
                 type="button"
                 role="menuitem"
-                className="map-info-panel__mode-option"
+                className="map-info-panel__mode-option panel-select__option"
                 onClick={() => {
                   onViewChange(view.id);
                   setIsOpen(false);
@@ -71,19 +101,8 @@ function ArchivedModeSelector({ activeView, onViewChange }) {
           })}
         </div>
       ) : null}
+      </div>
     </div>
-  );
-}
-
-function TimelineCard({ title, meta, body }) {
-  return (
-    <article className="map-info-panel__collection-card">
-      <header>
-        <strong>{title}</strong>
-        {meta ? <small>{meta}</small> : null}
-      </header>
-      {body ? <p>{body}</p> : null}
-    </article>
   );
 }
 
@@ -103,34 +122,36 @@ function ProjectionBody({ panelView, projections }) {
   }
 
   return (
-    <div className="map-info-panel__collection-stack">
+    <div className="map-info-panel__collection-stack archive-projection-groups">
       {comments.length ? (
         <section>
           <h3 className="map-info-panel__section-title">Comments</h3>
-          {comments.map((entry) => (
-            <TimelineCard
-              key={entry.versionId ?? `${entry.branchKey}:${entry.versionNumber}`}
-              title={entry.submission?.title || "Archived comment"}
-              meta={`${entry.mergedBy} · v${entry.versionNumber}`}
-              body={entry.submission?.comment || entry.closingComment?.content || "No comment text."}
-            />
-          ))}
+          <div className="archive-projection-group__cards">
+            {comments.map((entry) => (
+              <ArchivedSubmissionCard
+                key={entry.versionId ?? `${entry.branchKey}:${entry.versionNumber}`}
+                entry={entry}
+                categoryLabel="Comment"
+              />
+            ))}
+          </div>
         </section>
       ) : null}
 
       {objections.map((group) => (
         <section key={group.neighborKey}>
           <h3 className="map-info-panel__section-title">
-            Objections · <code>{group.secondaryDguid}</code>
+            Boundary Objections · <code>{group.secondaryDguid}</code>
           </h3>
-          {group.versions.map((entry) => (
-            <TimelineCard
-              key={entry.versionId ?? `${entry.branchKey}:${entry.versionNumber}`}
-              title={entry.submission?.title || "Archived objection"}
-              meta={`${entry.mergedBy} · v${entry.versionNumber}`}
-              body={entry.submission?.comment || entry.closingComment?.content || "No objection text."}
-            />
-          ))}
+          <div className="archive-projection-group__cards">
+            {group.versions.map((entry) => (
+              <ArchivedSubmissionCard
+                key={entry.versionId ?? `${entry.branchKey}:${entry.versionNumber}`}
+                entry={entry}
+                categoryLabel="Boundary Objection"
+              />
+            ))}
+          </div>
         </section>
       ))}
 
@@ -139,14 +160,15 @@ function ProjectionBody({ panelView, projections }) {
           <h3 className="map-info-panel__section-title">
             Counter-Proposals · <code>{group.secondaryDguid}</code>
           </h3>
-          {group.versions.map((entry) => (
-            <TimelineCard
-              key={entry.versionId ?? `${entry.branchKey}:${entry.versionNumber}`}
-              title={entry.submission?.title || "Archived counter-proposal"}
-              meta={`${entry.mergedBy} · v${entry.versionNumber}${entry.isLatest ? " · Latest" : ""}`}
-              body={entry.submission?.comment || entry.closingComment?.content || "No counter-proposal text."}
-            />
-          ))}
+          <div className="archive-projection-group__cards">
+            {group.versions.map((entry) => (
+              <ArchivedSubmissionCard
+                key={entry.versionId ?? `${entry.branchKey}:${entry.versionNumber}`}
+                entry={entry}
+                categoryLabel="Counter-Proposal"
+              />
+            ))}
+          </div>
         </section>
       ))}
     </div>
@@ -195,7 +217,7 @@ export function ArchivedMapInfoPanel({
   }, [hasSelection]);
 
   return (
-    <MapInfoPanelShell isOpen={hasSelection} ariaLabel="Archived map details">
+    <MapInfoPanelShell isOpen ariaLabel="Archived map details">
       <ArchivedModeSelector activeView={panelView} onViewChange={onPanelViewChange} />
       <div className="map-info-panel__content">
         {!hasSelection ? (

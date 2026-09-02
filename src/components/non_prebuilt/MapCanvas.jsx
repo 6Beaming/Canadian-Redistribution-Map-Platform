@@ -77,7 +77,6 @@ import {
   hasGoogleMapTilesApiKey,
 } from "@/services/googleMapTilesApi.js";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { getTotalComments } from "@/services/commentsApi";
 
 const EXPAND_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5"/><path d="M20 9V4h-5"/><path d="M4 15v5h5"/><path d="M20 15v5h-5"/></svg>`;
 
@@ -629,8 +628,6 @@ export function MapCanvas({
   const lastAppliedSearchTargetRef = useRef(null);
   const consumedCameraRequestIdRef = useRef(null);
   const cameraCommandRef = useRef(cameraCommand);
-  const [totalSubmissions, setTotalSubmissions] = useState(0);
-  const totalSubmissionsRef = useRef(0);
 
   onToggleFullscreenRef.current = onToggleFullscreen;
   isFullscreenRef.current = isFullscreen;
@@ -652,7 +649,7 @@ export function MapCanvas({
   heatmapEnabledRef.current = heatmapEnabled;
   archivedMapEnabledRef.current = archivedMapEnabled;
   heatmapFillExpressionRef.current = hasSubmissionHeatmapData(heatmap)
-    ? buildSubmissionHeatmapFillExpression(heatmap.countsByDguid, totalSubmissionsRef.current)
+    ? buildSubmissionHeatmapFillExpression(heatmap.countsByDguid)
     : null;
   interactionModeRef.current = interactionMode;
 
@@ -689,24 +686,6 @@ export function MapCanvas({
     onStatusChangeRef.current?.("Map moved to your postal area.");
     return true;
   }
-
-  useEffect(() => {
-    if (!loadSubmissionCount) return undefined;
-
-    async function fetchTotalSubmissions() {
-      try {
-        const data = await getTotalComments();
-
-        setTotalSubmissions(data.totalSubmissions);
-        totalSubmissionsRef.current = data.totalSubmissions;
-      } catch (error) {
-        console.error("Failed to fetch total submissions:", error);
-      }
-    }
-
-    fetchTotalSubmissions();
-    return undefined;
-  }, [heatmap, loadSubmissionCount, totalSubmissions]);
 
   useEffect(() => {
     const button = fullscreenBtnRef.current;
