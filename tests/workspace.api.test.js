@@ -134,14 +134,7 @@ test("a commissioner can load the archive-reviewer email list", async () => {
   assert.equal(JSON.stringify(response.body), JSON.stringify(["alpha@example.com", "beta@example.com"]));
 });
 
-test("a missing archive table is exposed as an empty archive tree", async () => {
-  const query = {
-    select() { return this; },
-    async order() {
-      return { data: null, error: { code: "PGRST205", message: "Table not found" } };
-    },
-  };
-
+test("an empty v2 archive tree returns an empty archive list", async () => {
   setSupabaseTestDoubles({
     getSupabaseClient: () => ({
       auth: {
@@ -149,7 +142,17 @@ test("a missing archive table is exposed as an empty archive tree", async () => 
       },
     }),
     getSupabaseProfile: async () => commissioner,
-    getSupabaseAdminDataClient: () => ({ from: () => query }),
+    getSupabaseAdminDataClient: () => ({
+      from(table) {
+        if (table === "archive_branches") {
+          return {
+            select() { return this; },
+            order() { return Promise.resolve({ data: [], error: null }); },
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    }),
   });
 
   const response = await request("GET", "/api/workspace/archive", {

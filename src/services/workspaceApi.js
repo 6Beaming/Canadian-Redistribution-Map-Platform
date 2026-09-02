@@ -484,7 +484,7 @@ async function persistArchiveMerge(submission, closingComment) {
         throw new Error("Temporary counter-proposals cannot be merged until their Supabase write protocol is available.");
     }
 
-    // HARD API: archive persistence requires the archive_tree bootstrap table.
+    // Archive merge is durable through the v2 archive request transaction.
     const response = await fetch("/api/workspace/archive", {
         method: "POST",
         credentials: "include",

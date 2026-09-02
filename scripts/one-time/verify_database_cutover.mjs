@@ -32,7 +32,7 @@ const blocking = {
   geometrySubmissionMissingRelease: Number(audit?.geometrySubmissionMissingRelease ?? 0) > 0,
   geometrySubmissionMissingRevision: Number(audit?.geometrySubmissionMissingRevision ?? 0) > 0,
   archiveSourceMissingGeometryRevision: Number(audit?.archiveSourceMissingGeometryRevision ?? 0) > 0,
-  archiveMigration: Number(audit?.legacyArchiveRows ?? 0) !== Number(audit?.archiveV2Versions ?? 0),
+  archiveMigration: Number(audit?.legacyArchiveRows ?? 0) > 0,
   rlsDisabled: (audit?.rlsDisabled ?? []).length > 0,
   browserTableGrants: (audit?.browserTableGrants ?? []).length > 0,
 };

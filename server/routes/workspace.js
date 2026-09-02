@@ -1,12 +1,12 @@
 import { Router } from "express";
 import {
   getSupabaseAdminDataClient,
-  getSupabaseProfileEmailsAsAdmin,
 } from "../lib/supabase.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { resolveCommissionerFedContext } from "../lib/authorization/commissionerAreaContext.js";
 import { queryDashboardAreaSubmissions } from "../lib/submissions/dashboardAreaQuery.js";
 import archiveTreeRouter from "./archiveTree.js";
+import { listArchiveTreeRecords } from "../lib/archive/archiveRepository.js";
 import { mergeApprovedArchiveRequest } from "../lib/archive/archiveMergeService.js";
 import { resolveMergeableArchiveRequest } from "../lib/archiveRequests/service.js";
 
@@ -66,26 +66,16 @@ router.get("/reviewers", async (_req, res) => {
 // Durable Archived Tree read. Profiles are resolved server-side so browser
 // clients never need a service-role query to display commissioner emails.
 router.get("/archive", async (_req, res) => {
-  const supabase = getSupabaseAdminDataClient();
-  const { data, error } = await supabase
-    .from("archive_tree")
-    .select("*")
-    .order("merged_at", { ascending: false });
-
-  if (error) {
-    if (error.code === "PGRST205") return res.json([]);
-    return res.status(500).json({ error: error.message });
+  try {
+    const supabase = getSupabaseAdminDataClient();
+    const { records } = await listArchiveTreeRecords(supabase);
+    return res.json(records);
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.message || "Unable to load archive records.",
+      ...(error.code ? { code: error.code } : {}),
+    });
   }
-
-  const profiles = await getSupabaseProfileEmailsAsAdmin(
-    (data ?? []).flatMap((record) => [record.merged_by, record.reverted_by]).filter(Boolean),
-  );
-  const emailsById = new Map(profiles.map((profile) => [profile.id, profile.email]));
-  return res.json((data ?? []).map((record) => ({
-    ...record,
-    merged_by_email: emailsById.get(record.merged_by) ?? null,
-    reverted_by_email: emailsById.get(record.reverted_by) ?? null,
-  })));
 });
 
 // Atomic Supabase merge: snapshot, version ordering, Latest state, Workspace

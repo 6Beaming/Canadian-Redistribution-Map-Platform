@@ -44,36 +44,56 @@ function authenticate(profile = commissioner, admin = null) {
   });
 }
 
-function legacyArchiveAdmin() {
-  return {
+test("archive-tree route returns v2 archive records", async () => {
+  authenticate(commissioner, {
     from(table) {
       if (table === "archive_branches") {
-        return {
-          select() { return this; },
-          order() { return Promise.resolve({ data: [], error: null }); },
-        };
-      }
-      if (table === "archive_tree") {
         return {
           select() { return this; },
           order() {
             return Promise.resolve({
               data: [{
-                id: "legacy-1",
-                branch_key: "feedback:2021S051260010118",
+                id: "branch-1",
+                branch_key: "comment:statscan-da-2021-r1:2021S051260010118",
+                submission_type: "comment",
+                release_id: "statscan-da-2021-r1",
+                primary_dguid: "2021S051260010118",
+                secondary_dguid: null,
+                head_version_id: "version-1",
+                head_version_number: 1,
+                resource_version: 1,
+                scope_pruids: ["60"],
+                created_at: "2026-01-01T00:00:00.000Z",
+                updated_at: "2026-01-01T00:00:00.000Z",
+              }],
+              error: null,
+            });
+          },
+        };
+      }
+      if (table === "archive_versions") {
+        return {
+          select() { return this; },
+          in() { return this; },
+          order() {
+            return Promise.resolve({
+              data: [{
+                id: "version-1",
+                branch_id: "branch-1",
                 version_number: 1,
-                is_latest: true,
-                submission_snapshot: {
+                merge_sequence: 1,
+                version_kind: "merge",
+                submission_projection: {
                   id: "submission-1",
                   type: "feedback",
+                  title: "Archived comment",
+                  comment: "Comment body",
                   dguid: "2021S051260010118",
-                  title: "Legacy comment",
                 },
+                geometry_digest: null,
+                closing_comment: null,
                 merged_by: "commissioner-1",
                 merged_at: "2026-01-01T00:00:00.000Z",
-                closing_comment: null,
-                reverted_at: null,
-                reverted_by: null,
               }],
               error: null,
             });
@@ -93,17 +113,12 @@ function legacyArchiveAdmin() {
       }
       throw new Error(`Unexpected table ${table}`);
     },
-  };
-}
-
-test("archive-tree route falls back to legacy archive_tree records", async () => {
-  authenticate(commissioner, legacyArchiveAdmin());
+  });
   const response = await request("/api/workspace/archive-tree");
   assert.equal(response.status, 200);
-  assert.equal(response.body.source, "legacy");
+  assert.equal(response.body.source, "v2");
   assert.equal(response.body.records.length, 1);
-  assert.equal(response.body.records[0].submission.title, "Legacy comment");
-  assert.equal(response.body.records[0].branchKey, "feedback:2021S051260010118");
+  assert.equal(response.body.records[0].submission.title, "Archived comment");
 });
 
 test("archive-tree route requires commissioner access", async () => {
@@ -120,8 +135,7 @@ test("archive-tree route requires commissioner access", async () => {
   assert.equal(response.status, 403);
 });
 
-test("legacy Counter-Proposal archive version geometry remains addressable by archive version ID", async () => {
-  const geometry = { type: "FeatureCollection", features: [] };
+test("legacy archive version geometry is no longer addressable by legacy archive_tree IDs", async () => {
   authenticate(commissioner, {
     from(table) {
       if (table === "archive_versions") {
@@ -131,67 +145,12 @@ test("legacy Counter-Proposal archive version geometry remains addressable by ar
           maybeSingle() { return Promise.resolve({ data: null, error: null }); },
         };
       }
-      if (table === "archive_tree") {
-        return {
-          select() { return this; },
-          eq() { return this; },
-          maybeSingle() {
-            return Promise.resolve({
-              data: {
-                id: "legacy-cp-version",
-                branch_key: "counter_proposal:da-1|da-2",
-                version_number: 1,
-                is_latest: true,
-                submission_snapshot: {
-                  id: "submission-cp",
-                  type: "counter_proposal",
-                  dguid: "da-1",
-                  neighboring_dguid: "da-2",
-                  title: "Archived CP",
-                  comment: "Move the shared boundary",
-                  user_id: "public-1",
-                  geometry,
-                },
-                merged_by: "commissioner-1",
-                merged_at: "2026-01-01T00:00:00.000Z",
-              },
-              error: null,
-            });
-          },
-        };
-      }
-      if (table === "profiles") {
-        return {
-          select() { return this; },
-          in() {
-            return Promise.resolve({
-              data: [
-                { id: "commissioner-1", email: "commissioner@example.com" },
-                { id: "public-1", email: "public@example.com" },
-              ],
-              error: null,
-            });
-          },
-        };
-      }
-      if (table === "counter_proposal_revisions") {
-        return {
-          select() { return this; },
-          in() { return this; },
-          order() {
-            return Promise.resolve({ data: [{ submission_id: "submission-cp", revision_number: 1, validation_report: {} }], error: null });
-          },
-        };
-      }
       throw new Error(`Unexpected table ${table}`);
     },
   });
 
   const response = await request("/api/workspace/archive-tree/versions/legacy-cp-version/geometry?representation=display");
-  assert.equal(response.status, 200);
-  assert.equal(response.body.versionId, "legacy-cp-version");
-  assert.equal(response.body.displayGeometry.type, "FeatureCollection");
-  assert.equal(response.body.displayGeometry.features.length, 0);
+  assert.equal(response.status, 404);
 });
 
 test("archive-map projections groups comments and pair branches for a DGUID", async () => {

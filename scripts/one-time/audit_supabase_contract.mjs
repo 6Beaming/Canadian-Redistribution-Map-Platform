@@ -100,7 +100,7 @@ const blockingCutover = {
   missingSubmissionRelease: Number(cutover?.geometrySubmissionMissingRelease ?? 0) > 0,
   missingSubmissionRevision: Number(cutover?.geometrySubmissionMissingRevision ?? 0) > 0,
   missingArchiveGeometryRevision: Number(cutover?.archiveSourceMissingGeometryRevision ?? 0) > 0,
-  archiveCountMismatch: Number(cutover?.legacyArchiveRows ?? 0) !== Number(cutover?.archiveV2Versions ?? 0),
+  archiveCountMismatch: Number(cutover?.legacyArchiveRows ?? 0) > 0,
   missingKeepTables: missingKeepTables.length > 0,
   liveLegacyConsumers: legacy.some(({ disposition }) => disposition === "migrate"),
 };
