@@ -1,5 +1,6 @@
 import { mapApi } from "@/services/mapApi.js";
 import { getSubmissionMaterializedGeometry } from "@/services/submissionsApi.js";
+import { loadSubmissionMapPresentation } from "@/services/submissionMapPresentation.js";
 import {
   buildDaObjectionIndex,
   getPairOuterBoundaryFeatureCollection,
@@ -48,16 +49,23 @@ export async function hydrateSubmissionMapView(payload) {
     return { ...submission, geometry: null, geometryError: "Submission release metadata is unavailable." };
   }
 
-  if (type === "feedback" || type === "comment") {
-    const display = await mapApi.getReleaseDa(releaseId, primaryDguid);
-    const index = buildDaObjectionIndex({ type: "FeatureCollection", features: [display.feature] });
+  if (type === "feedback" || type === "comment" || type === "objection") {
+    const presentation = await loadSubmissionMapPresentation({
+      submission: { ...submission, type },
+      releaseId,
+      primaryDguid,
+      secondaryDguid,
+    });
+    if (!presentation?.objectionPreview) {
+      return {
+        ...submission,
+        geometry: null,
+        geometryError: "Submission map geometry could not be loaded from the release.",
+      };
+    }
     return {
       ...submission,
-      geometry: {
-        featureCollection: { type: "FeatureCollection", features: [display.feature] },
-        boundaryGeoJson: { type: "FeatureCollection", features: [] },
-        outerBoundaryGeoJson: getPairOuterBoundaryFeatureCollection(index, [primaryDguid]),
-      },
+      geometry: presentation.objectionPreview,
     };
   }
 
@@ -65,16 +73,6 @@ export async function hydrateSubmissionMapView(payload) {
     representation: "display",
   });
   const baseIndex = buildDaObjectionIndex(basePair.features);
-  if (type === "objection") {
-    return {
-      ...submission,
-      geometry: {
-        featureCollection: basePair.features,
-        boundaryGeoJson: basePair.sharedBoundary,
-        outerBoundaryGeoJson: getPairOuterBoundaryFeatureCollection(baseIndex, [primaryDguid, secondaryDguid]),
-      },
-    };
-  }
 
   const detail = await getSubmissionMaterializedGeometry(payload.submission.id);
   const proposed = detail.geometry;

@@ -17,24 +17,16 @@ function isWorkspaceOrArchivePath(pathname) {
     || pathname.startsWith("/dashboard/archivedTree");
 }
 
-function isWorkspaceOrArchiveMapPath(pathname) {
-  return /^\/dashboard\/workspace\/[^/]+$/.test(pathname)
-    || /^\/dashboard\/archivedTree\/[^/]+\/difference$/.test(pathname);
-}
-
 function isSubmissionListPath(pathname) {
   return pathname === "/submissions"
     || pathname === "/dashboard/submissionsTable";
 }
 
 function getRouteLoadingDuration(fromPathname, toPathname) {
-  // Workspace and Archived Tree use this handoff both before returning to the
-  // Commissioner map and when a tree/list item opens its MapCanvas review or
-  // archived-difference child page, regardless of request readiness.
-  if (
-    isWorkspaceOrArchivePath(fromPathname)
-    && (toPathname === "/dashboard" || isWorkspaceOrArchiveMapPath(toPathname))
-  ) {
+  // Returning from Workspace / Archive to the Commissioner map still uses a short
+  // handoff overlay. Map subviews (workspace review, archived difference) rely on
+  // page-level RouteLoadingPage / map-area spinners instead.
+  if (isWorkspaceOrArchivePath(fromPathname) && toPathname === "/dashboard") {
     return ROUTE_LOADING_DURATION_MS.MAP_HANDOFF;
   }
 

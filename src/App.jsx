@@ -25,6 +25,8 @@ import UserHome from "./pages/UserHome.jsx";
 import UserProfile from "./pages/UserProfile.jsx";
 import UserResumeSubmission from "./pages/UserResumeSubmission.jsx";
 import RealtimeHarness from "./pages/RealtimeHarness.jsx";
+import WorkspaceMapLayout from "./layouts/WorkspaceMapLayout.jsx";
+import ArchivedMapLayout from "./layouts/ArchivedMapLayout.jsx";
 import { RouteLoadingOverlay } from "./components/non_prebuilt/RouteLoadingOverlay.jsx";
 import { RouteLoadingProvider } from "./contexts/RouteLoadingContext.jsx";
 import { RouteLoadingPage } from "./components/non_prebuilt/RouteLoadingPage.jsx";
@@ -125,10 +127,14 @@ function AppRoutes() {
               element={<DashBoardSubmissionsPage />}
             />
             <Route path="/dashboard/profile" element={<CommissionerProfile />} />
-            <Route path="/dashboard/workspace" element={<CommissionerWorkspace />} />
-            <Route path="/dashboard/workspace/:submissionId" element={<WorkspaceReview />} />
-            <Route path="/dashboard/archivedTree" element={<ArchivedTree />} />
-            <Route path="/dashboard/archivedTree/:submissionId/difference" element={<ArchivedDifference />} />
+            <Route path="/dashboard/workspace" element={<WorkspaceMapLayout />}>
+              <Route index element={<CommissionerWorkspace />} />
+              <Route path=":submissionId" element={<WorkspaceReview />} />
+            </Route>
+            <Route path="/dashboard/archivedTree" element={<ArchivedMapLayout />}>
+              <Route index element={<ArchivedTree />} />
+              <Route path=":submissionId/difference" element={<ArchivedDifference />} />
+            </Route>
             <Route
               path="/dashboard/realtime-harness"
               element={import.meta.env.DEV ? <RealtimeHarness /> : <Navigate to="/dashboard" replace />}

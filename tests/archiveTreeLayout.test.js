@@ -90,17 +90,22 @@ test("Archived Tree and archived map panels use responsive widths and floating m
 
 test("Archived Counter-Proposal maps retain comparison styling and fullscreen controls", () => {
   const css = fs.readFileSync("src/styles/archive-tree.css", "utf8");
+  const archivedLayoutCss = fs.readFileSync("src/styles/archived-map-layout.css", "utf8");
   const difference = fs.readFileSync("src/pages/ArchivedDifference.jsx", "utf8");
+  const layout = fs.readFileSync("src/layouts/ArchivedMapLayout.jsx", "utf8");
 
-  assert.match(difference, /hydrateWorkspaceSubmission\(submission\)/);
+  assert.match(difference, /useArchivedMapLayout/);
+  assert.match(difference, /setMapFetching/);
+  assert.doesNotMatch(difference, /PanelLoadingOverlay/);
+  assert.doesNotMatch(difference, /RouteLoadingPage/);
+  assert.match(difference, /buildArchivedDifferencePresentation/);
   assert.doesNotMatch(difference, /hydrateWorkspaceSubmission\([^)]*new Map\(\)/);
-  assert.match(difference, /buildDaObjectionIndex/);
-  assert.match(difference, /getSharedBoundaryFeatureCollection/);
-  assert.match(difference, /getPairOuterBoundaryFeatureCollection/);
   assert.match(difference, /Boundary comparison/);
   assert.match(difference, />Proposed<\/button>/);
   assert.match(difference, />Original<\/button>/);
-  assert.match(difference, /isFullscreen=\{isFullscreen\}/);
-  assert.match(difference, /onToggleFullscreen=\{toggleFullscreen\}/);
-  assert.match(css, /archive-difference-page\.map-dashboard--fullscreen/);
+  assert.match(layout, /PanelLoadingOverlay/);
+  assert.match(layout, /isFullscreen=\{isFullscreen\}/);
+  assert.match(layout, /onToggleFullscreen=\{toggleFullscreen\}/);
+  assert.match(archivedLayoutCss, /archived-map-layout--detail\.map-dashboard--fullscreen/);
+  assert.match(css, /archive-map-version-toggle/);
 });

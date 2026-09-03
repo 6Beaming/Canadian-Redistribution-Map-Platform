@@ -1,6 +1,9 @@
 import { test } from "@jest/globals";
 import assert from "node:assert/strict";
-import { loadSubmissionMapPresentation } from "../src/services/submissionMapPresentation.js";
+import {
+  hydrateCommentObjectionFromRelease,
+  loadSubmissionMapPresentation,
+} from "../src/services/submissionMapPresentation.js";
 
 const PAIR_PAYLOAD = {
   releaseId: "statscan-da-2021-r1",
@@ -82,6 +85,40 @@ test("loadSubmissionMapPresentation materializes comment DA from release envelop
     });
     assert.equal(presentation?.source, "immutable-release");
     assert.equal(presentation?.objectionPreview?.featureCollection?.features?.length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("hydrateCommentObjectionFromRelease resolves active release and maps geometry", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    if (String(url).includes("/releases/current")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ releaseId: "statscan-da-2021-r1" }),
+      };
+    }
+    if (String(url).includes("/das/")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => DA_PAYLOAD,
+      };
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  };
+
+  try {
+    const hydrated = await hydrateCommentObjectionFromRelease({
+      id: "sub-1",
+      type: "feedback",
+      dguid: "2021A000100011",
+      source: "supabase",
+    });
+    assert.equal(hydrated.geometry?.featureCollection?.features?.length, 1);
+    assert.equal(hydrated.geometryError, null);
   } finally {
     globalThis.fetch = originalFetch;
   }

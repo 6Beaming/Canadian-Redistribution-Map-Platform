@@ -66,6 +66,25 @@
   overflow: hidden;
 }
 
+.workspace-review-panel--with-overlay {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.workspace-review-panel__inline-error {
+  position: relative;
+  z-index: 41;
+  margin: 0.75rem 0.85rem 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.5rem;
+  background: #fff1f2;
+  color: #9f1239;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
 .workspace-review-panel__content {
   display: flex;
   flex-direction: column;

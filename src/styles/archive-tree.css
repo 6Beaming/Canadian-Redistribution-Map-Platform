@@ -507,6 +507,15 @@
 }
 
 .archive-difference-map { position: relative; min-width: 0; min-height: 0; }
+.archive-difference-map__canvas-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+}
+.archive-difference-panel--with-overlay {
+  position: relative;
+}
 .archive-difference-map .map-canvas { border-radius: 1rem; }
 
 .archive-map-version-toggle {

@@ -36,10 +36,20 @@ test("submission map API adapter preserves an immutable-release seam", () => {
   const source = read("src/services/submissionMapViewApi.js");
   assert.match(source, /\/api\/submissions\/\$\{encodeURIComponent\(submissionId\)\}\/map-view/);
   assert.match(source, /hydrateSubmissionMapView/);
-  assert.match(source, /mapApi\.getReleaseDa/);
+  assert.match(source, /loadSubmissionMapPresentation/);
   assert.match(source, /mapApi\.getReleaseDaPair/);
   assert.match(source, /getSubmissionMaterializedGeometry/);
   assert.doesNotMatch(source, /hydrateWorkspaceSubmission/);
+});
+
+test("public submission map uses route readiness and release-native comment/objection loading", () => {
+  const page = read("src/pages/UserResumeSubmission.jsx");
+  const api = read("src/services/submissionMapViewApi.js");
+  assert.match(page, /onInitialPresentationReady/);
+  assert.match(page, /signalRouteReady/);
+  assert.match(page, /map-first-idle/);
+  assert.match(api, /loadSubmissionMapPresentation/);
+  assert.match(page, /normalizeType\(submission\.type\) !== "counter-proposal"/);
 });
 
 test("workspace counter-proposal hydration uses compact geometry revisions", () => {

@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
 import { CounterProposalImpactSummary } from "@/components/non_prebuilt/CounterProposalImpactSummary.jsx";
 import { MapInfoPanelShell } from "@/components/non_prebuilt/MapInfoPanelShell.jsx";
 import { RouteLoadingPage } from "@/components/non_prebuilt/RouteLoadingPage.jsx";
 import { useMapFullscreen } from "@/contexts/MapFullscreenContext.jsx";
+import { useRouteLoading } from "@/contexts/RouteLoadingContext.jsx";
 import { MAP_INTERACTION_MODE } from "@/lib/map/interactionMode.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
+import { mark, measure } from "@/lib/performanceMarks.js";
 import { normalizePublicSubmissionStatus } from "@/lib/submissions/publicStatus.js";
 import { mapApi } from "@/services/mapApi.js";
 import {
@@ -109,15 +111,30 @@ export default function UserResumeSubmission() {
   const { submissionId } = useParams();
   const navigate = useNavigate();
   const { isFullscreen, toggle: toggleFullscreen } = useMapFullscreen();
+  const { signalRouteReady } = useRouteLoading() ?? {};
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [submission, setSubmission] = useState(null);
   const [comparisonView, setComparisonView] = useState("proposed");
   const [profilesByDguid, setProfilesByDguid] = useState(() => new Map());
+  const [mapPresentationReady, setMapPresentationReady] = useState(false);
   const [status, setStatus] = useState("Loading submission map…");
   const [error, setError] = useState("");
+  const routeReadySignaledRef = useRef(false);
+
+  const handleInitialPresentationReady = useCallback(() => {
+    if (routeReadySignaledRef.current) return;
+    routeReadySignaledRef.current = true;
+    setMapPresentationReady(true);
+    mark("route-overlay-hidden");
+    measure("route-overlay-hidden-after-map-idle", "map-first-idle", "route-overlay-hidden");
+    signalRouteReady?.();
+  }, [signalRouteReady]);
 
   useEffect(() => {
     let active = true;
+    if (!submission || normalizeType(submission.type) !== "counter-proposal") {
+      return undefined;
+    }
     mapApi.getDaProfiles()
       .then((payload) => {
         if (!active) return;
@@ -128,31 +145,37 @@ export default function UserResumeSubmission() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [submission]);
 
   useEffect(() => {
     let active = true;
     setSubmission(null);
     setError("");
     setComparisonView("proposed");
+    routeReadySignaledRef.current = false;
+    setMapPresentationReady(false);
+    mark("route-navigation-start");
 
     Promise.resolve()
       .then(() => getSubmissionMapView(submissionId))
       .then(hydrateSubmissionMapView)
       .then((nextSubmission) => {
         if (!active) return;
+        mark("map-presentation-data-ready");
         setSubmission(nextSubmission);
         setStatus("Submission map ready.");
       })
       .catch((loadError) => {
         if (!active) return;
         setError(loadError.message || "Unable to load this submission.");
+        mark("route-overlay-hidden");
+        signalRouteReady?.();
       });
 
     return () => {
       active = false;
     };
-  }, [loadAttempt, submissionId]);
+  }, [loadAttempt, signalRouteReady, submissionId]);
 
   const presentation = useMemo(
     () => buildPresentation(submission, comparisonView),
@@ -200,6 +223,8 @@ export default function UserResumeSubmission() {
                   loadSubmissionCount={false}
                   onStatusChange={setStatus}
                   onToggleFullscreen={toggleFullscreen}
+                  onInitialPresentationReady={mapPresentationReady ? undefined : handleInitialPresentationReady}
+                  presentationReadyKey={`${submission.id}:${comparisonView}:${Boolean(submission.geometry)}`}
                 />
               ) : (
                 <div className="submission-map-empty" role="status">

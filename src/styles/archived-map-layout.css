@@ -1,0 +1,61 @@
+.archived-map-layout--tree .archived-map-host {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.archived-map-layout--detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(20rem, 30vw, 28rem);
+  grid-template-rows: minmax(0, 1fr);
+  gap: clamp(0.6rem, 1.1vw, 1rem);
+  height: calc(100dvh - 3.5rem);
+  min-height: 0;
+  overflow: hidden;
+  padding: clamp(0.55rem, 1vw, 0.9rem);
+  background: var(--background);
+  box-sizing: border-box;
+}
+
+.archived-map-layout--detail .archived-map-host {
+  grid-column: 1;
+  grid-row: 1;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.archived-map-host__canvas-wrap {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+}
+
+.archived-map-layout--detail .archived-map-host .map-canvas {
+  border-radius: 1rem;
+}
+
+.archived-map-layout--detail .archive-difference-page--layout-panel {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.archived-map-layout--detail.map-dashboard--fullscreen {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0;
+}
+
+.archived-map-layout--detail.map-dashboard--fullscreen .archive-difference-page--layout-panel {
+  display: none;
+}
+
+.archived-map-layout--detail.map-dashboard--fullscreen .archived-map-host {
+  grid-column: 1 / -1;
+}

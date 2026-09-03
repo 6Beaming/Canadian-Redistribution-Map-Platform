@@ -64,11 +64,24 @@ test("Map pages render during profile hydration and Archived Tree waits for its 
 test("Workspace detail hydrates one exact row before its optional sibling list", () => {
   const review = read("src/pages/WorkspaceReview.jsx");
   const exact = review.indexOf("await getSubmissionTableRowById(submissionId)");
+  const presentation = review.indexOf("hydrateCommentObjectionFromRelease", exact);
   const hydrate = review.indexOf("hydrateWorkspaceSubmission", exact);
-  const full = review.indexOf("getWorkspaceSubmissions", hydrate);
-  assert.ok(exact >= 0 && hydrate > exact && full > hydrate);
+  const mapLoad = Math.min(
+    presentation >= 0 ? presentation : Number.POSITIVE_INFINITY,
+    hydrate >= 0 ? hydrate : Number.POSITIVE_INFINITY,
+  );
+  const full = review.indexOf("getWorkspaceSubmissions", mapLoad);
+  assert.ok(exact >= 0 && mapLoad > exact && full > mapLoad);
+  assert.match(review, /useWorkspaceMapLayout/);
+  assert.match(review, /setMapFetching/);
+  assert.match(review, /mapFetching/);
+  assert.doesNotMatch(review, /MapCanvas/);
+  assert.doesNotMatch(review, /PanelLoadingOverlay/);
+  assert.doesNotMatch(review, /RouteLoadingPage/);
+  assert.equal(review.includes("setSubmission(null)"), false);
   assert.equal(review.includes("getDaProfiles"), false);
-  assert.match(review, /return <RouteLoadingPage \/>/);
+  assert.match(review, /return null;/);
+  assert.match(review, /map-first-idle/);
 });
 
 test("Creating an Archive Request updates the active review without navigating away", () => {
@@ -86,7 +99,6 @@ test("Creating an Archive Request updates the active review without navigating a
   assert.match(panel, /ARCHIVE_REQUEST && request && !isRequester/);
   assert.match(panel, /refreshReview\(\);[\s\S]*refreshArchiveRequest\(\)\.catch/);
   assert.match(panel, /archiveRequestLoading=\{archiveRequestLoading\}/);
-  assert.match(api, /if \(error\.status === 404\) return null;[\s\S]*throw error;/);
   assert.match(review, /if \(action === "archive-request"\) \{[\s\S]*updateSubmissionStatus\(committed\?\.submissionStatus\);[\s\S]*return;/);
   assert.match(review, /onCommitted=\{handleCommitted\}/);
 });
@@ -114,7 +126,7 @@ test("CP5 navigation, readiness loading, and export entry points remain wired", 
   assert.doesNotMatch(header, /isCommissionerSurface && pathname !== "\/dashboard\/submissionsTable"/);
   assert.match(workspace, /navigate\("\/dashboard\/archivedTree", \{[\s\S]*workspaceFrom: location\.state\?\.from \?\? null/);
   assert.match(archived, /\{ replace: true, state: location\.state \}/);
-  assert.match(archived, /\/difference\?branch=[\s\S]*\{ state: location\.state \}/);
+  assert.match(archived, /\/difference\?branch=[\s\S]*state: \{ from: "\/dashboard\/archivedTree"/);
   assert.match(archived, /exportArchivedTreeJson/);
   assert.doesNotMatch(graphs, /exportCommissionerSubmissionsCsv|Export CSV/);
   assert.match(submissionsTable, /serverPagination/);
@@ -137,7 +149,7 @@ test("CP5 navigation, readiness loading, and export entry points remain wired", 
   assert.match(globals, /@media \(min-width: 64rem\) \{[\s\S]*\.commissioner-submissions-toolbar \{[\s\S]*flex-wrap: nowrap/);
   assert.match(globals, /font-size: clamp\(0\.75rem, calc\(0\.68rem \+ 0\.32vw\), 0\.95rem\)/);
   assert.match(globals, /\.commissioner-submissions-toolbar__type \{[\s\S]*min-width: clamp\(9\.5rem, 14vw, 12rem\)[\s\S]*flex-grow: 1\.25/);
-  [table, publicHome, dashboard].forEach((source) => assert.match(source, /RouteLoadingPage/));
+  [publicHome, dashboard].forEach((source) => assert.match(source, /RouteLoadingPage/));
   assert.equal(table.includes("RouteLoadingOverlay"), false);
   assert.equal(publicHome.includes("RouteLoadingOverlay"), false);
   assert.equal(dashboard.includes("RouteLoadingOverlay"), false);
@@ -150,16 +162,22 @@ test("Shared loading UI blocks page content and fullscreen owns Header visibilit
   const loadingPage = read("src/components/non_prebuilt/RouteLoadingPage.jsx");
   const archivedCanvas = read("src/components/non_prebuilt/ArchivedTreeCanvas.jsx");
   const review = read("src/pages/WorkspaceReview.jsx");
+  const workspaceLayout = read("src/layouts/WorkspaceMapLayout.jsx");
+  const workspaceLayoutCss = read("src/styles/workspace-map-layout.css");
   const globals = read("src/styles/globals.css");
   const archivedStyles = read("src/styles/archive-tree.css");
 
-  assert.match(app, /!isFullscreen \? <Header[\s\S]*app-route-content--fullscreen[\s\S]*<RouteLoadingOverlay \/>/);
+  assert.match(app, /WorkspaceMapLayout/);
+  assert.match(app, /ArchivedMapLayout/);
   assert.ok(app.indexOf("<Header") < app.indexOf("<RouteLoadingOverlay />"));
   assert.match(overlay, /toPathname === "\/dashboard\/workspace"/);
+  assert.doesNotMatch(overlay, /isWorkspaceOrArchiveMapPath|archivedTree\/\[^\/\]\+\/difference/);
   assert.doesNotMatch(overlay, /WORKSPACE:\s*2500/);
   assert.match(loadingPage, /<span>\{error \|\| "Loading\.\.\."\}<\/span>/);
   assert.match(archivedCanvas, /route-loading-overlay__spinner[\s\S]*<span>Loading\.\.\.<\/span>/);
-  assert.match(review, /route-loading-overlay__spinner[\s\S]*<span>Loading\.\.\.<\/span>/);
+  assert.match(workspaceLayout, /PanelLoadingOverlay/);
+  assert.doesNotMatch(review, /MapCanvas/);
+  assert.match(workspaceLayoutCss, /workspace-map-layout--tree[\s\S]*visibility: hidden/);
   assert.doesNotMatch(
     [app, loadingPage, archivedCanvas].join("\n"),
     /RouteLoadingPage label=|Loading (?:page|archived tree|public map|commissioner map)/,

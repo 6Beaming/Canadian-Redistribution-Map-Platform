@@ -146,3 +146,44 @@ export async function loadSubmissionMapPresentation({
 
   return null;
 }
+
+export async function resolveSubmissionReleaseId(submission, releaseId, { signal } = {}) {
+  const explicit = String(releaseId ?? submission?.release_id ?? "").trim();
+  if (explicit) return explicit;
+  const current = await mapApi.getCurrentRelease({ signal });
+  return String(current?.releaseId ?? "").trim();
+}
+
+export async function hydrateCommentObjectionFromRelease(submission, {
+  releaseId,
+  primaryDguid,
+  secondaryDguid,
+  signal,
+} = {}) {
+  const normalized = {
+    ...submission,
+    source: submission?.source ?? "supabase",
+  };
+  const resolvedReleaseId = await resolveSubmissionReleaseId(normalized, releaseId, { signal });
+  const presentation = await loadSubmissionMapPresentation({
+    submission: normalized,
+    releaseId: resolvedReleaseId,
+    primaryDguid,
+    secondaryDguid,
+    signal,
+  });
+
+  if (!presentation?.objectionPreview) {
+    return {
+      ...normalized,
+      geometry: null,
+      geometryError: "Map geometry could not be loaded from the active release.",
+    };
+  }
+
+  return {
+    ...normalized,
+    geometry: presentation.objectionPreview,
+    geometryError: null,
+  };
+}

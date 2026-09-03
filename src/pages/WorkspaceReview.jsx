@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
 import { WorkspaceReviewPanel } from "@/components/non_prebuilt/WorkspaceReviewPanel.jsx";
-import { MAP_INTERACTION_MODE } from "@/lib/map/interactionMode.js";
+import { mark, measure } from "@/lib/performanceMarks.js";
+import { useWorkspaceMapLayout } from "@/contexts/WorkspaceMapLayoutContext.jsx";
 import {
   getWorkspaceSubmissions,
   getWorkspaceReviewerEmails,
@@ -12,10 +12,8 @@ import {
 import { getSubmissionTableRowById } from "@/services/submissionListsApi.js";
 import { getSubmissionReviewContent } from "@/services/commentsApi.js";
 import { hydrateWorkspaceSubmission } from "@/services/tempCounterProposal.js";
-import { RouteLoadingPage } from "@/components/non_prebuilt/RouteLoadingPage.jsx";
+import { hydrateCommentObjectionFromRelease } from "@/services/submissionMapPresentation.js";
 import { useRouteLoading } from "@/contexts/RouteLoadingContext.jsx";
-import "@/styles/map.css";
-import "@/styles/workspace-review.css";
 
 function normalizeType(value) {
   return String(value ?? "feedback").toLowerCase().replaceAll("_", "-");
@@ -25,37 +23,79 @@ function branchKey(submission) {
   return `${normalizeType(submission.type)}:${normalizeWorkspaceStatus(submission.status)}`;
 }
 
+function buildMapPresentation(submission, comparisonView) {
+  if (!submission?.geometry) {
+    return {
+      objectionPreview: null,
+      counterProposalPreview: null,
+      focusGeoJson: null,
+    };
+  }
+  const isCounterProposal = normalizeType(submission.type) === "counter-proposal";
+  if (isCounterProposal) {
+    const isOriginal = comparisonView === "original";
+    const featureCollection = isOriginal
+      ? submission.geometry.originalFeatureCollection
+      : submission.geometry.proposedFeatureCollection;
+    return {
+      objectionPreview: null,
+      counterProposalPreview: {
+        featureCollection,
+        boundaryGeoJson: isOriginal
+          ? submission.geometry.originalBoundaryGeoJson
+          : submission.geometry.boundaryGeoJson,
+        outerBoundaryGeoJson: isOriginal
+          ? submission.geometry.originalOuterBoundaryGeoJson
+          : submission.geometry.outerBoundaryGeoJson,
+        editable: false,
+      },
+      focusGeoJson: submission.geometry.originalFeatureCollection
+        ?? submission.geometry.proposedFeatureCollection
+        ?? null,
+    };
+  }
+  return {
+    objectionPreview: submission.geometry,
+    counterProposalPreview: null,
+    focusGeoJson: submission.geometry.featureCollection ?? null,
+  };
+}
+
 export default function WorkspaceReview() {
   const { submissionId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const { signalRouteReady } = useRouteLoading() ?? {};
-  const [mapPresentationReady, setMapPresentationReady] = useState(false);
+  const { setMapFetching, updateMap, resetPresentationReady } = useWorkspaceMapLayout();
   const routeReadySignaledRef = useRef(false);
 
   const handleInitialPresentationReady = useCallback(() => {
     if (routeReadySignaledRef.current) return;
     routeReadySignaledRef.current = true;
-    setMapPresentationReady(true);
+    mark("route-overlay-hidden");
+    measure("route-overlay-hidden-after-map-idle", "map-first-idle", "route-overlay-hidden");
     signalRouteReady?.();
   }, [signalRouteReady]);
+
   const [submission, setSubmission] = useState(null);
   const [allSubmissions, setAllSubmissions] = useState([]);
   const [reviewerEmails, setReviewerEmails] = useState([]);
   const [comparisonView, setComparisonView] = useState("proposed");
+  const [mapFetching, setLocalMapFetching] = useState(true);
   const [status, setStatus] = useState("Loading submission workspace...");
   const [error, setError] = useState("");
 
   useEffect(() => {
     let isMounted = true;
     routeReadySignaledRef.current = false;
-    setMapPresentationReady(false);
+    resetPresentationReady();
+    setLocalMapFetching(true);
+    setMapFetching(true);
+    setError("");
+    mark("route-navigation-start");
     async function load() {
       try {
-        setError("");
         setStatus("Loading submission…");
-        setSubmission(null);
-        setAllSubmissions([]);
         const activeRow = await getSubmissionTableRowById(submissionId);
         if (!activeRow) throw new Error("Submission not found in the active workspace.");
         if (isMounted) {
@@ -63,15 +103,23 @@ export default function WorkspaceReview() {
           setStatus("Loading map detail…");
         }
         const reviewersPromise = getWorkspaceReviewerEmails().catch(() => []);
-        const contentPromise = normalizeType(activeRow.type) === "counter-proposal"
+        const submissionType = normalizeType(activeRow.type);
+        const contentPromise = submissionType === "counter-proposal"
           ? Promise.resolve(null)
           : getSubmissionReviewContent(activeRow.id).catch(() => null);
-  const [reviewContent, hydrated] = await Promise.all([
+        const hydratePromise = submissionType === "counter-proposal"
+          ? hydrateWorkspaceSubmission({ ...activeRow, source: "supabase" })
+          : hydrateCommentObjectionFromRelease({ ...activeRow, source: "supabase" });
+        const [reviewContent, hydrated] = await Promise.all([
           contentPromise,
-          hydrateWorkspaceSubmission({ ...activeRow, source: "supabase" }),
+          hydratePromise,
         ]);
+        mark("map-presentation-data-ready");
         if (isMounted) {
           setSubmission({ ...hydrated, comment: reviewContent?.comment ?? hydrated.comment ?? "" });
+          setLocalMapFetching(false);
+          setMapFetching(false);
+          setError("");
           setStatus("Submission map ready.");
         }
         Promise.all([
@@ -87,67 +135,59 @@ export default function WorkspaceReview() {
           .catch(() => {});
       } catch (loadError) {
         if (isMounted) {
+          setLocalMapFetching(false);
+          setMapFetching(false);
           setError(loadError.message);
         }
       }
     }
     load();
     return () => { isMounted = false; };
-  }, [signalRouteReady, submissionId]);
+  }, [resetPresentationReady, setMapFetching, submissionId]);
+
+  const panelReady = !mapFetching && String(submission?.id) === String(submissionId);
+  const focusDguids = submission
+    ? [submission.dguid, submission.neighboring_dguid].filter(Boolean)
+    : [];
+
+  const comparisonControls = panelReady && normalizeType(submission?.type) === "counter-proposal" ? (
+    <div className="workspace-comparison-toggle" role="group" aria-label="Boundary comparison">
+      <button type="button" className={comparisonView === "proposed" ? "is-active" : ""} onClick={() => setComparisonView("proposed")}>Proposed</button>
+      <button type="button" className={comparisonView === "original" ? "is-active" : ""} onClick={() => setComparisonView("original")}>Original</button>
+    </div>
+  ) : null;
 
   useEffect(() => {
-    const previousBodyOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = previousBodyOverflow; };
-  }, []);
+    if (!submission) return;
+    const presentation = buildMapPresentation(submission, comparisonView);
+    updateMap({
+      enabled: Boolean(submission.geometry),
+      objectionPreview: presentation.objectionPreview,
+      counterProposalPreview: presentation.counterProposalPreview,
+      focusGeoJson: presentation.focusGeoJson,
+      workflowFocusDguids: focusDguids,
+      geometryError: submission.geometry ? null : (submission.geometryError ?? null),
+      status,
+      presentationReadyKey: `${submissionId}:${comparisonView}:${Boolean(submission.geometry)}`,
+      mapControls: comparisonControls,
+      onPresentationReady: handleInitialPresentationReady,
+    });
+  }, [
+    comparisonControls,
+    comparisonView,
+    focusDguids,
+    handleInitialPresentationReady,
+    submission,
+    submissionId,
+    status,
+    updateMap,
+  ]);
 
   const siblingSubmissions = useMemo(() => {
     if (!submission) return [];
     const key = branchKey(submission);
     return allSubmissions.filter((entry) => branchKey(entry) === key);
   }, [allSubmissions, submission]);
-
-  const mapPresentation = useMemo(() => {
-    if (!submission?.geometry) return {};
-    const isCounterProposal = normalizeType(submission.type) === "counter-proposal";
-    if (isCounterProposal) {
-      const isOriginal = comparisonView === "original";
-      const featureCollection = isOriginal
-        ? submission.geometry.originalFeatureCollection
-        : submission.geometry.proposedFeatureCollection;
-      return {
-        counterProposalPreview: {
-          featureCollection,
-          boundaryGeoJson: isOriginal
-            ? submission.geometry.originalBoundaryGeoJson
-            : submission.geometry.boundaryGeoJson,
-          outerBoundaryGeoJson: isOriginal
-            ? submission.geometry.originalOuterBoundaryGeoJson
-            : submission.geometry.outerBoundaryGeoJson,
-          editable: false,
-        },
-      };
-    }
-    return {
-      objectionPreview: submission.geometry,
-    };
-  }, [comparisonView, submission]);
-
-  // Keep the camera anchor independent of Original/Proposed. Switching the
-  // view then updates only the already-mounted GeoJSON sources in MapCanvas.
-  const mapFocusGeoJson = useMemo(() => {
-    if (!submission?.geometry) return null;
-    if (normalizeType(submission.type) === "counter-proposal") {
-      return submission.geometry.originalFeatureCollection
-        ?? submission.geometry.proposedFeatureCollection
-        ?? null;
-    }
-    return submission.geometry.featureCollection ?? null;
-  }, [submission]);
-
-  const focusDguids = submission
-    ? [submission.dguid, submission.neighboring_dguid].filter(Boolean)
-    : [];
 
   function advanceAfterCommit() {
     const currentIndex = siblingSubmissions.findIndex((entry) => entry.id === submission.id);
@@ -204,64 +244,29 @@ export default function WorkspaceReview() {
     advanceAfterCommit();
   }
 
-  if (error) {
+  if (error && !submission) {
     return <main className="workspace-review-error"><h1>Workspace unavailable</h1><p>{error}</p></main>;
   }
-  if (!submission || String(submission.id) !== String(submissionId)) {
-    return <RouteLoadingPage />;
+  if (!submission) {
+    return null;
   }
 
   return (
-    <main className="workspace-review-page map-page">
-      <div className="map-workspace map-workspace--single-column">
-        <div className="map-dashboard map-dashboard--user workspace-review-dashboard">
-          <section className="map-dashboard__main workspace-review-map" aria-label="Read-only submission map">
-            <div className="map-dashboard__map-wrap">
-              <div className="sr-only" aria-live="polite">{status}</div>
-              {submission.geometry ? (
-                <MapCanvas
-                  selection={null}
-                  objectionPreview={mapPresentation.objectionPreview}
-                  counterProposalPreview={mapPresentation.counterProposalPreview}
-                  focusGeoJson={mapFocusGeoJson}
-                  workflowFocusDguids={focusDguids}
-                  interactionMode={MAP_INTERACTION_MODE.COUNTER_REVIEW}
-                  onStatusChange={setStatus}
-                  onInitialPresentationReady={mapPresentationReady ? undefined : handleInitialPresentationReady}
-                  presentationReadyKey={`${submission.id}:${comparisonView}:${Boolean(submission.geometry)}`}
-                />
-              ) : submission.geometryError ? (
-                <div className="workspace-review-map-empty" role="status">
-                  <strong>Map geometry unavailable</strong>
-                  <p>{submission.geometryError}</p>
-                </div>
-              ) : (
-                <div className="route-loading-overlay__indicator" role="status">
-                  <span className="route-loading-overlay__spinner" aria-hidden="true" />
-                  <span>Loading...</span>
-                </div>
-              )}
-              {normalizeType(submission.type) === "counter-proposal" ? (
-                <div className="workspace-comparison-toggle" role="group" aria-label="Boundary comparison">
-                  <button type="button" className={comparisonView === "proposed" ? "is-active" : ""} onClick={() => setComparisonView("proposed")}>Proposed</button>
-                  <button type="button" className={comparisonView === "original" ? "is-active" : ""} onClick={() => setComparisonView("original")}>Original</button>
-                </div>
-              ) : null}
-            </div>
-          </section>
-          <WorkspaceReviewPanel
-            key={submission.id}
-            submission={submission}
-            siblingSubmissions={siblingSubmissions}
-            onSubmissionSelect={(id) => navigate(`/dashboard/workspace/${encodeURIComponent(id)}`, {
-              state: location.state,
-            })}
-            onCommitted={handleCommitted}
-            onSubmissionUpdated={updateSubmissionStatus}
-            reviewerEmails={reviewerEmails}
-          />
-        </div>
-      </div>
-    </main>
+    <div className="workspace-review-panel workspace-review-panel--with-overlay">
+      {error && submission ? (
+        <p className="workspace-review-panel__inline-error" role="alert">{error}</p>
+      ) : null}
+      <WorkspaceReviewPanel
+        key={submission.id}
+        submission={submission}
+        siblingSubmissions={siblingSubmissions}
+        onSubmissionSelect={(id) => navigate(`/dashboard/workspace/${encodeURIComponent(id)}`, {
+          state: location.state,
+        })}
+        onCommitted={handleCommitted}
+        onSubmissionUpdated={updateSubmissionStatus}
+        reviewerEmails={reviewerEmails}
+      />
+    </div>
   );
 }

@@ -2,9 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeftRight, MapPinned, RotateCcw } from "lucide-react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArchivedSubmissionCard } from "@/components/non_prebuilt/ArchivedSubmissionCard.jsx";
-import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
 import { MapInfoPanelShell } from "@/components/non_prebuilt/MapInfoPanelShell.jsx";
-import { useMapFullscreen } from "@/contexts/MapFullscreenContext.jsx";
+import { useArchivedMapLayout } from "@/contexts/ArchivedMapLayoutContext.jsx";
 import { useRouteLoading } from "@/contexts/RouteLoadingContext.jsx";
 import {
   ARCHIVE_CATEGORY_DEFINITIONS,
@@ -12,16 +11,12 @@ import {
   normalizeArchiveType,
 } from "@/lib/archiveTree.js";
 import { buildArchivedDifferencePresentation } from "@/lib/archiveDifferencePresentation.js";
-import { MAP_INTERACTION_MODE } from "@/lib/map/interactionMode.js";
 import { mark, measure } from "@/lib/performanceMarks.js";
 import { loadSubmissionMapPresentation } from "@/services/submissionMapPresentation.js";
 import {
   getArchiveBranchView,
   revertArchiveBranch,
 } from "@/services/workspaceApi.js";
-import "@/styles/map.css";
-import "@/styles/workspace-review.css";
-import "@/styles/archive-tree.css";
 
 function mapVersionCards(view) {
   const categoryId = getArchiveCategoryId(view.selectedVersion?.submission?.type);
@@ -74,7 +69,7 @@ function geometryEntryForVersion(geometryByVersionId, versionId) {
 export default function ArchivedDifference() {
   const navigate = useNavigate();
   const { signalRouteReady } = useRouteLoading() ?? {};
-  const { isFullscreen, toggle: toggleFullscreen } = useMapFullscreen();
+  const { setMapFetching, updateMap, resetPresentationReady } = useArchivedMapLayout();
   const { submissionId: versionId } = useParams();
   const [searchParams] = useSearchParams();
   const branchKey = searchParams.get("branch");
@@ -89,9 +84,10 @@ export default function ArchivedDifference() {
   const [status, setStatus] = useState(openOnly ? "Loading archived map..." : "Loading archived difference...");
   const [error, setError] = useState("");
   const [isReverting, setIsReverting] = useState(false);
-  const [mapPresentationReady, setMapPresentationReady] = useState(false);
   const routeReadySignaledRef = useRef(false);
   const loadGenerationRef = useRef(0);
+  const lastMapPresentationRef = useRef(null);
+  const lastStableFocusRef = useRef(null);
 
   const signalRouteReadyOnce = useCallback(() => {
     if (routeReadySignaledRef.current) return;
@@ -102,7 +98,6 @@ export default function ArchivedDifference() {
   }, [signalRouteReady]);
 
   const handleInitialPresentationReady = useCallback(() => {
-    setMapPresentationReady(true);
     signalRouteReadyOnce();
   }, [signalRouteReadyOnce]);
 
@@ -111,8 +106,9 @@ export default function ArchivedDifference() {
     const generation = loadGenerationRef.current + 1;
     loadGenerationRef.current = generation;
     routeReadySignaledRef.current = false;
-    setMapPresentationReady(false);
-    setPresentationByVersionId(new Map());
+    resetPresentationReady();
+    setMapFetching(true);
+    setError("");
     mark("route-navigation-start");
 
     async function loadPresentationForVersion({
@@ -182,23 +178,20 @@ export default function ArchivedDifference() {
 
         if (!isMounted || generation !== loadGenerationRef.current) return;
         setPresentationByVersionId(presentations);
+        setMapFetching(false);
+        setError("");
         mark("map-presentation-data-ready");
         setStatus(openOnly ? "Archived map ready." : "Archived difference ready.");
       } catch (loadError) {
         if (!isMounted || generation !== loadGenerationRef.current) return;
+        setMapFetching(false);
         setError(loadError.message || "Archived version could not be loaded.");
         signalRouteReadyOnce();
       }
     }
     load();
     return () => { isMounted = false; };
-  }, [branchKey, openOnly, signalRouteReadyOnce, versionId]);
-
-  useEffect(() => {
-    const previousBodyOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = previousBodyOverflow; };
-  }, []);
+  }, [branchKey, openOnly, resetPresentationReady, setMapFetching, signalRouteReadyOnce, versionId]);
 
   const activeVersionId = view === "latest"
     ? String(latestEntry?.version.versionId ?? latestEntry?.version.id ?? "")
@@ -253,13 +246,69 @@ export default function ArchivedDifference() {
       ?? null;
   }, [geometryByVersionId, presentationByVersionId, selectedEntry]);
 
+  const mapPresentation = presentation ?? lastMapPresentationRef.current;
+  const mapFocusGeoJson = stableFocus ?? lastStableFocusRef.current;
+  if (presentation) {
+    lastMapPresentationRef.current = presentation;
+  }
+  if (stableFocus) {
+    lastStableFocusRef.current = stableFocus;
+  }
+
+  const selectedIsLatest = selectedEntry?.version.id === latestEntry?.version.id;
+  const isCounterProposal = normalizeArchiveType(activeEntry?.version.submission?.type) === "counter-proposal";
+
+  const mapControls = (
+    <>
+      {!openOnly && !selectedIsLatest ? (
+        <div className="archive-map-version-toggle" role="group" aria-label="Archived map version">
+          <button type="button" className={view === "latest" ? "is-active" : ""} onClick={() => setView("latest")}>Latest Version</button>
+          <button type="button" className={view === "selected" ? "is-active" : ""} onClick={() => setView("selected")}>Selected Version</button>
+        </div>
+      ) : null}
+      {isCounterProposal ? (
+        <div className="archive-counter-proposal-comparison" role="group" aria-label="Boundary comparison">
+          <button type="button" className={geometryView === "proposed" ? "is-active" : ""} onClick={() => setGeometryView("proposed")}>Proposed</button>
+          <button type="button" className={geometryView === "original" ? "is-active" : ""} onClick={() => setGeometryView("original")}>Original</button>
+        </div>
+      ) : null}
+    </>
+  );
+
+  useEffect(() => {
+    if (!selectedEntry || !latestEntry) return;
+    updateMap({
+      enabled: Boolean(mapPresentation),
+      objectionPreview: mapPresentation?.objectionPreview ?? null,
+      counterProposalPreview: mapPresentation?.counterProposalPreview ?? null,
+      focusGeoJson: mapFocusGeoJson,
+      workflowFocusDguids: selectedEntry.branch.dguids,
+      status,
+      presentationReadyKey: `${versionId}:${activeVersionId}:${geometryView}:${Boolean(mapPresentation)}`,
+      mapControls,
+      onPresentationReady: handleInitialPresentationReady,
+    });
+  }, [
+    activeVersionId,
+    geometryView,
+    handleInitialPresentationReady,
+    latestEntry,
+    mapControls,
+    mapFocusGeoJson,
+    mapPresentation,
+    selectedEntry,
+    status,
+    updateMap,
+    versionId,
+  ]);
+
   if (error && !selectedEntry) {
     return <main className="archive-difference-error"><h1>Archived version unavailable</h1><p>{error}</p></main>;
   }
-  if (!selectedEntry || !latestEntry) return null;
+  if (!selectedEntry || !latestEntry) {
+    return null;
+  }
 
-  const selectedIsLatest = selectedEntry.version.id === latestEntry.version.id;
-  const isCounterProposal = normalizeArchiveType(activeEntry?.version.submission?.type) === "counter-proposal";
   const versionCards = [...selectedEntry.branch.versions]
     .reverse()
     .map((version) => ({ category: selectedEntry.category, branch: selectedEntry.branch, version }));
@@ -295,37 +344,8 @@ export default function ArchivedDifference() {
   }
 
   return (
-    <main className={`archive-difference-page${isFullscreen ? " map-dashboard--fullscreen" : ""}`}>
-      <section className="archive-difference-map" aria-label={openOnly ? "Archived version map" : "Archived boundary difference map"}>
-        <div className="sr-only" aria-live="polite">{status}</div>
-        <MapCanvas
-          isFullscreen={isFullscreen}
-          selection={null}
-          objectionPreview={presentation?.objectionPreview ?? null}
-          counterProposalPreview={presentation?.counterProposalPreview ?? null}
-          focusGeoJson={stableFocus}
-          workflowFocusDguids={selectedEntry.branch.dguids}
-          interactionMode={MAP_INTERACTION_MODE.COUNTER_REVIEW}
-          onStatusChange={setStatus}
-          onToggleFullscreen={toggleFullscreen}
-          onInitialPresentationReady={mapPresentationReady ? undefined : handleInitialPresentationReady}
-          presentationReadyKey={`${activeVersionId}:${geometryView}:${Boolean(presentation)}`}
-        />
-        {!openOnly && !selectedIsLatest ? (
-          <div className="archive-map-version-toggle" role="group" aria-label="Archived map version">
-            <button type="button" className={view === "latest" ? "is-active" : ""} onClick={() => setView("latest")}>Latest Version</button>
-            <button type="button" className={view === "selected" ? "is-active" : ""} onClick={() => setView("selected")}>Selected Version</button>
-          </div>
-        ) : null}
-        {isCounterProposal ? (
-          <div className="archive-counter-proposal-comparison" role="group" aria-label="Boundary comparison">
-            <button type="button" className={geometryView === "proposed" ? "is-active" : ""} onClick={() => setGeometryView("proposed")}>Proposed</button>
-            <button type="button" className={geometryView === "original" ? "is-active" : ""} onClick={() => setGeometryView("original")}>Original</button>
-          </div>
-        ) : null}
-      </section>
-      <MapInfoPanelShell className="archive-difference-panel" ariaLabel="Archived version details">
-        <div className="archive-difference-panel__content">
+    <MapInfoPanelShell className="archive-difference-panel archive-difference-panel--with-overlay" ariaLabel="Archived version details">
+      <div className="archive-difference-panel__content">
         <header>
           {openOnly ? <MapPinned aria-hidden="true" /> : <ArrowLeftRight aria-hidden="true" />}
           <div>
@@ -350,7 +370,7 @@ export default function ArchivedDifference() {
             />
           ))}
         </div>
-        {error ? <p className="archive-difference-error-message" role="alert">{error}</p> : null}
+        {error && selectedEntry ? <p className="archive-difference-error-message" role="alert">{error}</p> : null}
         {!openOnly && !selectedIsLatest ? (
           <button type="button" className="archive-difference-revert" disabled={isReverting} onClick={revertSelectedVersion}>
             <RotateCcw aria-hidden="true" /> {isReverting ? "Creating latest version…" : `Revert to ${selectedEntry.version.label}`}
@@ -361,8 +381,7 @@ export default function ArchivedDifference() {
             ? "This is the latest immutable version for this branch."
             : "Revert creates a new latest version; it never overwrites historical versions."}
         </p>
-        </div>
-      </MapInfoPanelShell>
-    </main>
+      </div>
+    </MapInfoPanelShell>
   );
 }
