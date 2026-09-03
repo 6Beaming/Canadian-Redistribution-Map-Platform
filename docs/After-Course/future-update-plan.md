@@ -1,549 +1,716 @@
-# Future Counter-Proposal Geometry Scalability Plan
+# Future Counter-Proposal Canonical Mesh Plan
 
-## 1. Status and purpose
+## 1. Status and objective
 
-This document records the post-course plan for eliminating browser out-of-memory failures when a Counter-Proposal targets a highly fragmented or extremely detailed dissemination-area (DA) pair.
+This document defines a future implementation plan. It does not describe functionality that is complete in the current release.
 
-The plan is intentionally not an implementation commitment for the current delivery. It freezes the architectural direction, proposed data contracts, implementation order, and acceptance criteria so that a future refactor does not attempt another handle-density-only optimization.
+The remaining Counter-Proposal scalability defect is architectural: editing a DA pair still brings exact source geometry into the browser and repeatedly validates complete polygons. A DA with a highly detailed or fragmented boundary can therefore make opening the editor, dragging a handle, committing an edit, or calculating impact unacceptably slow and can exhaust browser memory.
 
-The required outcome is:
+The target is to replace that runtime model with one immutable canonical operational mesh:
 
-- every eligible adjacent DA pair can be inspected without loading exact pair geometry into the browser;
-- ordinary and extreme coastal pairs use the same edit semantics;
-- the browser renders a compact display representation and edits stable shared-arc vertices;
-- the server remains authoritative and validates sparse operations against the immutable exact release;
-- the existing PMTiles basemap remains independent and does not need to be rebuilt for this work;
-- release artifacts remain immutable, local, versioned data under `src/data/map/releases/<releaseId>/`, not browser-generated data and not transient Supabase cache rows.
+- source GeoJSON is an offline build input and provenance record only;
+- the canonical mesh is the only geometry used for runtime overlays, editing, validation, impact calculation, submission materialization, Archived Tree transitions, and exports;
+- PMTiles and Google Maps remain independent visual basemap layers and do not participate in Counter-Proposal geometry calculations;
+- all edits are stable sparse operations against a versioned mesh;
+- pointer-move validation is local and indexed, never a complete JSTS overlay loop.
 
-## 2. Audit findings
+This is a new release contract. It must not silently change the meaning of the existing `statscan-da-2021-r1` release.
 
-### 2.1 Measured release payloads
+## 2. Existing implementation audit
 
-The audit used release `statscan-da-2021-r1` and distinguished handle count from total polygon complexity.
+### 2.1 Measured failure modes
 
-| Area and representative pair | Pair vertices | Rings | Approximate API payload | Approximate expanded peak | Observed build characteristic |
-| --- | ---: | ---: | ---: | ---: | --- |
-| Saanich—Gulf Islands: `170642 + 170644` | 13,024 | 49 | 0.51 MB | about 10 MB | about 79 ms |
-| Saanich—Gulf Islands: `170642 + 170643` | 11,674 | 124 | 0.46 MB | about 9 MB | about 123 ms |
-| Sunshine Coast: `290097 + 290098` | 25,864 | 9 | 4.79 MB including outer-boundary expansion | about 20 MB | moderate pressure |
-| North Island—Powell River outlier: `450027 + 490179` | 711,985 | thousands | 27.2 MB exact pair; 131.8 MB outer boundary | about 534 MB before MapLibre/GPU overhead | about 71 seconds to build the current cache |
+Measurements against `statscan-da-2021-r1` show that editable-handle count is not a reliable proxy for geometry cost.
 
-The most complex single audited DA, `2021S051259450027`, contains approximately 395,065 vertices and 4,756 rings. The worst audited pair has only 226 fine-LOD handles. Reducing `maxHandles` therefore cannot materially reduce the exact feature payload, `edgeOwners`, outer-boundary expansion, structured clones, or MapLibre triangulation work.
+| Representative area or pair | Exact pair vertices | Rings | Approximate expanded geometry cost | Consequence |
+| --- | ---: | ---: | ---: | --- |
+| Saanich--Gulf Islands pair | 11,674--13,024 | 49--124 | about 9--10 MB before renderer overhead | avoidable latency and repeated topology work |
+| Sunshine Coast pair | 25,864 | 9 | about 20 MB | moderate memory and interaction pressure |
+| North Island--Powell River outlier pair | 711,985 | thousands | about 534 MB before MapLibre/GPU overhead | opening the editor can OOM |
 
-### 2.2 Current release behavior
+The audited extreme pair has only a few hundred fine-LOD handles. Reducing visible handle markers alone cannot remove the exact payload, full edge index, outer-boundary expansion, JSTS objects, MapLibre triangulation, or Worker clone.
 
-The release builder currently produces stable vertices and fine/medium/coarse LODs only for shared pair arcs:
+### 2.2 Current hot path
 
-- `scripts/reusable/build_map_release.py` defines the three LOD tolerances;
-- its topology pass groups shared edges into stable arc chains;
-- `server/lib/map/canonicalReleaseStore.js` chooses the first shared-arc LOD whose handle count is within the requested limit.
+The current implementation:
 
-This mechanism works for controlling editable handles. It does not control the number of coordinates in either complete DA polygon.
-
-The current `representation=edit` response still returns both exact DA features together with the compact shared-boundary data. The browser then:
-
-1. normalizes the exact features;
-2. clones them into original and current states;
-3. builds a full `buildDaObjectionIndex()` and `edgeOwners` map;
-4. derives the pair outer boundary by traversing the full index;
-5. creates additional FeatureCollections for MapLibre;
+1. reads both exact DA features before selecting a shared-arc LOD;
+2. inserts selected release vertices into complete polygon rings;
+3. clones original and current full features;
+4. builds `buildDaObjectionIndex()` across every ring edge;
+5. derives full shared and outer boundaries;
 6. structured-clones the cache into a Worker;
-7. returns a complete cache from Worker commit, undo, and redo operations.
+7. performs full `union`, `covers`, `intersection`, and `equalsTopo` validation during handle movement;
+8. performs up to 16 full checks while binary-searching an invalid pointer position;
+9. rebuilds complete indexes and recalculates full polygon impacts after commits, undo, and redo;
+10. materializes the proposal against exact coordinate arrays on the server.
 
 Important implementation locations are:
 
-- `server/lib/map/canonicalReleaseStore.js` — exact pair read and LOD selection;
-- `src/lib/map/releasePairLoader.js` — edit-pair request and browser cache construction;
-- `src/lib/map/counterProposalWorkflow.js` — full feature cloning, pair-index rebuilds, impact calculation, and history;
-- `src/lib/map/objectionWorkflow.js` — `edgeOwners`, adjacency, shared-boundary, and outer-boundary derivation;
-- `src/services/counterProposalWorkerClient.js` — full-cache Worker initialization;
-- `src/lib/map/counterProposalWorkerDomain.js` — full-cache commit/undo/redo responses;
-- `src/components/non_prebuilt/MapCanvas.jsx` — GeoJSON sources, fills, outlines, and editable-handle presentation.
+- `scripts/reusable/build_map_release.py`: current streaming release and shared-arc LOD builder;
+- `server/lib/map/canonicalReleaseStore.js`: exact pair reads and LOD selection;
+- `src/lib/map/releasePairLoader.js`: browser pair loading and cache construction;
+- `src/lib/map/counterProposalWorkflow.js`: complete feature/index/topology/impact operations;
+- `src/lib/map/objectionWorkflow.js`: full edge-owner and pair boundary indexes;
+- `src/services/counterProposalWorkerClient.js`: Worker transport;
+- `src/lib/map/counterProposalWorkerDomain.js`: Worker-owned full cache;
+- `server/lib/map/geometryOperations.js`: stable sparse operation derivation and materialization;
+- `server/lib/map/counterProposalSubmission.js`: authoritative submission validation;
+- `server/lib/archive/`: Archived Tree materialization, merge, revert, delete, and export.
 
 ### 2.3 Root cause
 
-The failure is a representation problem, not a handle-density problem.
+The root cause is not merely too many handles. It is that exact source coordinates remain part of the runtime representation.
 
-Nested GeoJSON coordinates are expensive JavaScript objects. The current path holds several logically equivalent versions of the pair at once, builds hundreds of thousands of string-keyed edge records, clones the cache across execution contexts, and sends highly fragmented polygons through MapLibre's fill pipeline. The raw JSON byte count therefore substantially understates the peak memory footprint.
+With `N` exact coordinates, the current browser cost is approximately:
 
-MapLibre's GeoJSON `tolerance` can simplify the internal tiled rendering representation, but the original GeoJSON must still enter the source/worker pipeline. It cannot remove the initial exact payload, application-side clones, or full topology index. `updateData()` may reduce the cost of later feature updates when stable IDs exist, but it does not solve initial exact-geometry ingestion.
+```text
+open:       O(N) parsing + indexing + rendering
+preview:    O(1..16 * N), with overlay operations often worse than linear
+memory:     multiple O(N) object graphs and cross-thread clones
+```
 
-References:
+The target mesh contains `M` bounded operational vertices and a local guard index. The target cost is:
 
-- [MapLibre GeoJSON source options](https://maplibre.org/maplibre-style-spec/sources/)
-- [MapLibre GeoJSONSource API](https://maplibre.org/maplibre-gl-js/docs/API/classes/GeoJSONSource/)
-- [geojson-vt options and simplification behavior](https://github.com/mapbox/geojson-vt)
-- [Earcut polygon triangulation behavior](https://github.com/mapbox/earcut)
-- [TopoJSON shared topology and topology-preserving simplification](https://github.com/topojson/topojson)
+```text
+open:       O(M + G)
+preview:    O(log G + K)
+memory:     O(M + G)
+```
 
-## 3. Architectural decision
+`G` is the compact guard artifact and `K` is the small set of nearby segments returned by the spatial query.
 
-### 3.1 Separate exact, edit, and display representations
+## 3. Frozen architectural decisions
 
-The future workflow must use three representations with different ownership and lifetimes.
+### 3.1 Geometry authority
 
-| Representation | Owner | Browser access | Purpose |
-| --- | --- | --- | --- |
-| Exact immutable geometry | Local canonical release and server | Never during editing | Authoritative operation application, final topology validation, persistence, and archive materialization |
-| Compact edit topology bundle | Immutable release and edit API | Yes, for the selected pair only | Handles, stable shared arcs, bounded collision guards, incremental impacts, and sparse history |
-| Display overlay | Immutable release and browser map | Yes | Original/proposed shared lines, simplified outline, and compact changed-area visualization |
+The canonical operational mesh is the only runtime geometry authority for Counter-Proposals.
 
-Exact geometry remains indispensable, but it must leave the browser edit path.
+| Representation | Runtime role | Persistence role |
+| --- | --- | --- |
+| Source exact GeoJSON | none | offline input, checksum, provenance, and reproducible rebuild only |
+| Canonical operational mesh | rendering, editing, validation, impact, adjacency, and navigation | immutable release artifact and geometry basis |
+| PMTiles/Google Maps | visual geographic context only | independent basemap artifact |
 
-### 3.2 Preserve the existing PMTiles basemap
+Exact GeoJSON must not be returned by a browser-facing Counter-Proposal route, placed in React state, sent to MapLibre as an editable overlay, cloned to a Worker, or loaded during submission/archive execution.
 
-The PMTiles basemap continues to render the immutable authoritative geography used during normal browsing. This refactor does not require rebuilding PMTiles because the editable overlay is independent.
+### 3.2 One global topology, not pair-specific GeoJSON copies
 
-The preferred Counter-Proposal presentation is:
+The mesh is stored as canonical arcs plus directed per-DA references. It is logically capable of materializing a complete GeoJSON geometry, but complete GeoJSON is not duplicated for every DA pair.
 
-- PMTiles renders the immutable base DA geography;
-- Original mode renders the original shared boundary;
-- Proposed mode renders the changed shared boundary and a compact delta polygon between the original and proposed lines;
-- a topology-safe simplified outer outline may be drawn when the existing black pair outline is required;
-- the browser does not fill or triangulate the two exact DA polygons.
+Each shared arc is stored once. Both owners refer to the same arc in opposite directions. Junctions shared by three or more regions have one stable identity. This is required for deterministic replay and Archived Tree LWW behavior.
 
-If product requirements continue to require full blue fills for both DAs, those fills must use an offline topology-safe display LOD. They must never use exact edit geometry.
+### 3.3 Mesh-relative operation semantics
 
-### 3.3 Reuse topology instead of creating one full asset per pair
+Runtime and persistence may store deltas because the immutable mesh already owns every base coordinate. A stored delta must always be relative to that immutable base, never relative to the previously applied command.
 
-The release must not duplicate full pair GeoJSON for every adjacent pair. It should store shared topological primitives and small reference indexes:
+```text
+final coordinate = immutable mesh base coordinate + base-relative delta
+```
+
+The operation is idempotent. Replaying it twice produces the same final coordinate.
+
+All coordinates and derived results must use the release's declared quantization rule. The initial contract retains eight decimal places for longitude and latitude unless measurement proves that another precision is required.
+
+### 3.4 Server authority remains mandatory
+
+The browser and server use the same mesh, eliminating exact-versus-display disagreement. The server still treats all client results as untrusted and repeats final validation before persistence or archive transition.
+
+### 3.5 New immutable release
+
+The canonical mesh must be published under a new immutable release identity, for example `statscan-da-2021-mesh-r1`. Existing release bytes and historical records must never be rewritten in place.
+
+## 4. Frozen release contract
+
+### 4.1 Release layout
 
 ```text
 src/data/map/releases/<releaseId>/
   release.json
-  exact/
-  topology/
-    arc-lods-*.ndjson
-    shared-arcs-*.ndjson
+  mesh/
+    arcs-000.bin
+    arcs-001.bin
+    arcs.index.json
+    vertices.bin
     da-arc-refs.json
-    pair-shared-arc-refs.json
-  edit-bundles/
-    manifests-*.ndjson
-    guard-segments-*.bin
+    pair-arc-refs.json
+    guard-segments-000.bin
+    guard-segments.index.json
   indexes/
-    vertex-occurrences-*.bin
+    dguids.json
+    feds.json
+    pruids.json
+    adjacency.json
     pair-complexity.json
+  validation/
+    source-audit.json
+    coverage-report.json
+    accuracy-report.json
+    performance-budget.json
 ```
 
-Each artifact must be content-hashed, declared in `release.json`, and sharded below repository/platform file-size limits. A target shard size of 32–64 MB is preferred; no generated artifact may approach GitHub's 100 MB hard limit.
+Artifacts may use NDJSON during the first implementation if binary formats would delay correctness. They must remain sharded, range-addressable, content-hashed, and below the repository file-size gate.
 
-## 4. Frozen target contracts
+### 4.2 Manifest identity
 
-### 4.1 Pair complexity record
-
-Every adjacent pair receives a deterministic complexity record during release construction:
+`release.json` must include at least:
 
 ```json
 {
-  "pair": "DA_A|DA_B",
-  "exactVertexCount": 711985,
-  "ringCount": 4756,
-  "sharedExactVertexCount": 226,
-  "displayVertexCountByLod": {
-    "fine": 12000,
-    "medium": 4200,
-    "coarse": 1400
-  },
-  "guardSegmentCount": 3800,
-  "estimatedBrowserBytesByLod": {
-    "fine": 18000000,
-    "medium": 7200000,
-    "coarse": 3100000
-  },
-  "tier": "extreme",
-  "editBundleAvailable": true
+  "schemaVersion": "2.0",
+  "releaseId": "statscan-da-2021-mesh-r1",
+  "sourceDataset": "Statistics Canada 2021 DA",
+  "sourceGeometryRevision": "sha256:...",
+  "meshRevision": "sha256:...",
+  "topologyRevision": "sha256:...",
+  "meshSchemaVersion": "canonical-coverage-mesh-v1",
+  "operationSchemaVersion": "base-relative-delta-v1",
+  "normalizationVersion": "wgs84-8dp-v1",
+  "metricCrs": "frozen projected CRS identifier",
+  "builderVersion": "canonical-mesh-builder-v1",
+  "simplificationParameters": {},
+  "counts": {},
+  "artifacts": [],
+  "manifestSha256": "sha256:..."
 }
 ```
 
-Complexity tiers drive display-LOD selection, observability, and temporary gating. They do not weaken server validation.
+The active Supabase `map_data_releases` row and local manifest must agree on `releaseId`, `manifestSha256`, `sourceGeometryRevision`, `meshRevision`, and `topologyRevision`. The server must fail closed on disagreement.
 
-### 4.2 Edit manifest response
+### 4.3 Arc and DA references
 
-The target edit request returns a manifest and compact artifact references, not two exact features:
+An arc owns ordered mesh vertices and immutable endpoints:
 
 ```json
 {
-  "schemaVersion": "1.0",
-  "releaseId": "statscan-da-2021-r1",
-  "geometryRevision": "sha256:...",
-  "topologyRevision": "sha256:...",
+  "arcId": "ma1_...",
+  "owners": ["DA_A", "DA_B"],
+  "vertices": [
+    {"vertexId": "mv1_...", "coordinate": [-123.1, 49.2], "locked": true},
+    {"vertexId": "mv1_...", "coordinate": [-123.0, 49.3], "locked": false}
+  ]
+}
+```
+
+A DA references arcs with direction and ring structure:
+
+```json
+{
+  "dguid": "DA_A",
+  "polygons": [
+    {
+      "outer": [
+        {"arcId": "ma1_...", "direction": 1},
+        {"arcId": "ma1_...", "direction": -1}
+      ],
+      "holes": []
+    }
+  ]
+}
+```
+
+The materializer must verify ring continuity before producing GeoJSON.
+
+### 4.4 Pair edit bundle
+
+The browser-facing pair response contains no source exact feature:
+
+```json
+{
+  "schemaVersion": "2.0",
+  "releaseId": "statscan-da-2021-mesh-r1",
+  "meshRevision": "sha256:...",
   "pair": ["DA_A", "DA_B"],
-  "exactDigest": "sha256:...",
-  "lod": "medium",
-  "complexity": {},
-  "display": {
-    "arcRefs": [],
-    "outerOutlineRefs": [],
+  "mesh": {
+    "daArcRefs": [],
+    "arcRecords": [],
+    "editableVertexIds": [],
+    "lockedVertexIds": [],
     "baseBounds": []
   },
-  "edit": {
-    "sharedArcRefs": [],
-    "handles": [],
-    "guardArtifact": {},
+  "guard": {
+    "maximumDisplacementMeters": 0,
+    "corridor": {},
+    "segmentIndex": {}
+  },
+  "metrics": {
     "baseAreas": {},
     "basePopulations": {}
   },
-  "constraints": {
-    "maximumDisplacementMeters": 0,
-    "corridorArtifact": {}
-  }
+  "complexity": {}
 }
 ```
 
-The exact endpoint remains server-internal. A browser-visible edit request must be rejected if release identity, artifact hashes, or the required compact bundle do not match.
-
-### 4.3 Sparse operation
-
-Counter-Proposal edits use stable, absolute, idempotent operations:
+### 4.5 Sparse operation
 
 ```json
 {
   "schemaVersion": "1.0",
   "operationId": "uuid",
-  "releaseId": "statscan-da-2021-r1",
-  "baseRevision": "sha256:...",
+  "releaseId": "statscan-da-2021-mesh-r1",
+  "meshRevision": "sha256:...",
   "pair": ["DA_A", "DA_B"],
-  "vertexId": "stable-release-vertex-id",
-  "coordinate": [-123.12345678, 49.12345678]
+  "meshVertexId": "mv1_...",
+  "deltaLng": 0.00001234,
+  "deltaLat": -0.00000567
 }
 ```
 
-Relative `dx/dy` commands are not authoritative. The stable vertex ID and absolute coordinate make replay, deduplication, conflict checks, migration, and Archived Tree LWW application deterministic.
+The server resolves the base coordinate from the immutable release, adds the quantized delta once, and rejects unknown, locked, non-pair, duplicate, non-finite, or out-of-range operations.
 
-### 4.4 Worker protocol
+For Archive LWW state, the resolved vertex state is:
 
-The target Worker owns compact typed-array state. It never receives or returns the full exact or display FeatureCollection.
+```json
+{
+  "meshVertexId": "mv1_...",
+  "deltaLng": 0.00001234,
+  "deltaLat": -0.00000567,
+  "lastMergeSequence": 42,
+  "sourceArchiveVersionId": "uuid"
+}
+```
+
+## 5. Canonical mesh builder
+
+### 5.1 Reuse the existing build foundation
+
+Extend `scripts/reusable/build_map_release.py`. Preserve its current strengths:
+
+- streaming source shard reads;
+- SQLite-backed edge occurrence data;
+- disk-backed temporary state;
+- deterministic ordering;
+- stable hashes;
+- resumable staging output;
+- bounded artifact shards;
+- single-writer topology pass.
+
+Do not load all Canadian source geometry into one Python object.
+
+### 5.2 Phase A: source audit and normalization
+
+1. Freeze the source manifest and checksum every source shard.
+2. Normalize coordinates using the declared precision.
+3. Validate every Polygon/MultiPolygon, ring closure, orientation, and DGUID.
+4. Detect duplicate positions and zero-length edges.
+5. Build the source edge occurrence database.
+6. Verify that the source coverage is suitable for topology processing; emit invalid edges and stop if it is not.
+7. Project geometry into the frozen metric CRS before simplification and measurement.
+
+The builder must never silently repair a source topology defect. Any permitted normalization or repair must be deterministic and recorded in `source-audit.json`.
+
+### 5.3 Phase B: global canonical arc graph
+
+1. Identify edges with one owner and edges with two owners.
+2. Identify graph junctions, including all vertices whose incident owner set or degree changes.
+3. Split edge sequences into maximal canonical arcs between locked junctions.
+4. Assign arc IDs independent of a DA pair.
+5. Assign mesh vertex IDs within the immutable release namespace.
+6. Record every arc owner and the direction in which each owner traverses it.
+7. Reconstruct every original DA ring from directed arc references.
+8. Verify reconstruction against normalized source geometry before simplifying anything.
+
+This replaces the current pair-owned shared-arc identity. A junction or shared primitive must not receive different IDs merely because it appears in more than one pair.
+
+### 5.4 Phase C: topology-aware adaptive simplification
+
+Use coverage-aware simplification rather than simplifying each DA independently. Shapely `coverage_simplify` backed by GEOS 3.12 or newer is the preferred initial implementation.
+
+The simplifier must:
+
+- preserve locked junctions and ring closure;
+- simplify a shared arc once for all owners;
+- preserve the owner and adjacency graph;
+- preserve required components and holes;
+- prevent an arc from crossing a non-incident arc;
+- preserve minimum-clearance requirements;
+- use metric, not longitude/latitude-degree, tolerances;
+- adapt tolerance per arc or connected partition when validation fails.
+
+Uniform handle spacing is not the primary simplification algorithm. After topology-aware simplification, densify any chord that exceeds the configured maximum physical length. This produces geographically usable handle spacing without discarding critical curvature points.
+
+### 5.5 Partitioning and memory safety
+
+National coverage validation may exceed the build machine's memory if processed as one geometry collection. Partition work by connected spatial tiles, provinces, or FED groups, but:
+
+- lock every cut-edge vertex shared with another partition;
+- include a validation halo around each partition;
+- never simplify the same canonical arc independently in two partitions;
+- perform a final national edge-match and adjacency pass;
+- keep intermediate topology in SQLite or another disk-backed store;
+- checkpoint every completed phase and support `--resume`;
+- enforce the existing configurable memory budget.
+
+### 5.6 Accuracy feedback loop
+
+The initial target remains no more than 1% relative area error per DA, but this is not the only acceptance criterion and must not be described as a confidence interval.
+
+For each candidate mesh:
+
+1. reconstruct affected DAs;
+2. run coverage validity;
+3. compare source and mesh area;
+4. compute symmetric-difference area;
+5. measure shared-boundary Hausdorff deviation in the metric CRS;
+6. verify component, hole, adjacency, and junction preservation;
+7. replay a frozen set of representative boundary moves and compare impact results;
+8. reduce tolerance for failed arcs and repeat.
+
+The maximum visual deviation must be derived from the minimum supported edit zoom and a frozen pixel-error budget. The release configuration records both the pixel budget and resulting meter thresholds. Area success must never override a failed topology or maximum-deviation gate.
+
+### 5.7 Handle policy
+
+Every editable vertex belongs to the canonical mesh. The map line always renders the complete operational mesh line, so there is no hidden exact chain behind a visible chord.
+
+The builder records:
+
+- locked junction/end vertices;
+- editable interior vertices;
+- physical distance to neighboring vertices;
+- local curvature/error contribution;
+- pair-level editable count and total mesh count.
+
+If a fidelity gate requires more vertices than the interaction budget permits, the build must report the pair as over budget. It must not silently weaken fidelity. The product may then raise the budget, tune the minimum edit zoom, or adopt a later control-cage model.
+
+### 5.8 Guard artifacts
+
+For each editable arc or pair:
+
+1. define a maximum displacement or legal movement corridor;
+2. spatially select only mesh segments that can interact with that corridor;
+3. encode those segments in compact transferable buffers;
+4. build a compact spatial index;
+5. record the guard count, bytes, and hash;
+6. verify the guard result against a complete mesh validation corpus.
+
+Unbounded movement cannot have a bounded, complete guard artifact. The first implementation must therefore freeze a maximum displacement/corridor rule.
+
+### 5.9 Artifact and manifest generation
+
+Write artifacts to a staging directory, validate them there, generate hashes and the manifest last, and atomically publish the completed release. Never modify an already published release directory.
+
+## 6. Release validation gates
+
+### 6.1 Topology gates
+
+The release fails if any condition is false:
+
+- every mesh DA is a valid Polygon/MultiPolygon;
+- interiors do not overlap;
+- shared edges are exactly edge-matched;
+- no unintended gap is introduced;
+- all DGUIDs remain represented;
+- feature, component, and required-hole policies are satisfied;
+- source and mesh adjacency graphs match;
+- junctions and locked endpoints retain their identities;
+- every DA ring can be reconstructed continuously from directed arcs;
+- every pair union remains stable under its editable shared-arc partition.
+
+### 6.2 Accuracy gates
+
+Record and enforce:
+
+- relative DA area error, with an initial maximum of 1%;
+- absolute DA area error;
+- symmetric-difference area and ratio;
+- densified Hausdorff distance for each shared arc;
+- maximum chord length;
+- minimum clearance;
+- exact-versus-mesh impact difference for the regression edit corpus;
+- population estimate difference under the frozen impact model.
+
+Thresholds other than the 1% initial area target must be frozen in a checked-in build configuration after calibration. Changes require a new release identity.
+
+### 6.3 Determinism gates
+
+- two clean builds from identical inputs produce identical artifact hashes;
+- build order, worker count, operating system path separator, and newline style do not change identity;
+- every arc and vertex ID is stable within the release;
+- all coordinates are quantized before hashing;
+- manifest identity covers source hashes, builder version, parameters, schemas, and artifacts.
+
+### 6.4 Repository and build gates
+
+- no artifact exceeds the configured Git limit;
+- the builder remains within `--max-memory-mb`;
+- all phases support explicit progress reporting;
+- interrupted builds can resume without accepting partial output;
+- source exact assets are excluded from runtime packaging once cutover completes;
+- current and previous immutable releases remain independently verifiable.
+
+## 7. Runtime implementation plan
+
+### 7.1 Pair-open API
+
+Add a canonical mesh pair endpoint under the existing public map API. It returns the pair edit bundle and no exact source geometry.
+
+The server must:
+
+1. resolve the active release;
+2. validate local/Supabase release identity;
+3. verify that both DGUIDs are Enabled and adjacent;
+4. range-read only referenced mesh/guard artifacts;
+5. return a bounded response with cache validators;
+6. reject missing, corrupt, stale, or over-budget artifacts without falling back to Yukon or another release.
+
+Network contract tests must fail if a browser-facing pair response contains source exact geometry.
+
+### 7.2 Rendering
+
+MapLibre sources should contain only:
+
+- selected canonical mesh DA overlay or compact pair materialization;
+- original shared mesh line;
+- proposed shared mesh line;
+- changed-area fill;
+- editable handles.
+
+PMTiles continues to show detailed immutable geography below the overlay. Exact GeoJSON is not used to preserve coastline detail in the overlay.
+
+Opening another pair must abort outstanding requests, remove prior pair sources, terminate or reset pair-specific Worker state, and release all previous buffers.
+
+### 7.3 Worker ownership
+
+The Worker owns compact typed-array mesh state and the guard spatial index. Use transferable `ArrayBuffer` ownership where practical.
 
 ```text
-INIT(transferable edit buffers)
+INIT(mesh buffers, guard buffers, metrics)
   -> READY(summary)
 
-PREVIEW_MOVE(vertexId, coordinate)
-  -> PREVIEW_RESULT(changed arc coordinates, validity, impact delta)
+PREVIEW_MOVE(meshVertexId, targetCoordinate, sequence)
+  -> PREVIEW_RESULT(validCoordinate, changedSegments, impactDelta, sequence)
 
-COMMIT_MOVE(vertexId, coordinate)
-  -> COMMIT_RESULT(operation, changed arc coordinates, accumulated impact)
+COMMIT_MOVE(meshVertexId, targetCoordinate, sequence)
+  -> COMMIT_RESULT(baseRelativeOperation, changedSegments, accumulatedImpact)
 
 UNDO / REDO
-  -> COMMIT_RESULT(operation delta, changed arc coordinates, accumulated impact)
+  -> COMMIT_RESULT(changedOperations, changedSegments, accumulatedImpact)
 ```
 
-`ArrayBuffer` ownership should be transferred where practical. `SharedArrayBuffer` is not required for the first implementation because it adds cross-origin-isolation deployment requirements.
+The Worker never receives or returns a complete source or mesh FeatureCollection after initialization.
 
-### 4.5 Submission contract
+### 7.4 Local pointer-move validation
 
-The browser submits:
+At most one preview is active per animation frame. Reject stale sequence numbers.
 
-- release and base revision identities;
-- canonical pair identity;
-- ordered sparse absolute operations;
-- non-authoritative preview impact data only when useful for diagnostics.
+For a moved vertex, validate only:
 
-The server:
+1. finite coordinate and maximum displacement;
+2. legal corridor containment;
+3. the two incident chords or other bounded incident set;
+4. intersections with guard segments returned by the spatial index;
+5. minimum node/segment clearance;
+6. orientation and local fold constraints;
+7. local changed-area contribution.
 
-1. verifies the active release and exact digest;
-2. loads the exact pair without returning it to the browser;
-3. resolves every stable vertex occurrence;
-4. applies operations to both owners of each shared vertex;
-5. runs authoritative topology, clearance, area, and scope validation;
-6. calculates authoritative impacts;
-7. persists the immutable geometry revision and sparse operations atomically;
-8. returns the committed projection and validation summary.
+Do not rebuild a DA index, construct a full MultiLineString, materialize both DA polygons, or run full JSTS overlay during pointer movement. Invalid pointer positions may be clipped to the corridor and refined with a small local search; the current unconditional 16 full-topology binary checks must be removed.
 
-## 5. Release-generation plan
+### 7.5 Incremental impact
 
-### 5.1 Extend the existing topology pass
+Store base metric area and the shoelace contribution around each mesh vertex. Moving one vertex updates only its incident terms.
 
-The existing SQLite-backed, single-writer topology pass is the correct foundation. Extend it instead of loading all national geometry into memory.
+The existing population model is area-proportional and remains an estimate. Version the new result, for example `mesh-area-proportional-v2`, and calculate it from the frozen metric CRS and mesh area model. The server recalculates the authoritative result during submission.
 
-The build should:
+### 7.6 History
 
-1. retain exact shards and current DGUID offsets;
-2. construct reusable canonical arcs for both shared and non-shared boundaries;
-3. store per-DA ordered arc references and orientation;
-4. store pair shared-arc references;
-5. assign stable vertex IDs and exact occurrence references;
-6. generate topology-safe fine/medium/coarse arc LODs once per arc;
-7. derive compact pair outer-outline references without materializing repeated pair GeoJSON;
-8. compute pair complexity records;
-9. build bounded collision-guard artifacts near editable shared arcs;
-10. write hashes, counts, byte sizes, schema versions, and artifact paths to the release manifest.
+Undo and redo store base-relative vertex states or bounded operation patches, never geometry snapshots. History limits are expressed in operation count and buffer bytes.
 
-Adjacent DAs must reuse the same simplified shared arc. Simplifying two polygons independently is prohibited because it can create gaps, overlaps, or inconsistent edit handles.
+## 8. Submission, persistence, and Archived Tree
 
-### 5.2 Preserve significant coastal topology
+### 8.1 Submission validation
 
-LOD generation must distinguish editable shared boundaries from non-editable coastlines:
+The client submits release identity, canonical pair, and ordered base-relative operations.
 
-- shared arc endpoints and all editable handle vertices are mandatory at every applicable edit LOD;
-- ring closure, winding, and ownership must be preserved;
-- islands must not be removed merely because their screen area is small unless the display contract explicitly permits that omission;
-- exact geometry and exact validation are never simplified;
-- display-only coastlines may use stronger simplification than shared editable arcs;
-- every LOD must pass pair union, non-overlap, adjacency, and digest validation.
+The server transaction:
 
-### 5.3 Generate bounded collision guards
+1. verifies active `releaseId` and `meshRevision`;
+2. validates operation schema and unique vertex IDs;
+3. resolves immutable base coordinates;
+4. materializes proposed mesh coordinates once;
+5. runs complete canonical-mesh topology and scope validation;
+6. calculates authoritative area/population impact;
+7. persists the geometry revision and operations atomically;
+8. returns a geometry-free submission projection plus validation summary.
 
-Local validation is only compact if vertex movement is bounded. The edit contract must therefore define a maximum displacement or a server-derived legal movement corridor.
+The existing tables may be evolved rather than replaced, but each revision and operation must unambiguously identify the mesh operation space. Existing exact-release rows must remain distinguishable.
 
-For each editable shared arc, the builder should spatially query only outer/shared segments whose envelopes intersect that corridor. Those segments become the guard artifact used for drag previews. The full exact boundary remains available to the server for commit validation.
+### 8.2 Archived Tree merge and LWW
 
-If product requirements permit unbounded movement, the client cannot guarantee complete collision validation with a small guard set. In that case, client validation must be explicitly advisory and final submission may be rejected by the server.
+Archived Tree uses the same `meshVertexId` namespace and base-relative delta.
 
-## 6. Browser and Worker implementation plan
+- merge time, not submission time, determines LWW sequence;
+- the latest state for a vertex is one delta plus the winning merge sequence;
+- unrelated arcs remain unchanged;
+- merge/revert validates the resulting global archived mesh before commit;
+- branch and global archive revisions record `releaseId` and `meshRevision`;
+- Counter-Proposal branch snapshots contain materialized canonical mesh GeoJSON, not source exact GeoJSON;
+- Comment and Objection branches remain geometry-free and materialize base mesh geometry only for map/export views.
 
-### 6.1 Pair opening
+Revert restores only the branch-owned arc states from the selected historical version, preserves unrelated current arcs, validates the global result, and creates a new monotonic map revision.
 
-```text
-Select adjacent pair
-  -> request compact edit manifest
-  -> verify release identity and artifact hashes
-  -> load only selected LOD arcs, handles, and guards
-  -> transfer edit buffers to Worker
-  -> render PMTiles base plus compact overlay
-```
+Delete Forever resets the affected branch vertices to zero base-relative delta, applies the existing submission/workspace state semantics, validates the global result, and records a delete transition.
 
-Opening Step 3 must not request the two exact DA GeoJSON features. Network tests must enforce this invariant.
+### 8.3 Export
 
-Only one Counter-Proposal pair may remain resident. Selecting another pair must abort old requests, remove old MapLibre sources, terminate the old Worker, and release all pair-specific references.
+Export keeps its schema version independent from `releaseId`. It must include:
 
-### 6.2 Rendering
+- export `schemaVersion`;
+- `releaseId` and `meshRevision`;
+- archive map revision sequence;
+- branch/version metadata and submission projections;
+- base-relative operations;
+- directly parseable materialized canonical mesh GeoJSON where the export contract requires geometry;
+- the impact method/version.
 
-Use separate, stable MapLibre sources for:
+The export must identify the geometry as the project's canonical operational mesh derived from the declared source revision.
 
-- original shared line;
-- proposed shared line;
-- delta fill;
-- simplified outer outline;
-- handles.
+## 9. Compatibility and cutover
 
-The proposed source should update only changed features. Stable feature IDs may allow `GeoJSONSource.updateData()` for small diffs; otherwise `setData()` is acceptable because the compact overlay is bounded. Exact polygons must never be passed to either method.
+### 9.1 Historical releases
 
-### 6.3 Drag preview
+Existing operations reference the old exact shared-vertex catalog and cannot be silently reinterpreted as mesh operations.
 
-During pointer movement:
+Choose and document one policy before cutover:
 
-- throttle or coalesce preview requests to at most one active Worker request per animation frame;
-- send only `vertexId + coordinate`;
-- reject stale Worker sequence numbers;
-- validate affected segments against the compact guard index;
-- update only the changed shared arc and delta region;
-- never rebuild the complete DA pair index;
-- never communicate with Supabase or the submission server.
+1. retain old releases for read-only historical materialization; or
+2. mark old submissions/archive geometry superseded under the project's metadata-change rule and preserve their existing exported snapshots for audit.
 
-### 6.4 Incremental area and population
+An in-place vertex-ID translation is prohibited unless a migration proves an unambiguous source-to-mesh mapping for every operation.
 
-Moving one vertex changes only the shoelace contributions involving that vertex and its immediate neighbors. Store base area plus per-occurrence neighbor references and compute an area delta in constant time per occurrence.
+### 9.2 Staged activation
 
-Population change remains derived from the accumulated authoritative area model. The browser result is a preview; the server recalculates it during submission.
+1. Register the new release as inactive.
+2. Run all offline release gates.
+3. Run API/runtime tests against an explicit non-active release ID.
+4. Back up relevant Supabase geometry/archive tables.
+5. Deploy code capable of reading both old historical and new mesh contracts.
+6. Activate the mesh release atomically.
+7. Confirm local manifest and Supabase identity at server startup.
+8. Run browser and API smoke tests.
+9. Remove exact source geometry from runtime packaging only after rollback confidence is established.
 
-### 6.5 History
+Rollback reactivates the prior release and compatible code path; it never rewrites either release.
 
-Undo and redo store bounded sparse operations, not geometry snapshots. Replaying or reversing an operation updates:
+## 10. Implementation sequence
 
-- the affected vertex coordinate;
-- the affected shared-arc display coordinates;
-- local guard validation state;
-- accumulated area/population impact.
+### Phase 0: measurement and frozen regression corpus
 
-History limits should be expressed in operation count and compact-buffer bytes.
+- Preserve the audited ordinary, island, coastal, and extreme pairs.
+- Add MultiPolygon, multiple-shared-arc, hole, narrow-corridor, cross-FED, cross-province, and three-way-junction fixtures.
+- Record current payload, open duration, preview duration, Worker clone duration, JS heap, renderer memory, submission duration, and archive transition duration.
+- Freeze build and runtime performance budgets.
 
-## 7. Server validation and persistence plan
+### Phase 1: canonical arc graph
 
-### 7.1 Avoid rebuilding national-style object graphs
+- Upgrade pair-owned edges to global canonical arcs.
+- Generate stable junction, arc, and vertex identities.
+- Generate directed DA ring references.
+- Prove exact reconstruction before simplification.
+- Extend deterministic and resume tests.
 
-The server may use exact geometry, but it should not repeat the browser's current string-keyed `edgeOwners` expansion on every request.
+### Phase 2: mesh simplification and gates
 
-Use release-built indexes to resolve:
+- Add the projected metric build stage.
+- Add coverage-aware adaptive simplification.
+- Add maximum-chord densification.
+- Add topology, area, symmetric-difference, Hausdorff, adjacency, and determinism gates.
+- Iterate first on the frozen corpus, then one FED, one province, and finally the national release.
 
-- `vertexId -> exact coordinate occurrences`;
-- pair shared arcs;
-- nearby collision segments;
-- base area and topology identities.
+### Phase 3: guard and metric artifacts
 
-Applying `k` moved vertices should be proportional to their occurrences and affected arcs. Full serialization of the final exact snapshot remains proportional to pair size, but occurs once on the server rather than repeatedly in the browser.
+- Freeze movement-corridor policy.
+- Generate compact guard segments and spatial indexes.
+- Generate base area, local shoelace, population, and complexity metadata.
+- Verify local guard decisions against complete mesh validation.
 
-If JavaScript/JSTS validation remains too slow for extreme pairs, evaluate a server-only GEOS/PostGIS validation adapter or a worker-thread validation job. This is an implementation choice; it must not change the frozen browser contract.
+### Phase 4: mesh read API and renderer
 
-### 7.2 Persistence compatibility
+- Add the mesh pair endpoint.
+- Add hash/range/cache validation.
+- Render only canonical mesh overlays.
+- Ensure pair switching releases all prior resources.
+- Add a network assertion that exact source geometry is absent.
 
-The existing immutable submission geometry design remains valid:
+### Phase 5: incremental Worker editor
 
-- `submission_geometry_revisions` stores committed revision identity and exact result metadata;
-- `submission_geometry_operations` stores stable sparse operations;
-- the committed exact proposed snapshot may remain available for authorized detail/replay;
-- list endpoints remain geometry-free;
-- Archived Tree merge applies sparse operations to the latest exact branch snapshot and persists the next immutable version.
+- Replace full-cache Worker messages with compact transferable state.
+- Implement coalesced local previews.
+- Implement base-relative operation history.
+- Implement constant/local impact updates.
+- Remove complete JSTS and index rebuilds from the pointer hot path.
 
-The optimization changes how editing data reaches the browser. It does not weaken immutable submission or Archived Tree guarantees.
+### Phase 6: server submission and persistence
 
-## 8. Temporary safety gate
+- Validate mesh release identity.
+- Accept and normalize base-relative operations.
+- Materialize and fully validate canonical mesh once per submission.
+- Persist mesh revision identity and authoritative impacts.
+- Preserve geometry-free list/query behavior.
 
-Before compact edit bundles are complete, the current exact-browser path must fail safely for pairs predicted to exceed a conservative budget.
+### Phase 7: Archived Tree and export
 
-The gate should use release-derived data such as:
+- Apply mesh operations through merge, LWW, revert, and delete.
+- Validate global archived mesh transitions.
+- Update branch/map materializers and caches.
+- Version and verify export geometry semantics.
 
-- exact vertex count;
-- ring count;
-- outer segment count;
-- raw exact bytes;
-- estimated expanded browser bytes;
-- edit-bundle availability.
+### Phase 8: cutover and retirement
 
-An initial policy may classify pairs as standard, complex, or extreme. Exact thresholds must be calibrated from the project test machines and must not be treated as universal browser limits.
+- Complete compatibility decision and backups.
+- Activate the new release.
+- Run full integration and browser acceptance.
+- Confirm no runtime exact geometry request, parse, clone, or materialization remains.
+- Remove source exact assets from deployment packaging while preserving offline provenance and rebuild inputs.
 
-If an extreme pair has no validated compact bundle, Step 3 should show a clear unsupported-complexity message instead of attempting to load exact geometry. The gate is a temporary availability limitation, not the final solution.
+## 11. Acceptance criteria
 
-## 9. Implementation phases
+### 11.1 Functional
 
-### Phase 0 — Measurement and safety
+- Every Enabled adjacent DA pair with a valid mesh bundle can enter the editor.
+- Original and proposed lines are derived from the same canonical mesh used for validation.
+- Handles are deterministic for a release.
+- Undo/redo/reload reproduces the same coordinates and impact.
+- Submission, Commissioner review, merge, revert, delete, Archived Map, and export preserve mesh identity and geometry.
+- Stale or mismatched releases fail closed.
 
-- Freeze the three-pair regression corpus listed in Section 2.1.
-- Record network bytes, pair build duration, Worker copy duration, main-thread long tasks, JS heap, total page/Worker memory, and MapLibre source timing.
-- Add pair complexity generation and the temporary hard gate.
-- Confirm that repeated open/close cycles release the previous Worker and pair assets.
+### 11.2 Performance
 
-### Phase 1 — Release topology expansion
+- Browser pair-open responses contain no source exact GeoJSON.
+- Extreme source complexity does not proportionally increase runtime payload or memory.
+- Pointer preview performs no complete polygon overlay and no complete pair-index rebuild.
+- Preview p95 meets the frozen interaction-frame budget on the reference test machine.
+- Repeated pair open/close does not produce monotonically growing heap or Worker counts.
+- The frozen extreme pair opens, edits, submits, merges, reverts, and deletes without OOM.
 
-- Add reusable all-boundary arcs and per-DA arc references.
-- Add vertex occurrence indexes.
-- Generate topology-safe display LODs and pair complexity records.
-- Generate compact outer-outline and guard artifacts.
-- Extend manifest validation and deterministic rebuild tests.
+### 11.3 Geometry and impact
 
-### Phase 2 — Compact API and rendering
+- All topology, accuracy, adjacency, and determinism gates in Section 6 pass.
+- Relative area error is at most the frozen target, initially 1%, for every DA.
+- No DA passes solely because positive and negative local errors cancel.
+- Impact differences for the frozen edit corpus remain within explicit absolute and relative limits.
+- Area calculations use the declared metric model rather than the current Web Mercator approximation.
 
-- Add the edit-manifest/artifact read contract.
-- Stop returning exact features for browser edit requests.
-- Render the PMTiles base plus original/proposed lines and delta overlay.
-- Preserve the existing black outer and red shared-boundary visual contract using compact artifacts.
+### 11.4 Integration
 
-### Phase 3 — Worker and local-first editing
+- Existing Comment and Objection workflows remain functional.
+- Normal map browsing continues to use PMTiles/Google Maps independently.
+- Public and Commissioner submission lists remain geometry-free.
+- Realtime payloads contain projections/identities, not mesh geometry.
+- Archive operations remain atomic and version-conflict safe.
+- Full automated regression, browser acceptance, and production-container health checks pass before activation.
 
-- Replace full-cache messages with transferable compact buffers and operation deltas.
-- Implement coalesced local preview validation.
-- Implement incremental area/population calculation.
-- Store sparse operation history only.
+## 12. Principal risks
 
-### Phase 4 — Authoritative submission
+- Source data may not initially form a clean edge-matched coverage after normalization.
+- Per-partition simplification can create inconsistent cut edges unless canonical arcs are owned globally.
+- A 1% whole-DA area gate can conceal unacceptable local displacement.
+- Fidelity requirements may force more mesh vertices than the initial interaction budget permits.
+- Changing from exact-source to operational-mesh authority changes the semantic meaning of stored geometry and exports.
+- Historical exact-release operations cannot be remapped automatically.
+- Removing source exact assets too early would prevent rollback or historical materialization.
 
-- Accept sparse absolute operations.
-- Resolve and apply operations against the immutable exact release.
-- Run exact validation and calculate authoritative impacts.
-- Persist exact revision output and sparse operations atomically.
-- Verify submission detail, Commissioner review, and Archived Tree replay.
+These risks are controlled by immutable release identities, global arc ownership, multi-metric gates, staged activation, and an explicit historical compatibility policy.
 
-### Phase 5 — Remove the legacy exact-browser path
+## 13. Completion definition
 
-- Delete or permanently reject browser-facing exact edit representation.
-- Remove full pair-index and outer-boundary construction from the client workflow.
-- Remove full-cache Worker responses.
-- Retain a documented rollback to the safe complexity gate, not to an OOM-prone exact fallback.
-
-## 10. Acceptance criteria
-
-### 10.1 Functional
-
-- Every available edit pair uses the active immutable release and stable vertex IDs.
-- Original and Proposed views remain visually distinguishable.
-- Shared-boundary edits update both DA owners consistently.
-- Endpoints and other locked vertices cannot move.
-- Undo and redo reproduce the same sparse operation history.
-- Client validation is responsive and server validation remains authoritative.
-- A rejected server commit preserves the browser draft and returns an actionable reason.
-- Reopening a committed Counter-Proposal reproduces its exact persisted result.
-- Archived Tree merge/revert continues to use immutable geometry and sparse operations correctly.
-
-### 10.2 Topology
-
-- Every generated LOD preserves pair adjacency and common shared arcs.
-- Display LODs contain no gap or overlap between the two selected DAs.
-- Exact server results remain valid, non-overlapping, and confined to the legal pair domain.
-- LOD generation never changes exact digests or authoritative calculations.
-
-### 10.3 Performance targets
-
-Targets are regression budgets, not universal browser guarantees:
-
-- Step 3 makes no browser request for exact pair GeoJSON.
-- A normal pair compact bundle is preferably below 5 MB compressed.
-- An extreme pair compact bundle must remain below 15 MB compressed unless a reviewed exception is recorded.
-- Opening an extreme pair should add less than 150 MB to total page/Worker memory on the reference test machine.
-- Worker initialization should complete within 500 ms after artifacts are available.
-- Drag-preview P95 should remain below 50 ms.
-- No drag operation should create a main-thread task longer than 100 ms.
-- Commit, undo, and redo must not return or retain complete geometry caches.
-- Repeatedly opening and closing five pairs must not show monotonic retained-memory growth.
-
-### 10.4 Required regression corpus
-
-At minimum, test:
-
-1. Saanich—Gulf Islands `170642 + 170644`;
-2. Saanich—Gulf Islands `170642 + 170643` to stress ring count;
-3. Sunshine Coast `290097 + 290098`;
-4. North Island—Powell River outlier `450027 + 490179`;
-5. an ordinary inland pair;
-6. an invalid or unavailable pair;
-7. rapid cancellation while switching from the extreme pair to another pair.
-
-For each valid pair, cover open, Original/Proposed switching, handle selection, valid move, invalid move, undo, redo, submit, reconnect, Commissioner review, and archive replay.
-
-## 11. Measurement guidance
-
-Do not use a nominal Chromium or V8 maximum as the acceptance threshold. Actual failure depends on the operating system, renderer/GPU allocations, extensions, other tabs, Worker heaps, garbage-collection timing, and browser version.
-
-Use:
-
-- Chrome DevTools Performance traces for long tasks and source processing;
-- allocation sampling and Heap Snapshots before open, after open, and after close;
-- browser task-manager process memory for renderer/GPU behavior;
-- `performance.measureUserAgentSpecificMemory()` when the required secure and cross-origin-isolated environment is available;
-- network traces proving exact geometry is absent.
-
-`performance.memory` is deprecated and can omit Worker or non-JS allocations. Memory comparisons must use the same browser version, machine, route state, and pair.
-
-References:
-
-- [MDN: `measureUserAgentSpecificMemory()`](https://developer.mozilla.org/en-US/docs/Web/API/Performance/measureUserAgentSpecificMemory)
-- [MDN: limitations of `performance.memory`](https://developer.mozilla.org/en-US/docs/Web/API/Performance/memory)
-
-## 12. Risks and explicit non-goals
-
-### Risks
-
-- independently simplified polygon boundaries can introduce topology defects;
-- unbounded vertex movement can make a compact client collision guard impossible;
-- display geometry may look correct while exact server validation rejects the operation;
-- careless artifact generation can exceed repository file limits;
-- rebuilding complete exact snapshots on the server may remain slow even after browser OOM is eliminated;
-- multiple retained Workers or MapLibre sources can reintroduce memory growth.
-
-### Non-goals
-
-- changing the PMTiles basemap;
-- allowing the browser to become the geometry authority;
-- writing runtime-generated releases back to GitHub or Supabase;
-- weakening exact validation for coastal pairs;
-- storing a full geometry snapshot for every undo step;
-- using handle-count reduction as the sole complexity control.
-
-## 13. Final recommendation
-
-The implementation should converge on:
-
-```text
-PMTiles immutable base
-  + topology-safe display overlay
-  + compact shared-arc edit bundle
-  + transferable Worker state
-  + sparse absolute operations
-  + server-only exact validation
-```
-
-This design addresses both audited failure classes:
-
-- moderate coastal pairs stop paying repeated index, outer-boundary, and structured-clone costs;
-- extreme archipelago pairs never place hundreds of thousands of exact polygon vertices in the browser.
-
-Until this complete path is available, extreme pairs must be rejected by a deliberate complexity gate rather than allowed to crash the browser.
+This future update is complete only when the canonical mesh is reproducibly built and validated, exact GeoJSON has left every Counter-Proposal runtime path, local indexed previews replace complete per-frame overlays, submission and Archived Tree use the same mesh-relative operation model, the extreme regression corpus passes without OOM, and the release can be activated or rolled back without rewriting historical data.

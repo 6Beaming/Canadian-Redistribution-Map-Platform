@@ -13,6 +13,10 @@ Past Releases:
 
 These releases were verified with `npm test`, `npm run check:server`, and `npm run build`.
 
+## After Course
+
+Since August 6, the project has received broad post-course hardening and optimization across immutable map releases, sparse geometry operations, database contracts and security, submission queries and caching, realtime synchronization, Workspace and Archived Tree workflows, responsive map UI, diagnostics, and integration coverage. The remaining Counter-Proposal editing scalability gap is the replacement of runtime exact geometry with a canonical operational mesh, documented in the [future Counter-Proposal canonical mesh plan](docs/After-Course/future-update-plan.md).
+
 ## Background
 Every ten years, the Canadian government redraws the lines for federal voting districts (ridings). Currently, if citizens want to provide feedback or object to new boundaries, they must submit emails or physical letters. This project provides a map-centered web application where people can view proposed electoral maps, submit feedback, or even draw better lines directly on the screen.
 
