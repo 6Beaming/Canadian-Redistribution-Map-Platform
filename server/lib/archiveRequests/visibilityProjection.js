@@ -60,7 +60,8 @@ export async function projectArchiveRequestVisibility(supabase, rows, actorProfi
     const isAssignee = visibility?.isAssignee === true;
     return {
       ...row,
-      visible_status: isAssignee ? "archive-request" : "accepted",
+      // Everyone sees Archive Request / Merge Request status; voting stays assignee-gated.
+      visible_status: "archive-request",
       archive_request_assigned_to_viewer: isAssignee,
       archive_request_id: visibility?.requestId ?? null,
       archive_request_version: visibility?.requestVersion ?? null,
@@ -70,5 +71,5 @@ export async function projectArchiveRequestVisibility(supabase, rows, actorProfi
 
 export function projectSingleArchiveRequestStatus(row, visibility) {
   if (!isArchiveRequestStatus(row?.status)) return row?.status;
-  return visibility?.isAssignee === true ? "archive-request" : "accepted";
+  return "archive-request";
 }

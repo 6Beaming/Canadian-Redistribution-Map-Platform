@@ -46,6 +46,24 @@
   border-radius: clamp(14px, 1.5vw, 24px);
 }
 
+.workspace-map-layout--detail.map-dashboard--fullscreen {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0;
+  height: 100dvh;
+}
+
+.workspace-map-layout--detail.map-dashboard--fullscreen .workspace-review-page--layout-panel {
+  display: none;
+}
+
+.workspace-map-layout--detail.map-dashboard--fullscreen .workspace-map-host {
+  grid-column: 1 / -1;
+}
+
+.workspace-map-layout--detail.map-dashboard--fullscreen .workspace-map-host .map-canvas {
+  border-radius: 0;
+}
+
 .workspace-review-page--layout-panel .workspace-review-panel--with-overlay {
   height: 100%;
 }

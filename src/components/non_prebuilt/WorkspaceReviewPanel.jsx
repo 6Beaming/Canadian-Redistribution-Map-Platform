@@ -1071,6 +1071,11 @@ function DecisionControls({
           value={message}
           onChange={(event) => setMessage(event.target.value)}
           placeholder="Explain the decision and its reasoning..."
+          disabled={
+            displayedStatus === WORKSPACE_STATUS.ARCHIVE_REQUEST
+            && !isRequester
+            && !submission.archive_request_assigned_to_viewer
+          }
         />
       </label>}
       {error ? <p className="workspace-decision-error" role="alert">{error}</p> : null}
@@ -1089,8 +1094,22 @@ function DecisionControls({
           <button type="button" className="is-accept" disabled={isSubmitting} onClick={() => runAction("accept-again")}><Check />Accept again</button>
         ) : null}
         {displayedStatus === WORKSPACE_STATUS.ARCHIVE_REQUEST && request && !isRequester ? <>
-          <button type="button" className="is-accept" disabled={isSubmitting} onClick={() => runAction("archive-vote-accept")}><Check />Accept</button>
-          <button type="button" className="is-reject" disabled={isSubmitting} onClick={() => runAction("archive-vote-reject")}><X />Reject</button>
+          <button
+            type="button"
+            className="is-accept"
+            disabled={isSubmitting || !submission.archive_request_assigned_to_viewer}
+            onClick={() => runAction("archive-vote-accept")}
+          >
+            <Check />Accept
+          </button>
+          <button
+            type="button"
+            className="is-reject"
+            disabled={isSubmitting || !submission.archive_request_assigned_to_viewer}
+            onClick={() => runAction("archive-vote-reject")}
+          >
+            <X />Reject
+          </button>
         </> : null}
         {displayedStatus === WORKSPACE_STATUS.ARCHIVE_REQUEST && isRequester ? <>
           <button type="button" className="is-reject" disabled={isSubmitting} onClick={() => runAction("archive-cancel")}><X />Cancel Request</button>
@@ -1099,6 +1118,14 @@ function DecisionControls({
           </button>
         </> : null}
       </div> : null}
+      {displayedStatus === WORKSPACE_STATUS.ARCHIVE_REQUEST
+        && request
+        && !isRequester
+        && !submission.archive_request_assigned_to_viewer ? (
+        <p className="workspace-decision-note" role="status">
+          You are not an assignee on this Archive Request. Accept and Reject stay disabled until you are assigned. Labels and comments remain available.
+        </p>
+      ) : null}
       {displayedStatus === WORKSPACE_STATUS.ARCHIVE_REQUEST && !request ? (
         <p className="workspace-decision-note" role="status">
           {archiveRequestLoading

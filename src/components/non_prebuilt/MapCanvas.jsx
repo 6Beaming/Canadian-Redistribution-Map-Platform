@@ -1745,6 +1745,21 @@ export function MapCanvas({
         );
         map.setPaintProperty("da-outline", "line-opacity", boundaryLineOpacity(showBoundaries));
       }
+
+      // Workspace / archive review outlines must follow the same toggle.
+      [
+        "workflow-focus-outline",
+        "counter-proposal-outline",
+        "objection-boundary-line",
+        "objection-boundary-glow",
+      ].forEach((layerId) => {
+        if (!map.getLayer(layerId)) return;
+        map.setLayoutProperty(
+          layerId,
+          "visibility",
+          showBoundaries ? "visible" : "none",
+        );
+      });
     }
 
     function addObjectionBoundaryLayers() {

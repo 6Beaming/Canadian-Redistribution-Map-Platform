@@ -3,6 +3,7 @@ import { Outlet, useMatch } from "react-router-dom";
 import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
 import { PanelLoadingOverlay } from "@/components/non_prebuilt/LoadingIndicator.jsx";
 import { WorkspaceMapLayoutContext } from "@/contexts/WorkspaceMapLayoutContext.jsx";
+import { useMapFullscreen } from "@/contexts/MapFullscreenContext.jsx";
 import { MAP_INTERACTION_MODE } from "@/lib/map/interactionMode.js";
 import { subscribeCommissionerListStoreToWorkspaceEvents } from "@/lib/submissions/commissionerListStoreRealtime.js";
 import "@/styles/map.css";
@@ -23,6 +24,7 @@ const EMPTY_MAP_CONFIG = {
 
 export default function WorkspaceMapLayout() {
   const isDetail = Boolean(useMatch("/dashboard/workspace/:submissionId"));
+  const { isFullscreen, toggle: toggleFullscreen } = useMapFullscreen();
   const [mapActivated, setMapActivated] = useState(false);
   const [mapFetching, setMapFetching] = useState(false);
   const [mapConfig, setMapConfig] = useState(EMPTY_MAP_CONFIG);
@@ -64,14 +66,14 @@ export default function WorkspaceMapLayout() {
       window.dispatchEvent(new Event("resize"));
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [isDetail, mapActivated]);
+  }, [isDetail, mapActivated, isFullscreen]);
 
   const showMapHost = mapActivated || (isDetail && !mapConfig.geometryError);
 
   return (
     <WorkspaceMapLayoutContext.Provider value={contextValue}>
       <div
-        className={`workspace-map-layout${isDetail ? " workspace-map-layout--detail" : " workspace-map-layout--tree"}`}
+        className={`workspace-map-layout${isDetail ? " workspace-map-layout--detail" : " workspace-map-layout--tree"}${isFullscreen ? " map-dashboard--fullscreen" : ""}`}
       >
         {showMapHost ? (
           <div className="workspace-map-host">
@@ -87,6 +89,8 @@ export default function WorkspaceMapLayout() {
                     <div className="sr-only" aria-live="polite">{mapConfig.status}</div>
                     <MapCanvas
                       selection={null}
+                      isFullscreen={isFullscreen}
+                      onToggleFullscreen={toggleFullscreen}
                       objectionPreview={mapConfig.objectionPreview}
                       counterProposalPreview={mapConfig.counterProposalPreview}
                       focusGeoJson={mapConfig.focusGeoJson}

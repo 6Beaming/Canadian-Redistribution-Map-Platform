@@ -206,6 +206,10 @@ test("Shared loading UI blocks page content and fullscreen owns Header visibilit
 
   assert.match(app, /WorkspaceMapLayout/);
   assert.match(app, /ArchivedMapLayout/);
+  assert.match(workspaceLayout, /useMapFullscreen/);
+  assert.match(workspaceLayout, /onToggleFullscreen=\{toggleFullscreen\}/);
+  assert.match(workspaceLayout, /isFullscreen=\{isFullscreen\}/);
+  assert.match(workspaceLayoutCss, /workspace-map-layout--detail\.map-dashboard--fullscreen/);
   assert.match(read("src/layouts/ArchivedMapLayout.jsx"), /<ArchivedTree/);
   assert.doesNotMatch(app, /index element=\{<ArchivedTree/);
   assert.ok(app.indexOf("<Header") < app.indexOf("<RouteLoadingOverlay />"));

@@ -22,7 +22,7 @@ function archiveRequestAdmin(requests) {
   };
 }
 
-test("Archive Request status projects to Archive Request only for current assignees", async () => {
+test("Archive Request status is visible to all commissioners; assignee flag gates votes", async () => {
   const row = { id: "submission-1", status: "archive-request" };
   const request = {
     id: "request-1",
@@ -46,9 +46,11 @@ test("Archive Request status projects to Archive Request only for current assign
   );
 
   assert.equal(applyCommissionerStatusVisibility(assigned).status, "archive-request");
-  assert.equal(applyCommissionerStatusVisibility(unassigned).status, "accepted");
+  assert.equal(applyCommissionerStatusVisibility(unassigned).status, "archive-request");
   assert.equal(applyCommissionerStatusVisibility(unassigned).actual_status, "archive-request");
-  assert.equal(applyCommissionerStatusVisibility(unassigned).archive_request_status_hidden, true);
+  assert.equal(applyCommissionerStatusVisibility(unassigned).archive_request_status_hidden, false);
+  assert.equal(applyCommissionerStatusVisibility(assigned).archive_request_assigned_to_viewer, true);
+  assert.equal(applyCommissionerStatusVisibility(unassigned).archive_request_assigned_to_viewer, false);
 });
 
 test("requester remains visible as an assignee for a legacy request row", async () => {
