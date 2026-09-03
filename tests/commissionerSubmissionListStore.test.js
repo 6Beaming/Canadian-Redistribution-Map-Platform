@@ -56,11 +56,17 @@ test("commissioner list cache is only live on table and workspace surfaces", () 
   assert.equal(isCommissionerListSurface("/dashboard/workspace/submission-1"), true);
 });
 
-test("invalidate drops cached rows without bootstrapping", () => {
+test("invalidate can skip notify so workspace tree can silent-refresh", () => {
   const store = new CommissionerSubmissionListStore();
-  store.invalidate();
+  let notifies = 0;
+  store.subscribe(() => {
+    notifies += 1;
+  });
+  store.upsertItem({ id: "row-1", created_at: new Date().toISOString(), status: "pending" });
+  notifies = 0;
+  store.invalidate({ notify: false });
+  assert.equal(notifies, 0);
   assert.deepEqual(store.getItems(), []);
-  assert.equal(store.cache.fullyLoaded, false);
 });
 
 test("remote row upsert and delete patch the commissioner list cache", () => {

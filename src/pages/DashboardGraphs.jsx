@@ -48,6 +48,10 @@ export default function DashboardGraphs() {
 
     const refreshAffectedSubmission = async ({ event, hints, resync }) => {
       const submissionId = getRealtimeSubmissionId({ event, hints });
+      if (resync && !submissionId) {
+        if (mounted) await loadAnalytics();
+        return;
+      }
       if (resync || !submissionId) {
         await store.reset();
       } else if (event?.entity === "submission" && event.operation === "delete") {

@@ -140,9 +140,9 @@ export class CommissionerSubmissionListStore {
     }
   }
 
-  async reset() {
-    this.invalidate();
-    await this.ensureBootstrapped();
+  async reset({ signal, notifyOnInvalidate = true } = {}) {
+    this.invalidate({ notify: notifyOnInvalidate });
+    await this.ensureBootstrapped({ signal });
   }
 
   upsertItem(item, { notify = true } = {}) {
@@ -157,7 +157,7 @@ export class CommissionerSubmissionListStore {
     if (notify) this.#notify();
   }
 
-  invalidate() {
+  invalidate({ notify = true } = {}) {
     this.#cancelBackground();
     this.#itemsById.clear();
     this.#fullyExpanded = false;
@@ -169,7 +169,7 @@ export class CommissionerSubmissionListStore {
     this.#bootstrapping = false;
     const resolvers = this.#fullyExpandedResolvers.splice(0);
     resolvers.forEach((resolve) => resolve(this.cache));
-    this.#notify();
+    if (notify) this.#notify();
   }
 
   #getSortedItems() {

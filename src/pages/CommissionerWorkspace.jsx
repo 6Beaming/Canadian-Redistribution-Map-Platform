@@ -18,14 +18,9 @@ import {
 import {
   getWorkspaceSubmission,
   mapWorkspaceSubmissions,
-  subscribeWorkspaceListState,
 } from "@/services/workspaceApi.js";
 import { getCommissionerSubmissionListStore } from "@/lib/submissions/commissionerSubmissionListStore.js";
 import { useRouteLoading } from "@/contexts/RouteLoadingContext.jsx";
-import {
-  getRealtimeSubmissionId,
-  reconcileWorkspaceSubmission,
-} from "@/lib/realtime/workspaceRealtime.js";
 import { PanelLoadingOverlay } from "@/components/non_prebuilt/LoadingIndicator.jsx";
 import "@/styles/workspace.css";
 
@@ -599,7 +594,10 @@ export default function CommissionerWorkspace() {
   const [searchParams, setSearchParams] = useSearchParams();
   const focusId = searchParams.get("focus");
   const { signalRouteReady } = useRouteLoading() ?? {};
+  const signalRouteReadyRef = useRef(signalRouteReady);
+  signalRouteReadyRef.current = signalRouteReady;
   const storeRef = useRef(getCommissionerSubmissionListStore());
+  const focusedRowRef = useRef(null);
   const [workspaceSubmissions, setWorkspaceSubmissions] = useState([]);
   const [treeFetching, setTreeFetching] = useState(() => {
     const cached = mapWorkspaceSubmissions(storeRef.current.getItems(), { includeArchived: false });
@@ -615,7 +613,6 @@ export default function CommissionerWorkspace() {
     let isMounted = true;
     const abortController = new AbortController();
     const store = storeRef.current;
-    let focusedRow = null;
 
     const mergeFocusedSubmission = (submissions, focused) => {
       const merged = new Map(
@@ -633,6 +630,7 @@ export default function CommissionerWorkspace() {
     const syncFromStore = () => {
       if (!isMounted) return;
       const submissions = mapWorkspaceSubmissions(store.getItems(), { includeArchived: false });
+      const focusedRow = focusedRowRef.current;
       const next = focusedRow
         ? mergeFocusedSubmission(submissions, focusedRow)
         : submissions;
@@ -640,43 +638,12 @@ export default function CommissionerWorkspace() {
         setWorkspaceSubmissions(next);
         if (next.length > 0 || !store.isBootstrapping()) {
           setTreeFetching(false);
-          signalRouteReady?.();
+          signalRouteReadyRef.current?.();
         }
       });
     };
 
     const unsubscribeStore = store.subscribe(syncFromStore);
-
-    const refreshAffectedSubmission = async ({ event, hints, resync }) => {
-      const affectedSubmissionId = getRealtimeSubmissionId({ event, hints });
-      if (resync || !affectedSubmissionId) {
-        await store.reset();
-        if (!isMounted) return;
-        syncFromStore();
-        return;
-      }
-
-      try {
-        const submission = event.entity === "submission" && event.operation === "delete"
-          ? null
-          : await getWorkspaceSubmission(affectedSubmissionId, { hydrateGeometry: false });
-        if (!isMounted) return;
-        if (submission) {
-          store.upsertItem(submission, { notify: false });
-        } else {
-          store.removeItem(affectedSubmissionId, { notify: false });
-        }
-        setWorkspaceSubmissions((current) => (
-          reconcileWorkspaceSubmission(current, event, submission, hints)
-        ));
-        setLoadError("");
-      } catch (error) {
-        if (isMounted) {
-          setLoadError(error.message || "The affected submission could not be refreshed.");
-        }
-        throw error;
-      }
-    };
 
     void (async () => {
       try {
@@ -686,16 +653,10 @@ export default function CommissionerWorkspace() {
           syncFromStore();
         }
 
-        void store.ensureBootstrapped({ signal: abortController.signal });
-
-        if (focusId) {
-          focusedRow = await getWorkspaceSubmission(focusId, { hydrateGeometry: false });
-          if (!isMounted) return;
-          if (!focusedRow) throw new Error("The focused submission was not found.");
-          setExpansion(createFocusedExpansion(focusedRow));
-          syncFromStore();
-        }
-
+        // Hot start only — WorkspaceMapLayout owns submission-driven refresh.
+        await store.ensureBootstrapped({ signal: abortController.signal });
+        if (!isMounted) return;
+        syncFromStore();
         setLoadError("");
       } catch (error) {
         if (error?.name === "AbortError") return;
@@ -706,22 +667,51 @@ export default function CommissionerWorkspace() {
       }
     })();
 
-    const unsubscribeRealtime = subscribeWorkspaceListState({
-      onInvalidate: refreshAffectedSubmission,
-      onRecover: () => {
-        void store.reset().then(() => {
-          if (isMounted) syncFromStore();
-        });
-      },
-    });
-
     return () => {
       isMounted = false;
       abortController.abort();
       unsubscribeStore();
-      unsubscribeRealtime();
     };
-  }, [focusId, signalRouteReady]);
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const store = storeRef.current;
+
+    void (async () => {
+      if (!focusId) {
+        focusedRowRef.current = null;
+        const submissions = mapWorkspaceSubmissions(store.getItems(), { includeArchived: false });
+        if (isMounted) setWorkspaceSubmissions(submissions);
+        return;
+      }
+
+      try {
+        const focusedRow = await getWorkspaceSubmission(focusId, { hydrateGeometry: false });
+        if (!isMounted) return;
+        if (!focusedRow) throw new Error("The focused submission was not found.");
+        focusedRowRef.current = focusedRow;
+        setExpansion(createFocusedExpansion(focusedRow));
+        const submissions = mapWorkspaceSubmissions(store.getItems(), { includeArchived: false });
+        const merged = new Map(submissions.map((submission) => [String(submission.id), submission]));
+        merged.set(String(focusedRow.id), focusedRow);
+        setWorkspaceSubmissions(
+          [...merged.values()].sort(
+            (left, right) => new Date(right.created_at) - new Date(left.created_at),
+          ),
+        );
+        setLoadError("");
+      } catch (error) {
+        if (isMounted) {
+          setLoadError(error.message || "The focused submission was not found.");
+        }
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [focusId]);
 
   useEffect(() => {
     if (!focusId || !workspaceSubmissions.length) return;
@@ -730,7 +720,6 @@ export default function CommissionerWorkspace() {
     );
     if (focusedSubmission) setExpansion(createFocusedExpansion(focusedSubmission));
   }, [focusId, workspaceSubmissions]);
-
   useEffect(() => {
     if (!isFilterOpen) return undefined;
 

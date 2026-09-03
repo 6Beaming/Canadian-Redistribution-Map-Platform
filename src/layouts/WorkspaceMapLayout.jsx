@@ -4,6 +4,7 @@ import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
 import { PanelLoadingOverlay } from "@/components/non_prebuilt/LoadingIndicator.jsx";
 import { WorkspaceMapLayoutContext } from "@/contexts/WorkspaceMapLayoutContext.jsx";
 import { MAP_INTERACTION_MODE } from "@/lib/map/interactionMode.js";
+import { subscribeCommissionerListStoreToWorkspaceEvents } from "@/lib/submissions/commissionerListStoreRealtime.js";
 import "@/styles/map.css";
 import "@/styles/workspace-review.css";
 import "@/styles/workspace-map-layout.css";
@@ -26,6 +27,8 @@ export default function WorkspaceMapLayout() {
   const [mapFetching, setMapFetching] = useState(false);
   const [mapConfig, setMapConfig] = useState(EMPTY_MAP_CONFIG);
   const [mapPresentationReady, setMapPresentationReady] = useState(false);
+
+  useEffect(() => subscribeCommissionerListStoreToWorkspaceEvents(), []);
 
   const handleInitialPresentationReady = useCallback(() => {
     setMapPresentationReady(true);

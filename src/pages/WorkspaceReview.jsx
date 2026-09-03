@@ -9,6 +9,7 @@ import {
   getWorkspaceReviewerEmails,
   normalizeWorkspaceStatus,
 } from "@/services/workspaceApi";
+import { getCommissionerSubmissionListStore } from "@/lib/submissions/commissionerSubmissionListStore.js";
 import { getSubmissionTableRowById } from "@/services/submissionListsApi.js";
 import { getSubmissionReviewContent } from "@/services/commentsApi.js";
 import { hydrateWorkspaceSubmission } from "@/services/tempCounterProposal.js";
@@ -232,7 +233,13 @@ export default function WorkspaceReview() {
         scope_pruids: nextStatus.eligibilityPruids ?? current.scope_pruids,
       };
     };
-    setSubmission(applyStatus);
+    setSubmission((current) => {
+      const next = applyStatus(current);
+      if (next) {
+        getCommissionerSubmissionListStore().upsertItem(next);
+      }
+      return next;
+    });
     setAllSubmissions((current) => current.map(applyStatus));
   }
 

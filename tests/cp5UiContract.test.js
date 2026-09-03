@@ -18,6 +18,7 @@ test("Public and Commissioner tables use the lightweight service without changin
   assert.doesNotMatch(mine, /RouteLoadingPage/);
   assert.match(commissioner, /getCommissionerSubmissionListStore/);
   assert.match(commissioner, /store\.ensureBootstrapped/);
+  assert.match(commissioner, /resync && !submissionId/);
   assert.match(commissioner, /tableFetching/);
   assert.match(commissioner, /<SubmissionsTable/);
   assert.doesNotMatch(commissioner, /CommissionerListPrefetchController/);
@@ -39,6 +40,8 @@ test("Commissioner new-submission indicator renders above the table shell", () =
 
 test("Workspace reuses the shared commissioner submission cache for hot start", () => {
   const workspace = read("src/pages/CommissionerWorkspace.jsx");
+  const layout = read("src/layouts/WorkspaceMapLayout.jsx");
+  const listRealtime = read("src/lib/submissions/commissionerListStoreRealtime.js");
   const graphs = read("src/pages/DashboardGraphs.jsx");
   const app = read("src/App.jsx");
   const store = read("src/lib/submissions/commissionerSubmissionListStore.js");
@@ -46,6 +49,9 @@ test("Workspace reuses the shared commissioner submission cache for hot start", 
   assert.match(workspace, /getCommissionerSubmissionListStore/);
   assert.match(workspace, /mapWorkspaceSubmissions/);
   assert.match(workspace, /store\.ensureBootstrapped/);
+  assert.doesNotMatch(workspace, /subscribeWorkspaceListState/);
+  assert.match(layout, /subscribeCommissionerListStoreToWorkspaceEvents/);
+  assert.match(listRealtime, /onRecover: \(\) => \{\}/);
   assert.match(workspace, /PanelLoadingOverlay/);
   assert.match(workspace, /treeFetching/);
   assert.match(workspace, /mergeFocusedSubmission/);

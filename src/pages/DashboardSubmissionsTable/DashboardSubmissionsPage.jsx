@@ -171,7 +171,9 @@ export default function DashBoardSubmissionsPage() {
     });
 
     void (async () => {
-      setTableFetching(true);
+      const store = storeRef.current;
+      const hadCache = store.getItems().length > 0;
+      if (!hadCache) setTableFetching(true);
       try {
         await store.ensureBootstrapped();
         applyCacheToViewRef.current({ clearBuffered: true, endFetching: true });
@@ -209,6 +211,12 @@ export default function DashBoardSubmissionsPage() {
       if (!realtimeReadyRef.current) return;
 
       const submissionId = getRealtimeSubmissionId({ event, hints });
+      // Focus/visibility recover passes resync without a submission id — keep the
+      // warm table cache and only re-paint. Full reset stays for true list gaps.
+      if (resync && !submissionId) {
+        applyCacheToViewRef.current({ clearBuffered: false });
+        return;
+      }
       if (resync || !submissionId) {
         await storeRef.current.reset();
         if (!isMounted) return;
@@ -242,7 +250,10 @@ export default function DashBoardSubmissionsPage() {
 
     const unsubscribe = subscribeCommissionerSubmissionTable({
       onInvalidate: (payload) => enqueueRefresh(() => refreshAffectedSubmission(payload)),
-      onRecover: (payload) => scheduleResync(() => refreshAffectedSubmission(payload)),
+      onRecover: (payload) => scheduleResync(() => refreshAffectedSubmission({
+        ...payload,
+        resync: true,
+      })),
     });
 
     return () => {
