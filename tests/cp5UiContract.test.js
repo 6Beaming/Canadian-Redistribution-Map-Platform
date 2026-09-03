@@ -126,7 +126,12 @@ test("Creating an Archive Request updates the active review without navigating a
 
   assert.doesNotMatch(api, /submission\.status\s*=\s*WORKSPACE_STATUS\.ARCHIVE_REQUEST/);
   assert.match(api, /action === "archive-request"[\s\S]*getWorkspaceSubmissionStatus\(submission\.id\)/);
-  assert.match(api, /return \{ status: nextStatus, review, submissionStatus \}/);
+  assert.match(api, /archiveOwnedAcceptActions/);
+  assert.match(api, /archive-cancel[\s\S]*archive-vote-reject/);
+  assert.match(
+    api,
+    /return \{\s*status: normalizeWorkspaceStatus\(submissionStatus\?\.status \?\? nextStatus\),\s*review,\s*submissionStatus,\s*\}/,
+  );
   assert.match(panel, /const committed = await commitWorkspaceAction/);
   assert.match(panel, /onCommitted\(action, committed\)/);
   assert.match(panel, /archiveRequest: committed\.review\.archiveRequest \?\? null/);

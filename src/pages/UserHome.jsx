@@ -745,6 +745,10 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
       })));
     } catch (error) {
       const baselineCache = counterProposalCacheRef.current;
+      const client = counterProposalWorkerRef.current;
+      if (client && baselineCache) {
+        counterProposalWorkerInitRef.current = client.init(baselineCache).catch(() => undefined);
+      }
       setCounterProposalWorkflow((current) => ({
         ...current,
         cache: baselineCache,
@@ -1041,6 +1045,7 @@ export default function UserHome({ mapSearchTarget = null, onClearMapSearchTarge
                 recenterTarget={sessionStatus === "signed-out" ? null : undefined}
                 postalAreaTarget={profileMapTarget}
                 onPostalAreaActivate={handlePostalAreaActivate}
+                onClearMapSearchTarget={onClearMapSearchTarget}
                 selection={selection}
                 externalHoverSelection={rolloutHoverSelection}
                 objectionPreview={objectionPreview}

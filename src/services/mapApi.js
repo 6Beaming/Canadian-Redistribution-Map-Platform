@@ -133,7 +133,7 @@ export const mapApi = {
     signal,
   } = {}) {
     const pair = [String(primaryDguid), String(secondaryDguid)].sort();
-    const key = `pair:${releaseId}:${pair.join("|")}:${representation}:${lod}`;
+    const key = `pair:${releaseId}:${pair.join("|")}:${representation}:${lod}:v3-edit-handles`;
     const promise = geometryCache.remember(key, () => request(
       `/releases/${encodeURIComponent(releaseId)}/da-pairs/${encodeURIComponent(pair[0])}/${encodeURIComponent(pair[1])}`
         + `?representation=${encodeURIComponent(representation)}&lod=${encodeURIComponent(lod)}`,

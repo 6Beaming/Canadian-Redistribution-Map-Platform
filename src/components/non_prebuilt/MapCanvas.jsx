@@ -544,6 +544,7 @@ export function MapCanvas({
   onDaSelect,
   onFedSelect,
   onPostalAreaActivate,
+  onClearMapSearchTarget,
   onStatusChange,
   onToggleFullscreen,
   rolloutEnabled = false,
@@ -604,10 +605,12 @@ export function MapCanvas({
   const postalAreaControlRef = useRef(null);
   const postalAreaTargetRef = useRef(postalAreaTarget);
   const onPostalAreaActivateRef = useRef(onPostalAreaActivate);
+  const onClearMapSearchTargetRef = useRef(onClearMapSearchTarget);
   const skipNextPostalTargetSyncRef = useRef(false);
   const onToggleFullscreenRef = useRef(onToggleFullscreen);
   const onDaSelectRef = useRef(onDaSelect);
   const onFedSelectRef = useRef(onFedSelect);
+  const pickMapTargetRef = useRef(null);
   const onStatusChangeRef = useRef(onStatusChange);
   const onInitialPresentationReadyRef = useRef(onInitialPresentationReady);
   const initialPresentationReadyKeyRef = useRef(null);
@@ -660,6 +663,7 @@ export function MapCanvas({
   onDaSelectRef.current = onDaSelect;
   onFedSelectRef.current = onFedSelect;
   onPostalAreaActivateRef.current = onPostalAreaActivate;
+  onClearMapSearchTargetRef.current = onClearMapSearchTarget;
   onStatusChangeRef.current = onStatusChange;
   onInitialPresentationReadyRef.current = onInitialPresentationReady;
   recenterTargetRef.current = recenterTarget;
@@ -688,9 +692,13 @@ export function MapCanvas({
   }
 
   function clearSearchMarker() {
+    const hadMarker = Boolean(searchMarkerRef.current);
     setIsSearchMarkerVisible(false);
     searchMarkerRef.current?.remove();
     searchMarkerRef.current = null;
+    if (hadMarker) {
+      onClearMapSearchTargetRef.current?.();
+    }
   }
 
   function focusPostalArea() {
@@ -1004,6 +1012,45 @@ export function MapCanvas({
     }
 
     onStatusChangeRef.current?.(`Map moved to ${target?.label || "the selected place"}.`);
+
+    let cancelled = false;
+    if (command?.source === "search" && coordinates) {
+      const selectUnderSearch = () => {
+        if (cancelled) return;
+        const point = map.project(coordinates);
+        const hit = pickMapTargetRef.current?.(point);
+        if (
+          !hit
+          || hit.type === "counter-proposal-handle"
+          || hit.type === "data-blocked"
+          || hit.type === "data-blocked-da"
+          || hit.type === "zoom-required"
+        ) {
+          return;
+        }
+        applySelectionRef.current?.(
+          hit.type === "da"
+            ? { type: "da", dguid: hit.id }
+            : { type: "fed", fedNum: hit.id },
+        );
+        if (hit.type === "da") {
+          onDaSelectRef.current?.(hit.id);
+          return;
+        }
+        const fedName = fedNameLookupRef.current.get(String(hit.id)) || `FED ${hit.id}`;
+        onFedSelectRef.current?.(hit.id, fedName);
+      };
+      const onMoveEnd = () => {
+        if (cancelled) return;
+        map.once("idle", selectUnderSearch);
+      };
+      map.once("moveend", onMoveEnd);
+      return () => {
+        cancelled = true;
+        map.off("moveend", onMoveEnd);
+        map.off("idle", selectUnderSearch);
+      };
+    }
   }, [cameraCommand, isSearchMarkerVisible, mapReadyTick, mapSearchTarget]);
 
   useEffect(() => {
@@ -2398,6 +2445,7 @@ export function MapCanvas({
     }
 
     applySelectionRef.current = applySelectionTarget;
+    pickMapTargetRef.current = pickMapTarget;
     applyExternalHoverRef.current = setExternalHover;
     applyObjectionPreviewRef.current = applyObjectionPreview;
     applyCounterProposalPreviewRef.current = applyCounterProposalPreview;

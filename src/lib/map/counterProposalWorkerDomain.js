@@ -69,22 +69,38 @@ export function processCounterProposalWorkerMessage(state, message) {
       message.handleId,
       message.coordinate,
     );
+    const afterPreview = movedHandle(preview, message.handleId);
+    const moved = Boolean(
+      before
+      && afterPreview
+      && coordinatesDiffer(before.coordinate, afterPreview.coordinate),
+    );
+    if (!moved || preview === state.cache) {
+      return {
+        type: "COMMIT_RESULT",
+        sequence,
+        valid: false,
+        committedCoordinate: before?.coordinate ?? null,
+        impacts: state.cache.impacts ?? null,
+        rejectionReason: "No valid movement was available for this handle.",
+        committedPatch: null,
+      };
+    }
     state.cache = commitCounterProposalCacheHistory(preview, baseline);
     syncWorkerOperationState(state.operationState, state.cache);
     const after = movedHandle(state.cache, message.handleId);
-    const valid = Boolean(before && after && coordinatesDiffer(before.coordinate, after.coordinate));
     return {
       type: "COMMIT_RESULT",
       sequence,
-      valid,
-      committedCoordinate: after?.coordinate ?? before?.coordinate ?? null,
+      valid: true,
+      committedCoordinate: after?.coordinate ?? afterPreview.coordinate,
       impacts: state.cache.impacts ?? null,
-      rejectionReason: valid ? null : "No valid movement was available for this handle.",
-      committedPatch: valid ? {
+      rejectionReason: null,
+      committedPatch: {
         handleId: after?.id ?? message.handleId,
-        coordinate: after?.coordinate ?? null,
+        coordinate: after?.coordinate ?? afterPreview.coordinate,
         impacts: state.cache.impacts ?? null,
-      } : null,
+      },
     };
   }
 

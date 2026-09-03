@@ -78,6 +78,7 @@ export function buildReleaseEditableHandles(editableHandles, features) {
         id: `release:${vertex.vertexId ?? `vertex-${index}`}`,
         legacyId: key,
         vertexId: vertex.vertexId ?? null,
+        arcId: vertex.arcId ?? null,
         lineId: `arc-${vertex.arcId ?? index}`,
         segmentIndex: index,
         coordinate,

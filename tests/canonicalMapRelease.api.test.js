@@ -53,6 +53,12 @@ test("public immutable release routes random-read one DA pair and revalidate wit
     assert.equal(payload.representation, "edit");
     assert.ok(payload.sharedBoundary.features.length >= 1);
     assert.ok(payload.editableHandles.every(({ vertexId }) => /^v1_[0-9a-f]{24}$/.test(vertexId)));
+    if (payload.editableHandles.length > 2) {
+      assert.ok(
+        payload.editableHandles.some((handle) => !handle.locked),
+        "edit pairs with interior vertices must expose unlocked catalog handles",
+      );
+    }
 
     const cached = await fetch(url, { headers: { "If-None-Match": tag } });
     assert.equal(cached.status, 304);

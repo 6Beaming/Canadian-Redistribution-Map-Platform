@@ -6,7 +6,7 @@
   "description": "Canadian Redistribution Map Platform",
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:server": "node --watch --watch-preserve-output server/process-entry.js",
+    "dev:server": "node --watch --watch-path=server --watch-preserve-output server/process-entry.js",
     "dev:client": "vite --host 0.0.0.0",
     "start": "node server/process-entry.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",

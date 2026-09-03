@@ -176,15 +176,38 @@ function buildSharedBoundary(record, level) {
   };
 }
 
+function lodIndexesAreEndpointOnly(chain, indexes) {
+  if (!Array.isArray(indexes) || indexes.length <= 2) {
+    return true;
+  }
+  return indexes.every((vertexIndex, index, arr) => (
+    index === 0
+    || index === arr.length - 1
+    || Boolean(chain.vertices[vertexIndex]?.[3])
+  ));
+}
+
 function buildEditableHandles(record, level) {
   return record.chains.flatMap((chain) => {
-    return (chain.lods[level] ?? []).map((vertexIndex, index, indexes) => {
+    let indexes = [...(chain.lods[level] ?? [])];
+    // Display LODs often collapse short shared arcs to endpoints even when the
+    // full chain still has unlocked catalog interiors. Edit handles must keep
+    // those interiors addressable with stable release vertex IDs — otherwise
+    // clients invent synthetic midpoints that fail submission validation.
+    if (lodIndexesAreEndpointOnly(chain, indexes) && chain.vertices.length > 2) {
+      indexes = chain.vertices.map((_, vertexIndex) => vertexIndex);
+    }
+    return indexes.map((vertexIndex, index, resolvedIndexes) => {
       const exact = chain.vertices[vertexIndex];
       return {
         vertexId: exact?.[0] ?? null,
         coordinate: exact ? [exact[1], exact[2]] : null,
         arcId: chain.arcId,
-        locked: Boolean(exact?.[3] || index === 0 || index === indexes.length - 1),
+        locked: Boolean(
+          exact?.[3]
+          || index === 0
+          || index === resolvedIndexes.length - 1,
+        ),
       };
     }).filter((vertex) => vertex.vertexId);
   });

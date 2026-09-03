@@ -116,7 +116,7 @@ test("border-anchor validation allows small interior moves along the shared boun
   assert.deepEqual(movedHandle?.coordinate, nextCoordinate);
 });
 
-test("release pairs with only two locked endpoints gain a midpoint handle", () => {
+test("release pairs expose catalog interiors instead of inventing midpoint ids", () => {
   const shared = [[0, 0], [0, 1], [0, 2]];
   const first = {
     type: "Feature",
@@ -139,8 +139,11 @@ test("release pairs with only two locked endpoints gain a midpoint handle", () =
         geometry: { type: "LineString", coordinates: shared },
       }],
     },
+    // Server edit handles now include unlocked catalog interiors even when a
+    // display LOD collapsed the arc to endpoints.
     editableHandles: [
       { vertexId: "v0", coordinate: [0, 0], arcId: "arc-1", locked: true },
+      { vertexId: "v1", coordinate: [0, 1], arcId: "arc-1", locked: false },
       { vertexId: "v2", coordinate: [0, 2], arcId: "arc-1", locked: true },
     ],
   };
@@ -148,14 +151,15 @@ test("release pairs with only two locked endpoints gain a midpoint handle", () =
   const cache = buildCounterProposalCacheFromReleasePair(payload, new Map(), "left", "right");
 
   assert.ok(cache.handles.length >= 3);
-  assert.ok(cache.handles.some((handle) => !handle.locked));
-  assert.ok(
-    cache.handles.some((handle) =>
-      !handle.locked && handle.coordinate[0] === 0 && handle.coordinate[1] === 1),
+  assert.equal(cache.sourceBoundaryDensifications.length, 0);
+  assert.ok(cache.handles.some((handle) => !handle.locked && handle.vertexId === "v1"));
+  assert.equal(
+    cache.handles.some((handle) => String(handle.vertexId ?? "").startsWith("release-midpoint-")),
+    false,
   );
 });
 
-test("release coarse arcs with only two lod vertices gain a midpoint handle", () => {
+test("true endpoint-only release arcs gain an editable midpoint", () => {
   const shared = [[0, 0], [0, 2]];
   const first = {
     type: "Feature",
@@ -186,12 +190,10 @@ test("release coarse arcs with only two lod vertices gain a midpoint handle", ()
 
   const cache = buildCounterProposalCacheFromReleasePair(payload, new Map(), "left", "right");
 
-  assert.ok(cache.handles.length >= 3);
   assert.ok(cache.handles.some((handle) => !handle.locked));
-  assert.equal(cache.sourceBoundaryDensifications.length >= 1, true);
+  assert.ok(cache.sourceBoundaryDensifications.length >= 1);
   assert.ok(
-    cache.handles.some((handle) =>
-      !handle.locked && handle.occurrences.length > 0),
+    cache.handles.some((handle) => String(handle.vertexId ?? "").startsWith("release-midpoint-")),
   );
 });
 
@@ -259,20 +261,20 @@ test("shared-boundary corner moves still respect third-da exterior edges", () =>
   );
 });
 
-test("release midpoint handles move their boundary segments", () => {
-  const shared = [[0, 0], [0, 2]];
+test("release catalog interior handles move their boundary segments", () => {
+  const shared = [[0, 0], [0, 1], [0, 2]];
   const first = {
     type: "Feature",
     properties: { DGUID: "left" },
-    geometry: { type: "Polygon", coordinates: [[[-1, 0], [0, 0], [0, 2], [-1, 2], [-1, 0]]] },
+    geometry: { type: "Polygon", coordinates: [[[-1, 0], ...shared, [-1, 2], [-1, 0]]] },
   };
   const second = {
     type: "Feature",
     properties: { DGUID: "right" },
-    geometry: { type: "Polygon", coordinates: [[[0, 2], [0, 0], [1, 0], [1, 2], [0, 2]]] },
+    geometry: { type: "Polygon", coordinates: [[[0, 2], [0, 1], [0, 0], [1, 0], [1, 2], [0, 2]]] },
   };
   const payload = {
-    lod: "coarse",
+    lod: "fine",
     features: { type: "FeatureCollection", features: [first, second] },
     sharedBoundary: {
       type: "FeatureCollection",
@@ -284,27 +286,20 @@ test("release midpoint handles move their boundary segments", () => {
     },
     editableHandles: [
       { vertexId: "v0", coordinate: [0, 0], arcId: "arc-1", locked: true },
-      { vertexId: "v1", coordinate: [0, 2], arcId: "arc-1", locked: true },
+      { vertexId: "v1", coordinate: [0, 1], arcId: "arc-1", locked: false },
+      { vertexId: "v2", coordinate: [0, 2], arcId: "arc-1", locked: true },
     ],
   };
 
   const cache = buildCounterProposalCacheFromReleasePair(payload, new Map(), "left", "right");
-  const midpoint = cache.handles.find((handle) => !handle.locked && handle.occurrences.length > 0);
+  const interior = cache.handles.find((handle) => !handle.locked && handle.vertexId === "v1");
 
-  assert.ok(midpoint);
-  const nextCoordinate = [0.01, 1];
-  const nextCache = previewCounterProposalHandleMove(cache, midpoint.id, nextCoordinate);
-  const movedHandle = nextCache.handles.find((entry) => entry.id === midpoint.id);
+  assert.ok(interior);
+  const nextCoordinate = [interior.coordinate[0], interior.coordinate[1] + 0.05];
+  const nextCache = previewCounterProposalHandleMove(cache, interior.id, nextCoordinate);
+  const movedHandle = nextCache.handles.find((entry) => entry.id === interior.id);
 
   assert.deepEqual(movedHandle?.coordinate, nextCoordinate);
-  const occurrence = midpoint.occurrences[0];
-  const feature = nextCache.currentFeatures.find(
-    (entry) => String(entry.properties?.DGUID) === occurrence.featureDguid,
-  );
-  const ring = feature.geometry.coordinates[occurrence.ringIndex];
-
-  assert.equal(ring[occurrence.coordinateIndex][0], nextCoordinate[0]);
-  assert.deepEqual(ring[occurrence.coordinateIndex][1], nextCoordinate[1]);
 });
 
 test("fast drag overlay follows raw mouse without validation", () => {

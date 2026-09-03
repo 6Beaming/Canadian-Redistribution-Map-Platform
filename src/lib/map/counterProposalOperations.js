@@ -74,8 +74,24 @@ export function coordinatesEqual(left, right) {
 
 export function buildBaseCoordinateMap(cache) {
   const map = new Map();
+  const recorded = cache?.baselineCoordinatesByVertexId;
+  if (recorded && typeof recorded === "object") {
+    for (const [vertexId, coordinate] of Object.entries(recorded)) {
+      if (!vertexId || !Array.isArray(coordinate) || coordinate.length < 2) {
+        continue;
+      }
+      map.set(vertexId, [Number(coordinate[0]), Number(coordinate[1])]);
+    }
+  }
+  for (const insertion of cache?.sourceBoundaryDensifications ?? []) {
+    const vertexId = String(insertion?.vertexId ?? "").trim();
+    if (!vertexId || map.has(vertexId) || !Array.isArray(insertion.coordinate)) {
+      continue;
+    }
+    map.set(vertexId, [...insertion.coordinate]);
+  }
   for (const handle of cache?.handles ?? []) {
-    if (!handle?.vertexId) {
+    if (!handle?.vertexId || map.has(handle.vertexId)) {
       continue;
     }
     const base = readCoordinateFromFeatures(cache?.originalFeatures, handle);
@@ -86,25 +102,170 @@ export function buildBaseCoordinateMap(cache) {
   return map;
 }
 
+function isSyntheticVertexId(vertexId) {
+  const id = String(vertexId ?? "").trim();
+  return (
+    id.startsWith("bent-")
+    || id.startsWith("release-midpoint-")
+    || id.startsWith("release-interior-")
+  );
+}
+
+function releaseCoordinateKey(coordinate) {
+  return `${Number(coordinate[0]).toFixed(6)},${Number(coordinate[1]).toFixed(6)}`;
+}
+
+function lookupValues(lookup) {
+  if (!lookup) {
+    return [];
+  }
+  if (lookup instanceof Map) {
+    return [...lookup.values()];
+  }
+  if (typeof lookup === "object") {
+    return Object.values(lookup);
+  }
+  return [];
+}
+
+function lookupReleaseVertex(lookup, coordinate) {
+  if (!lookup || !Array.isArray(coordinate)) {
+    return null;
+  }
+  const key = releaseCoordinateKey(coordinate);
+  if (lookup instanceof Map) {
+    return lookup.get(key) ?? null;
+  }
+  if (typeof lookup === "object") {
+    return lookup[key] ?? null;
+  }
+  return null;
+}
+
+function listUnlockableCatalogVertices(cache) {
+  const byId = new Map();
+  const add = (entry) => {
+    const vertexId = String(entry?.vertexId ?? "").trim();
+    if (!vertexId || isSyntheticVertexId(vertexId) || entry?.locked) {
+      return;
+    }
+    if (byId.has(vertexId)) {
+      return;
+    }
+    byId.set(vertexId, {
+      vertexId,
+      coordinate: Array.isArray(entry.coordinate) ? [...entry.coordinate] : null,
+      arcId: entry.arcId ?? null,
+    });
+  };
+  (cache?.catalogVertices ?? []).forEach(add);
+  (cache?.handles ?? []).forEach(add);
+  lookupValues(cache?.releaseVertexByCoordinate).forEach(add);
+  return [...byId.values()];
+}
+
+function resolveSubmittableVertexId(cache, handle, baseCoordinate) {
+  const directId = String(handle?.vertexId ?? "").trim();
+  if (directId && !isSyntheticVertexId(directId)) {
+    return directId;
+  }
+  const lookupCoordinate = Array.isArray(baseCoordinate)
+    ? baseCoordinate
+    : handle?.coordinate;
+  if (!Array.isArray(lookupCoordinate)) {
+    return null;
+  }
+  const releaseVertex = lookupReleaseVertex(
+    cache?.releaseVertexByCoordinate,
+    lookupCoordinate,
+  );
+  if (releaseVertex?.vertexId && !releaseVertex.locked && !isSyntheticVertexId(releaseVertex.vertexId)) {
+    return String(releaseVertex.vertexId).trim();
+  }
+  const handleArcId = handle?.arcId ?? null;
+  const candidates = listUnlockableCatalogVertices(cache).filter((entry) => (
+    Array.isArray(entry.coordinate)
+    && (!handleArcId || !entry.arcId || String(entry.arcId) === String(handleArcId))
+  ));
+  let best = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const entry of candidates) {
+    const distance = Math.hypot(
+      Number(entry.coordinate[0]) - Number(lookupCoordinate[0]),
+      Number(entry.coordinate[1]) - Number(lookupCoordinate[1]),
+    );
+    if (distance < bestDistance) {
+      best = entry;
+      bestDistance = distance;
+    }
+  }
+  return best?.vertexId ?? null;
+}
+
+function emitDirtyOperation(dirty, vertexId, coordinate) {
+  if (!vertexId || !Array.isArray(coordinate) || dirty.has(vertexId)) {
+    return;
+  }
+  const toLng = normalizeCoordinateValue(coordinate[0]);
+  const toLat = normalizeCoordinateValue(coordinate[1]);
+  if (toLng === null || toLat === null) {
+    return;
+  }
+  dirty.set(vertexId, { vertexId, toLng, toLat });
+}
+
+function findHandleById(cache, handleId) {
+  return (cache?.handles ?? []).find((entry) => (
+    entry.id === handleId || entry.legacyId === handleId
+  )) ?? null;
+}
+
 export function rebuildDirtyOperations(cache, baseCoordinateByVertexId) {
   const dirty = new Map();
   for (const handle of cache?.handles ?? []) {
     if (!handle?.vertexId || handle.locked) {
       continue;
     }
-    const base = baseCoordinateByVertexId.get(handle.vertexId);
-    if (!base || !Array.isArray(handle.coordinate)) {
+    const currentCandidates = [
+      Array.isArray(handle.coordinate) ? handle.coordinate : null,
+      readCoordinateFromFeatures(cache?.currentFeatures, handle),
+    ].filter((coordinate) => Array.isArray(coordinate));
+    const base = baseCoordinateByVertexId.get(handle.vertexId)
+      ?? readCoordinateFromFeatures(cache?.originalFeatures, handle);
+    const current = currentCandidates.find((coordinate) => !coordinatesEqual(base, coordinate))
+      ?? currentCandidates[0];
+    if (!base || !current || coordinatesEqual(base, current)) {
       continue;
     }
-    if (coordinatesEqual(base, handle.coordinate)) {
+    const vertexId = resolveSubmittableVertexId(cache, handle, base);
+    if (!vertexId) {
       continue;
     }
-    const toLng = normalizeCoordinateValue(handle.coordinate[0]);
-    const toLat = normalizeCoordinateValue(handle.coordinate[1]);
-    if (toLng === null || toLat === null) {
+    emitDirtyOperation(dirty, vertexId, current);
+  }
+  for (const operation of cache?.history ?? []) {
+    if (operation?.type !== "move-handle" || !operation.handleId || !Array.isArray(operation.to)) {
       continue;
     }
-    dirty.set(handle.vertexId, { vertexId: handle.vertexId, toLng, toLat });
+    const handle = findHandleById(cache, operation.handleId);
+    if (!handle || handle.locked) {
+      continue;
+    }
+    const vertexId = resolveSubmittableVertexId(
+      cache,
+      handle,
+      operation.from ?? baseCoordinateByVertexId.get(handle.vertexId),
+    );
+    if (!vertexId) {
+      continue;
+    }
+    const base = baseCoordinateByVertexId.get(vertexId)
+      ?? operation.from
+      ?? readCoordinateFromFeatures(cache?.originalFeatures, handle);
+    if (!base || coordinatesEqual(base, operation.to)) {
+      continue;
+    }
+    emitDirtyOperation(dirty, vertexId, operation.to);
   }
   return dirty;
 }
@@ -123,6 +284,18 @@ export function syncWorkerOperationState(state, cache) {
   }
   if (!state.baseCoordinateByVertexId?.size) {
     state.baseCoordinateByVertexId = buildBaseCoordinateMap(cache);
+  } else {
+    for (const handle of cache.handles ?? []) {
+      if (!handle?.vertexId || state.baseCoordinateByVertexId.has(handle.vertexId)) {
+        continue;
+      }
+      const recorded = cache.baselineCoordinatesByVertexId?.[handle.vertexId];
+      const base = readCoordinateFromFeatures(cache.originalFeatures, handle)
+        ?? (Array.isArray(recorded) ? [...recorded] : null);
+      if (base) {
+        state.baseCoordinateByVertexId.set(handle.vertexId, base);
+      }
+    }
   }
   state.dirtyOperationsByVertexId = rebuildDirtyOperations(cache, state.baseCoordinateByVertexId);
 }

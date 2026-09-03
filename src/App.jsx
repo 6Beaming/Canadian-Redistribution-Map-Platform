@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
 import { RealtimeProvider } from "./contexts/RealtimeContext.jsx";
@@ -71,16 +71,16 @@ function AppRoutes() {
   const [mapSearchTarget, setMapSearchTarget] = useState(null);
   const { isFullscreen } = useMapFullscreen();
 
-  function handlePlaceSelect(place) {
+  const handlePlaceSelect = useCallback((place) => {
     setMapSearchTarget({
       ...place,
       requestId: Date.now(),
     });
-  }
+  }, []);
 
-  function handleMapSearchClear() {
+  const handleMapSearchClear = useCallback(() => {
     setMapSearchTarget(null);
-  }
+  }, []);
 
   return (
     <>
@@ -121,7 +121,12 @@ function AppRoutes() {
           <Route path="/reset-password" element={<PasswordRecoveryPage />} />
 
           <Route element={<RequireCommissioner />}>
-            <Route path="/dashboard" element={<DashboardHome mapSearchTarget={mapSearchTarget} />} />
+            <Route path="/dashboard" element={(
+              <DashboardHome
+                mapSearchTarget={mapSearchTarget}
+                onClearMapSearchTarget={handleMapSearchClear}
+              />
+            )} />
             <Route path="/dashboard/graphs" element={<DashboardGraphs />} />
             <Route
               path="/dashboard/submissionsTable"

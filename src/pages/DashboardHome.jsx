@@ -22,7 +22,10 @@ import {
 import { RouteLoadingPage } from "@/components/non_prebuilt/RouteLoadingPage.jsx";
 import "@/styles/map.css";
 
-export default function DashboardHome({ mapSearchTarget = null }) {
+export default function DashboardHome({
+  mapSearchTarget = null,
+  onClearMapSearchTarget,
+}) {
   const { user } = useAuth();
   const { isFullscreen, toggle: handleToggleFullscreen } = useMapFullscreen();
   const [searchParams] = useSearchParams();
@@ -43,14 +46,30 @@ export default function DashboardHome({ mapSearchTarget = null }) {
     () => getProvinceMapView(user?.province),
     [user?.province],
   );
-  const { cameraCommand, search: searchCamera } = useMapCameraCommands({
+  const {
+    cameraCommand,
+    search: searchCamera,
+    recenter: recenterCamera,
+  } = useMapCameraCommands({
     initialTarget: commissionerProvinceView?.mapTarget ?? null,
   });
 
   useEffect(() => {
-    if (!mapSearchTarget) return;
+    if (!mapSearchTarget || initialArchivedMapEnabled) return;
     searchCamera(mapSearchTarget);
-  }, [mapSearchTarget, searchCamera]);
+  }, [mapSearchTarget, searchCamera, initialArchivedMapEnabled]);
+
+  // Super-root Archived Map should open on the Presenter Map, not a leftover
+  // Places search from an earlier route in the same SPA session.
+  useEffect(() => {
+    if (!initialArchivedMapEnabled) return;
+    onClearMapSearchTarget?.();
+    if (commissionerProvinceView?.mapTarget) {
+      recenterCamera(commissionerProvinceView.mapTarget);
+    }
+    // Intentionally once per archived-map entry, not on every identity change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount/entry only
+  }, [initialArchivedMapEnabled]);
 
   useEffect(() => {
     let isMounted = true;
@@ -218,6 +237,7 @@ export default function DashboardHome({ mapSearchTarget = null }) {
                 externalHoverSelection={rolloutHoverSelection}
                 onDaSelect={handleDaSelect}
                 onFedSelect={handleFedSelect}
+                onClearMapSearchTarget={onClearMapSearchTarget}
                 onStatusChange={handleStatusChange}
                 onToggleFullscreen={handleToggleFullscreen}
                 rolloutEnabled={isRolloutOpen}

@@ -555,9 +555,16 @@ export async function commitWorkspaceAction(submission, {
         });
     }
 
-    // Accept/reject (and cancel/reject-vote returning to accepted) use the
-    // durable status route. Archive-request and archived stay Archive-owned.
-    if (DURABLE_STATUS_WRITES.has(nextStatus) && action !== "archive-merge") {
+    // Accept/reject use the durable status route. Archive cancel / reject-vote
+    // already reopen the submission as accepted inside the archive service and
+    // bump resource_version — a second status write races that version and
+    // blocks the closing note. Archive-request and archived stay Archive-owned.
+    const archiveOwnedAcceptActions = new Set(["archive-cancel", "archive-vote-reject"]);
+    if (
+        DURABLE_STATUS_WRITES.has(nextStatus)
+        && action !== "archive-merge"
+        && !archiveOwnedAcceptActions.has(action)
+    ) {
         await setWorkspaceSubmissionStatus(submission, nextStatus);
     }
     await addWorkspaceComment(submission.id, {
@@ -567,11 +574,21 @@ export async function commitWorkspaceAction(submission, {
     });
     const [review, submissionStatus] = await Promise.all([
         getWorkspaceReviewState(submission.id),
-        action === "archive-request"
+        action === "archive-request" || archiveOwnedAcceptActions.has(action)
             ? getWorkspaceSubmissionStatus(submission.id)
             : Promise.resolve(null),
     ]);
-    return { status: nextStatus, review, submissionStatus };
+    if (submission && submissionStatus?.resource_version != null) {
+        submission.resource_version = submissionStatus.resource_version;
+    }
+    if (submission && submissionStatus?.status) {
+        submission.status = normalizeWorkspaceStatus(submissionStatus.status);
+    }
+    return {
+        status: normalizeWorkspaceStatus(submissionStatus?.status ?? nextStatus),
+        review,
+        submissionStatus,
+    };
 }
 
 export function canMergeArchiveRequest(request) {
