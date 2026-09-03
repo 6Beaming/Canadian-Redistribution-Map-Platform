@@ -661,6 +661,11 @@ export default function CommissionerWorkspace() {
           ? null
           : await getWorkspaceSubmission(affectedSubmissionId, { hydrateGeometry: false });
         if (!isMounted) return;
+        if (submission) {
+          store.upsertItem(submission, { notify: false });
+        } else {
+          store.removeItem(affectedSubmissionId, { notify: false });
+        }
         setWorkspaceSubmissions((current) => (
           reconcileWorkspaceSubmission(current, event, submission, hints)
         ));

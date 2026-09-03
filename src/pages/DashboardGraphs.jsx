@@ -2,8 +2,14 @@ import { BarChart3, UserCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { SubmissionsGraph } from "@/components/non_prebuilt/submissionsGraph.jsx";
 import { Card, CardAccent, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getRealtimeSubmissionId } from "@/lib/realtime/workspaceRealtime.js";
 import { SUBMISSION_STATUS_SERIES } from "@/lib/submissions/analytics.js";
-import { getCommissionerSubmissionAnalytics } from "@/services/submissionListsApi.js";
+import { getCommissionerSubmissionListStore } from "@/lib/submissions/commissionerSubmissionListStore.js";
+import {
+  getCommissionerSubmissionAnalytics,
+  getSubmissionTableRowById,
+  subscribeCommissionerSubmissionTable,
+} from "@/services/submissionListsApi.js";
 
 function percent(value, total) {
   return total ? `${Math.round((value / total) * 100)}%` : "0%";
@@ -24,20 +30,48 @@ export default function DashboardGraphs() {
 
   useEffect(() => {
     let mounted = true;
-    getCommissionerSubmissionAnalytics()
-      .then((payload) => {
-        if (mounted) {
-          setAnalytics(payload);
-          setLoadError("");
-        }
-      })
-      .catch((error) => {
+    const store = getCommissionerSubmissionListStore();
+    const abortController = new AbortController();
+
+    async function loadAnalytics() {
+      try {
+        const payload = await getCommissionerSubmissionAnalytics();
+        if (!mounted) return;
+        setAnalytics(payload);
+        setLoadError("");
+      } catch (error) {
         if (mounted) setLoadError(error.message || "Unable to load submission analytics.");
-      })
-      .finally(() => {
+      } finally {
         if (mounted) setLoading(false);
-      });
-    return () => { mounted = false; };
+      }
+    }
+
+    const refreshAffectedSubmission = async ({ event, hints, resync }) => {
+      const submissionId = getRealtimeSubmissionId({ event, hints });
+      if (resync || !submissionId) {
+        await store.reset();
+      } else if (event?.entity === "submission" && event.operation === "delete") {
+        store.removeItem(submissionId);
+      } else {
+        const row = await getSubmissionTableRowById(submissionId);
+        if (row) store.upsertItem(row);
+      }
+      if (mounted) await loadAnalytics();
+    };
+
+    void store.ensureBootstrapped({ signal: abortController.signal });
+    void loadAnalytics();
+
+    const unsubscribe = subscribeCommissionerSubmissionTable({
+      onInvalidate: refreshAffectedSubmission,
+      onRecover: (payload) => refreshAffectedSubmission(payload),
+    });
+
+    return () => {
+      mounted = false;
+      abortController.abort();
+      unsubscribe();
+    };
   }, []);
 
   return (

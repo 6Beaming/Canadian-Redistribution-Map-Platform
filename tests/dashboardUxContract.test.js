@@ -12,6 +12,8 @@ test("Dashboard graphs use commissioner analytics for all five status series", (
   const analytics = read("src/lib/submissions/analytics.js");
 
   assert.match(page, /getCommissionerSubmissionAnalytics/);
+  assert.match(page, /getCommissionerSubmissionListStore/);
+  assert.match(page, /subscribeCommissionerSubmissionTable/);
   assert.match(page, /dailyTimeline=\{analytics\?\.daily/);
   assert.doesNotMatch(page, /Support: 68%|Oppose: 32%|getTotalComments/);
   assert.match(chart, /buildSubmissionStatusTimeline/);

@@ -17,6 +17,7 @@ test("Public and Commissioner tables use the lightweight service without changin
   assert.doesNotMatch(mine, /rejected:\s*"bg-/);
   assert.doesNotMatch(mine, /RouteLoadingPage/);
   assert.match(commissioner, /getCommissionerSubmissionListStore/);
+  assert.match(commissioner, /store\.ensureBootstrapped/);
   assert.match(commissioner, /tableFetching/);
   assert.match(commissioner, /<SubmissionsTable/);
   assert.doesNotMatch(commissioner, /CommissionerListPrefetchController/);
@@ -38,6 +39,10 @@ test("Commissioner new-submission indicator renders above the table shell", () =
 
 test("Workspace reuses the shared commissioner submission cache for hot start", () => {
   const workspace = read("src/pages/CommissionerWorkspace.jsx");
+  const graphs = read("src/pages/DashboardGraphs.jsx");
+  const app = read("src/App.jsx");
+  const store = read("src/lib/submissions/commissionerSubmissionListStore.js");
+  const lifetime = read("src/lib/submissions/CommissionerListStoreLifetime.jsx");
   assert.match(workspace, /getCommissionerSubmissionListStore/);
   assert.match(workspace, /mapWorkspaceSubmissions/);
   assert.match(workspace, /store\.ensureBootstrapped/);
@@ -45,6 +50,27 @@ test("Workspace reuses the shared commissioner submission cache for hot start", 
   assert.match(workspace, /treeFetching/);
   assert.match(workspace, /mergeFocusedSubmission/);
   assert.doesNotMatch(workspace, /return <RouteLoadingPage \/>/);
+  assert.match(graphs, /getCommissionerSubmissionListStore/);
+  assert.match(graphs, /store\.ensureBootstrapped/);
+  assert.match(graphs, /subscribeCommissionerSubmissionTable/);
+  assert.match(graphs, /getCommissionerSubmissionAnalytics/);
+  assert.match(app, /CommissionerListStoreLifetime/);
+  assert.match(lifetime, /invalidateCommissionerSubmissionListStore/);
+  assert.match(store, /export function isCommissionerListSurface/);
+  assert.match(store, /path === "\/dashboard\/graphs"/);
+  assert.match(store, /path === "\/dashboard\/submissionsTable"/);
+  assert.match(store, /path.startsWith\("\/dashboard\/workspace"\)/);
+});
+
+test("Dashboard heatmap does not rehydrate the shared commissioner list cache", () => {
+  const api = read("src/services/workspaceApi.js");
+  const start = api.indexOf("export async function getSubmissionHeatmap");
+  const end = api.indexOf("export async function getDashboardAreaContext");
+  const heatmap = api.slice(start, end);
+
+  assert.match(heatmap, /getCommissionerSubmissionTableRows/);
+  assert.doesNotMatch(heatmap, /getCommissionerSubmissionListStore/);
+  assert.doesNotMatch(heatmap, /getWorkspaceSubmissions/);
 });
 
 test("Map pages render during profile hydration and Archived Tree waits for its canvas", () => {

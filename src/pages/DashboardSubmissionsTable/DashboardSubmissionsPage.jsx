@@ -221,6 +221,11 @@ export default function DashBoardSubmissionsPage() {
           ? null
           : await getSubmissionTableRowById(submissionId);
         if (!isMounted) return;
+        if (row) {
+          storeRef.current.upsertItem(row, { notify: false });
+        } else {
+          storeRef.current.removeItem(submissionId, { notify: false });
+        }
         setSubmissionView((current) => reconcileCommissionerSubmissionView(
           current,
           event,

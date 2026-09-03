@@ -29,7 +29,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { subDays } from "date-fns";
+import {
+  createDefaultCommissionerTableFilters,
+  formatCommissionerFilterDate,
+  parseCommissionerFilterDayBound,
+} from "@/lib/submissions/commissionerSubmissionListFilters.js";
 import { exportCommissionerSubmissionsCsv } from "@/services/exportApi.js";
 import {
   Table,
@@ -48,7 +52,6 @@ import {
   DEFAULT_VISIBLE_SUBMISSION_TYPES,
   getSubmissionTypeBucket,
 } from "@/lib/submissions/commissionerListPaging.js";
-import { formatCommissionerFilterDate } from "@/lib/submissions/commissionerSubmissionListFilters.js";
 import { PanelLoadingOverlay } from "@/components/non_prebuilt/LoadingIndicator.jsx";
 
 function buildServerPageLabel(serverPagination) {
@@ -67,8 +70,8 @@ function buildServerPageLabel(serverPagination) {
 function isWithinDateRange(value, dateStart, dateEnd) {
   const timestamp = new Date(value).getTime();
   if (!Number.isFinite(timestamp)) return false;
-  const start = dateStart ? new Date(dateStart).setHours(0, 0, 0, 0) : Number.NEGATIVE_INFINITY;
-  const end = dateEnd ? new Date(dateEnd).setHours(23, 59, 59, 999) : Number.POSITIVE_INFINITY;
+  const start = parseCommissionerFilterDayBound(dateStart, { endOfDay: false });
+  const end = parseCommissionerFilterDayBound(dateEnd, { endOfDay: true });
   return timestamp >= start && timestamp <= end;
 }
 
@@ -90,8 +93,12 @@ export default function SubmissionsTable({
 }) {
   const [sorting, setSorting] = React.useState([]);
   const [columnFilters, setColumnFilters] = React.useState([]);
-  const [localDateStart, setLocalDateStart] = React.useState(subDays(new Date(), 30));
-  const [localDateEnd, setLocalDateEnd] = React.useState(new Date());
+  const [localDateStart, setLocalDateStart] = React.useState(
+    () => createDefaultCommissionerTableFilters().dateStart,
+  );
+  const [localDateEnd, setLocalDateEnd] = React.useState(
+    () => createDefaultCommissionerTableFilters().dateEnd,
+  );
   const [localVisibleTypes, setLocalVisibleTypes] = React.useState({
     ...DEFAULT_VISIBLE_SUBMISSION_TYPES,
   });

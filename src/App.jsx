@@ -26,6 +26,7 @@ import UserResumeSubmission from "./pages/UserResumeSubmission.jsx";
 import RealtimeHarness from "./pages/RealtimeHarness.jsx";
 import WorkspaceMapLayout from "./layouts/WorkspaceMapLayout.jsx";
 import ArchivedMapLayout from "./layouts/ArchivedMapLayout.jsx";
+import { CommissionerListStoreLifetime } from "@/lib/submissions/CommissionerListStoreLifetime.jsx";
 import { RouteLoadingOverlay } from "./components/non_prebuilt/RouteLoadingOverlay.jsx";
 import { RouteLoadingProvider } from "./contexts/RouteLoadingContext.jsx";
 import { RouteLoadingPage } from "./components/non_prebuilt/RouteLoadingPage.jsx";
@@ -83,6 +84,7 @@ function AppRoutes() {
 
   return (
     <>
+      <CommissionerListStoreLifetime />
       {!isFullscreen ? <Header onPlaceSelect={handlePlaceSelect} /> : null}
       <div className={`app-route-content${isFullscreen ? " app-route-content--fullscreen" : ""}`}>
         <Routes>

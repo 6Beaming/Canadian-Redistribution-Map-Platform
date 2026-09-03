@@ -6,6 +6,7 @@ import { SUBMISSION_LIST_API_PAGE_SIZE } from "@/lib/submissions/submissionListP
 import {
   createDefaultCommissionerTableFilters,
   filterCommissionerSubmissionsForTable,
+  parseCommissionerFilterDayBound,
 } from "@/lib/submissions/commissionerSubmissionListFilters.js";
 
 function normalizeApiPage(page) {
@@ -89,7 +90,7 @@ export class CommissionerSubmissionListStore {
   isRangeFullyLoaded(createdFrom) {
     if (this.#fullyExpanded) return true;
     if (!createdFrom) return false;
-    const target = new Date(createdFrom).setHours(0, 0, 0, 0);
+    const target = parseCommissionerFilterDayBound(createdFrom, { endOfDay: false });
     if (!Number.isFinite(target)) return false;
     return this.#getEarliestTimestamp() <= target;
   }
@@ -129,7 +130,7 @@ export class CommissionerSubmissionListStore {
   async ensureDateCoverage(createdFrom) {
     if (!createdFrom || this.#fullyExpanded) return;
 
-    const target = new Date(createdFrom).setHours(0, 0, 0, 0);
+    const target = parseCommissionerFilterDayBound(createdFrom, { endOfDay: false });
     if (!Number.isFinite(target)) return;
 
     while (!this.#fullyExpanded) {
@@ -140,8 +141,24 @@ export class CommissionerSubmissionListStore {
   }
 
   async reset() {
+    this.invalidate();
+    await this.ensureBootstrapped();
+  }
+
+  upsertItem(item, { notify = true } = {}) {
+    this.#mergeItems([item]);
+    if (notify) this.#notify();
+  }
+
+  removeItem(itemId, { notify = true } = {}) {
+    const id = String(itemId ?? "");
+    if (!id || !this.#itemsById.has(id)) return;
+    this.#itemsById.delete(id);
+    if (notify) this.#notify();
+  }
+
+  invalidate() {
     this.#cancelBackground();
-    this.#runGeneration += 1;
     this.#itemsById.clear();
     this.#fullyExpanded = false;
     this.#phase = "seed";
@@ -149,8 +166,10 @@ export class CommissionerSubmissionListStore {
     this.#windowCursor = null;
     this.#windowHasMore = false;
     this.#bootstrapPromise = null;
+    this.#bootstrapping = false;
+    const resolvers = this.#fullyExpandedResolvers.splice(0);
+    resolvers.forEach((resolve) => resolve(this.cache));
     this.#notify();
-    await this.ensureBootstrapped();
   }
 
   #getSortedItems() {
@@ -252,6 +271,7 @@ export class CommissionerSubmissionListStore {
 
   async #fetchNextPage({ signal } = {}) {
     if (this.#fullyExpanded) return false;
+    const generation = this.#runGeneration;
 
     if (signal?.aborted) {
       throw signal.reason ?? new DOMException("Aborted", "AbortError");
@@ -262,6 +282,8 @@ export class CommissionerSubmissionListStore {
       ...this.#activeRequestFilters(),
       ...(this.#windowCursor ? { cursor: this.#windowCursor } : {}),
     });
+    if (generation !== this.#runGeneration) return false;
+
     const normalized = normalizeApiPage(page);
     const added = this.#mergeItems(normalized.items);
     this.#windowCursor = normalized.nextCursor;
@@ -303,9 +325,22 @@ export class CommissionerSubmissionListStore {
 
 let sharedStore = null;
 
+export function isCommissionerListSurface(pathname) {
+  const path = String(pathname ?? "");
+  return (
+    path === "/dashboard/submissionsTable"
+    || path === "/dashboard/graphs"
+    || path.startsWith("/dashboard/workspace")
+  );
+}
+
 export function getCommissionerSubmissionListStore() {
   if (!sharedStore) {
     sharedStore = new CommissionerSubmissionListStore();
   }
   return sharedStore;
+}
+
+export function invalidateCommissionerSubmissionListStore() {
+  sharedStore?.invalidate();
 }

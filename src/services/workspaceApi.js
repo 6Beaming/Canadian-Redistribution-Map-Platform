@@ -2,9 +2,12 @@ import {
     hydrateWorkspaceSubmission,
 } from "@/services/tempCounterProposal.js";
 import {
+    getCommissionerSubmissionTableRows,
     getSubmissionTableRowById,
 } from "@/services/submissionListsApi.js";
 import { getCommissionerSubmissionListStore } from "@/lib/submissions/commissionerSubmissionListStore.js";
+import { createDefaultCommissionerTableFilters } from "@/lib/submissions/commissionerSubmissionListFilters.js";
+import { SUBMISSION_LIST_API_PAGE_SIZE } from "@/lib/submissions/submissionListPaging.js";
 import { subscribeRealtimeInvalidation } from "@/lib/realtime/realtimeInvalidation.js";
 import {
     getWorkspaceReviewInvalidationKeys,
@@ -577,11 +580,19 @@ export function canMergeArchiveRequest(request) {
 }
 
 /**
- * Transitional Commissioner heatmap aggregate over hybrid Workspace data.
+ * Transitional Commissioner heatmap aggregate. Reads a seed page directly so
+ * Dashboard Home cannot re-seed the Table/Workspace singleton.
  * Replace with a compact authenticated server aggregate for production scale.
  */
 export async function getSubmissionHeatmap() {
-    const submissions = await getWorkspaceSubmissions({ includeArchived: false });
+    const defaults = createDefaultCommissionerTableFilters();
+    const page = await getCommissionerSubmissionTableRows({
+        pageSize: SUBMISSION_LIST_API_PAGE_SIZE,
+        createdFrom: defaults.createdFrom,
+        createdTo: defaults.createdTo,
+        query: "",
+    });
+    const submissions = mapWorkspaceSubmissions(page.items ?? [], { includeArchived: false });
     const countsByDguid = {};
 
     submissions
