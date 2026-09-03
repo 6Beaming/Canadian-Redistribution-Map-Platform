@@ -10,6 +10,10 @@ const cleanupPreparation = fs.readFileSync(
   "supabase/migrations/20260903050000_prepare_final_legacy_cleanup.sql",
   "utf8",
 );
+const cleanupContraction = fs.readFileSync(
+  "supabase/migrations/20260903060000_drop_final_legacy_objects.sql",
+  "utf8",
+);
 
 test("retired proposal and comment-tag contracts have no runtime consumer", () => {
   const activeSource = `${app}\n${commentsRoute}\n${commentsClient}`;
@@ -87,4 +91,33 @@ test("replacement database audit covers all runtime tables and excludes the alia
   assert.doesNotMatch(replacement, /map_release_legacy_aliases/);
   assert.match(replacement, /workspaceCatalogLinks/);
   assert.match(replacement, /workspaceFixedLabelsMissingKey/);
+});
+
+test("final cleanup contracts legacy objects without an uncontrolled cascade", () => {
+  for (const table of [
+    "audit_log",
+    "comment_tags",
+    "da_adjacency",
+    "da_assignments",
+    "fed_districts",
+    "map_proposals",
+    "map_release_legacy_aliases",
+    "workspace_label_catalog",
+  ]) {
+    assert.match(cleanupContraction, new RegExp(`drop table if exists public\\.${table} restrict`, "i"));
+  }
+  assert.match(cleanupContraction, /drop column if exists proposal_id restrict/i);
+  assert.match(cleanupContraction, /drop column if exists catalog_id restrict/i);
+  assert.match(cleanupContraction, /drop function if exists public\.archive_branch_key\(jsonb, uuid\) restrict/i);
+  assert.doesNotMatch(cleanupContraction, /\bcascade\b/i);
+});
+
+test("final cleanup has transactional data and dependency preflights", () => {
+  assert.match(cleanupContraction, /begin;[\s\S]*commit;/i);
+  assert.match(cleanupContraction, /public\.audit_final_refactor_database\(\)/i);
+  assert.match(cleanupContraction, /submissions where proposal_id is not null/i);
+  assert.match(cleanupContraction, /workspace_labels where catalog_id is not null/i);
+  assert.match(cleanupContraction, /unexpected foreign-key dependencies/i);
+  assert.match(cleanupContraction, /and source_class\.relname not in/i);
+  assert.match(cleanupContraction, /workspaceCatalogLinks', 0/i);
 });
