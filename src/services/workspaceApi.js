@@ -650,30 +650,40 @@ async function getRemoteArchiveTreeRecords() {
     }
     const payload = await response.json();
     const records = Array.isArray(payload?.records) ? payload.records : [];
-    return records.map((record) => ({
-        submission: {
-            ...(record.submission ?? {}),
-            status: WORKSPACE_STATUS.ARCHIVED,
-        },
-        branchKey: record.branchKey ?? null,
-        versionNumber: Number(record.versionNumber) || null,
-        isLatest: Boolean(record.isLatest),
-        revertedAt: record.revertedAt ?? null,
-        revertedBy: record.revertedBy ?? null,
-        mergedBy: record.mergedBy ?? "Unknown commissioner",
-        mergedAt: record.mergedAt,
-        closingComment: record.closingComment ?? null,
-        versionId: record.versionId ?? null,
-        branchId: record.branchId ?? null,
-        submissionType: record.submissionType ?? null,
-        primaryDguid: record.primaryDguid ?? record.submission?.dguid ?? null,
-        secondaryDguid: record.secondaryDguid ?? record.submission?.neighboring_dguid ?? null,
-        releaseId: record.releaseId ?? null,
-        resourceVersion: record.resourceVersion ?? 1,
-        geometryDigest: record.geometryDigest ?? null,
-        hasGeometry: Boolean(record.hasGeometry),
-        validationReport: record.validationReport ?? null,
-    }));
+    return records.map((record) => {
+        const submission = record.submission ?? {};
+        return {
+            submission: {
+                id: submission.id ?? record.versionId ?? null,
+                type: submission.type ?? record.submissionType ?? "feedback",
+                title: submission.title ?? "",
+                dguid: submission.dguid ?? record.primaryDguid ?? null,
+                neighboring_dguid: submission.neighboring_dguid ?? record.secondaryDguid ?? null,
+                community_name: submission.community_name
+                    ?? submission.communityName
+                    ?? record.communityName
+                    ?? null,
+                status: WORKSPACE_STATUS.ARCHIVED,
+            },
+            branchKey: record.branchKey ?? null,
+            versionNumber: Number(record.versionNumber) || null,
+            isLatest: Boolean(record.isLatest),
+            revertedAt: record.revertedAt ?? null,
+            revertedBy: record.revertedBy ?? null,
+            mergedBy: record.mergedBy ?? "Unknown commissioner",
+            mergedAt: record.mergedAt,
+            versionId: record.versionId ?? null,
+            branchId: record.branchId ?? null,
+            submissionType: record.submissionType ?? null,
+            primaryDguid: record.primaryDguid ?? submission.dguid ?? null,
+            secondaryDguid: record.secondaryDguid ?? submission.neighboring_dguid ?? null,
+            releaseId: record.releaseId ?? null,
+            resourceVersion: record.resourceVersion ?? 1,
+            geometryDigest: record.geometryDigest ?? null,
+            hasGeometry: Boolean(record.hasGeometry),
+            communityName: record.communityName ?? submission.community_name ?? null,
+        };
+    });
 }
 
 /** Latest archived map overlay from archive_map_da_heads when available. */

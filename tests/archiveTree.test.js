@@ -59,6 +59,39 @@ test("archive search matches community name and full submission IDs", () => {
   assert.equal(filterArchiveTree(categories, "Dawson")[2].branches.length, 0);
 });
 
+test("slim mapVersionRecord keeps tree identity without fat projection fields", () => {
+  const mapped = mapVersionRecord(
+    {
+      id: "branch-1",
+      branch_key: "comment:r:da-1",
+      submission_type: "comment",
+      release_id: "r",
+      primary_dguid: "da-1",
+      secondary_dguid: null,
+      resource_version: 1,
+      head_version_id: "version-1",
+    },
+    {
+      id: "version-1",
+      version_number: 1,
+      source_submission_id: "submission-1",
+      title: "Slim title",
+      community_name: "Whitehorse",
+      merged_by: "commissioner-1",
+      merged_at: "2026-01-01T00:00:00.000Z",
+    },
+    new Map([["commissioner-1", "commissioner@example.com"]]),
+    { slim: true },
+  );
+
+  assert.equal(mapped.submission.id, "submission-1");
+  assert.equal(mapped.submission.title, "Slim title");
+  assert.equal(mapped.submission.community_name, "Whitehorse");
+  assert.equal(mapped.submission.comment, undefined);
+  assert.equal("validationReport" in mapped, false);
+  assert.equal("closingComment" in mapped, false);
+});
+
 test("mapVersionRecord exposes submission id for migrated v2 projections", () => {
   const mapped = mapVersionRecord(
     {

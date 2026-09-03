@@ -5,6 +5,7 @@ import { PanelLoadingOverlay } from "@/components/non_prebuilt/LoadingIndicator.
 import { ArchivedMapLayoutContext } from "@/contexts/ArchivedMapLayoutContext.jsx";
 import { useMapFullscreen } from "@/contexts/MapFullscreenContext.jsx";
 import { MAP_INTERACTION_MODE } from "@/lib/map/interactionMode.js";
+import ArchivedTree from "@/pages/ArchivedTree.jsx";
 import "@/styles/map.css";
 import "@/styles/workspace-review.css";
 import "@/styles/archive-tree.css";
@@ -102,13 +103,14 @@ export default function ArchivedMapLayout() {
             </div>
           </div>
         ) : null}
+        <div className="archived-tree-host" inert={isDetail || undefined} aria-hidden={isDetail || undefined}>
+          <ArchivedTree />
+        </div>
         {isDetail ? (
           <main className="archive-difference-page--layout-panel">
             <Outlet />
           </main>
-        ) : (
-          <Outlet />
-        )}
+        ) : null}
       </div>
     </ArchivedMapLayoutContext.Provider>
   );

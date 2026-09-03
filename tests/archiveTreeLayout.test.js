@@ -93,9 +93,11 @@ test("Archived Counter-Proposal maps retain comparison styling and fullscreen co
   const archivedLayoutCss = fs.readFileSync("src/styles/archived-map-layout.css", "utf8");
   const difference = fs.readFileSync("src/pages/ArchivedDifference.jsx", "utf8");
   const layout = fs.readFileSync("src/layouts/ArchivedMapLayout.jsx", "utf8");
+  const app = fs.readFileSync("src/App.jsx", "utf8");
 
   assert.match(difference, /useArchivedMapLayout/);
   assert.match(difference, /setMapFetching/);
+  assert.match(difference, /getArchiveTreeRecordsStore\(\)\.refresh/);
   assert.doesNotMatch(difference, /PanelLoadingOverlay/);
   assert.doesNotMatch(difference, /RouteLoadingPage/);
   assert.match(difference, /buildArchivedDifferencePresentation/);
@@ -104,8 +106,12 @@ test("Archived Counter-Proposal maps retain comparison styling and fullscreen co
   assert.match(difference, />Proposed<\/button>/);
   assert.match(difference, />Original<\/button>/);
   assert.match(layout, /PanelLoadingOverlay/);
+  assert.match(layout, /<ArchivedTree/);
+  assert.match(layout, /archived-tree-host/);
+  assert.doesNotMatch(app, /index element=\{<ArchivedTree/);
   assert.match(layout, /isFullscreen=\{isFullscreen\}/);
   assert.match(layout, /onToggleFullscreen=\{toggleFullscreen\}/);
   assert.match(archivedLayoutCss, /archived-map-layout--detail\.map-dashboard--fullscreen/);
+  assert.match(archivedLayoutCss, /archived-map-layout--detail \.archived-tree-host[\s\S]*visibility: hidden/);
   assert.match(css, /archive-map-version-toggle/);
 });

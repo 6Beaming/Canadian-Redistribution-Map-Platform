@@ -28,7 +28,7 @@ function handleArchiveError(res, error, fallbackMessage) {
 router.get("/archive-tree", async (_req, res) => {
   try {
     const supabase = getSupabaseAdminDataClient();
-    const payload = await listArchiveTreeRecords(supabase);
+    const payload = await listArchiveTreeRecords(supabase, { slim: true });
     return res.json(payload);
   } catch (error) {
     return handleArchiveError(res, error, "Unable to load the Archived Tree.");

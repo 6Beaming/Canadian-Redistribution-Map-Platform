@@ -55,6 +55,9 @@ test("Map pages render during profile hydration and Archived Tree waits for its 
 
   assert.match(publicHome, /if \(!initialLoad\.ready && initialLoad\.error\)/);
   assert.match(dashboard, /if \(!initialLoad\.ready && initialLoad\.error\)/);
+  assert.match(archived, /getArchiveTreeRecordsStore/);
+  assert.match(archived, /isParked/);
+  assert.doesNotMatch(archived, /getDaProfiles/);
   assert.match(archived, /isLoading=\{isLoading\}/);
   assert.match(archivedCanvas, /const \[hasRendered, setHasRendered\] = useState\(false\)/);
   assert.match(archivedCanvas, /isLoading \|\| !hasRendered/);
@@ -171,6 +174,8 @@ test("Shared loading UI blocks page content and fullscreen owns Header visibilit
 
   assert.match(app, /WorkspaceMapLayout/);
   assert.match(app, /ArchivedMapLayout/);
+  assert.match(read("src/layouts/ArchivedMapLayout.jsx"), /<ArchivedTree/);
+  assert.doesNotMatch(app, /index element=\{<ArchivedTree/);
   assert.ok(app.indexOf("<Header") < app.indexOf("<RouteLoadingOverlay />"));
   assert.match(overlay, /toPathname === "\/dashboard\/workspace"/);
   assert.doesNotMatch(overlay, /isWorkspaceOrArchiveMapPath|archivedTree\/\[^\/\]\+\/difference/);

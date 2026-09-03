@@ -8,7 +8,6 @@ import {
 } from "./contexts/MapFullscreenContext.jsx";
 import Header from "./pages/Header.jsx";
 import AcceptInvitePage from "./pages/AcceptInvitePage.jsx";
-import ArchivedTree from "./pages/ArchivedTree.jsx";
 import ArchivedDifference from "./pages/ArchivedDifference.jsx";
 import CommissionerProfile from "./pages/CommissionerProfile.jsx";
 import CommissionerWorkspace from "./pages/CommissionerWorkspace.jsx";
@@ -132,7 +131,6 @@ function AppRoutes() {
               <Route path=":submissionId" element={<WorkspaceReview />} />
             </Route>
             <Route path="/dashboard/archivedTree" element={<ArchivedMapLayout />}>
-              <Route index element={<ArchivedTree />} />
               <Route path=":submissionId/difference" element={<ArchivedDifference />} />
             </Route>
             <Route

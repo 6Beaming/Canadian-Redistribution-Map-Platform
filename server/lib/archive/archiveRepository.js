@@ -1,5 +1,5 @@
 import { archiveError } from "./archiveErrors.js";
-import { getProfileForDguid } from "../map/mapAssetAuthority.js";
+import { getProfileForDguid, loadProfileIndex } from "../map/mapAssetAuthority.js";
 import { getArchiveMapRevisionSequence } from "./archivedMapRepository.js";
 
 const ARCHIVE_VERSION_SUMMARY_COLUMNS = [
@@ -14,6 +14,20 @@ const ARCHIVE_VERSION_SUMMARY_COLUMNS = [
   "closing_comment",
   "merged_by",
   "merged_at",
+].join(",");
+
+const ARCHIVE_VERSION_TREE_COLUMNS = [
+  "id",
+  "branch_id",
+  "version_number",
+  "merge_sequence",
+  "version_kind",
+  "source_submission_id",
+  "geometry_digest",
+  "merged_by",
+  "merged_at",
+  "title:submission_projection->>title",
+  "community_name:submission_projection->>community_name",
 ].join(",");
 
 const ARCHIVE_VERSION_GEOMETRY_COLUMNS = [
@@ -84,7 +98,65 @@ function projectionToSubmission(projection, branch, emailsById = new Map()) {
   return submission;
 }
 
-export function mapVersionRecord(branch, version, emailsById = new Map()) {
+function firstNonEmpty(...values) {
+  for (const value of values) {
+    if (value == null) continue;
+    const text = String(value).trim();
+    if (text) return typeof value === "string" ? value : text;
+  }
+  return null;
+}
+
+function mapSlimVersionRecord(branch, version, emailsById = new Map(), communityName = null) {
+  const projection = version.submission_projection && typeof version.submission_projection === "object"
+    ? version.submission_projection
+    : null;
+  const submissionId = version.source_submission_id
+    ?? projection?.id
+    ?? projection?.source_submission_id
+    ?? version.id;
+  const title = firstNonEmpty(version.title, projection?.title) ?? "";
+  const community = firstNonEmpty(
+    version.community_name,
+    projection?.community_name,
+    projection?.communityName,
+    communityName,
+  ) ?? "Unknown community";
+  const mergedBy = version.merged_by ?? null;
+  return {
+    branchId: branch.id,
+    branchKey: branch.branch_key,
+    releaseId: branch.release_id,
+    submissionType: branch.submission_type,
+    primaryDguid: branch.primary_dguid,
+    secondaryDguid: branch.secondary_dguid ?? null,
+    resourceVersion: Number(branch.resource_version) || 1,
+    versionId: version.id,
+    versionNumber: Number(version.version_number) || null,
+    versionKind: version.version_kind,
+    mergeSequence: Number(version.merge_sequence) || null,
+    isLatest: branch.head_version_id === version.id,
+    geometryDigest: version.geometry_digest ?? null,
+    hasGeometry: Boolean(version.geometry_digest),
+    communityName: community,
+    submission: {
+      id: submissionId,
+      type: mapLegacyTypeToSubmission(branch?.submission_type),
+      title,
+      dguid: branch?.primary_dguid ?? null,
+      neighboring_dguid: branch?.secondary_dguid ?? null,
+      community_name: community,
+      status: "archived",
+    },
+    mergedBy: emailsById.get(mergedBy) ?? mergedBy ?? "Unknown commissioner",
+    mergedAt: version.merged_at,
+  };
+}
+
+export function mapVersionRecord(branch, version, emailsById = new Map(), options = {}) {
+  if (options.slim) {
+    return mapSlimVersionRecord(branch, version, emailsById, options.communityName ?? null);
+  }
   const mergedBy = version.merged_by ?? null;
   return {
     branchId: branch.id,
@@ -188,7 +260,47 @@ async function loadProfileEmails(supabase, ids) {
   return new Map((data ?? []).map((profile) => [profile.id, profile.email]));
 }
 
-async function listV2ArchiveRecords(supabase) {
+async function resolveTreeCommunityNames(branches) {
+  const byBranchId = new Map();
+  if (!branches?.length) return byBranchId;
+  try {
+    await loadProfileIndex();
+  } catch {
+    for (const branch of branches) {
+      byBranchId.set(branch.id, "Unknown community");
+    }
+    return byBranchId;
+  }
+
+  const uniqueDguids = [...new Set(branches.flatMap((branch) => [
+    branch.primary_dguid,
+    branch.secondary_dguid,
+  ].filter(Boolean)))];
+  const namesByDguid = new Map();
+  await Promise.all(uniqueDguids.map(async (dguid) => {
+    try {
+      const profile = await getProfileForDguid(dguid);
+      namesByDguid.set(dguid, profile?.community_name ?? profile?.community ?? null);
+    } catch {
+      namesByDguid.set(dguid, null);
+    }
+  }));
+
+  for (const branch of branches) {
+    const primary = namesByDguid.get(branch.primary_dguid) ?? null;
+    const secondary = branch.secondary_dguid
+      ? namesByDguid.get(branch.secondary_dguid) ?? null
+      : null;
+    let name = primary ?? secondary;
+    if (primary && secondary && primary !== secondary) {
+      name = `${primary} / ${secondary}`;
+    }
+    byBranchId.set(branch.id, name ?? "Unknown community");
+  }
+  return byBranchId;
+}
+
+async function listV2ArchiveRecords(supabase, { slim = false } = {}) {
   const { data: branches, error: branchError } = await supabase
     .from("archive_branches")
     .select("id, branch_key, submission_type, release_id, primary_dguid, secondary_dguid, head_version_id, head_version_number, resource_version, scope_pruids, created_at, updated_at")
@@ -203,7 +315,7 @@ async function listV2ArchiveRecords(supabase) {
   const branchIds = branches.map((branch) => branch.id);
   const { data: versions, error: versionError } = await supabase
     .from("archive_versions")
-    .select(ARCHIVE_VERSION_SUMMARY_COLUMNS)
+    .select(slim ? ARCHIVE_VERSION_TREE_COLUMNS : ARCHIVE_VERSION_SUMMARY_COLUMNS)
     .in("branch_id", branchIds)
     .order("version_number", { ascending: false });
   if (versionError) {
@@ -214,21 +326,32 @@ async function listV2ArchiveRecords(supabase) {
 
   const emailsById = await loadProfileEmails(
     supabase,
-    (versions ?? []).flatMap((version) => [
-      version.merged_by,
-      version.submission_projection?.user_id,
-    ]),
+    (versions ?? []).flatMap((version) => (
+      slim
+        ? [version.merged_by]
+        : [version.merged_by, version.submission_projection?.user_id]
+    )),
   );
-  const branchesById = new Map(branches.map((branch) => [branch.id, branch]));
-  return (versions ?? []).map((version) => mapVersionRecord(
-    branchesById.get(version.branch_id),
-    version,
-    emailsById,
+  const needsCommunityLookup = slim && (versions ?? []).some((version) => !firstNonEmpty(
+    version.community_name,
+    version.submission_projection?.community_name,
+    version.submission_projection?.communityName,
   ));
+  const communityByBranchId = needsCommunityLookup
+    ? await resolveTreeCommunityNames(branches)
+    : new Map();
+  const branchesById = new Map(branches.map((branch) => [branch.id, branch]));
+  return (versions ?? []).map((version) => {
+    const branch = branchesById.get(version.branch_id);
+    return mapVersionRecord(branch, version, emailsById, {
+      slim,
+      communityName: communityByBranchId.get(branch?.id) ?? null,
+    });
+  });
 }
 
-export async function listArchiveTreeRecords(supabase) {
-  const v2Records = await listV2ArchiveRecords(supabase);
+export async function listArchiveTreeRecords(supabase, { slim = false } = {}) {
+  const v2Records = await listV2ArchiveRecords(supabase, { slim });
   return { source: "v2", records: v2Records };
 }
 

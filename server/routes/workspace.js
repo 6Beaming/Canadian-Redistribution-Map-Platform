@@ -68,7 +68,7 @@ router.get("/reviewers", async (_req, res) => {
 router.get("/archive", async (_req, res) => {
   try {
     const supabase = getSupabaseAdminDataClient();
-    const { records } = await listArchiveTreeRecords(supabase);
+    const { records } = await listArchiveTreeRecords(supabase, { slim: true });
     return res.json(records);
   } catch (error) {
     return res.status(error.statusCode || 500).json({

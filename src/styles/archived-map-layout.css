@@ -6,6 +6,14 @@
   pointer-events: none;
 }
 
+.archived-map-layout--detail .archived-tree-host {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .archived-map-layout--detail {
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(20rem, 30vw, 28rem);

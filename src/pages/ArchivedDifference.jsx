@@ -17,6 +17,7 @@ import {
   getArchiveBranchView,
   revertArchiveBranch,
 } from "@/services/workspaceApi.js";
+import { getArchiveTreeRecordsStore } from "@/lib/archive/archiveTreeRecordsStore.js";
 
 function mapVersionCards(view) {
   const categoryId = getArchiveCategoryId(view.selectedVersion?.submission?.type);
@@ -336,6 +337,7 @@ export default function ArchivedDifference() {
         expectedBranchVersion: selectedEntry.branch.resourceVersion,
         expectedMapRevision: archiveMapRevision,
       });
+      await getArchiveTreeRecordsStore().refresh({ silent: true }).catch(() => {});
       navigate("/dashboard/archivedTree", { replace: true });
     } catch (revertError) {
       setError(revertError.message || "Unable to revert this archived version.");

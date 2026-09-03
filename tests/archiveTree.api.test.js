@@ -45,6 +45,7 @@ function authenticate(profile = commissioner, admin = null) {
 }
 
 test("archive-tree route returns v2 archive records", async () => {
+  let versionSelect = "";
   authenticate(commissioner, {
     from(table) {
       if (table === "archive_branches") {
@@ -73,7 +74,10 @@ test("archive-tree route returns v2 archive records", async () => {
       }
       if (table === "archive_versions") {
         return {
-          select() { return this; },
+          select(columns) {
+            versionSelect = String(columns ?? "");
+            return this;
+          },
           in() { return this; },
           order() {
             return Promise.resolve({
@@ -83,6 +87,9 @@ test("archive-tree route returns v2 archive records", async () => {
                 version_number: 1,
                 merge_sequence: 1,
                 version_kind: "merge",
+                source_submission_id: "submission-1",
+                title: "Archived comment",
+                community_name: "Whitehorse",
                 submission_projection: {
                   id: "submission-1",
                   type: "feedback",
@@ -91,7 +98,8 @@ test("archive-tree route returns v2 archive records", async () => {
                   dguid: "2021S051260010118",
                 },
                 geometry_digest: null,
-                closing_comment: null,
+                validation_report: { impact_summary: { version: 1 } },
+                closing_comment: { content: "Closing note" },
                 merged_by: "commissioner-1",
                 merged_at: "2026-01-01T00:00:00.000Z",
               }],
@@ -119,6 +127,14 @@ test("archive-tree route returns v2 archive records", async () => {
   assert.equal(response.body.source, "v2");
   assert.equal(response.body.records.length, 1);
   assert.equal(response.body.records[0].submission.title, "Archived comment");
+  assert.equal(response.body.records[0].submission.id, "submission-1");
+  assert.equal(response.body.records[0].submission.comment, undefined);
+  assert.equal("validationReport" in response.body.records[0], false);
+  assert.equal("closingComment" in response.body.records[0], false);
+  assert.match(versionSelect, /source_submission_id/);
+  assert.doesNotMatch(versionSelect, /validation_report/);
+  assert.doesNotMatch(versionSelect, /closing_comment/);
+  assert.doesNotMatch(versionSelect, /submission_projection(?!->>)/);
 });
 
 test("archive-tree route requires commissioner access", async () => {

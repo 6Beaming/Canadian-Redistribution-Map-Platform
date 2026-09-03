@@ -1,74 +1,70 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, GitFork, Search } from "lucide-react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useMatch, useNavigate, useSearchParams } from "react-router-dom";
 import { ArchivedTreeCanvas } from "@/components/non_prebuilt/ArchivedTreeCanvas.jsx";
 import { ArchivedTreePanel } from "@/components/non_prebuilt/ArchivedTreePanel.jsx";
+import { getArchiveTreeRecordsStore } from "@/lib/archive/archiveTreeRecordsStore.js";
 import {
   buildArchiveTree,
   filterArchiveTree,
   findArchiveVersion,
   getArchiveVersionRouteId,
 } from "@/lib/archiveTree.js";
-import { buildProfileIndex } from "@/lib/map/profileUtils.js";
-import { mapApi } from "@/services/mapApi.js";
 import { exportArchivedTreeJson } from "@/services/exportApi.js";
-import {
-  deleteArchiveBranch,
-  getArchiveTreeRecords,
-} from "@/services/workspaceApi.js";
+import { deleteArchiveBranch } from "@/services/workspaceApi.js";
 import "@/styles/archive-tree.css";
 
 export default function ArchivedTree() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [records, setRecords] = useState([]);
-  const [profilesByDguid, setProfilesByDguid] = useState(new Map());
+  const isParked = Boolean(useMatch("/dashboard/archivedTree/:submissionId/difference"));
+  const storeRef = useRef(getArchiveTreeRecordsStore());
+  const wasParkedRef = useRef(isParked);
+  const [records, setRecords] = useState(() => storeRef.current.getSnapshot().records);
   const [query, setQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [reloadVersion, setReloadVersion] = useState(0);
+  const [isLoading, setIsLoading] = useState(() => !storeRef.current.getSnapshot().loaded);
+  const [error, setError] = useState(() => storeRef.current.getSnapshot().error);
   const [exportState, setExportState] = useState({ pending: false, error: "" });
   const selectedId = searchParams.get("selected");
 
   useEffect(() => {
-    let isMounted = true;
-    setIsLoading(true);
-    setError("");
-
-    getArchiveTreeRecords()
-      .then((nextRecords) => {
-        if (!isMounted) return;
-        setRecords(nextRecords);
-      })
-      .catch((loadError) => {
-        if (isMounted) setError(loadError.message || "Archived records could not be loaded.");
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false);
-      });
-
-    const loadProfiles = () => {
-      mapApi.getDaProfiles()
-        .then((payload) => {
-          if (isMounted) setProfilesByDguid(buildProfileIndex(payload).index);
-        })
-        .catch(() => {
-          // Snapshot fields remain usable when profile metadata is unavailable.
-        });
+    const store = storeRef.current;
+    const apply = (snapshot) => {
+      setRecords(snapshot.records);
+      setError(snapshot.error);
     };
-    if (typeof window !== "undefined" && typeof window.requestIdleCallback === "function") {
-      window.requestIdleCallback(loadProfiles, { timeout: 1500 });
-    } else {
-      window.setTimeout(loadProfiles, 0);
-    }
+    apply(store.getSnapshot());
+    return store.subscribe(apply);
+  }, []);
 
-    return () => { isMounted = false; };
-  }, [reloadVersion]);
+  useEffect(() => {
+    const store = storeRef.current;
+    const hasCache = store.getSnapshot().loaded;
+    if (!hasCache) setIsLoading(true);
+    let cancelled = false;
+    store.refresh({ silent: hasCache })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    const wasParked = wasParkedRef.current;
+    wasParkedRef.current = isParked;
+    if (!wasParked || isParked) return undefined;
+    storeRef.current.refresh({ silent: true }).catch(() => {});
+    const frame = window.requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [isParked]);
 
   const categories = useMemo(
-    () => buildArchiveTree(records, profilesByDguid),
-    [profilesByDguid, records],
+    () => buildArchiveTree(records),
+    [records],
   );
   const visibleCategories = useMemo(
     () => filterArchiveTree(categories, query),
@@ -101,7 +97,7 @@ export default function ArchivedTree() {
   }
 
   return (
-    <main className="archive-tree-page" aria-labelledby="archive-tree-title">
+    <main className="archive-tree-page" aria-labelledby="archive-tree-title" aria-hidden={isParked || undefined} inert={isParked || undefined}>
       <header className="archive-tree-toolbar">
         <div className="archive-tree-heading">
           <span><GitFork aria-hidden="true" /></span>
@@ -174,7 +170,7 @@ export default function ArchivedTree() {
               expectedBranchVersion: branch.resourceVersion,
             });
             clearSelection();
-            setReloadVersion((current) => current + 1);
+            await storeRef.current.refresh({ silent: true });
           }}
         />
       </div>

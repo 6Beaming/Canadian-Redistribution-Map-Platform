@@ -160,7 +160,6 @@ export function filterArchiveTree(categories, query) {
         ...branch.versions.flatMap((version) => [
           version.id,
           version.submission?.title,
-          version.submission?.comment,
         ]),
       ].filter(Boolean).join(" ").toLowerCase();
       return searchText.includes(target);
