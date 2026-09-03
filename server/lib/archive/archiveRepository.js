@@ -642,16 +642,6 @@ export async function getArchiveBranchView(supabase, {
     geometryByVersionId[resolvedLatestVersionId] = geometryByVersionId[resolvedSelectedVersionId];
   }
 
-  const selectedGeometryEntry = geometryByVersionId[resolvedSelectedVersionId] ?? null;
-  const latestGeometryEntry = selectedSameAsLatest
-    ? selectedGeometryEntry
-    : (geometryByVersionId[resolvedLatestVersionId] ?? null);
-
-  const selectedDisplayGeometry = selectedGeometryEntry?.displayGeometry ?? null;
-  const latestDisplayGeometry = latestGeometryEntry?.displayGeometry ?? null;
-  const selectedOriginalGeometry = null;
-  const latestOriginalGeometry = null;
-
   return {
     source: "v2",
     branch: {
@@ -674,10 +664,6 @@ export async function getArchiveBranchView(supabase, {
     selectedVersionId: resolvedSelectedVersionId,
     latestVersionId: resolvedLatestVersionId,
     geometryByVersionId,
-    selectedDisplayGeometry,
-    latestDisplayGeometry,
-    selectedOriginalGeometry,
-    latestOriginalGeometry,
     archiveMapRevision,
   };
 }

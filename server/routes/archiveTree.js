@@ -14,6 +14,8 @@ import {
   revertArchiveVersion,
 } from "../lib/archive/archiveMergeService.js";
 
+import { withServerTimingSpan } from "../lib/serverTiming.js";
+
 const router = Router();
 
 function handleArchiveError(res, error, fallbackMessage) {
@@ -46,11 +48,11 @@ router.get("/archive-tree/branches/:branchId", async (req, res) => {
 router.get("/archive-tree/versions/:versionId/view", async (req, res) => {
   try {
     const supabase = getSupabaseAdminDataClient();
-    const payload = await getArchiveBranchView(supabase, {
+    const payload = await withServerTimingSpan(req, "db", () => getArchiveBranchView(supabase, {
       selectedVersionId: req.params.versionId,
       branchKey: req.query.branchKey ?? null,
       includeLatestGeometry: req.query.includeDifference !== "0",
-    });
+    }));
     return res.json(payload);
   } catch (error) {
     return handleArchiveError(res, error, "Unable to load the archived branch view.");

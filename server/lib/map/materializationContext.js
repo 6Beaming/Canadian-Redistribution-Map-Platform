@@ -7,6 +7,15 @@ import {
 } from "./canonicalReleaseStore.js";
 
 const storage = new AsyncLocalStorage();
+let readCounterForTests = null;
+
+export function setMaterializationReadCounterForTests(counter) {
+  readCounterForTests = counter;
+}
+
+export function clearMaterializationReadCounterForTests() {
+  readCounterForTests = null;
+}
 
 function pairKey(primaryDguid, secondaryDguid, representation, lod) {
   const pair = [String(primaryDguid ?? "").trim(), String(secondaryDguid ?? "").trim()].sort();
@@ -34,6 +43,7 @@ export class MaterializationContext {
   async getExactDaFeature(release, dguid) {
     const key = `${release.manifest.releaseId}:${String(dguid ?? "").trim()}`;
     if (!this.exactDaByKey.has(key)) {
+      readCounterForTests?.recordExactDa?.(dguid);
       this.exactDaByKey.set(key, readExactDaFeature(release, dguid));
     }
     return this.exactDaByKey.get(key);
@@ -44,6 +54,7 @@ export class MaterializationContext {
     const lod = options.lod ?? "auto";
     const key = `${release.manifest.releaseId}:${pairKey(primaryDguid, secondaryDguid, representation, lod)}`;
     if (!this.pairByKey.has(key)) {
+      readCounterForTests?.recordPair?.({ primaryDguid, secondaryDguid, representation, lod });
       this.pairByKey.set(key, await readCanonicalDaPair(
         release,
         primaryDguid,
@@ -58,6 +69,7 @@ export class MaterializationContext {
     const pair = [String(primaryDguid ?? "").trim(), String(secondaryDguid ?? "").trim()].sort();
     const key = `${release.manifest.releaseId}:${pair.join("|")}`;
     if (!this.sharedArcByKey.has(key)) {
+      readCounterForTests?.recordSharedArc?.(pair.join("|"));
       this.sharedArcByKey.set(key, await readSharedArcRecord(release, pair.join("|")));
     }
     return this.sharedArcByKey.get(key);

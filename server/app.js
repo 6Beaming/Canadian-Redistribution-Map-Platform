@@ -20,6 +20,7 @@ import {
   getDefaultRealtimeEventStore,
   syntheticRealtimeEnabled,
 } from "./realtime/eventStore.js";
+import { serverTimingMiddleware } from "./lib/serverTiming.js";
 
 
 const app = express();
@@ -47,6 +48,7 @@ app.use(
 );
 
 app.use(express.json({ limit: "1mb" }));
+app.use(serverTimingMiddleware);
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });

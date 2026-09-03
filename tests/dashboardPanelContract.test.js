@@ -28,6 +28,11 @@ test("Dashboard cards use the dedicated DGUID API and reject stale responses", (
   assert.match(cards, /relationship !== "in_scope"/);
 });
 
+test("Legacy dashboard collection loader is removed from the client bundle", () => {
+  const temp = read("src/services/tempCounterProposal.js");
+  assert.doesNotMatch(temp, /getDashboardSubmissionCollections/);
+});
+
 test("Workspace actions stack and panel selectors share styling", () => {
   const workspace = read("src/components/non_prebuilt/WorkspaceReviewPanel.jsx");
   const mapPanel = read("src/components/non_prebuilt/MapInfoPanel.jsx");

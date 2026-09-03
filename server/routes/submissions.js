@@ -19,6 +19,7 @@ import {
   loadLatestCounterProposalGeometryRevisions,
 } from "../lib/map/counterProposalRevisionStore.js";
 import { assertActiveMapRelease } from "../lib/map/mapReleaseGate.js";
+import { withServerTimingSpan } from "../lib/serverTiming.js";
 
 const router = Router();
 
@@ -71,8 +72,12 @@ router.post("/counter-proposals", requirePublicUser, async (req, res, next) => {
       });
     }
 
-    const activeRelease = await assertActiveMapRelease();
-    const prepared = await prepareCounterProposalSubmissionV2(req.body, activeRelease);
+    const activeRelease = await withServerTimingSpan(req, "asset-read", () => assertActiveMapRelease());
+    const prepared = await withServerTimingSpan(
+      req,
+      "materialize",
+      () => prepareCounterProposalSubmissionV2(req.body, activeRelease),
+    );
     const supabase = getSupabaseAdminDataClient();
     const persisted = await createCounterProposalSubmissionV2(supabase, {
       userId: req.user.id,

@@ -6,6 +6,7 @@ import {
   listMySubmissionRowsV2,
 } from "../lib/submissions/submissionListRepository.js";
 import { getCommissionerSubmissionAnalytics } from "../lib/submissions/submissionAnalyticsQuery.js";
+import { withServerTimingSpan } from "../lib/serverTiming.js";
 
 const router = Router();
 
@@ -31,17 +32,17 @@ async function listRows(req, res, {
   try {
     const supabase = getSupabaseAdminDataClient();
     if (ownerId) {
-      const payload = await listMySubmissionRowsV2(supabase, {
+      const payload = await withServerTimingSpan(req, "db", () => listMySubmissionRowsV2(supabase, {
         userId: ownerId,
         query: req.query,
-      });
+      }));
       return res.json(payload);
     }
     if (scopeToCommissioner) {
-      const payload = await listCommissionerSubmissionRowsV2(supabase, {
+      const payload = await withServerTimingSpan(req, "db", () => listCommissionerSubmissionRowsV2(supabase, {
         actorProfile: req.profile,
         query: req.query,
-      });
+      }));
       return res.json(payload);
     }
     return res.status(503).json({
@@ -94,10 +95,10 @@ router.get("/table-row/:submissionId", requireCommissioner, async (req, res) => 
 router.get("/analytics", requireCommissioner, async (req, res) => {
   try {
     const supabase = getSupabaseAdminDataClient();
-    const payload = await getCommissionerSubmissionAnalytics(supabase, {
+    const payload = await withServerTimingSpan(req, "db", () => getCommissionerSubmissionAnalytics(supabase, {
       actorProfile: req.profile,
       query: req.query,
-    });
+    }));
     return res.json(payload);
   } catch (error) {
     return res.status(error.statusCode || 500).json({

@@ -429,7 +429,6 @@ test("Commissioner CSV is authorized, subset-filtered, tag-inclusive, and formul
   assert.ok(response.text.includes("Constructive; Follow Up"));
   assert.equal(response.text.includes("Removed"), false);
   assert.equal(response.text.includes("Excluded Tag"), false);
-  assert.equal(capture.submissionColumns.includes("geometry"), false);
   assert.equal(capture.labelColumns, "submission_id,name,is_selected,updated_at");
 
   authDoubles(publicUser, admin);

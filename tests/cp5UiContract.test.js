@@ -133,8 +133,10 @@ test("CP5 navigation, readiness loading, and export entry points remain wired", 
   assert.match(submissionsTable, /tableFetching/);
   assert.match(submissionsTable, /Counting pages/);
   assert.match(submissionsTable, /PanelLoadingOverlay/);
-  assert.match(submissionsTable, /exportCommissionerSubmissionsCsv\(submissionIds\)/);
-  assert.match(submissionsTable, /serverMode && onResolveExportIds/);
+  assert.match(submissionsTable, /exportCommissionerSubmissionsCsv\(\{/);
+  assert.match(submissionsTable, /filters:/);
+  assert.match(submissionsTable, /types: visibleSubmissions/);
+  assert.match(submissionsTable, /exportMatchCount/);
   assert.match(submissionsTable, /isWithinDateRange\(submission\.submittedAt, dateStart, dateEnd\)/);
   assert.match(datePicker, /"Jan\."[\s\S]*"Aug\."[\s\S]*"Dec\."/);
   assert.match(datePicker, /formatDateLabel\(date\)/);

@@ -18,11 +18,14 @@ async function downloadFile(url, fallbackFilename, requestOptions = {}) {
   }
 }
 
-export function exportCommissionerSubmissionsCsv(submissionIds) {
+export function exportCommissionerSubmissionsCsv(exportRequest = {}) {
+  const body = typeof exportRequest === "object" && !Array.isArray(exportRequest)
+    ? exportRequest
+    : { submissionIds: exportRequest };
   return downloadFile("/api/exports/submissions.csv", "commissioner-submissions.csv", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ submissionIds }),
+    body: JSON.stringify(body),
   });
 }
 

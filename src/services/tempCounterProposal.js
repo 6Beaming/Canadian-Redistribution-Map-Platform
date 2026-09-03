@@ -428,52 +428,6 @@ async function hydratePersistedCounterProposal(submission, profilesByDguid) {
   };
 }
 
-function isRelatedToDguid(submission, dguid) {
-  const targetDguid = String(dguid ?? "");
-  return (
-    String(submission?.dguid ?? "") === targetDguid ||
-    String(submission?.neighboring_dguid ?? "") === targetDguid
-  );
-}
-
-/**
- * Dashboard DA cards: live feedback/objections from /api/comments plus
- * persisted counter-proposals from /api/submissions/counter-proposals.
- */
-export async function getDashboardSubmissionCollections(dguid, profilesByDguid) {
-  if (!dguid) {
-    return { comments: [], objections: [], counterProposals: [] };
-  }
-
-  const profiles = await getProfilesByDguid(profilesByDguid);
-  const [liveSubmissions, counterProposalRows] = await Promise.all([
-    getAllComments().catch(() => []),
-    getCounterProposals().catch(() => []),
-  ]);
-
-  const relatedLive = (Array.isArray(liveSubmissions) ? liveSubmissions : [])
-    .filter((submission) => isRelatedToDguid(submission, dguid));
-  const comments = relatedLive
-    .filter((submission) => normalizeSubmissionType(submission.type) === "feedback")
-    .map((submission) => normalizeSubmission(submission, "supabase"));
-  const objectionRows = relatedLive.filter(
-    (submission) => normalizeSubmissionType(submission.type) === "objection",
-  );
-  const relatedCounterProposals = (Array.isArray(counterProposalRows) ? counterProposalRows : [])
-    .filter((submission) => isRelatedToDguid(submission, dguid));
-
-  const [objections, counterProposals] = await Promise.all([
-    Promise.all(objectionRows.map((submission) => hydrateObjection(submission, profiles))),
-    Promise.all(
-      relatedCounterProposals.map((submission) =>
-        hydratePersistedCounterProposal(submission, profiles),
-      ),
-    ),
-  ]);
-
-  return { comments, objections, counterProposals };
-}
-
 /** Load one counter-proposal with persisted revision geometry for review. */
 export async function getTemporaryCounterProposalById(id, profilesByDguid) {
   try {

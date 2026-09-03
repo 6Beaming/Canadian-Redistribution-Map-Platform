@@ -48,6 +48,7 @@ import {
   DEFAULT_VISIBLE_SUBMISSION_TYPES,
   getSubmissionTypeBucket,
 } from "@/lib/submissions/commissionerListPaging.js";
+import { formatCommissionerFilterDate } from "@/lib/submissions/commissionerSubmissionListFilters.js";
 import { PanelLoadingOverlay } from "@/components/non_prebuilt/LoadingIndicator.jsx";
 
 function buildServerPageLabel(serverPagination) {
@@ -162,10 +163,20 @@ export default function SubmissionsTable({
     if (exportState.pending) return;
     setExportState({ pending: true, error: "" });
     try {
-      const submissionIds = serverMode && onResolveExportIds
-        ? await onResolveExportIds(visibleSubmissions)
-        : table.getPrePaginationRowModel().rows.map((row) => String(row.original.id));
-      await exportCommissionerSubmissionsCsv(submissionIds);
+      if (serverMode) {
+        const communityQuery = columnFilters.find((filter) => filter.id === "community_name")?.value ?? "";
+        await exportCommissionerSubmissionsCsv({
+          filters: {
+            createdFrom: formatCommissionerFilterDate(dateStart),
+            createdTo: formatCommissionerFilterDate(dateEnd),
+            query: String(serverFilters?.query ?? communityQuery ?? "").trim(),
+          },
+          types: visibleSubmissions,
+        });
+      } else {
+        const submissionIds = table.getPrePaginationRowModel().rows.map((row) => String(row.original.id));
+        await exportCommissionerSubmissionsCsv({ submissionIds });
+      }
       setExportState({ pending: false, error: "" });
     } catch (error) {
       setExportState({
