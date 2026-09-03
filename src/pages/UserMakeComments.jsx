@@ -32,14 +32,13 @@ function FieldHoverHint({ message }) {
 }
 
 export default function UserMakeComments({
-  proposalId,
   fedNum,
   dguid,
   daName,
   hasSelection,
   onSubmitSuccess,
 }) {
-  const { sessionStatus, user } = useAuth();
+  const { sessionStatus } = useAuth();
   const isSignedIn = sessionStatus === "signed-in";
   const [comment, setComment] = useState("");
   const [title, setTitle] = useState("");
@@ -75,8 +74,6 @@ export default function UserMakeComments({
 
     try {
       await addComment(
-        proposalId,
-        user.id,
         comment,
         fedNum,
         dguid,

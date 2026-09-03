@@ -122,7 +122,6 @@ function WizardActions({
 }
 
 export default function UserMakeObjection({
-  proposalId,
   fedNum,
   dguid,
   neighboring_dguid,
@@ -132,7 +131,7 @@ export default function UserMakeObjection({
   onConfirmReview,
   onSubmitSuccess,
 }) {
-  const { sessionStatus, user } = useAuth();
+  const { sessionStatus } = useAuth();
   const isSignedIn = sessionStatus === "signed-in";
   const [objectionText, setObjectionText] = useState("");
   const [title, setTitle] = useState("");
@@ -168,8 +167,6 @@ export default function UserMakeObjection({
 
     try {
       await addComment(
-        proposalId,
-        user.id,
         objectionText,
         fedNum,
         dguid,

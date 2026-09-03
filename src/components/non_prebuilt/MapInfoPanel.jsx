@@ -605,7 +605,6 @@ export function MapInfoPanel({
           return (
             <div className="map-info-panel__embedded">
               <UserMakeComments
-                proposalId={null}
                 fedNum={selection?.fedNum ?? fedNum}
                 dguid={dguid}
                 daName={profile ? getDaPanelTitle(profile).text : ""}
@@ -618,7 +617,6 @@ export function MapInfoPanel({
           return (
             <div className="map-info-panel__embedded">
               <UserMakeObjection
-              proposalId={null}
                 fedNum={fedNum}
                 dguid={objectionWorkflow?.firstDguid ?? dguid}
                 neighboring_dguid={objectionWorkflow?.secondDguid ?? null}

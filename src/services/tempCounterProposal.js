@@ -13,7 +13,6 @@ import {
   normalizeDaAssetManifest,
 } from "@/lib/map/daAssetManifest.js";
 import { buildProfileIndex } from "@/lib/map/profileUtils.js";
-import { getAllComments } from "@/services/commentsApi.js";
 import { mapApi } from "@/services/mapApi.js";
 import {
   getCounterProposal,

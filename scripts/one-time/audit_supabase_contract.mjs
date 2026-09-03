@@ -14,16 +14,27 @@ const LEGACY_CONTRACTS = [
   { name: "counter_proposal_revisions", kind: "table" },
   { name: "archive_tree", kind: "table" },
   { name: "dissemination_areas", kind: "table" },
+  { name: "audit_log", kind: "table" },
+  { name: "comment_tags", kind: "table" },
+  { name: "da_adjacency", kind: "table" },
+  { name: "da_assignments", kind: "table" },
+  { name: "fed_districts", kind: "table" },
+  { name: "map_proposals", kind: "table" },
+  { name: "map_release_legacy_aliases", kind: "table" },
+  { name: "workspace_label_catalog", kind: "table" },
   { name: "merge_submission_into_archive", kind: "routine" },
   { name: "revert_archive_branch", kind: "routine" },
   { name: "delete_archive_branch", kind: "routine" },
+  { name: "archive_branch_key", kind: "routine" },
+  { name: "set_workspace_labels", kind: "routine" },
+  { name: "sync_workspace_label_catalog_assignments", kind: "routine" },
 ];
 const KEEP_TABLES = [
   "profiles",
+  "pending_invites",
   "submissions",
   "workspace_comments",
   "workspace_labels",
-  "workspace_label_catalog",
   "workspace_archive_requests",
   "workspace_archive_request_votes",
   "submission_scope_pruids",
@@ -31,7 +42,6 @@ const KEEP_TABLES = [
   "realtime_outbox",
   "realtime_scope_deliveries",
   "map_data_releases",
-  "map_release_legacy_aliases",
   "submission_geometry_revisions",
   "submission_geometry_operations",
   "archive_branches",
@@ -59,9 +69,11 @@ const sourceText = sources.map((filePath) => ({
   text: fs.readFileSync(filePath, "utf8"),
 }));
 
-function referencesFor(name) {
+function referencesFor({ name, kind }) {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const expression = new RegExp(`\\b${escaped}\\b`);
+  const expression = kind === "routine"
+    ? new RegExp(`\\.rpc\\s*\\(\\s*["']${escaped}["']`)
+    : new RegExp(`\\.from\\s*\\(\\s*["']${escaped}["']`);
   return sourceText.flatMap(({ relativePath, text }) => {
     const lines = text.split(/\r?\n/u);
     return lines.flatMap((line, index) => expression.test(line)
@@ -81,7 +93,7 @@ if (cutoverError) throw new Error(`Database cutover audit failed: ${cutoverError
 const relationNames = new Set((inventory?.relations ?? []).map(({ name }) => name));
 const routineNames = new Set((inventory?.routines ?? []).map(({ name }) => name));
 const legacy = LEGACY_CONTRACTS.map((contract) => {
-  const references = referencesFor(contract.name);
+  const references = referencesFor(contract);
   const exists = contract.kind === "table"
     ? relationNames.has(contract.name)
     : routineNames.has(contract.name);
@@ -93,6 +105,20 @@ const legacy = LEGACY_CONTRACTS.map((contract) => {
   };
 });
 const missingKeepTables = KEEP_TABLES.filter((name) => !relationNames.has(name));
+const rlsByTable = new Map((inventory?.relations ?? []).map((relation) => [
+  relation.name,
+  Boolean(relation.rls),
+]));
+const rlsDisabledKeepTables = KEEP_TABLES.filter((name) => (
+  relationNames.has(name) && !rlsByTable.get(name)
+));
+const unexpectedBrowserGrants = (inventory?.browserGrants ?? []).filter((grant) => !(
+  grant.table === "profiles"
+  && grant.grantee === "authenticated"
+  && ["SELECT", "INSERT", "UPDATE"].includes(grant.privilege)
+));
+const liveLegacyConsumers = legacy.filter(({ disposition }) => disposition === "migrate");
+const remainingLegacyObjects = legacy.filter(({ exists }) => exists);
 const blockingCutover = {
   activeReleaseCount: Number(cutover?.activeReleaseCount ?? 0) !== 1,
   nonReadyGeometry: Object.entries(cutover?.geometryDisposition ?? {})
@@ -102,13 +128,24 @@ const blockingCutover = {
   missingArchiveGeometryRevision: Number(cutover?.archiveSourceMissingGeometryRevision ?? 0) > 0,
   archiveCountMismatch: Number(cutover?.legacyArchiveRows ?? 0) > 0,
   missingKeepTables: missingKeepTables.length > 0,
-  liveLegacyConsumers: legacy.some(({ disposition }) => disposition === "migrate"),
+  liveLegacyConsumers: liveLegacyConsumers.length > 0,
+  rlsDisabledKeepTables: rlsDisabledKeepTables.length > 0,
+  unexpectedBrowserGrants: unexpectedBrowserGrants.length > 0,
 };
 const report = {
   schemaVersion: "1.0",
   checkedAt: new Date().toISOString(),
   cleanupReady: Object.values(blockingCutover).every((blocked) => !blocked),
+  cleanupComplete:
+    Object.values(blockingCutover).every((blocked) => !blocked)
+    && remainingLegacyObjects.length === 0,
   blockingCutover,
+  blockerDetails: {
+    liveLegacyConsumers,
+    rlsDisabledKeepTables,
+    unexpectedBrowserGrants,
+    remainingLegacyObjects,
+  },
   keep: KEEP_TABLES.map((name) => ({ name, exists: relationNames.has(name) })),
   legacy,
   database: inventory,

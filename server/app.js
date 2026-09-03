@@ -5,7 +5,6 @@ import { fileURLToPath } from "node:url";
 import { mountMapApiService } from "./map-api-service/index.js";
 import authRouter from "./routes/auth.js";
 import commentsRouter from "./routes/comments.js";
-import commentTagsRouter from "./routes/commentTags.js";
 import workspaceRouter from "./routes/workspace.js";
 import workspaceCollaborationRouter from "./routes/workspaceCollaboration.js";
 import workspaceStatusRouter from "./routes/workspaceStatus.js";
@@ -58,7 +57,6 @@ app.use("/api/auth", authRouter);
 // All submission routes require a verified session. commentsRouter applies the
 // role-specific public/commissioner safeguard to each individual operation.
 app.use("/api/comments", requireAuth, commentsRouter);
-app.use("/api/comment-tags",requireAuth, commentTagsRouter);
 app.use("/api/workspace", requireAuth, workspaceCollaborationRouter);
 app.use("/api/workspace", requireAuth, workspaceStatusRouter);
 app.use("/api/workspace", requireAuth, archiveRequestsRouter);

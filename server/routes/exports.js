@@ -22,8 +22,9 @@ router.get("/archive-tree.json", async (req, res) => {
   try {
     const supabase = getSupabaseAdminDataClient();
     await streamArchiveTreeExport(res, supabase);
-    return undefined;
+    return res.end();
   } catch (error) {
+    if (res.headersSent) return res.end();
     return res.status(error.statusCode || 500).json({
       error: error.message || "Unable to export archived tree.",
     });

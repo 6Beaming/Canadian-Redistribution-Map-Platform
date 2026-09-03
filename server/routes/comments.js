@@ -1,7 +1,6 @@
 import { Router } from "express";
 import {
   getSupabaseAdminDataClient,
-  getSupabaseClient,
   getSupabaseProfileEmailsAsAdmin,
 } from "../lib/supabase.js";
 import { getProfileForDguid } from "../lib/map/mapAssetAuthority.js";
@@ -17,36 +16,6 @@ import { requirePublicUser } from "../middleware/requireAuth.js";
 
 const router = Router();
 
-// Public-only proposal read. requireAuth is registered in server/app.js;
-// this route adds the role boundary that prevents Commissioner fall-through.
-router.get("/proposal/:proposalId", requirePublicUser, async (req, res) => {
-  const supabase = getSupabaseClient();
-  const { proposalId } = req.params;
-
-  // Verify proposal exists
-  const { data: proposal, error: proposalError } = await supabase
-    .from("map_proposals")
-    .select("id, province_code")
-    .eq("id", proposalId)
-    .single();
-
-  if (proposalError || !proposal) {
-    return res.status(404).json({ error: "Proposal not found." });
-  }
-
-  const { data, error } = await supabase
-    .from("submissions")
-    .select("*, profiles!submissions_user_id_fkey(first_name, last_name)")
-    .eq("proposal_id", proposalId)
-    .eq("type", "feedback")
-    .order("created_at", { ascending: false });
-
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
-});
-
-
-
 function requireCommissioner(req, res, next) {
   if (req.profile?.role !== "commissioner") {
     res.status(403).json({ error: "Commissioner access is required." });
@@ -58,7 +27,7 @@ function requireCommissioner(req, res, next) {
 
 // Get total number of sumissions
 router.get("/count", async (req, res) => {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseAdminDataClient();
 
   const { count, error } = await supabase
     .from("submissions")
@@ -150,7 +119,7 @@ router.get("/:user_id", requirePublicUser, async (req, res) => {
 // session; geometry-specific validation remains a dedicated follow-up API.
 router.post("/", requirePublicUser, async (req, res) => {
   const supabase = getSupabaseAdminDataClient();
-  const { proposal_id, comment, fed_num, dguid, title, neighboring_dguid, type } = req.body;
+  const { comment, fed_num, dguid, title, neighboring_dguid, type } = req.body;
   const user_id = req.user.id;
   const normalizedType = String(type ?? "feedback").trim().toLowerCase();
   const primaryDguid = String(dguid ?? "").trim() || null;
@@ -207,19 +176,6 @@ router.post("/", requirePublicUser, async (req, res) => {
     });
   }
 
-  // Verify proposal exists
-  if (proposal_id) {
-    const { data: proposal, error: proposalError } = await supabase
-      .from("map_proposals")
-      .select("id, province_code")
-      .eq("id", proposal_id)
-      .single();
-
-    if (proposalError || !proposal) {
-      return res.status(404).json({ error: "Proposal not found." });
-    }
-  }
-
   const resolvedFedNum =
     String(fed_num ?? "").trim()
     || (await getProfileForDguid(primaryDguid))?.fed_num
@@ -228,7 +184,6 @@ router.post("/", requirePublicUser, async (req, res) => {
   const { data, error } = await supabase
     .from("submissions")
     .insert([{
-      proposal_id: proposal_id || null,
       user_id,
       comment: normalizedComment,
       fed_num: resolvedFedNum,
