@@ -139,7 +139,8 @@ test("Creating an Archive Request updates the active review without navigating a
   assert.match(panel, /ARCHIVE_REQUEST && request && !isRequester/);
   assert.match(panel, /refreshReview\(\);[\s\S]*refreshArchiveRequest\(\)\.catch/);
   assert.match(panel, /archiveRequestLoading=\{archiveRequestLoading\}/);
-  assert.match(review, /if \(action === "archive-request"\) \{[\s\S]*updateSubmissionStatus\(committed\?\.submissionStatus\);[\s\S]*return;/);
+  assert.match(review, /action === "archive-request" \|\| action === "archive-vote-accept"/);
+  assert.match(review, /updateSubmissionStatus\(committed\?\.submissionStatus\);[\s\S]*return;/);
   assert.match(review, /onCommitted=\{handleCommitted\}/);
 });
 
@@ -297,10 +298,10 @@ test("Resolved Workspace submissions announce navigation to the next item", () =
   assert.match(review, /import \{ toast \} from "sonner"/);
   assert.match(review, /toast\.success\("Submission resolved\. Moving to the next submission\."/);
   assert.match(review, /toast\.success\("Submission resolved\. Returning to the Workspace\."/);
-  assert.equal((review.match(/className: "workspace-resolution-toast"/g) ?? []).length, 2);
+  assert.equal((review.match(/className: "workspace-resolution-toast"/g) ?? []).length, 3);
   assert.match(globals, /\.workspace-resolution-toast \{[\s\S]*width: max-content !important;[\s\S]*translate: -50% 0/);
   assert.match(globals, /\.workspace-resolution-toast \[data-title\] \{[\s\S]*white-space: nowrap/);
-  assert.match(review, /if \(action === "archive-request"\) \{[\s\S]*updateSubmissionStatus[\s\S]*return;/);
+  assert.match(review, /action === "archive-request" \|\| action === "archive-vote-accept"/);
   const notice = review.indexOf("Submission resolved. Moving to the next submission.");
   const navigation = review.indexOf("navigate(`/dashboard/workspace/${encodeURIComponent(next.id)}`", notice);
   assert.ok(notice >= 0 && navigation > notice);
@@ -316,7 +317,7 @@ test("Workspace decision controls do not flash the next status before navigation
   assert.match(controls, /const \[submittedStatus, setSubmittedStatus\] = useState\(null\)/);
   assert.match(controls, /const displayedStatus = submittedStatus \?\? submission\.status/);
   assert.match(controls, /setSubmittedStatus\(submission\.status\)[\s\S]*commitWorkspaceAction/);
-  assert.match(controls, /keepControlsFrozen = action !== "archive-request"/);
+  assert.match(controls, /keepControlsFrozen = !\["archive-request", "archive-vote-accept"\]\.includes\(action\)/);
   assert.match(
     controls,
     /if \(!keepControlsFrozen\) \{[\s\S]*setSubmittedStatus\(null\)[\s\S]*setIsSubmitting\(false\)/,

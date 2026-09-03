@@ -959,6 +959,13 @@ function DecisionControls({
     request.allowedActions?.includes("merge")
     || canMergeArchiveRequest(request)
   );
+  const actorVote = request?.actorVote ?? Object.entries(request?.votes ?? {})
+    .find(([email]) => String(email).trim().toLowerCase() === signedInEmail)?.[1] ?? null;
+  const hasFinalVote = actorVote === "accepted" || actorVote === "rejected";
+  const canVote = Boolean(request?.allowedActions?.includes("vote")) && !hasFinalVote;
+  const allAssigneesApproved = request?.state === "approved"
+    || (Array.isArray(request?.pendingAssigneeEmails) && request.pendingAssigneeEmails.length === 0)
+    || canMergeArchiveRequest(request);
 
   assigneesRef.current = assignees;
 
@@ -1025,7 +1032,7 @@ function DecisionControls({
       });
       setMessage("");
       onCommitted(action, committed);
-      keepControlsFrozen = action !== "archive-request";
+      keepControlsFrozen = !["archive-request", "archive-vote-accept"].includes(action);
     } catch (actionError) {
       setError(actionError.message);
     } finally {
@@ -1074,7 +1081,7 @@ function DecisionControls({
           disabled={
             displayedStatus === WORKSPACE_STATUS.ARCHIVE_REQUEST
             && !isRequester
-            && !submission.archive_request_assigned_to_viewer
+            && (!submission.archive_request_assigned_to_viewer || hasFinalVote)
           }
         />
       </label>}
@@ -1097,7 +1104,7 @@ function DecisionControls({
           <button
             type="button"
             className="is-accept"
-            disabled={isSubmitting || !submission.archive_request_assigned_to_viewer}
+            disabled={isSubmitting || !submission.archive_request_assigned_to_viewer || !canVote}
             onClick={() => runAction("archive-vote-accept")}
           >
             <Check />Accept
@@ -1105,7 +1112,7 @@ function DecisionControls({
           <button
             type="button"
             className="is-reject"
-            disabled={isSubmitting || !submission.archive_request_assigned_to_viewer}
+            disabled={isSubmitting || !submission.archive_request_assigned_to_viewer || !canVote}
             onClick={() => runAction("archive-vote-reject")}
           >
             <X />Reject
@@ -1124,6 +1131,17 @@ function DecisionControls({
         && !submission.archive_request_assigned_to_viewer ? (
         <p className="workspace-decision-note" role="status">
           You are not an assignee on this Archive Request. Accept and Reject stay disabled until you are assigned. Labels and comments remain available.
+        </p>
+      ) : null}
+      {displayedStatus === WORKSPACE_STATUS.ARCHIVE_REQUEST
+        && request
+        && !isRequester
+        && submission.archive_request_assigned_to_viewer
+        && actorVote === "accepted" ? (
+        <p className="workspace-decision-note" role="status">
+          {allAssigneesApproved
+            ? "Your approval has been recorded. Waiting for the requester to merge this Archive Request."
+            : "Your approval has been recorded. Waiting for the remaining assignees to respond."}
         </p>
       ) : null}
       {displayedStatus === WORKSPACE_STATUS.ARCHIVE_REQUEST && !request ? (
@@ -1150,6 +1168,7 @@ export function WorkspaceReviewPanel({
   onSubmissionSelect,
   onCommitted,
   onSubmissionUpdated,
+  onArchiveRequestConsumed,
   reviewerEmails: availableReviewerEmails = [],
 }) {
 
@@ -1346,7 +1365,16 @@ export function WorkspaceReviewPanel({
     }
   }
 
-  async function handleReviewInvalidation({ hints, resync }) {
+  async function handleReviewInvalidation({ event, hints, resync }) {
+    const archiveRequestKey = workspaceReviewHint(submission.id, "archiveRequest");
+    if (
+      event?.entity === "workspace.archive-request"
+      && event?.operation === "delete"
+      && (hints ?? []).includes(archiveRequestKey)
+    ) {
+      onArchiveRequestConsumed?.({ event, submissionId: submission.id });
+      return;
+    }
     if (resync) {
       await refreshReview({ rethrow: true });
       return;

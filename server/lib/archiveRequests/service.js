@@ -167,6 +167,7 @@ function deriveAllowedActions(request, votes, actor) {
   if (!request || !actor) return actions;
   const isRequester = String(request.requester_id) === String(actor.id);
   const isAssignee = (request.assignee_ids ?? []).some((id) => String(id) === String(actor.id));
+  const hasVoted = votes.some((vote) => String(vote.voter_id) === String(actor.id));
   const state = request.state;
 
   if (state === OPEN || state === APPROVED) {
@@ -174,7 +175,7 @@ function deriveAllowedActions(request, votes, actor) {
       actions.push("update-assignees", "cancel");
       if (canApproveFromVotes(request, votes)) actions.push("merge");
     }
-    if (isAssignee || isRequester) actions.push("vote");
+    if (state === OPEN && (isAssignee || isRequester) && !hasVoted) actions.push("vote");
   }
   return actions;
 }
@@ -260,6 +261,13 @@ export async function serializeArchiveRequestReadModel(supabase, request, {
   );
   const actorId = String(actorProfile?.id ?? "");
   const isAssignee = Boolean(actorId) && requiredAssigneeIds(request).includes(actorId);
+  const actorVote = voteProjections.find((vote) => String(vote.voterId) === actorId)?.vote ?? null;
+  const pendingAssigneeEmails = assignees
+    .filter((assignee) => !voteProjections.some((vote) => (
+      String(vote.voterId) === String(assignee.id) && vote.vote === "accepted"
+    )))
+    .map((assignee) => assignee.email)
+    .filter(Boolean);
 
   return {
     id: request.id,
@@ -282,6 +290,8 @@ export async function serializeArchiveRequestReadModel(supabase, request, {
     assigneeEmails: assignees.map((entry) => entry.email),
     votesByEmail,
     isAssignee,
+    actorVote,
+    pendingAssigneeEmails,
     visibleSubmissionStatus: isAssignee ? "archive-request" : "accepted",
   };
 }
@@ -641,19 +651,26 @@ export async function castArchiveRequestVote({
       code: "RESOURCE_ALREADY_CLAIMED",
     });
   }
-  if (request.state !== OPEN) {
-    throw archiveError("Votes are only accepted while the request is open.", {
-      statusCode: 409,
-      code: "ILLEGAL_STATE_TRANSITION",
-    });
-  }
-
   const isRequester = String(request.requester_id) === String(actorUser.id);
   const isAssignee = (request.assignee_ids ?? []).some((id) => String(id) === String(actorUser.id));
   if (!isRequester && !isAssignee) {
     throw archiveError("Only assignees in the operating province may vote.", {
       statusCode: 403,
       code: "FORBIDDEN",
+    });
+  }
+
+  const existingVotes = await repo.listVotes(supabase, request.id);
+  if (existingVotes.some((entry) => String(entry.voter_id) === String(actorUser.id))) {
+    throw archiveError("Your Archive Request vote has already been recorded and is final.", {
+      statusCode: 409,
+      code: "ARCHIVE_REQUEST_ALREADY_VOTED",
+    });
+  }
+  if (request.state !== OPEN) {
+    throw archiveError("Votes are only accepted while the request is open.", {
+      statusCode: 409,
+      code: "ILLEGAL_STATE_TRANSITION",
     });
   }
 

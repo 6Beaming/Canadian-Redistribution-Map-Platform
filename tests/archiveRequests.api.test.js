@@ -443,6 +443,16 @@ test("approved Archive Request keeps requester cancel and merge actions", async 
   });
   assert.equal(voted.status, 200);
   assert.equal(voted.body.state, "approved");
+  assert.equal(voted.body.actorVote, "accepted");
+  assert.equal(voted.body.pendingAssigneeEmails.length, 0);
+  assert.equal(voted.body.allowedActions.includes("vote"), false);
+
+  const repeatedVote = await request(`/api/workspace/archive-requests/${created.body.id}/votes`, {
+    method: "POST",
+    body: { vote: "rejected", expectedVersion: voted.body.version },
+  });
+  assert.equal(repeatedVote.status, 409);
+  assert.equal(repeatedVote.body.code, "ARCHIVE_REQUEST_ALREADY_VOTED");
 
   auth(requester, admin);
   const loaded = await request("/api/workspace/archive-requests/submission-1");

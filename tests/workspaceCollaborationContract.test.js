@@ -52,11 +52,14 @@ test("Workspace review comments stay editable in every sub-workspace status", ()
   assert.match(router, /\.eq\("author_id", req\.user\.id\)/);
 });
 
-test("Archive Request UI pins the requester and disables votes for non-assignees", () => {
+test("Archive Request UI pins the requester and treats every assignee vote as final", () => {
   const panel = fs.readFileSync("src/components/non_prebuilt/WorkspaceReviewPanel.jsx", "utf8");
   assert.match(panel, /isRequiredRequester/);
   assert.match(panel, /disabled=\{isAssigneePending \|\| isRequiredRequester\}/);
   assert.match(panel, /archive_request_assigned_to_viewer/);
   assert.match(panel, /not an assignee on this Archive Request/);
-  assert.match(panel, /disabled=\{isSubmitting \|\| !submission\.archive_request_assigned_to_viewer\}/);
+  assert.match(panel, /const hasFinalVote = actorVote === "accepted" \|\| actorVote === "rejected"/);
+  assert.match(panel, /disabled=\{isSubmitting \|\| !submission\.archive_request_assigned_to_viewer \|\| !canVote\}/);
+  assert.match(panel, /Your approval has been recorded\. Waiting for the remaining assignees/);
+  assert.match(panel, /Waiting for the requester to merge this Archive Request/);
 });

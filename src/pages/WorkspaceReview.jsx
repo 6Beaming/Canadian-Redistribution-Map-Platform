@@ -69,6 +69,7 @@ export default function WorkspaceReview() {
   const { signalRouteReady } = useRouteLoading() ?? {};
   const { setMapFetching, updateMap, resetPresentationReady } = useWorkspaceMapLayout();
   const routeReadySignaledRef = useRef(false);
+  const archiveClosureHandledRef = useRef(false);
 
   const handleInitialPresentationReady = useCallback(() => {
     if (routeReadySignaledRef.current) return;
@@ -85,6 +86,10 @@ export default function WorkspaceReview() {
   const [mapFetching, setLocalMapFetching] = useState(true);
   const [status, setStatus] = useState("Loading submission workspace...");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    archiveClosureHandledRef.current = false;
+  }, [submissionId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -212,7 +217,25 @@ export default function WorkspaceReview() {
     }
   }
 
+  function returnAfterArchiveRequestConsumed() {
+    if (archiveClosureHandledRef.current) return;
+    archiveClosureHandledRef.current = true;
+    getCommissionerSubmissionListStore().removeItem(submissionId);
+    toast.success("Archive Request merged. Returning to the Workspace.", {
+      duration: 3000,
+      className: "workspace-resolution-toast",
+    });
+    navigate("/dashboard/workspace", {
+      replace: true,
+      state: { from: location.state?.workspaceFrom ?? null },
+    });
+  }
+
   function updateSubmissionStatus(nextStatus) {
+    if (normalizeWorkspaceStatus(nextStatus?.status) === "archived") {
+      returnAfterArchiveRequestConsumed();
+      return;
+    }
     const applyStatus = (current) => {
       if (!current || String(current.id) !== String(nextStatus?.submissionId)) return current;
       return {
@@ -244,7 +267,7 @@ export default function WorkspaceReview() {
   }
 
   function handleCommitted(action, committed) {
-    if (action === "archive-request") {
+    if (action === "archive-request" || action === "archive-vote-accept") {
       updateSubmissionStatus(committed?.submissionStatus);
       return;
     }
@@ -272,6 +295,7 @@ export default function WorkspaceReview() {
         })}
         onCommitted={handleCommitted}
         onSubmissionUpdated={updateSubmissionStatus}
+        onArchiveRequestConsumed={returnAfterArchiveRequestConsumed}
         reviewerEmails={reviewerEmails}
       />
     </div>
