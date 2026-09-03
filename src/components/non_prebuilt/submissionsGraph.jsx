@@ -27,10 +27,10 @@ const chartConfig = Object.fromEntries(
   ]),
 );
 
-export function SubmissionsGraph({ submissions = [] }) {
+export function SubmissionsGraph({ submissions = [], dailyTimeline = null }) {
   const chartData = useMemo(
-    () => buildSubmissionStatusTimeline(submissions),
-    [submissions],
+    () => (dailyTimeline != null ? dailyTimeline : buildSubmissionStatusTimeline(submissions)),
+    [dailyTimeline, submissions],
   );
 
   return (

@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import {
   loadCanonicalRelease,
   readCanonicalDaPair,
+  readExactDaFeature,
   readSharedArcRecord,
 } from "./canonicalReleaseStore.js";
 
@@ -15,6 +16,7 @@ function pairKey(primaryDguid, secondaryDguid, representation, lod) {
 export class MaterializationContext {
   constructor() {
     this.releaseById = new Map();
+    this.exactDaByKey = new Map();
     this.pairByKey = new Map();
     this.sharedArcByKey = new Map();
     this.vertexCatalogByKey = new Map();
@@ -27,6 +29,14 @@ export class MaterializationContext {
       this.releaseById.set(normalized, loadCanonicalRelease(normalized));
     }
     return this.releaseById.get(normalized);
+  }
+
+  async getExactDaFeature(release, dguid) {
+    const key = `${release.manifest.releaseId}:${String(dguid ?? "").trim()}`;
+    if (!this.exactDaByKey.has(key)) {
+      this.exactDaByKey.set(key, readExactDaFeature(release, dguid));
+    }
+    return this.exactDaByKey.get(key);
   }
 
   async getCanonicalDaPair(release, primaryDguid, secondaryDguid, options = {}) {

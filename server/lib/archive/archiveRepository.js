@@ -502,6 +502,7 @@ async function loadArchiveVersionViewGeometries(supabase, versionIds) {
     String(row.id),
     {
       displayGeometry: row.display_geometry ?? null,
+      geometryDigest: row.geometry_digest ?? null,
     },
   ]));
 }
@@ -600,46 +601,56 @@ export async function getArchiveBranchView(supabase, {
     || String(version.submission?.id) === normalizedVersionId
   )) ?? mapVersionRecord(branch, anchorVersion, emailsById);
 
-  let selectedDisplayGeometry = null;
-  let latestDisplayGeometry = null;
-  let selectedOriginalGeometry = null;
-  let latestOriginalGeometry = null;
+  const resolvedSelectedVersionId = String(selectedVersion?.versionId ?? "");
+  const resolvedLatestVersionId = String(latestVersion?.versionId ?? "");
+  const selectedSameAsLatest = resolvedSelectedVersionId && resolvedSelectedVersionId === resolvedLatestVersionId;
 
   const geometryIds = [];
-  if (selectedVersion?.versionId) {
-    geometryIds.push(selectedVersion.versionId);
+  if (resolvedSelectedVersionId) {
+    geometryIds.push(resolvedSelectedVersionId);
   }
-  if (
-    includeLatestGeometry
-    && latestVersion?.versionId
-    && latestVersion.versionId !== selectedVersion?.versionId
-  ) {
-    geometryIds.push(latestVersion.versionId);
+  if (includeLatestGeometry && resolvedLatestVersionId && !selectedSameAsLatest) {
+    geometryIds.push(resolvedLatestVersionId);
   }
 
-  if (geometryIds.length) {
-    const geometriesById = await loadArchiveVersionViewGeometries(supabase, geometryIds);
-    const selectedRow = geometriesById.get(String(selectedVersion.versionId));
-    const selectedPayload = geometryPayloadFromRow(selectedRow);
-    selectedDisplayGeometry = selectedPayload.displayGeometry;
-    selectedOriginalGeometry = selectedPayload.originalGeometry;
-
-    if (latestVersion?.versionId && latestVersion.versionId !== selectedVersion.versionId) {
-      const latestRow = geometriesById.get(String(latestVersion.versionId));
-      const latestPayload = geometryPayloadFromRow(latestRow);
-      latestDisplayGeometry = latestPayload.displayGeometry;
-      latestOriginalGeometry = latestPayload.originalGeometry;
-    } else {
-      latestDisplayGeometry = null;
-      latestOriginalGeometry = selectedOriginalGeometry;
-    }
-  }
-
-  const communityName = await resolveBranchCommunityName(
+  const revisionPromise = getArchiveMapRevisionSequence(supabase);
+  const communityPromise = resolveBranchCommunityName(
     branch.primary_dguid,
     branch.secondary_dguid,
   );
-  const archiveMapRevision = await getArchiveMapRevisionSequence(supabase);
+  const geometriesPromise = geometryIds.length
+    ? loadArchiveVersionViewGeometries(supabase, geometryIds)
+    : Promise.resolve(new Map());
+
+  const [geometriesById, communityName, archiveMapRevision] = await Promise.all([
+    geometriesPromise,
+    communityPromise,
+    revisionPromise,
+  ]);
+
+  const geometryByVersionId = {};
+  for (const versionId of geometryIds) {
+    const row = geometriesById.get(String(versionId));
+    const payload = geometryPayloadFromRow(row);
+    geometryByVersionId[String(versionId)] = {
+      displayGeometry: payload.displayGeometry,
+      geometryDigest: row?.geometryDigest ?? null,
+    };
+  }
+
+  if (selectedSameAsLatest && geometryByVersionId[resolvedSelectedVersionId]) {
+    geometryByVersionId[resolvedLatestVersionId] = geometryByVersionId[resolvedSelectedVersionId];
+  }
+
+  const selectedGeometryEntry = geometryByVersionId[resolvedSelectedVersionId] ?? null;
+  const latestGeometryEntry = selectedSameAsLatest
+    ? selectedGeometryEntry
+    : (geometryByVersionId[resolvedLatestVersionId] ?? null);
+
+  const selectedDisplayGeometry = selectedGeometryEntry?.displayGeometry ?? null;
+  const latestDisplayGeometry = latestGeometryEntry?.displayGeometry ?? null;
+  const selectedOriginalGeometry = null;
+  const latestOriginalGeometry = null;
 
   return {
     source: "v2",
@@ -655,10 +666,14 @@ export async function getArchiveBranchView(supabase, {
       resourceVersion: Number(branch.resource_version) || 1,
       headVersionId: branch.head_version_id,
       headVersionNumber: Number(branch.head_version_number) || null,
+      releaseId: branch.release_id ?? null,
     },
     versions: mappedVersions,
     selectedVersion,
     latestVersion,
+    selectedVersionId: resolvedSelectedVersionId,
+    latestVersionId: resolvedLatestVersionId,
+    geometryByVersionId,
     selectedDisplayGeometry,
     latestDisplayGeometry,
     selectedOriginalGeometry,

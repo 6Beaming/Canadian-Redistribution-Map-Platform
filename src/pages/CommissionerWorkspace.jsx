@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Archive,
@@ -16,14 +17,16 @@ import {
 } from "lucide-react";
 import {
   getWorkspaceSubmission,
-  getWorkspaceSubmissions,
+  mapWorkspaceSubmissions,
   subscribeWorkspaceListState,
 } from "@/services/workspaceApi.js";
+import { getCommissionerSubmissionListStore } from "@/lib/submissions/commissionerSubmissionListStore.js";
+import { useRouteLoading } from "@/contexts/RouteLoadingContext.jsx";
 import {
   getRealtimeSubmissionId,
   reconcileWorkspaceSubmission,
 } from "@/lib/realtime/workspaceRealtime.js";
-import { RouteLoadingPage } from "@/components/non_prebuilt/RouteLoadingPage.jsx";
+import { PanelLoadingOverlay } from "@/components/non_prebuilt/LoadingIndicator.jsx";
 import "@/styles/workspace.css";
 
 const VISIBLE_LIST_ITEMS = 3;
@@ -595,8 +598,13 @@ export default function CommissionerWorkspace() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const focusId = searchParams.get("focus");
+  const { signalRouteReady } = useRouteLoading() ?? {};
+  const storeRef = useRef(getCommissionerSubmissionListStore());
   const [workspaceSubmissions, setWorkspaceSubmissions] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [treeFetching, setTreeFetching] = useState(() => {
+    const cached = mapWorkspaceSubmissions(storeRef.current.getItems(), { includeArchived: false });
+    return cached.length === 0;
+  });
   const [loadError, setLoadError] = useState("");
   const [expansion, setExpansion] = useState(() => createExpansionState(true));
   const [filterDraft, setFilterDraft] = useState(() => createExpansionState(true));
@@ -606,6 +614,8 @@ export default function CommissionerWorkspace() {
   useEffect(() => {
     let isMounted = true;
     const abortController = new AbortController();
+    const store = storeRef.current;
+    let focusedRow = null;
 
     const mergeFocusedSubmission = (submissions, focused) => {
       const merged = new Map(
@@ -620,44 +630,29 @@ export default function CommissionerWorkspace() {
       );
     };
 
-    const loadSubmissions = async ({ showLoading = false } = {}) => {
-      if (showLoading) setIsLoading(true);
-      try {
-        if (focusId) {
-          const focused = await getWorkspaceSubmission(focusId, { hydrateGeometry: false });
-          if (!isMounted) return;
-          if (!focused) throw new Error("The focused submission was not found.");
-          setWorkspaceSubmissions([focused]);
-          setExpansion(createFocusedExpansion(focused));
-          if (showLoading) setIsLoading(false);
-
-          const submissions = await getWorkspaceSubmissions({
-            includeArchived: false,
-            signal: abortController.signal,
-          });
-          if (!isMounted) return;
-          setWorkspaceSubmissions(mergeFocusedSubmission(submissions, focused));
-        } else {
-          const submissions = await getWorkspaceSubmissions({
-            includeArchived: false,
-            signal: abortController.signal,
-          });
-          if (!isMounted) return;
-          setWorkspaceSubmissions(Array.isArray(submissions) ? submissions : []);
+    const syncFromStore = () => {
+      if (!isMounted) return;
+      const submissions = mapWorkspaceSubmissions(store.getItems(), { includeArchived: false });
+      const next = focusedRow
+        ? mergeFocusedSubmission(submissions, focusedRow)
+        : submissions;
+      flushSync(() => {
+        setWorkspaceSubmissions(next);
+        if (next.length > 0 || !store.isBootstrapping()) {
+          setTreeFetching(false);
+          signalRouteReady?.();
         }
-        setLoadError("");
-      } catch (error) {
-        if (error?.name === "AbortError") return;
-        if (isMounted) setLoadError(error.message || "Submissions could not be loaded.");
-      } finally {
-        if (isMounted && showLoading) setIsLoading(false);
-      }
+      });
     };
+
+    const unsubscribeStore = store.subscribe(syncFromStore);
 
     const refreshAffectedSubmission = async ({ event, hints, resync }) => {
       const affectedSubmissionId = getRealtimeSubmissionId({ event, hints });
       if (resync || !affectedSubmissionId) {
-        await loadSubmissions();
+        await store.reset();
+        if (!isMounted) return;
+        syncFromStore();
         return;
       }
 
@@ -678,18 +673,50 @@ export default function CommissionerWorkspace() {
       }
     };
 
-    loadSubmissions({ showLoading: true });
-    const unsubscribe = subscribeWorkspaceListState({
+    void (async () => {
+      try {
+        if (store.getItems().length === 0) {
+          setTreeFetching(true);
+        } else {
+          syncFromStore();
+        }
+
+        void store.ensureBootstrapped({ signal: abortController.signal });
+
+        if (focusId) {
+          focusedRow = await getWorkspaceSubmission(focusId, { hydrateGeometry: false });
+          if (!isMounted) return;
+          if (!focusedRow) throw new Error("The focused submission was not found.");
+          setExpansion(createFocusedExpansion(focusedRow));
+          syncFromStore();
+        }
+
+        setLoadError("");
+      } catch (error) {
+        if (error?.name === "AbortError") return;
+        if (isMounted) {
+          setLoadError(error.message || "Submissions could not be loaded.");
+          setTreeFetching(false);
+        }
+      }
+    })();
+
+    const unsubscribeRealtime = subscribeWorkspaceListState({
       onInvalidate: refreshAffectedSubmission,
-      onRecover: loadSubmissions,
+      onRecover: () => {
+        void store.reset().then(() => {
+          if (isMounted) syncFromStore();
+        });
+      },
     });
 
     return () => {
       isMounted = false;
       abortController.abort();
-      unsubscribe();
+      unsubscribeStore();
+      unsubscribeRealtime();
     };
-  }, [focusId]);
+  }, [focusId, signalRouteReady]);
 
   useEffect(() => {
     if (!focusId || !workspaceSubmissions.length) return;
@@ -767,10 +794,6 @@ export default function CommissionerWorkspace() {
     setFilterDraft(createExpansionState(true));
   }
 
-  if (isLoading) {
-    return <RouteLoadingPage />;
-  }
-
   return (
     <main className="commissioner-workspace workspace-page" aria-labelledby="workspace-title">
       <div className="workspace-scroll-region">
@@ -822,10 +845,11 @@ export default function CommissionerWorkspace() {
               Live submissions are unavailable. Check your commissioner session and try again.
             </p>
           ) : null}
-          <section className="workspace-tree" aria-busy={isLoading} aria-label="Submission decision tree">
+          <section className="workspace-tree relative" aria-busy={treeFetching} aria-label="Submission decision tree">
+            {treeFetching ? <PanelLoadingOverlay label="Loading..." /> : null}
             <div className="workspace-tree__top-row">
               <RootCard
-                total={isLoading ? "—" : total}
+                total={treeFetching && workspaceSubmissions.length === 0 ? "—" : total}
                 isOpen={expansion.root}
                 onToggle={() => setExpansion((current) => ({ ...current, root: !current.root }))}
               />

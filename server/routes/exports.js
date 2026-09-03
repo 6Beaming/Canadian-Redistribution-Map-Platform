@@ -1,7 +1,9 @@
 import { Router } from "express";
 import { getSupabaseAdminDataClient } from "../lib/supabase.js";
-import { enrichSubmissionsWithDaMetadata } from "../lib/map/submissionPresentation.js";
 import { streamArchiveTreeExport } from "../lib/archive/archiveExportSerializer.js";
+import { filterSubmissionsForCommissionerScope } from "../lib/authorization/resourceScopeGuard.js";
+import { projectArchiveRequestVisibility } from "../lib/archiveRequests/visibilityProjection.js";
+import { enrichSubmissionsWithDaMetadata } from "../lib/map/submissionPresentation.js";
 import {
   LIGHTWEIGHT_SUBMISSION_COLUMNS,
   serializeLightweightSubmission,
@@ -37,21 +39,42 @@ function normalizeSubmissionIds(value) {
   return [...new Set(normalized)];
 }
 
-async function loadSubmissionExportRows(supabase) {
-  const { data, error } = await supabase.from("submissions")
-    .select(LIGHTWEIGHT_SUBMISSION_COLUMNS)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  const enriched = await enrichSubmissionsWithDaMetadata(data ?? []);
-  const userIds = [...new Set(enriched.map((row) => row.user_id).filter(Boolean))];
+async function loadSubmissionExportRows(supabase, { submissionIds, actorProfile }) {
+  if (!submissionIds?.length) return [];
+
+  const CHUNK_SIZE = 100;
+  const scopedRows = [];
+  for (let index = 0; index < submissionIds.length; index += CHUNK_SIZE) {
+    const chunk = submissionIds.slice(index, index + CHUNK_SIZE);
+    const { data, error } = await supabase
+      .from("submissions")
+      .select(LIGHTWEIGHT_SUBMISSION_COLUMNS)
+      .in("id", chunk);
+    if (error) throw error;
+    scopedRows.push(...await filterSubmissionsForCommissionerScope(data ?? [], actorProfile));
+  }
+
+  const enriched = await enrichSubmissionsWithDaMetadata(scopedRows);
+  const projected = await projectArchiveRequestVisibility(
+    supabase,
+    enriched,
+    actorProfile.id,
+  );
+  const userIds = [...new Set(projected.map((row) => row.user_id).filter(Boolean))];
   let profileById = new Map();
   if (userIds.length) {
     const { data: profiles, error: profileError } = await supabase.from("profiles")
-      .select("id,email").in("id", userIds);
+      .select("id,email")
+      .in("id", userIds);
     if (profileError) throw profileError;
     profileById = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
   }
-  return enriched.map((row) => serializeLightweightSubmission(row, profileById.get(row.user_id)));
+
+  const rowsById = new Map(projected.map((row) => [
+    String(row.id),
+    serializeLightweightSubmission(row, profileById.get(row.user_id)),
+  ]));
+  return submissionIds.flatMap((submissionId) => rowsById.get(submissionId) ?? []);
 }
 
 async function loadSubmissionTags(supabase, submissionIds) {
@@ -87,12 +110,14 @@ const CSV_COLUMNS = [
 async function sendSubmissionCsv(req, res) {
   try {
     const requestedIds = normalizeSubmissionIds(req.body?.submissionIds);
+    if (!requestedIds?.length) {
+      return res.status(400).json({ error: "submissionIds must be a non-empty array." });
+    }
     const supabase = getSupabaseAdminDataClient();
-    const allRows = await loadSubmissionExportRows(supabase);
-    const rowsById = new Map(allRows.map((row) => [String(row.id), row]));
-    const selectedRows = requestedIds === null
-      ? allRows
-      : requestedIds.flatMap((id) => rowsById.get(id) ?? []);
+    const selectedRows = await loadSubmissionExportRows(supabase, {
+      submissionIds: requestedIds,
+      actorProfile: req.profile,
+    });
     const tagsBySubmissionId = await loadSubmissionTags(
       supabase,
       selectedRows.map((row) => String(row.id)),

@@ -141,12 +141,21 @@ function listAdmin(rows, capture = {}, workspaceLabels = []) {
       }
       assert.equal(table, "submissions");
       let filtered = [...rows];
-      return {
-        select(columns) { capture.submissionColumns = columns; return this; },
-        eq(field, value) { filtered = filtered.filter((row) => String(row[field]) === String(value)); return this; },
+      const builder = {
+        select(columns) { capture.submissionColumns = columns; return builder; },
+        eq(field, value) { filtered = filtered.filter((row) => String(row[field]) === String(value)); return builder; },
+        in(field, values) {
+          const allowed = new Set(values.map((value) => String(value)));
+          filtered = filtered.filter((row) => allowed.has(String(row[field])));
+          return builder;
+        },
         async order() { return { data: filtered, error: null }; },
         async maybeSingle() { return { data: filtered[0] ?? null, error: null }; },
+        then(resolve, reject) {
+          return Promise.resolve({ data: filtered, error: null }).then(resolve, reject);
+        },
       };
+      return builder;
     },
   };
 }
@@ -242,6 +251,16 @@ test("Commissioner list returns all 70 geometry-free rows with normalized filter
   assert.equal(response.body.items[0].profile.email, "public-2@example.com");
   assert.ok(Buffer.byteLength(response.text) < 100_000);
   assert.equal(response.text.includes("mustNotLeak"), false);
+});
+
+test("Commissioner analytics aggregates list rows without loading the full table in the client", async () => {
+  authDoubles(commissioner, listAdmin(submissionRows(12)));
+  const response = await request("/api/submissions/analytics");
+  assert.equal(response.status, 200);
+  assert.equal(response.body.total, 12);
+  assert.equal(typeof response.body.byType.feedback, "number");
+  assert.equal(typeof response.body.byStatus.pending, "number");
+  assert.ok(Array.isArray(response.body.daily));
 });
 
 test("Public mine route derives ownership from the session and exact-ID route remains Commissioner-only", async () => {

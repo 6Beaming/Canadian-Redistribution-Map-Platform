@@ -6,16 +6,16 @@ function read(path) {
   return fs.readFileSync(path, "utf8");
 }
 
-test("Dashboard graphs use live table rows for all five status series", () => {
+test("Dashboard graphs use commissioner analytics for all five status series", () => {
   const page = read("src/pages/DashboardGraphs.jsx");
   const chart = read("src/components/non_prebuilt/submissionsGraph.jsx");
   const analytics = read("src/lib/submissions/analytics.js");
 
-  assert.match(page, /getAllCommissionerSubmissionTableRows/);
-  assert.match(page, /buildSubmissionStatusTotals/);
+  assert.match(page, /getCommissionerSubmissionAnalytics/);
+  assert.match(page, /dailyTimeline=\{analytics\?\.daily/);
   assert.doesNotMatch(page, /Support: 68%|Oppose: 32%|getTotalComments/);
   assert.match(chart, /buildSubmissionStatusTimeline/);
-  assert.doesNotMatch(chart, /const chartData = \[/);
+  assert.match(chart, /dailyTimeline != null/);
   ["pending", "accepted", "rejected", "archive-request", "archived"].forEach((status) => {
     assert.match(analytics, new RegExp(`id: "${status}"`));
   });

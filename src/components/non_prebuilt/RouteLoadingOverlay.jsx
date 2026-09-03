@@ -9,8 +9,6 @@ const ROUTE_LOADING_DURATION_MS = Object.freeze({
   BRIEF: 300,
   STANDARD: 500,
   EXTENDED: 1000,
-  SUBMISSIONS: 2500,
-  WORKSPACE: 2500,
   MAP_HANDOFF: 2000,
 });
 
@@ -40,16 +38,11 @@ function getRouteLoadingDuration(fromPathname, toPathname) {
     return ROUTE_LOADING_DURATION_MS.MAP_HANDOFF;
   }
 
-  // Public My Submissions and Commissioner User Submissions rely on the page
-  // loader and real request completion instead of a fixed-duration overlay.
-  if (isSubmissionListPath(toPathname)) {
+  // Public My Submissions, Commissioner User Submissions, and the Workspace tree
+  // rely on page-level loaders and real request/cache completion instead of a
+  // fixed-duration route overlay.
+  if (isSubmissionListPath(toPathname) || toPathname === "/dashboard/workspace") {
     return 0;
-  }
-
-  // Entering the Workspace tree uses a separate, equally long transition. Map
-  // review/difference child routes retain the dedicated 2000 ms map handoff.
-  if (toPathname === "/dashboard/workspace") {
-    return ROUTE_LOADING_DURATION_MS.WORKSPACE;
   }
 
   return 0;

@@ -33,24 +33,13 @@ export default function ArchivedTree() {
 
   useEffect(() => {
     let isMounted = true;
-    mapApi.getDaProfiles()
-      .then((payload) => {
-        if (isMounted) setProfilesByDguid(buildProfileIndex(payload).index);
-      })
-      .catch(() => {
-        // Snapshot fields remain usable when profile metadata is unavailable.
-      });
-    return () => { isMounted = false; };
-  }, []);
-
-  useEffect(() => {
-    let isMounted = true;
     setIsLoading(true);
+    setError("");
+
     getArchiveTreeRecords()
       .then((nextRecords) => {
         if (!isMounted) return;
         setRecords(nextRecords);
-        setError("");
       })
       .catch((loadError) => {
         if (isMounted) setError(loadError.message || "Archived records could not be loaded.");
@@ -58,6 +47,21 @@ export default function ArchivedTree() {
       .finally(() => {
         if (isMounted) setIsLoading(false);
       });
+
+    const loadProfiles = () => {
+      mapApi.getDaProfiles()
+        .then((payload) => {
+          if (isMounted) setProfilesByDguid(buildProfileIndex(payload).index);
+        })
+        .catch(() => {
+          // Snapshot fields remain usable when profile metadata is unavailable.
+        });
+    };
+    if (typeof window !== "undefined" && typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(loadProfiles, { timeout: 1500 });
+    } else {
+      window.setTimeout(loadProfiles, 0);
+    }
 
     return () => { isMounted = false; };
   }, [reloadVersion]);
@@ -80,17 +84,12 @@ export default function ArchivedTree() {
     0,
   );
 
-  const navigationState = useMemo(
-    () => ({ ...location.state, profilesByDguid }),
-    [location.state, profilesByDguid],
-  );
-
   function selectVersion(_category, _branch, version) {
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
       next.set("selected", version.id);
       return next;
-    }, { replace: true, state: navigationState });
+    }, { replace: true, state: location.state });
   }
 
   function clearSelection() {
@@ -98,7 +97,7 @@ export default function ArchivedTree() {
       const next = new URLSearchParams(current);
       next.delete("selected");
       return next;
-    }, { replace: true, state: navigationState });
+    }, { replace: true, state: location.state });
   }
 
   return (
@@ -163,11 +162,11 @@ export default function ArchivedTree() {
           onClose={clearSelection}
           onOpenMap={(_category, branch, version) => navigate(
             `/dashboard/archivedTree/${encodeURIComponent(getArchiveVersionRouteId(version))}/difference?branch=${encodeURIComponent(branch.key)}&mode=open`,
-            { state: navigationState },
+            { state: { from: "/dashboard/archivedTree", branchKey: branch.key, versionId: getArchiveVersionRouteId(version) } },
           )}
           onViewDifference={(_category, branch, version) => navigate(
             `/dashboard/archivedTree/${encodeURIComponent(getArchiveVersionRouteId(version))}/difference?branch=${encodeURIComponent(branch.key)}`,
-            { state: navigationState },
+            { state: { from: "/dashboard/archivedTree", branchKey: branch.key, versionId: getArchiveVersionRouteId(version) } },
           )}
           onDeleteBranch={async (branch) => {
             await deleteArchiveBranch(branch.key, {

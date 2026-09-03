@@ -183,6 +183,30 @@ button:disabled {
   min-height: 0;
 }
 
+.route-loading-overlay--panel {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: rgba(226, 232, 240, 0.58);
+  animation: route-loading-overlay-in 160ms ease-out both;
+  pointer-events: all;
+  cursor: wait;
+  border-radius: inherit;
+}
+
+.submissions-pagination__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+
+.submissions-pagination__counting {
+  margin-left: 1.5rem;
+  color: #9ca3af;
+}
+
 .route-loading-page .route-loading-overlay__indicator button {
   border: 0;
   border-radius: 999px;

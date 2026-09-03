@@ -44,13 +44,23 @@ import {
   commissionerStatusStyles,
   normalizeCommissionerStatus,
 } from "./SubmissionsColumns.jsx";
+import {
+  DEFAULT_VISIBLE_SUBMISSION_TYPES,
+  getSubmissionTypeBucket,
+} from "@/lib/submissions/commissionerListPaging.js";
+import { PanelLoadingOverlay } from "@/components/non_prebuilt/LoadingIndicator.jsx";
 
-function getSubmissionTypeBucket(type) {
-  const normalized = String(type ?? "").trim().toLowerCase().replaceAll("-", "_");
+function buildServerPageLabel(serverPagination) {
+  const pageNumber = serverPagination.pageIndex + 1;
+  const suffix = serverPagination.paginationSuffix ?? "counting";
 
-  if (["feedback", "comment", "comments"].includes(normalized)) return "comments";
-  if (["objection", "objections"].includes(normalized)) return "objections";
-  return "counterproposal";
+  if (suffix === "counting") {
+    return { pageNumber, counting: true };
+  }
+  if (suffix === "total" && serverPagination.totalPages) {
+    return { text: `Page ${pageNumber} of ${serverPagination.totalPages}` };
+  }
+  return { text: `Page ${pageNumber}` };
 }
 
 function isWithinDateRange(value, dateStart, dateEnd) {
@@ -68,33 +78,62 @@ export default function SubmissionsTable({
   onOpenAnalytics,
   onRevealNewSubmissions,
   onRowClick,
+  serverPagination = null,
+  serverFilters = null,
+  onServerFiltersChange = null,
+  visibleTypes: controlledVisibleTypes = null,
+  onVisibleTypesChange = null,
+  onResolveExportIds = null,
+  exportMatchCount = null,
+  tableFetching = false,
 }) {
   const [sorting, setSorting] = React.useState([]);
   const [columnFilters, setColumnFilters] = React.useState([]);
-  const [dateStart, setDateStart] = React.useState(subDays(new Date(), 30));
-  const [dateEnd, setDateEnd] = React.useState(new Date());
+  const [localDateStart, setLocalDateStart] = React.useState(subDays(new Date(), 30));
+  const [localDateEnd, setLocalDateEnd] = React.useState(new Date());
+  const [localVisibleTypes, setLocalVisibleTypes] = React.useState({
+    ...DEFAULT_VISIBLE_SUBMISSION_TYPES,
+  });
   const [hoveredRowId, setHoveredRowId] = React.useState(null);
   const [exportState, setExportState] = React.useState({ pending: false, error: "" });
   const tableShellRef = React.useRef(null);
-  const [visibleSubmissions, setVisibleSubmissions] = React.useState({
-    comments: true,
-    objections: true,
-    counterproposal: true,
-  });
+
+  const serverMode = Boolean(serverPagination);
+  const dateStart = serverMode && serverFilters?.dateStart ? serverFilters.dateStart : localDateStart;
+  const dateEnd = serverMode && serverFilters?.dateEnd ? serverFilters.dateEnd : localDateEnd;
+  const visibleSubmissions = controlledVisibleTypes ?? localVisibleTypes;
+
+  function updateVisibleTypes(next) {
+    if (onVisibleTypesChange) {
+      onVisibleTypesChange(next);
+      return;
+    }
+    setLocalVisibleTypes(next);
+  }
+
+  function notifyServerFilters(next = {}) {
+    if (!serverMode || !onServerFiltersChange) return;
+    const communityQuery = columnFilters.find((filter) => filter.id === "community_name")?.value ?? "";
+    onServerFiltersChange({
+      dateStart: next.dateStart ?? dateStart,
+      dateEnd: next.dateEnd ?? dateEnd,
+      query: String(next.query ?? communityQuery).trim(),
+    });
+  }
 
   const filteredData = React.useMemo(
     () => data.filter((submission) => (
       visibleSubmissions[getSubmissionTypeBucket(submission.type)]
-      && isWithinDateRange(submission.submittedAt, dateStart, dateEnd)
+      && (serverMode || isWithinDateRange(submission.submittedAt, dateStart, dateEnd))
     )),
-    [data, dateEnd, dateStart, visibleSubmissions],
+    [data, dateEnd, dateStart, serverMode, visibleSubmissions],
   );
 
   const table = useReactTable({
     data: filteredData,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    ...(serverMode ? { manualPagination: true } : { getPaginationRowModel: getPaginationRowModel() }),
     onSortingChange: setSorting,
     getSortedRowModel: getSortedRowModel(),
     onColumnFiltersChange: setColumnFilters,
@@ -103,9 +142,12 @@ export default function SubmissionsTable({
       sorting,
       columnFilters,
     },
-    initialState: { pagination: { pageSize: 10 } },
+    initialState: { pagination: { pageSize: serverMode ? filteredData.length || 10 : 10 } },
   });
-  const filteredSubmissionCount = table.getPrePaginationRowModel().rows.length;
+
+  const filteredSubmissionCount = serverMode
+    ? (exportMatchCount ?? "matching")
+    : table.getPrePaginationRowModel().rows.length;
 
   function revealNewSubmissions() {
     if (!newSubmissionCount) return;
@@ -118,10 +160,11 @@ export default function SubmissionsTable({
 
   async function exportCsv() {
     if (exportState.pending) return;
-    const submissionIds = table.getPrePaginationRowModel().rows
-      .map((row) => String(row.original.id));
     setExportState({ pending: true, error: "" });
     try {
+      const submissionIds = serverMode && onResolveExportIds
+        ? await onResolveExportIds(visibleSubmissions)
+        : table.getPrePaginationRowModel().rows.map((row) => String(row.original.id));
       await exportCommissionerSubmissionsCsv(submissionIds);
       setExportState({ pending: false, error: "" });
     } catch (error) {
@@ -132,26 +175,50 @@ export default function SubmissionsTable({
     }
   }
 
+  const pageLabel = serverMode
+    ? buildServerPageLabel(serverPagination)
+    : { text: `Page ${table.getState().pagination.pageIndex + 1} of ${Math.max(table.getPageCount(), 1)}` };
+
+  const showTableOverlay = tableFetching || exportState.pending;
+
+  const exportCountLabel = filteredSubmissionCount === "matching"
+    ? "all matching"
+    : filteredSubmissionCount;
+
   return (
-    <div className="min-w-0">
+    <div className="relative min-w-0">
+      {exportState.pending ? <PanelLoadingOverlay label="Loading..." /> : null}
+
       <div className="commissioner-submissions-toolbar">
         <Input
           placeholder="Filter Community Name..."
-          value={table.getColumn("community_name")?.getFilterValue() ?? ""}
-          onChange={(event) =>
-            table.getColumn("community_name")?.setFilterValue(event.target.value)
-          }
+          value={serverMode
+            ? (serverFilters?.query ?? "")
+            : (table.getColumn("community_name")?.getFilterValue() ?? "")}
+          onChange={(event) => {
+            const query = event.target.value;
+            if (!serverMode) {
+              table.getColumn("community_name")?.setFilterValue(query);
+            }
+            notifyServerFilters({ query });
+          }}
           className="commissioner-submissions-toolbar__search"
         />
         <div className="commissioner-submissions-toolbar__date-group">
           <DatePickerSimple
             date={dateStart}
-            setDate={setDateStart}
+            setDate={(nextDate) => {
+              if (!serverMode) setLocalDateStart(nextDate);
+              notifyServerFilters({ dateStart: nextDate });
+            }}
             className="commissioner-submissions-toolbar__control h-10"
           />
           <DatePickerSimple
             date={dateEnd}
-            setDate={setDateEnd}
+            setDate={(nextDate) => {
+              if (!serverMode) setLocalDateEnd(nextDate);
+              notifyServerFilters({ dateEnd: nextDate });
+            }}
             className="commissioner-submissions-toolbar__control h-10"
           />
         </div>
@@ -173,7 +240,7 @@ export default function SubmissionsTable({
                 className="capitalize"
                 checked={visibleSubmissions.comments}
                 onCheckedChange={(value) =>
-                  setVisibleSubmissions((current) => ({ ...current, comments: value }))
+                  updateVisibleTypes({ ...visibleSubmissions, comments: value })
                 }
               >
                 Comments
@@ -182,7 +249,7 @@ export default function SubmissionsTable({
                 className="capitalize"
                 checked={visibleSubmissions.objections}
                 onCheckedChange={(value) =>
-                  setVisibleSubmissions((current) => ({ ...current, objections: value }))
+                  updateVisibleTypes({ ...visibleSubmissions, objections: value })
                 }
               >
                 Objections
@@ -191,7 +258,7 @@ export default function SubmissionsTable({
                 className="capitalize"
                 checked={visibleSubmissions.counterproposal}
                 onCheckedChange={(value) =>
-                  setVisibleSubmissions((current) => ({ ...current, counterproposal: value }))
+                  updateVisibleTypes({ ...visibleSubmissions, counterproposal: value })
                 }
               >
                 Counterproposal
@@ -262,7 +329,8 @@ export default function SubmissionsTable({
         </div>
       ) : null}
 
-      <div ref={tableShellRef} className="submissions-table-shell rounded-md border">
+      <div ref={tableShellRef} className="submissions-table-shell relative rounded-md border">
+        {showTableOverlay && !exportState.pending ? <PanelLoadingOverlay label="Loading..." /> : null}
         <Table className="min-w-[60rem]">
           <TableHeader className="bg-gray-50">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -320,6 +388,10 @@ export default function SubmissionsTable({
                   </Fragment>
                 );
               })
+            ) : showTableOverlay ? (
+              <TableRow aria-hidden="true">
+                <TableCell colSpan={columns.length} className="h-24" />
+              </TableRow>
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">
@@ -332,23 +404,30 @@ export default function SubmissionsTable({
       </div>
 
       <div className="submissions-pagination flex items-center justify-between py-4">
-        <p className="text-gray-500">
-          Page {table.getState().pagination.pageIndex + 1} of {Math.max(table.getPageCount(), 1)}
+        <p className="submissions-pagination__label text-gray-500">
+          {pageLabel.counting ? (
+            <>
+              <span>Page {pageLabel.pageNumber}</span>
+              <span className="submissions-pagination__counting">Counting pages...</span>
+            </>
+          ) : (
+            pageLabel.text
+          )}
         </p>
         <div className="submissions-pagination__actions">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
+            onClick={() => (serverMode ? serverPagination.onPrevious() : table.previousPage())}
+            disabled={serverMode ? !serverPagination.hasPrevious : !table.getCanPreviousPage()}
           >
             Previous
           </Button>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
+            onClick={() => (serverMode ? serverPagination.onNext() : table.nextPage())}
+            disabled={serverMode ? !serverPagination.hasNext : !table.getCanNextPage()}
           >
             Next
           </Button>

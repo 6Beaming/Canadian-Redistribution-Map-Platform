@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeftRight, MapPinned, RotateCcw } from "lucide-react";
-import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArchivedSubmissionCard } from "@/components/non_prebuilt/ArchivedSubmissionCard.jsx";
 import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
 import { MapInfoPanelShell } from "@/components/non_prebuilt/MapInfoPanelShell.jsx";
@@ -11,12 +11,10 @@ import {
   getArchiveCategoryId,
   normalizeArchiveType,
 } from "@/lib/archiveTree.js";
-import {
-  buildArchivedDifferencePresentation,
-  canRenderArchivedDifferenceFromSnapshots,
-} from "@/lib/archiveDifferencePresentation.js";
+import { buildArchivedDifferencePresentation } from "@/lib/archiveDifferencePresentation.js";
 import { MAP_INTERACTION_MODE } from "@/lib/map/interactionMode.js";
-import { hydrateWorkspaceSubmission } from "@/services/tempCounterProposal.js";
+import { mark, measure } from "@/lib/performanceMarks.js";
+import { loadSubmissionMapPresentation } from "@/services/submissionMapPresentation.js";
 import {
   getArchiveBranchView,
   revertArchiveBranch,
@@ -33,6 +31,7 @@ function mapVersionCards(view) {
     dguids: view.branch.dguids ?? [],
     communityName: view.branch.communityName,
     resourceVersion: view.branch.resourceVersion ?? 1,
+    releaseId: view.branch.releaseId ?? null,
     versions: (view.versions ?? []).map((version, index) => ({
       id: String(version.versionId ?? version.submission?.id),
       versionId: version.versionId,
@@ -52,8 +51,8 @@ function mapVersionCards(view) {
     ?? null;
 
   const selectedVersion = branch.versions.find((version) => (
-    String(version.versionId) === String(view.selectedVersion?.versionId)
-    || String(version.id) === String(view.selectedVersion?.versionId)
+    String(version.versionId) === String(view.selectedVersionId ?? view.selectedVersion?.versionId)
+    || String(version.id) === String(view.selectedVersionId ?? view.selectedVersion?.versionId)
   )) ?? branch.latestVersion;
   const latestVersion = branch.versions.find((version) => version.isLatest) ?? branch.latestVersion;
 
@@ -62,151 +61,138 @@ function mapVersionCards(view) {
     branch,
     selected: { category: { id: category.id, title: category.title }, branch, version: selectedVersion },
     latest: { category: { id: category.id, title: category.title }, branch, version: latestVersion },
+    selectedVersionId: String(view.selectedVersionId ?? selectedVersion?.versionId ?? ""),
+    latestVersionId: String(view.latestVersionId ?? latestVersion?.versionId ?? ""),
   };
 }
 
-function mapPresentation(submission, displayGeometry, originalGeometry, geometryView = "proposed") {
-  const hydratedOriginal = submission?.geometry?.originalFeatureCollection ?? null;
-  const hydratedProposed = submission?.geometry?.proposedFeatureCollection ?? null;
-  const fromSnapshots = buildArchivedDifferencePresentation(submission, {
-    displayGeometry: displayGeometry ?? hydratedProposed,
-    originalGeometry: originalGeometry ?? hydratedOriginal,
-    geometryView,
-  });
-  if (fromSnapshots) {
-    return fromSnapshots;
-  }
-
-  if (!submission?.geometry) {
-    return {};
-  }
-
-  if (normalizeArchiveType(submission?.type) === "counter-proposal") {
-    return buildArchivedDifferencePresentation(submission, {
-      displayGeometry: submission.geometry.proposedFeatureCollection,
-      originalGeometry: submission.geometry.originalFeatureCollection,
-      geometryView,
-    }) ?? {};
-  }
-
-  return {
-    objectionPreview: submission.geometry,
-    focusGeoJson: submission.geometry.featureCollection,
-  };
-}
-
-async function hydrateActiveSubmission(submission, {
-  displayGeometry,
-  originalGeometry,
-  profilesByDguid,
-}) {
-  if (!submission) return null;
-  if (canRenderArchivedDifferenceFromSnapshots({ submission, displayGeometry, originalGeometry })) {
-    return submission;
-  }
-  try {
-    return await hydrateWorkspaceSubmission(submission, profilesByDguid);
-  } catch {
-    return submission;
-  }
+function geometryEntryForVersion(geometryByVersionId, versionId) {
+  if (!versionId) return null;
+  return geometryByVersionId?.[String(versionId)] ?? null;
 }
 
 export default function ArchivedDifference() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { signalRouteReady } = useRouteLoading() ?? {};
   const { isFullscreen, toggle: toggleFullscreen } = useMapFullscreen();
   const { submissionId: versionId } = useParams();
   const [searchParams] = useSearchParams();
   const branchKey = searchParams.get("branch");
   const openOnly = searchParams.get("mode") === "open";
-  const profilesByDguid = location.state?.profilesByDguid instanceof Map
-    ? location.state.profilesByDguid
-    : null;
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [latestEntry, setLatestEntry] = useState(null);
-  const [selectedSubmission, setSelectedSubmission] = useState(null);
-  const [latestSubmission, setLatestSubmission] = useState(null);
-  const [submissionsByVersionId, setSubmissionsByVersionId] = useState(() => new Map());
-  const [selectedGeometry, setSelectedGeometry] = useState(null);
-  const [latestGeometry, setLatestGeometry] = useState(null);
-  const [selectedOriginalGeometry, setSelectedOriginalGeometry] = useState(null);
-  const [latestOriginalGeometry, setLatestOriginalGeometry] = useState(null);
+  const [geometryByVersionId, setGeometryByVersionId] = useState(() => ({}));
+  const [presentationByVersionId, setPresentationByVersionId] = useState(() => new Map());
   const [archiveMapRevision, setArchiveMapRevision] = useState(0);
   const [view, setView] = useState(openOnly ? "latest" : "selected");
   const [geometryView, setGeometryView] = useState("proposed");
   const [status, setStatus] = useState(openOnly ? "Loading archived map..." : "Loading archived difference...");
   const [error, setError] = useState("");
   const [isReverting, setIsReverting] = useState(false);
+  const [mapPresentationReady, setMapPresentationReady] = useState(false);
+  const routeReadySignaledRef = useRef(false);
+  const loadGenerationRef = useRef(0);
+
+  const signalRouteReadyOnce = useCallback(() => {
+    if (routeReadySignaledRef.current) return;
+    routeReadySignaledRef.current = true;
+    mark("route-overlay-hidden");
+    measure("route-overlay-hidden-after-map-idle", "map-first-idle", "route-overlay-hidden");
+    signalRouteReady?.();
+  }, [signalRouteReady]);
+
+  const handleInitialPresentationReady = useCallback(() => {
+    setMapPresentationReady(true);
+    signalRouteReadyOnce();
+  }, [signalRouteReadyOnce]);
 
   useEffect(() => {
     let isMounted = true;
+    const generation = loadGenerationRef.current + 1;
+    loadGenerationRef.current = generation;
+    routeReadySignaledRef.current = false;
+    setMapPresentationReady(false);
+    setPresentationByVersionId(new Map());
+    mark("route-navigation-start");
+
+    async function loadPresentationForVersion({
+      version,
+      branch,
+      geometryEntry,
+      geometryViewMode,
+    }) {
+      const submission = version?.submission;
+      if (!submission) return null;
+      const releasePresentation = await loadSubmissionMapPresentation({
+        submission,
+        releaseId: branch.releaseId,
+        primaryDguid: branch.dguids?.[0] ?? submission.dguid,
+        secondaryDguid: branch.dguids?.[1] ?? submission.neighboring_dguid,
+        archivedDisplayGeometry: geometryEntry?.displayGeometry ?? null,
+        geometryView: geometryViewMode,
+      });
+      if (releasePresentation) {
+        return releasePresentation;
+      }
+      return buildArchivedDifferencePresentation(submission, {
+        displayGeometry: geometryEntry?.displayGeometry ?? null,
+        originalGeometry: null,
+        geometryView: geometryViewMode,
+      });
+    }
+
     async function load() {
       try {
         const branchView = await getArchiveBranchView(versionId, {
           branchKey,
           includeDifference: !openOnly,
         });
+        mark("archive-view-response");
+        if (!isMounted || generation !== loadGenerationRef.current) return;
+
         const mapped = mapVersionCards(branchView);
-        const selectedSameAsLatest = mapped.selected.version.id === mapped.latest.version.id;
-        const hydrateOptions = {
-          profilesByDguid,
-          displayGeometry: branchView.selectedDisplayGeometry ?? null,
-          originalGeometry: branchView.selectedOriginalGeometry ?? null,
-        };
-        const latestHydrateOptions = {
-          profilesByDguid,
-          displayGeometry: branchView.latestDisplayGeometry ?? branchView.selectedDisplayGeometry ?? null,
-          originalGeometry: branchView.latestOriginalGeometry ?? branchView.selectedOriginalGeometry ?? null,
-        };
-
-        let selectedHydrated;
-        let latestHydrated;
-        if (selectedSameAsLatest) {
-          selectedHydrated = await hydrateActiveSubmission(
-            mapped.selected.version.submission,
-            hydrateOptions,
-          );
-          latestHydrated = selectedHydrated;
-        } else {
-          [selectedHydrated, latestHydrated] = await Promise.all([
-            hydrateActiveSubmission(mapped.selected.version.submission, hydrateOptions),
-            hydrateActiveSubmission(mapped.latest.version.submission, latestHydrateOptions),
-          ]);
-        }
-        if (!isMounted) return;
-
-        const hydratedById = new Map(
-          mapped.branch.versions.map((version) => [
-            version.id,
-            version.id === mapped.selected.version.id ? selectedHydrated : version.submission,
-          ]),
-        );
-        hydratedById.set(mapped.latest.version.id, latestHydrated);
-
+        const nextGeometryByVersionId = branchView.geometryByVersionId ?? {};
+        setGeometryByVersionId(nextGeometryByVersionId);
         setSelectedEntry(mapped.selected);
         setLatestEntry(mapped.latest);
-        setSubmissionsByVersionId(hydratedById);
-        setSelectedSubmission(selectedHydrated);
-        setLatestSubmission(latestHydrated);
-        setSelectedGeometry(branchView.selectedDisplayGeometry ?? null);
-        setLatestGeometry(branchView.latestDisplayGeometry ?? null);
-        setSelectedOriginalGeometry(branchView.selectedOriginalGeometry ?? null);
-        setLatestOriginalGeometry(branchView.latestOriginalGeometry ?? branchView.selectedOriginalGeometry ?? null);
         setArchiveMapRevision(branchView.archiveMapRevision ?? 0);
         setGeometryView("proposed");
+        setView(openOnly ? "latest" : "selected");
+
+        const versionIdsToLoad = new Set([
+          mapped.selectedVersionId,
+          mapped.latestVersionId,
+        ].filter(Boolean));
+
+        const presentations = new Map();
+        await Promise.all([...versionIdsToLoad].map(async (activeVersionId) => {
+          const version = mapped.branch.versions.find((entry) => String(entry.versionId) === String(activeVersionId))
+            ?? mapped.branch.versions.find((entry) => String(entry.id) === String(activeVersionId));
+          if (!version) return;
+          const presentation = await loadPresentationForVersion({
+            version,
+            branch: mapped.branch,
+            geometryEntry: geometryEntryForVersion(nextGeometryByVersionId, activeVersionId),
+            geometryViewMode: "proposed",
+          });
+          if (presentation) {
+            presentations.set(String(activeVersionId), presentation);
+          }
+        }));
+
+        if (!isMounted || generation !== loadGenerationRef.current) return;
+        setPresentationByVersionId(presentations);
+        mark("map-presentation-data-ready");
         setStatus(openOnly ? "Archived map ready." : "Archived difference ready.");
-        signalRouteReady?.();
       } catch (loadError) {
-        if (isMounted) {
-          setError(loadError.message || "Archived version could not be loaded.");
-          signalRouteReady?.();
-        }
+        if (!isMounted || generation !== loadGenerationRef.current) return;
+        setError(loadError.message || "Archived version could not be loaded.");
+        signalRouteReadyOnce();
       }
     }
     load();
     return () => { isMounted = false; };
-  }, [branchKey, openOnly, profilesByDguid, signalRouteReady, versionId]);
+  }, [branchKey, openOnly, signalRouteReadyOnce, versionId]);
 
   useEffect(() => {
     const previousBodyOverflow = document.body.style.overflow;
@@ -214,84 +200,69 @@ export default function ArchivedDifference() {
     return () => { document.body.style.overflow = previousBodyOverflow; };
   }, []);
 
-  const activeSubmission = view === "latest" ? latestSubmission : selectedSubmission;
-  const activeGeometry = view === "latest" ? latestGeometry : selectedGeometry;
-  const activeOriginalGeometry = view === "latest" ? latestOriginalGeometry : selectedOriginalGeometry;
+  const activeVersionId = view === "latest"
+    ? String(latestEntry?.version.versionId ?? latestEntry?.version.id ?? "")
+    : String(selectedEntry?.version.versionId ?? selectedEntry?.version.id ?? "");
   const activeEntry = view === "latest" ? latestEntry : selectedEntry;
+  const activePresentation = presentationByVersionId.get(activeVersionId) ?? null;
 
   useEffect(() => {
-    if (geometryView !== "original" || !activeSubmission) {
+    if (!activeEntry || geometryView !== "original") return undefined;
+    if (normalizeArchiveType(activeEntry.version.submission?.type) !== "counter-proposal") {
       return undefined;
     }
-    if (normalizeArchiveType(activeSubmission.type) !== "counter-proposal") {
-      return undefined;
-    }
-    if (activeOriginalGeometry || activeSubmission.geometry?.originalFeatureCollection) {
+    if (presentationByVersionId.get(`${activeVersionId}:original`)) {
       return undefined;
     }
 
     let isMounted = true;
-    hydrateWorkspaceSubmission(activeSubmission, profilesByDguid)
-      .then((hydrated) => {
-        if (!isMounted || !hydrated?.geometry?.originalFeatureCollection) return;
-        const applyHydrated = (current) => (
-          current && String(current.id) === String(hydrated.id)
-            ? { ...current, geometry: hydrated.geometry }
-            : current
-        );
-        if (view === "latest") {
-          setLatestSubmission(applyHydrated);
-        } else {
-          setSelectedSubmission(applyHydrated);
-        }
-        setSubmissionsByVersionId((current) => {
-          const next = new Map(current);
-          const activeVersionId = view === "latest" ? latestEntry?.version.id : selectedEntry?.version.id;
-          if (activeVersionId) next.set(activeVersionId, applyHydrated(next.get(activeVersionId) ?? hydrated));
-          return next;
-        });
-      })
-      .catch(() => {});
+    const generation = loadGenerationRef.current;
+    (async () => {
+      const geometryEntry = geometryEntryForVersion(geometryByVersionId, activeVersionId);
+      const presentation = await loadSubmissionMapPresentation({
+        submission: activeEntry.version.submission,
+        releaseId: activeEntry.branch.releaseId,
+        primaryDguid: activeEntry.branch.dguids?.[0],
+        secondaryDguid: activeEntry.branch.dguids?.[1],
+        archivedDisplayGeometry: geometryEntry?.displayGeometry ?? null,
+        geometryView: "original",
+      });
+      if (!isMounted || generation !== loadGenerationRef.current || !presentation) return;
+      setPresentationByVersionId((current) => {
+        const next = new Map(current);
+        next.set(`${activeVersionId}:original`, presentation);
+        return next;
+      });
+    })().catch(() => {});
     return () => { isMounted = false; };
-  }, [
-    activeOriginalGeometry,
-    activeSubmission,
-    geometryView,
-    latestEntry?.version.id,
-    profilesByDguid,
-    selectedEntry?.version.id,
-    view,
-  ]);
+  }, [activeEntry, activeVersionId, geometryByVersionId, geometryView, presentationByVersionId]);
 
-  const presentationByView = useMemo(() => ({
-    proposed: mapPresentation(activeSubmission, activeGeometry, activeOriginalGeometry, "proposed"),
-    original: mapPresentation(activeSubmission, activeGeometry, activeOriginalGeometry, "original"),
-  }), [activeGeometry, activeOriginalGeometry, activeSubmission]);
-  const presentation = presentationByView[geometryView === "original" ? "original" : "proposed"];
-  const stableFocus = useMemo(
-    () => mapPresentation(
-      selectedSubmission,
-      selectedGeometry,
-      selectedOriginalGeometry,
-      "original",
-    ).focusGeoJson,
-    [selectedGeometry, selectedOriginalGeometry, selectedSubmission],
-  );
+  const presentation = geometryView === "original"
+    ? (presentationByVersionId.get(`${activeVersionId}:original`) ?? activePresentation)
+    : activePresentation;
+
+  const stableFocus = useMemo(() => {
+    const selectedVersionId = String(selectedEntry?.version.versionId ?? selectedEntry?.version.id ?? "");
+    const selectedPresentation = presentationByVersionId.get(selectedVersionId)
+      ?? presentationByVersionId.get(`${selectedVersionId}:original`);
+    return selectedPresentation?.focusGeoJson
+      ?? buildArchivedDifferencePresentation(selectedEntry?.version.submission, {
+        displayGeometry: geometryEntryForVersion(geometryByVersionId, selectedVersionId)?.displayGeometry ?? null,
+        geometryView: "original",
+      })?.focusGeoJson
+      ?? null;
+  }, [geometryByVersionId, presentationByVersionId, selectedEntry]);
 
   if (error && !selectedEntry) {
     return <main className="archive-difference-error"><h1>Archived version unavailable</h1><p>{error}</p></main>;
   }
   if (!selectedEntry || !latestEntry) return null;
+
   const selectedIsLatest = selectedEntry.version.id === latestEntry.version.id;
-  const isCounterProposal = normalizeArchiveType(activeSubmission?.type) === "counter-proposal";
+  const isCounterProposal = normalizeArchiveType(activeEntry?.version.submission?.type) === "counter-proposal";
   const versionCards = [...selectedEntry.branch.versions]
     .reverse()
     .map((version) => ({ category: selectedEntry.category, branch: selectedEntry.branch, version }));
-
-  function submissionForEntry(entry) {
-    return submissionsByVersionId.get(entry.version.id)
-      ?? (entry.version.id === latestEntry.version.id ? latestSubmission : selectedSubmission);
-  }
 
   function versionRole(entry) {
     const isLatest = entry.version.id === latestEntry.version.id;
@@ -330,13 +301,15 @@ export default function ArchivedDifference() {
         <MapCanvas
           isFullscreen={isFullscreen}
           selection={null}
-          objectionPreview={presentation.objectionPreview}
-          counterProposalPreview={presentation.counterProposalPreview}
+          objectionPreview={presentation?.objectionPreview ?? null}
+          counterProposalPreview={presentation?.counterProposalPreview ?? null}
           focusGeoJson={stableFocus}
           workflowFocusDguids={selectedEntry.branch.dguids}
           interactionMode={MAP_INTERACTION_MODE.COUNTER_REVIEW}
           onStatusChange={setStatus}
           onToggleFullscreen={toggleFullscreen}
+          onInitialPresentationReady={mapPresentationReady ? undefined : handleInitialPresentationReady}
+          presentationReadyKey={`${activeVersionId}:${geometryView}:${Boolean(presentation)}`}
         />
         {!openOnly && !selectedIsLatest ? (
           <div className="archive-map-version-toggle" role="group" aria-label="Archived map version">
@@ -370,7 +343,7 @@ export default function ArchivedDifference() {
             <ArchivedSubmissionCard
               key={entry.version.id}
               entry={entry.version}
-              submission={submissionForEntry(entry)}
+              submission={entry.version.submission}
               categoryLabel={entry.category.title}
               versionLabel={versionRole(entry)}
               isActive={activeEntry?.version.id === entry.version.id}

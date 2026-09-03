@@ -9,11 +9,17 @@ function read(path) {
 test("Public and Commissioner tables use the lightweight service without changing table ownership", () => {
   const mine = read("src/pages/MySubmissions.jsx");
   const commissioner = read("src/pages/DashboardSubmissionsTable/DashboardSubmissionsPage.jsx");
-  assert.match(mine, /getAllMySubmissionTableRows/);
+  assert.match(mine, /getMySubmissionTableRows/);
+  assert.match(mine, /SubmissionListPrefetchController/);
+  assert.match(mine, /tableFetching/);
+  assert.match(mine, /PanelLoadingOverlay/);
   assert.match(mine, /normalizePublicSubmissionStatus/);
   assert.doesNotMatch(mine, /rejected:\s*"bg-/);
-  assert.match(commissioner, /getAllCommissionerSubmissionTableRows/);
+  assert.doesNotMatch(mine, /RouteLoadingPage/);
+  assert.match(commissioner, /getCommissionerSubmissionListStore/);
+  assert.match(commissioner, /tableFetching/);
   assert.match(commissioner, /<SubmissionsTable/);
+  assert.doesNotMatch(commissioner, /CommissionerListPrefetchController/);
 });
 
 test("Commissioner new-submission indicator renders above the table shell", () => {
@@ -21,7 +27,7 @@ test("Commissioner new-submission indicator renders above the table shell", () =
   const indicatorStart = table.indexOf("{newSubmissionCount > 0 ? (");
   const indicatorEnd = table.indexOf(") : null}", indicatorStart);
   const tableShell = table.indexOf(
-    '<div ref={tableShellRef} className="submissions-table-shell rounded-md border">',
+    '<div ref={tableShellRef} className="submissions-table-shell relative rounded-md border">',
   );
 
   assert.ok(indicatorStart >= 0);
@@ -30,14 +36,15 @@ test("Commissioner new-submission indicator renders above the table shell", () =
   assert.match(table, /sticky top-2 z-20 mb-3 flex justify-center/);
 });
 
-test("Workspace waits behind the shared full-page loading UI before rendering its complete tree", () => {
+test("Workspace reuses the shared commissioner submission cache for hot start", () => {
   const workspace = read("src/pages/CommissionerWorkspace.jsx");
-  const exact = workspace.indexOf("await getWorkspaceSubmission(focusId");
-  const full = workspace.indexOf("await getWorkspaceSubmissions", exact);
-  assert.ok(exact >= 0 && full > exact);
-  assert.match(workspace, /if \(isLoading\) \{[\s\S]*return <RouteLoadingPage \/>/);
-  assert.match(workspace, /setWorkspaceSubmissions\(\[focused\]\)/);
-  assert.match(workspace, /mergeFocusedSubmission\(submissions, focused\)/);
+  assert.match(workspace, /getCommissionerSubmissionListStore/);
+  assert.match(workspace, /mapWorkspaceSubmissions/);
+  assert.match(workspace, /store\.ensureBootstrapped/);
+  assert.match(workspace, /PanelLoadingOverlay/);
+  assert.match(workspace, /treeFetching/);
+  assert.match(workspace, /mergeFocusedSubmission/);
+  assert.doesNotMatch(workspace, /return <RouteLoadingPage \/>/);
 });
 
 test("Map pages render during profile hydration and Archived Tree waits for its canvas", () => {
@@ -110,8 +117,12 @@ test("CP5 navigation, readiness loading, and export entry points remain wired", 
   assert.match(archived, /\/difference\?branch=[\s\S]*\{ state: location\.state \}/);
   assert.match(archived, /exportArchivedTreeJson/);
   assert.doesNotMatch(graphs, /exportCommissionerSubmissionsCsv|Export CSV/);
+  assert.match(submissionsTable, /serverPagination/);
+  assert.match(submissionsTable, /tableFetching/);
+  assert.match(submissionsTable, /Counting pages/);
+  assert.match(submissionsTable, /PanelLoadingOverlay/);
   assert.match(submissionsTable, /exportCommissionerSubmissionsCsv\(submissionIds\)/);
-  assert.match(submissionsTable, /table\.getPrePaginationRowModel\(\)\.rows/);
+  assert.match(submissionsTable, /serverMode && onResolveExportIds/);
   assert.match(submissionsTable, /isWithinDateRange\(submission\.submittedAt, dateStart, dateEnd\)/);
   assert.match(datePicker, /"Jan\."[\s\S]*"Aug\."[\s\S]*"Dec\."/);
   assert.match(datePicker, /formatDateLabel\(date\)/);
@@ -144,7 +155,8 @@ test("Shared loading UI blocks page content and fullscreen owns Header visibilit
 
   assert.match(app, /!isFullscreen \? <Header[\s\S]*app-route-content--fullscreen[\s\S]*<RouteLoadingOverlay \/>/);
   assert.ok(app.indexOf("<Header") < app.indexOf("<RouteLoadingOverlay />"));
-  assert.match(overlay, /aria-label="Loading"[\s\S]*<span>Loading\.\.\.<\/span>/);
+  assert.match(overlay, /toPathname === "\/dashboard\/workspace"/);
+  assert.doesNotMatch(overlay, /WORKSPACE:\s*2500/);
   assert.match(loadingPage, /<span>\{error \|\| "Loading\.\.\."\}<\/span>/);
   assert.match(archivedCanvas, /route-loading-overlay__spinner[\s\S]*<span>Loading\.\.\.<\/span>/);
   assert.match(review, /route-loading-overlay__spinner[\s\S]*<span>Loading\.\.\.<\/span>/);

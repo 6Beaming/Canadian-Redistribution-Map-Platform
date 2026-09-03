@@ -558,6 +558,8 @@ export function MapCanvas({
   focusGeoJson = null,
   focusMaxZoom = 15,
   loadSubmissionCount = true,
+  onInitialPresentationReady = null,
+  presentationReadyKey = null,
 }) {
   const [heatmapEnabled, setHeatmapEnabled] = useState(false);
   const isArchivedMapControlled = controlledArchivedMapEnabled !== undefined;
@@ -607,6 +609,8 @@ export function MapCanvas({
   const onDaSelectRef = useRef(onDaSelect);
   const onFedSelectRef = useRef(onFedSelect);
   const onStatusChangeRef = useRef(onStatusChange);
+  const onInitialPresentationReadyRef = useRef(onInitialPresentationReady);
+  const initialPresentationReadyKeyRef = useRef(null);
   const isFullscreenRef = useRef(isFullscreen);
   const boundariesVisibleRef = useRef(true);
   const fedNameLookupRef = useRef(new Map());
@@ -657,6 +661,7 @@ export function MapCanvas({
   onFedSelectRef.current = onFedSelect;
   onPostalAreaActivateRef.current = onPostalAreaActivate;
   onStatusChangeRef.current = onStatusChange;
+  onInitialPresentationReadyRef.current = onInitialPresentationReady;
   recenterTargetRef.current = recenterTarget;
   cameraCommandRef.current = cameraCommand;
   rolloutCategoryIdRef.current = rolloutCategoryId;
@@ -1056,6 +1061,65 @@ export function MapCanvas({
       applyInteractionModeRef.current(interactionMode);
     }
   }, [interactionMode, mapReadyTick]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapReadyRef.current || !onInitialPresentationReadyRef.current) {
+      return undefined;
+    }
+    if (!presentationReadyKey) {
+      return undefined;
+    }
+    if (initialPresentationReadyKeyRef.current === presentationReadyKey) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const notifyReady = () => {
+      if (cancelled || initialPresentationReadyKeyRef.current === presentationReadyKey) {
+        return;
+      }
+      initialPresentationReadyKeyRef.current = presentationReadyKey;
+      if (typeof performance !== "undefined" && typeof performance.mark === "function") {
+        performance.mark("map-first-idle");
+      }
+      onInitialPresentationReadyRef.current?.();
+    };
+
+    const scheduleReady = () => {
+      if (cancelled) return;
+      if (typeof map.once === "function") {
+        map.once("idle", notifyReady);
+        return;
+      }
+      notifyReady();
+    };
+
+    if (focusGeoJson) {
+      const bounds = getGeoJsonBounds(focusGeoJson);
+      if (bounds) {
+        map.fitBounds(bounds, {
+          padding: 34,
+          maxZoom: Math.min(MAP_ZOOM.MAX, focusMaxZoom),
+          duration: 0,
+        });
+      }
+    }
+
+    requestAnimationFrame(() => requestAnimationFrame(scheduleReady));
+    return () => {
+      cancelled = true;
+      map.off("idle", notifyReady);
+    };
+  }, [
+    counterProposalPreview,
+    focusGeoJson,
+    focusMaxZoom,
+    mapReadyTick,
+    objectionPreview,
+    presentationReadyKey,
+    workflowFocusDguids,
+  ]);
 
   useEffect(() => {
     const map = mapRef.current;

@@ -10,6 +10,7 @@ import {
   loadCurrentCanonicalRelease,
   readExactDaFeature,
 } from "./canonicalReleaseStore.js";
+import { getMaterializationContext } from "./materializationContext.js";
 
 let profileIndexPromise = null;
 let assetManifestPromise = null;
@@ -108,9 +109,13 @@ export async function loadPairObjectionIndex(primaryDguid, secondaryDguid) {
   }
 
   const release = loadCurrentCanonicalRelease();
+  const context = getMaterializationContext();
+  const readExact = context
+    ? (dguid) => context.getExactDaFeature(release, dguid)
+    : (dguid) => readExactDaFeature(release, dguid);
   const [firstRecord, secondRecord] = await Promise.all([
-    readExactDaFeature(release, firstDguid),
-    readExactDaFeature(release, secondDguid),
+    readExact(firstDguid),
+    readExact(secondDguid),
   ]);
   const firstProfile = firstRecord.descriptor.profile ?? null;
   const secondProfile = secondRecord.descriptor.profile ?? null;

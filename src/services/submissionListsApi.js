@@ -42,6 +42,11 @@ export async function getCommissionerSubmissionTableRows(filters = {}) {
   };
 }
 
+export async function getCommissionerSubmissionAnalytics(filters = {}) {
+  return requestJson(appendFilters("/api/submissions/analytics", filters));
+}
+
+/** @deprecated Export-only transitional helper; pages must not call this. */
 export async function getAllCommissionerSubmissionTableRows(filters = {}, { signal, pageSize = 100 } = {}) {
   const items = [];
   let cursor = null;
@@ -76,6 +81,7 @@ export async function getMySubmissionTableRows(filters = {}) {
   };
 }
 
+/** @deprecated Export-only transitional helper; pages must not call this. */
 export async function getAllMySubmissionTableRows(filters = {}, { signal, pageSize = 100 } = {}) {
   const items = [];
   let cursor = null;

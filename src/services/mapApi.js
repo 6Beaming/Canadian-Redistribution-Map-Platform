@@ -1,19 +1,58 @@
 const MAP_API_BASE = "/api/map";
-const immutableRequestCache = new Map();
-const MAX_IMMUTABLE_CACHE_ENTRIES = 12;
 
-function rememberImmutable(key, factory) {
-  if (immutableRequestCache.has(key)) return immutableRequestCache.get(key);
-  const promise = factory().catch((error) => {
-    immutableRequestCache.delete(key);
-    throw error;
-  });
-  immutableRequestCache.set(key, promise);
-  while (immutableRequestCache.size > MAX_IMMUTABLE_CACHE_ENTRIES) {
-    immutableRequestCache.delete(immutableRequestCache.keys().next().value);
+const MAX_PROFILE_CACHE_ENTRIES = 4;
+const MAX_STATIC_ASSET_CACHE_ENTRIES = 16;
+const MAX_GEOMETRY_CACHE_ENTRIES = 24;
+const MAX_GEOMETRY_CACHE_BYTES = 12 * 1024 * 1024;
+
+function estimateJsonBytes(value) {
+  try {
+    return new TextEncoder().encode(JSON.stringify(value)).length;
+  } catch {
+    return 0;
   }
-  return promise;
 }
+
+function createPromiseCache({ maxEntries, maxBytes = null, shouldCache = () => true }) {
+  const entries = new Map();
+
+  function evict() {
+    while (entries.size > maxEntries) {
+      entries.delete(entries.keys().next().value);
+    }
+  }
+
+  function remember(key, factory) {
+    if (entries.has(key)) return entries.get(key);
+    const promise = factory()
+      .then((value) => {
+        if (!shouldCache(value)) {
+          entries.delete(key);
+        }
+        return value;
+      })
+      .catch((error) => {
+        entries.delete(key);
+        throw error;
+      });
+    entries.set(key, promise);
+    evict();
+    return promise;
+  }
+
+  function clear() {
+    entries.clear();
+  }
+
+  return { remember, clear };
+}
+
+const profileIndexCache = createPromiseCache({ maxEntries: MAX_PROFILE_CACHE_ENTRIES });
+const staticAssetCache = createPromiseCache({ maxEntries: MAX_STATIC_ASSET_CACHE_ENTRIES });
+const geometryCache = createPromiseCache({
+  maxEntries: MAX_GEOMETRY_CACHE_ENTRIES,
+  shouldCache: (value) => estimateJsonBytes(value) <= MAX_GEOMETRY_CACHE_BYTES,
+});
 
 function withAbort(promise, signal) {
   if (!signal) return promise;
@@ -32,8 +71,8 @@ async function request(path, options = {}) {
     ...options,
     headers: {
       ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...options.headers
-    }
+      ...options.headers,
+    },
   });
 
   if (!response.ok) {
@@ -61,7 +100,7 @@ export const mapApi = {
   },
 
   getDaProfiles() {
-    return rememberImmutable("da-profiles", () => request("/da-profiles"));
+    return profileIndexCache.remember("da-profiles", () => request("/da-profiles"));
   },
 
   getDaAssetManifest() {
@@ -74,7 +113,7 @@ export const mapApi = {
 
   getReleaseAdjacency(releaseId, { signal } = {}) {
     const key = `adjacency:${releaseId}`;
-    const promise = rememberImmutable(key, () => request(
+    const promise = geometryCache.remember(key, () => request(
       `/releases/${encodeURIComponent(releaseId)}/adjacency`,
     ));
     return withAbort(promise, signal);
@@ -82,7 +121,7 @@ export const mapApi = {
 
   getReleaseDa(releaseId, dguid, { representation = "display", signal } = {}) {
     const key = `da:${releaseId}:${dguid}:${representation}`;
-    const promise = rememberImmutable(key, () => request(
+    const promise = geometryCache.remember(key, () => request(
       `/releases/${encodeURIComponent(releaseId)}/das/${encodeURIComponent(dguid)}?representation=${encodeURIComponent(representation)}`,
     ));
     return withAbort(promise, signal);
@@ -95,7 +134,7 @@ export const mapApi = {
   } = {}) {
     const pair = [String(primaryDguid), String(secondaryDguid)].sort();
     const key = `pair:${releaseId}:${pair.join("|")}:${representation}:${lod}`;
-    const promise = rememberImmutable(key, () => request(
+    const promise = geometryCache.remember(key, () => request(
       `/releases/${encodeURIComponent(releaseId)}/da-pairs/${encodeURIComponent(pair[0])}/${encodeURIComponent(pair[1])}`
         + `?representation=${encodeURIComponent(representation)}&lod=${encodeURIComponent(lod)}`,
     ));
@@ -103,7 +142,9 @@ export const mapApi = {
   },
 
   clearImmutableReleaseCache() {
-    immutableRequestCache.clear();
+    profileIndexCache.clear();
+    staticAssetCache.clear();
+    geometryCache.clear();
   },
 
   getAssignments() {
@@ -113,12 +154,12 @@ export const mapApi = {
   saveAssignments(assignments) {
     return request("/assignments", {
       method: "PUT",
-      body: JSON.stringify({ assignments })
+      body: JSON.stringify({ assignments }),
     });
   },
 
   async fetchAssetJson(filename) {
-    const promise = rememberImmutable(`asset:${filename}`, async () => {
+    const promise = staticAssetCache.remember(`asset:${filename}`, async () => {
       const response = await fetch(this.assetUrl(filename));
       if (!response.ok) {
         throw new Error(`Failed to load ${filename} (${response.status}).`);
@@ -131,7 +172,7 @@ export const mapApi = {
   async assetExists(filename) {
     try {
       const response = await fetch(this.assetUrl(filename), {
-        method: "HEAD"
+        method: "HEAD",
       });
       return response.ok;
     } catch {
@@ -142,7 +183,7 @@ export const mapApi = {
   async supportsByteServing(filename) {
     try {
       const response = await fetch(this.assetUrl(filename), {
-        headers: { Range: "bytes=0-1" }
+        headers: { Range: "bytes=0-1" },
       });
       if (response.status !== 206) return false;
 
@@ -155,5 +196,5 @@ export const mapApi = {
     } catch {
       return false;
     }
-  }
+  },
 };

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { MapCanvas } from "@/components/non_prebuilt/MapCanvas.jsx";
@@ -30,6 +30,15 @@ export default function WorkspaceReview() {
   const navigate = useNavigate();
   const location = useLocation();
   const { signalRouteReady } = useRouteLoading() ?? {};
+  const [mapPresentationReady, setMapPresentationReady] = useState(false);
+  const routeReadySignaledRef = useRef(false);
+
+  const handleInitialPresentationReady = useCallback(() => {
+    if (routeReadySignaledRef.current) return;
+    routeReadySignaledRef.current = true;
+    setMapPresentationReady(true);
+    signalRouteReady?.();
+  }, [signalRouteReady]);
   const [submission, setSubmission] = useState(null);
   const [allSubmissions, setAllSubmissions] = useState([]);
   const [reviewerEmails, setReviewerEmails] = useState([]);
@@ -39,6 +48,8 @@ export default function WorkspaceReview() {
 
   useEffect(() => {
     let isMounted = true;
+    routeReadySignaledRef.current = false;
+    setMapPresentationReady(false);
     async function load() {
       try {
         setError("");
@@ -55,14 +66,13 @@ export default function WorkspaceReview() {
         const contentPromise = normalizeType(activeRow.type) === "counter-proposal"
           ? Promise.resolve(null)
           : getSubmissionReviewContent(activeRow.id).catch(() => null);
-        const [reviewContent, hydrated] = await Promise.all([
+  const [reviewContent, hydrated] = await Promise.all([
           contentPromise,
           hydrateWorkspaceSubmission({ ...activeRow, source: "supabase" }),
         ]);
         if (isMounted) {
           setSubmission({ ...hydrated, comment: reviewContent?.comment ?? hydrated.comment ?? "" });
           setStatus("Submission map ready.");
-          signalRouteReady?.();
         }
         Promise.all([
           getWorkspaceSubmissions({ includeArchived: false }),
@@ -78,7 +88,6 @@ export default function WorkspaceReview() {
       } catch (loadError) {
         if (isMounted) {
           setError(loadError.message);
-          signalRouteReady?.();
         }
       }
     }
@@ -218,6 +227,8 @@ export default function WorkspaceReview() {
                   workflowFocusDguids={focusDguids}
                   interactionMode={MAP_INTERACTION_MODE.COUNTER_REVIEW}
                   onStatusChange={setStatus}
+                  onInitialPresentationReady={mapPresentationReady ? undefined : handleInitialPresentationReady}
+                  presentationReadyKey={`${submission.id}:${comparisonView}:${Boolean(submission.geometry)}`}
                 />
               ) : submission.geometryError ? (
                 <div className="workspace-review-map-empty" role="status">

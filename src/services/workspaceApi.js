@@ -2,9 +2,9 @@ import {
     hydrateWorkspaceSubmission,
 } from "@/services/tempCounterProposal.js";
 import {
-    getAllCommissionerSubmissionTableRows,
     getSubmissionTableRowById,
 } from "@/services/submissionListsApi.js";
+import { getCommissionerSubmissionListStore } from "@/lib/submissions/commissionerSubmissionListStore.js";
 import { subscribeRealtimeInvalidation } from "@/lib/realtime/realtimeInvalidation.js";
 import {
     getWorkspaceReviewInvalidationKeys,
@@ -200,20 +200,32 @@ export async function deleteWorkspaceLabelCatalog(labelId, submissionId) {
     return handleResponse(res);
 }
 
+export function mapWorkspaceSubmissions(items, { includeArchived = true } = {}) {
+    return items
+        .map((submission) => normalizeSubmission(submission, "supabase"))
+        .filter((submission) => includeArchived || submission.status !== WORKSPACE_STATUS.ARCHIVED)
+        .sort((left, right) => new Date(right.created_at) - new Date(left.created_at));
+}
+
 /**
  * REUSED API: live comments and objections are read through the existing
  * authenticated GET /api/comments route. Counter-proposals are loaded from the
  * dedicated submissions API so revision geometry is available for review.
  */
-export async function getWorkspaceSubmissions({ includeArchived = true, signal } = {}) {
-    const { items } = await getAllCommissionerSubmissionTableRows({}, { signal, pageSize: 100 });
-
-    const submissions = items
-        .map((submission) => normalizeSubmission(submission, "supabase"))
-        .filter((submission) => includeArchived || submission.status !== WORKSPACE_STATUS.ARCHIVED)
-        .sort((left, right) => new Date(right.created_at) - new Date(left.created_at));
-
-    return submissions;
+export async function getWorkspaceSubmissions({
+    includeArchived = true,
+    signal,
+    waitForFull = false,
+} = {}) {
+    const store = getCommissionerSubmissionListStore();
+    await store.ensureBootstrapped({ signal });
+    if (waitForFull) {
+        await store.waitUntilFullyExpanded();
+    }
+    if (signal?.aborted) {
+        throw signal.reason ?? new DOMException("Aborted", "AbortError");
+    }
+    return mapWorkspaceSubmissions(store.getItems(), { includeArchived });
 }
 
 export async function getCommissionerSubmissionRows() {
@@ -251,40 +263,14 @@ export async function getWorkspaceReviewState(submissionId) {
     const response = await fetch(`/api/workspace/submissions/${encodeURIComponent(submissionId)}/review-state`, {
         credentials: "include",
     });
-    if (response.ok) {
-        return response.json();
-    }
-
-    let collaborationWarning = "";
-    const tolerateMissingLabelMigration = (promise) => promise.catch((error) => {
-        if (/workspace label migration is not installed/i.test(error.message)) {
-            collaborationWarning = error.message;
-            return [];
-        }
+    if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        const error = new Error(payload.error || "Unable to load workspace review state.");
+        error.code = payload.code ?? null;
+        error.status = response.status;
         throw error;
-    });
-
-    const [
-        comments,
-        labels,
-        archiveRequest,
-        labelCatalog,
-    ] = await Promise.all([
-        getWorkspaceComments(submissionId),
-        tolerateMissingLabelMigration(getWorkspaceLabels(submissionId)),
-        getArchiveRequest(submissionId).catch((error) => {
-            if (error.status === 404) return null;
-            throw error;
-        }),
-        tolerateMissingLabelMigration(getWorkspaceLabelCatalog(submissionId)),
-    ]);
-    return {
-        comments,
-        labels,
-        labelCatalog,
-        archiveRequest,
-        collaborationWarning,
-    };
+    }
+    return response.json();
 }
 
 export function subscribeWorkspaceState(listener, keys = "workspace:*") {
