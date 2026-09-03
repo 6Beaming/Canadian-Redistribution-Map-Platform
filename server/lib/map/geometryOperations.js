@@ -108,7 +108,6 @@ export async function persistSubmissionGeometryRevision(supabase, {
   submissionType,
   compact,
   validationReport,
-  legacyRevisionId = null,
 }) {
   const { data: revision, error } = await supabase.from("submission_geometry_revisions").insert({
     submission_id: submission.id,
@@ -122,7 +121,6 @@ export async function persistSubmissionGeometryRevision(supabase, {
     validation_report: { ...validationReport, operationCount: compact.operations.length },
     migration_state: "ready",
     migration_error: null,
-    legacy_revision_id: legacyRevisionId,
     created_by: submission.user_id,
     created_at: submission.created_at,
   }).select("id,submission_id,revision_number,release_id,base_revision,primary_dguid,secondary_dguid,geometry_digest,validation_report,migration_state").single();

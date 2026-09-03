@@ -110,6 +110,7 @@ test("legacy protocol cleanup migration drops dormant tables and rewrites list R
   assert.match(cleanupSql, /drop table if exists public\.archive_tree cascade/i);
   assert.match(cleanupSql, /drop table if exists public\.counter_proposal_revisions cascade/i);
   assert.match(cleanupSql, /drop table if exists public\.dissemination_areas cascade/i);
+  assert.match(cleanupSql, /drop column if exists legacy_revision_id/i);
   assert.match(cleanupSql, /'legacyArchiveRows', 0/);
   assert.match(cleanupSql, /drop function if exists public\.merge_submission_into_archive\(uuid, uuid, jsonb\)/i);
 });
@@ -123,6 +124,14 @@ test("post-cleanup fix removes archive_tree and dissemination_areas from live sc
   assert.doesNotMatch(fixSql, /dissemination_areas/i);
   assert.match(fixSql, /checkpoint0_submission_scope/i);
   assert.match(fixSql, /submission_matches_commissioner_pruid/i);
+});
+
+test("live geometry writes do not target dropped legacy revision columns", () => {
+  const persist = fs.readFileSync("server/lib/map/geometryOperations.js", "utf8");
+  const comments = fs.readFileSync("server/routes/comments.js", "utf8");
+  assert.doesNotMatch(persist, /legacy_revision_id/);
+  assert.doesNotMatch(persist, /legacyRevisionId/);
+  assert.match(comments, /persistSubmissionGeometryRevision/);
 });
 
 test("cleanup inventory is read-only, service-role-only, and paired with source reference auditing", () => {

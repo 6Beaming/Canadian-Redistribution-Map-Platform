@@ -384,7 +384,6 @@ test("counter-proposal Archive Request seals V2 geometry revisions", async () =>
     validation_report: { operationCount: 2 },
     migration_state: "ready",
     migration_error: null,
-    legacy_revision_id: null,
     created_by: "public-1",
   });
   auth(requester, admin);
