@@ -68,8 +68,18 @@ function RequirePublicUser() {
 }
 
 function AppRoutes() {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
+  const [searchUserId, setSearchUserId] = useState(userId);
   const [mapSearchTarget, setMapSearchTarget] = useState(null);
   const { isFullscreen } = useMapFullscreen();
+
+  // Reset before rendering the map so a previous session's search cannot
+  // override the newly signed-in user's initial postal-code camera command.
+  if (searchUserId !== userId) {
+    setSearchUserId(userId);
+    setMapSearchTarget(null);
+  }
 
   const handlePlaceSelect = useCallback((place) => {
     setMapSearchTarget({

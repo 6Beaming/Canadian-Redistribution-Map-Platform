@@ -2,11 +2,54 @@ import assert from "node:assert/strict";
 import { test } from "@jest/globals";
 import {
   getRealtimeSubmissionId,
+  excludeBufferedCommissionerRows,
   reconcileCommissionerSubmissionRows,
   reconcileCommissionerSubmissionSnapshot,
   reconcileCommissionerSubmissionView,
   revealCommissionerSubmissionRows,
 } from "../../src/lib/realtime/workspaceRealtime.js";
+
+test("cache refreshes and paging keep arrivals hidden until reveal", () => {
+  const existing = Array.from({ length: 25 }, (_, index) => ({
+    id: `old-${index}`, submittedAt: "2026-08-01T00:00:00Z",
+  }));
+  const arrival = { id: "new", submittedAt: "2026-08-03T00:00:00Z" };
+  const event = { aggregateId: arrival.id, entity: "submission", operation: "create" };
+  let view = reconcileCommissionerSubmissionView(
+    { visibleRows: existing.slice(0, 10), bufferedRows: [] }, event, arrival,
+  );
+  const cache = [arrival, ...existing];
+  for (const pageIndex of [0, 1, 0]) {
+    const eligible = excludeBufferedCommissionerRows(cache, view.bufferedRows);
+    view = { ...view, visibleRows: eligible.slice(pageIndex * 10, (pageIndex + 1) * 10) };
+    assert.equal(view.visibleRows.length, 10);
+    assert.equal(view.visibleRows.some((row) => row.id === arrival.id), false);
+    assert.equal(view.bufferedRows.length, 1);
+  }
+  view = revealCommissionerSubmissionRows(view);
+  assert.equal(excludeBufferedCommissionerRows(cache, view.bufferedRows)[0], arrival);
+  assert.equal(view.bufferedRows.length, 0);
+});
+
+test("historical off-page updates and replayed creations do not increase the counter", () => {
+  const view = { visibleRows: [], bufferedRows: [] };
+  const historical = { id: "old", submittedAt: "2026-08-01T00:00:00Z" };
+  for (const [entity, operation] of [["workspace.status", "update"], ["submission", "update"], ["submission", "create"]]) {
+    assert.deepEqual(reconcileCommissionerSubmissionView(
+      view, { aggregateId: historical.id, entity, operation }, historical, [],
+      { newSince: Date.parse("2026-08-02T00:00:00Z") },
+    ), view);
+  }
+  const arrival = { id: "new", submittedAt: "2026-08-03T00:00:00Z" };
+  const event = { aggregateId: arrival.id, entity: "submission", operation: "create" };
+  const buffered = reconcileCommissionerSubmissionView(view, event, arrival);
+  assert.deepEqual(reconcileCommissionerSubmissionView(
+    buffered, event, arrival, [], { newSince: Infinity },
+  ), buffered);
+  assert.deepEqual(reconcileCommissionerSubmissionView(
+    view, event, arrival, [], { newSince: Infinity },
+  ), view);
+});
 
 test("Issue 102 replaces one Commissioner Table row without resetting row order", () => {
   const current = [

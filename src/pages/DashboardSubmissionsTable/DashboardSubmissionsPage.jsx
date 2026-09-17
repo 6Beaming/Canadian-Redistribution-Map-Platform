@@ -10,8 +10,8 @@ import {
 } from "@/services/submissionListsApi";
 import {
   getRealtimeSubmissionId,
+  excludeBufferedCommissionerRows,
   reconcileCommissionerSubmissionView,
-  revealCommissionerSubmissionRows,
 } from "@/lib/realtime/workspaceRealtime.js";
 import {
   COMMISSIONER_UI_PAGE_SIZE,
@@ -55,10 +55,18 @@ export default function DashBoardSubmissionsPage() {
   const navigate = useNavigate();
   const defaultFilters = createDefaultCommissionerTableFilters();
   const storeRef = useRef(getCommissionerSubmissionListStore());
-  const [submissionView, setSubmissionView] = useState({
+  const [submissionView, setSubmissionViewState] = useState({
     visibleRows: [],
     bufferedRows: [],
   });
+  const submissionViewRef = useRef(submissionView);
+  const newSubmissionsSinceRef = useRef(Date.now());
+  const receivedCreationIdsRef = useRef(new Set());
+  const setSubmissionView = useCallback((update) => {
+    const next = typeof update === "function" ? update(submissionViewRef.current) : update;
+    submissionViewRef.current = next;
+    setSubmissionViewState(next);
+  }, []);
   const [loadError, setLoadError] = useState("");
   const [tableFetching, setTableFetching] = useState(true);
   const [uiPageIndex, setUiPageIndex] = useState(0);
@@ -86,7 +94,10 @@ export default function DashBoardSubmissionsPage() {
     endFetching = false,
   } = {}) => {
     const store = storeRef.current;
-    const filtered = store.getFilteredForTable(nextServerFilters, nextVisibleTypes);
+    const filtered = excludeBufferedCommissionerRows(
+      store.getFilteredForTable(nextServerFilters, nextVisibleTypes),
+      clearBuffered ? [] : submissionViewRef.current.bufferedRows,
+    );
     const start = targetUiPageIndex * COMMISSIONER_UI_PAGE_SIZE;
     const pageRows = filtered.slice(start, start + COMMISSIONER_UI_PAGE_SIZE).map(toTableSubmission);
     const stats = computePageStats(
@@ -113,7 +124,7 @@ export default function DashBoardSubmissionsPage() {
         setTableFetching(false);
       }
     });
-  }, []);
+  }, [setSubmissionView]);
 
   const runWithTableFetching = useCallback(async (task) => {
     setTableFetching(true);
@@ -229,6 +240,10 @@ export default function DashBoardSubmissionsPage() {
           ? null
           : await getSubmissionTableRowById(submissionId);
         if (!isMounted) return;
+        const alreadyReceived = receivedCreationIdsRef.current.has(submissionId);
+        if (event?.entity === "submission" && event?.operation === "create") {
+          receivedCreationIdsRef.current.add(submissionId);
+        }
         if (row) {
           storeRef.current.upsertItem(row, { notify: false });
         } else {
@@ -239,6 +254,7 @@ export default function DashBoardSubmissionsPage() {
           event,
           row ? toTableSubmission(row) : null,
           hints,
+          { newSince: alreadyReceived ? Number.POSITIVE_INFINITY : newSubmissionsSinceRef.current },
         ));
       } catch (err) {
         if (isMounted) {
@@ -279,7 +295,7 @@ export default function DashBoardSubmissionsPage() {
             tableFetching={tableFetching}
             onOpenAnalytics={() => navigate("/dashboard/graphs")}
             onRevealNewSubmissions={() => {
-              setSubmissionView((current) => revealCommissionerSubmissionRows(current));
+              applyCacheToView({ targetUiPageIndex: 0, clearBuffered: true });
             }}
             onRowClick={(submission) =>
               navigate(
@@ -311,7 +327,7 @@ export default function DashBoardSubmissionsPage() {
             visibleTypes={visibleTypes}
             onVisibleTypesChange={(nextVisibleTypes) => {
               setVisibleTypes(nextVisibleTypes);
-              void navigateUiPage(0, { nextVisibleTypes, clearBuffered: true });
+              void navigateUiPage(0, { nextVisibleTypes });
             }}
             onServerFiltersChange={(nextFilters) => {
               const nextServerFilters = {
@@ -330,7 +346,7 @@ export default function DashBoardSubmissionsPage() {
                   applyCacheToView({
                     targetUiPageIndex: 0,
                     nextServerFilters,
-                    clearBuffered: true,
+                    clearBuffered: false,
                     endFetching: true,
                   });
                   setLoadError("");

@@ -92,6 +92,7 @@ export function reconcileCommissionerSubmissionView(
   event,
   submission,
   hints = [],
+  { newSince = Number.NEGATIVE_INFINITY } = {},
 ) {
   const submissionId = getRealtimeSubmissionId({ event, hints });
   if (!submissionId) return current;
@@ -116,6 +117,12 @@ export function reconcileCommissionerSubmissionView(
     };
   }
 
+  const alreadyBuffered = bufferedRows.some((item) => String(item.id) === submissionId);
+  const isNewCreation = event?.entity === "submission"
+    && event?.operation === "create"
+    && new Date(submission.submittedAt).getTime() >= newSince;
+  if (!alreadyBuffered && !isNewCreation) return current;
+
   return {
     visibleRows,
     bufferedRows: [
@@ -123,6 +130,12 @@ export function reconcileCommissionerSubmissionView(
       ...bufferedRows.filter((item) => String(item.id) !== submissionId),
     ].sort(newestCommissionerRowFirst),
   };
+}
+
+// Exclude pending arrivals before slicing so refreshes and pagination cannot reveal them.
+export function excludeBufferedCommissionerRows(rows, bufferedRows = []) {
+  const bufferedIds = new Set(bufferedRows.map((row) => String(row.id)));
+  return rows.filter((row) => !bufferedIds.has(String(row.id)));
 }
 
 export function reconcileCommissionerSubmissionSnapshot(current, submissions) {

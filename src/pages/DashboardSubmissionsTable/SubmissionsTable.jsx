@@ -104,7 +104,6 @@ export default function SubmissionsTable({
   });
   const [hoveredRowId, setHoveredRowId] = React.useState(null);
   const [exportState, setExportState] = React.useState({ pending: false, error: "" });
-  const tableShellRef = React.useRef(null);
 
   const serverMode = Boolean(serverPagination);
   const dateStart = serverMode && serverFilters?.dateStart ? serverFilters.dateStart : localDateStart;
@@ -161,9 +160,6 @@ export default function SubmissionsTable({
     if (!newSubmissionCount) return;
     table.setPageIndex(0);
     onRevealNewSubmissions?.();
-    window.requestAnimationFrame(() => {
-      tableShellRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
   }
 
   async function exportCsv() {
@@ -347,7 +343,7 @@ export default function SubmissionsTable({
         </div>
       ) : null}
 
-      <div ref={tableShellRef} className="submissions-table-shell relative rounded-md border">
+      <div className="submissions-table-shell relative rounded-md border">
         {showTableOverlay && !exportState.pending ? <PanelLoadingOverlay label="Loading..." /> : null}
         <Table className="min-w-[60rem]">
           <TableHeader className="bg-gray-50">
