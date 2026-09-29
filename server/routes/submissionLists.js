@@ -6,6 +6,7 @@ import {
   listMySubmissionRowsV2,
 } from "../lib/submissions/submissionListRepository.js";
 import { getCommissionerSubmissionAnalytics } from "../lib/submissions/submissionAnalyticsQuery.js";
+import { getCommissionerSubmissionHeatmap } from "../lib/submissions/submissionHeatmapQuery.js";
 import { withServerTimingSpan } from "../lib/serverTiming.js";
 
 const router = Router();
@@ -89,6 +90,19 @@ router.get("/table-row/:submissionId", requireCommissioner, async (req, res) => 
     }
   } catch (error) {
     return res.status(500).json({ error: error.message || "Unable to load submission." });
+  }
+});
+
+router.get("/heatmap", requireCommissioner, async (req, res) => {
+  try {
+    const payload = await withServerTimingSpan(req, "db", () => getCommissionerSubmissionHeatmap(
+      getSupabaseAdminDataClient(), { actorProfile: req.profile },
+    ));
+    return res.json(payload);
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.message || "Unable to load submission heatmap.",
+    });
   }
 });
 

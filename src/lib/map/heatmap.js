@@ -3,8 +3,7 @@ import { getSubmissionHeatmap } from "@/services/workspaceApi";
 const HEATMAP_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="#dc2626" class="bi bi-fire" viewBox="0 0 16 16" id="Fire--Streamline-Bootstrap" height="16" width="16" aria-hidden="true"><path d="M8 16c3.314 0 6-2 6-5.5 0-1.5-.5-4-2.5-6 .25 1.5-1.25 2-1.25 2C11 4 9 .5 6 0c.357 2 .5 4-2 6-1.25 1-2 2.729-2 4.5C2 14 4.686 16 8 16m0-1c-1.657 0-3-1-3-2.75 0-.75.25-2 1.25-3C6.125 10 7 10.5 7 10.5c-.375-1.25.5-3.25 2-3.5-.179 1-.25 2 1 3 .625.5 1 1.364 1 2.25C11 14 9.657 15 8 15" stroke-width="1"></path></svg>`;
 
 /**
- * Transitional Commissioner heatmap loader. Dashboard Home must not reuse the
- * Table/Workspace list singleton; heatmap reads its own seed page.
+ * Dashboard heatmap counts are independent of Table/Workspace pagination.
  */
 export async function loadSubmissionHeatmap() {
   return getSubmissionHeatmap();
@@ -15,12 +14,12 @@ export const loadDemoSubmissionHeatmap = loadSubmissionHeatmap;
 export function hasSubmissionHeatmapData(heatmap) {
   return Boolean(
     heatmap?.countsByDguid &&
-    typeof heatmap.countsByDguid === "object" &&
-    Object.keys(heatmap.countsByDguid).length,
+    typeof heatmap.countsByDguid === "object",
   );
 }
 
 function buildSubmissionCountExpression(countsByDguid = {}) {
+  if (!Object.keys(countsByDguid).length) return 0;
   const expression = ["match", ["to-string", ["get", "DGUID"]]];
 
   Object.entries(countsByDguid).forEach(([dguid, count]) => {
@@ -31,34 +30,33 @@ function buildSubmissionCountExpression(countsByDguid = {}) {
   return expression;
 }
 
-export function buildSubmissionHeatmapFillExpression(countsByDguid = {}) {
-  const positiveCounts = Object.values(countsByDguid)
-    .map((value) => Number(value) || 0)
-    .filter((value) => value > 0);
+export const SUBMISSION_HEATMAP_SCALE = Object.freeze([
+  { min: 0, label: "0", color: "#e2e8f0" },
+  { min: 1, label: "1–2", color: "#fed976" },
+  { min: 3, label: "3–5", color: "#feb24c" },
+  { min: 6, label: "6–10", color: "#fd8d3c" },
+  { min: 11, label: "11–25", color: "#e31a1c" },
+  { min: 26, label: "26+", color: "#800026" },
+]);
 
-  if (!positiveCounts.length) {
-    return [
-      "rgba",
-      0,
-      0,
-      0,
-      0,
-    ];
-  }
-
-  const maxIntensity = Math.max(Math.max(...positiveCounts), 2);
-
+export function buildSubmissionHeatmapFillExpression(countsByDguid = {}, operatingPruid = null) {
+  // Counts can include the neighboring side of a cross-province submission.
+  // Neither those colors nor the zero-count background belong outside our scope.
+  if (!operatingPruid) return "rgba(0,0,0,0)";
   return [
-    "interpolate",
-    ["linear"],
-    buildSubmissionCountExpression(countsByDguid),
-    0, "rgba(0,0,0,0)",
-    maxIntensity * 0.05, "#fff7ed", // almost white
-    maxIntensity * 0.20, "#fdba74", // light orange
-    maxIntensity * 0.40, "#fb923c", // orange
-    maxIntensity * 0.60, "#ef4444", // bright red
-    maxIntensity * 0.80, "#b91c1c", // dark red
-    maxIntensity, "#450a0a",        // hotspot
+    "case",
+    [
+      "==",
+      ["slice", ["to-string", ["coalesce", ["get", "fed_num"], ["get", "FED_NUM"], ""]], 0, 2],
+      String(operatingPruid),
+    ],
+    [
+      "step",
+      buildSubmissionCountExpression(countsByDguid),
+      SUBMISSION_HEATMAP_SCALE[0].color,
+      ...SUBMISSION_HEATMAP_SCALE.slice(1).flatMap(({ min, color }) => [min, color]),
+    ],
+    "rgba(0,0,0,0)",
   ];
 }
 

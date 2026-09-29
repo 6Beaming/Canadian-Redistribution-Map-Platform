@@ -2,12 +2,9 @@ import {
     hydrateWorkspaceSubmission,
 } from "@/services/tempCounterProposal.js";
 import {
-    getCommissionerSubmissionTableRows,
     getSubmissionTableRowById,
 } from "@/services/submissionListsApi.js";
 import { getCommissionerSubmissionListStore } from "@/lib/submissions/commissionerSubmissionListStore.js";
-import { createDefaultCommissionerTableFilters } from "@/lib/submissions/commissionerSubmissionListFilters.js";
-import { SUBMISSION_LIST_API_PAGE_SIZE } from "@/lib/submissions/submissionListPaging.js";
 import { subscribeRealtimeInvalidation } from "@/lib/realtime/realtimeInvalidation.js";
 import {
     getWorkspaceReviewInvalidationKeys,
@@ -597,30 +594,13 @@ export function canMergeArchiveRequest(request) {
 }
 
 /**
- * Transitional Commissioner heatmap aggregate. Reads a seed page directly so
- * Dashboard Home cannot re-seed the Table/Workspace singleton.
- * Replace with a compact authenticated server aggregate for production scale.
+ * All-date active-submission counts, scoped by the server to the commissioner.
  */
 export async function getSubmissionHeatmap() {
-    const defaults = createDefaultCommissionerTableFilters();
-    const page = await getCommissionerSubmissionTableRows({
-        pageSize: SUBMISSION_LIST_API_PAGE_SIZE,
-        createdFrom: defaults.createdFrom,
-        createdTo: defaults.createdTo,
-        query: "",
+    const response = await fetch("/api/submissions/heatmap", {
+        credentials: "include",
     });
-    const submissions = mapWorkspaceSubmissions(page.items ?? [], { includeArchived: false });
-    const countsByDguid = {};
-
-    submissions
-        .filter((submission) => [WORKSPACE_STATUS.PENDING, WORKSPACE_STATUS.ARCHIVE_REQUEST].includes(submission.status))
-        .forEach((submission) => {
-            [submission.dguid, submission.neighboring_dguid].filter(Boolean).forEach((dguid) => {
-                countsByDguid[dguid] = (countsByDguid[dguid] ?? 0) + 1;
-            });
-        });
-
-    return { countsByDguid };
+    return handleResponse(response);
 }
 
 /** Dashboard-only DA-card query; the server filters DGUID and scope in SQL. */

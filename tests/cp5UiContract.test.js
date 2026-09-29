@@ -29,7 +29,7 @@ test("Commissioner new-submission indicator renders above the table shell", () =
   const indicatorStart = table.indexOf("{newSubmissionCount > 0 ? (");
   const indicatorEnd = table.indexOf(") : null}", indicatorStart);
   const tableShell = table.indexOf(
-    '<div ref={tableShellRef} className="submissions-table-shell relative rounded-md border">',
+    '<div className="submissions-table-shell relative rounded-md border">',
   );
 
   assert.ok(indicatorStart >= 0);
@@ -74,7 +74,7 @@ test("Dashboard heatmap does not rehydrate the shared commissioner list cache", 
   const end = api.indexOf("export async function getDashboardAreaContext");
   const heatmap = api.slice(start, end);
 
-  assert.match(heatmap, /getCommissionerSubmissionTableRows/);
+  assert.match(heatmap, /\/api\/submissions\/heatmap/);
   assert.doesNotMatch(heatmap, /getCommissionerSubmissionListStore/);
   assert.doesNotMatch(heatmap, /getWorkspaceSubmissions/);
 });

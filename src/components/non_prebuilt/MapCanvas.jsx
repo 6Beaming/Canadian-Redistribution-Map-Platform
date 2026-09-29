@@ -65,6 +65,7 @@ import {
   buildSubmissionHeatmapFillExpression,
   createSubmissionHeatmapControl,
   hasSubmissionHeatmapData,
+  SUBMISSION_HEATMAP_SCALE,
 } from "@/lib/map/heatmap.js";
 import {
   createArchivedMapControl,
@@ -681,7 +682,7 @@ export function MapCanvas({
     setUncontrolledArchivedMapEnabled(initialArchivedMapEnabled);
   }, [initialArchivedMapEnabled, isArchivedMapControlled]);
   heatmapFillExpressionRef.current = hasSubmissionHeatmapData(heatmap)
-    ? buildSubmissionHeatmapFillExpression(heatmap.countsByDguid)
+    ? buildSubmissionHeatmapFillExpression(heatmap.countsByDguid, heatmap.operatingPruid)
     : null;
   interactionModeRef.current = interactionMode;
 
@@ -2815,6 +2816,19 @@ export function MapCanvas({
   return (
     <div className="map-canvas">
       <div ref={containerRef} className="map-canvas__viewport" aria-label="Electoral map" />
+      {heatmapEnabled && !rolloutEnabled && !archivedMapEnabled ? (
+        <div className="submission-heatmap-legend" aria-label="Submission heatmap legend">
+          <strong>Active submissions</strong>
+          <div className="submission-heatmap-legend__scale">
+            {SUBMISSION_HEATMAP_SCALE.map(({ label, color }) => (
+              <span key={label}>
+                <i style={{ backgroundColor: color }} aria-hidden="true" />
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

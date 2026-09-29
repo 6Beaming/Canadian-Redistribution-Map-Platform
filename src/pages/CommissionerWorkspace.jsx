@@ -271,6 +271,7 @@ function StatusPill({ status, count, isOpen, onToggle }) {
 }
 
 function SubmissionList({ branch, submissions, isOpen, onToggle, focusId, onSubmissionOpen }) {
+  const location = useLocation();
   const definition = LIST_DEFINITIONS[branch];
   const HeaderIcon = definition.icon;
   const [showAll, setShowAll] = useState(false);
@@ -314,8 +315,8 @@ function SubmissionList({ branch, submissions, isOpen, onToggle, focusId, onSubm
             return (
               <button
                 type="button"
-                className="workspace-submission-row"
-                key={submission.id}
+                className={`workspace-submission-row${String(submission.id) === String(focusId) ? " workspace-submission-row--arrival" : ""}`}
+                key={String(submission.id) === String(focusId) ? `${submission.id}:${location.key}` : submission.id}
                 onClick={() => onSubmissionOpen(submission.id)}
               >
                 <span className="workspace-submission-row__glyph" aria-hidden="true">

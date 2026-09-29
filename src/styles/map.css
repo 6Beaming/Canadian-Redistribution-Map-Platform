@@ -1398,3 +1398,37 @@
   justify-content: center;
   padding: 24px;
 }
+.submission-heatmap-legend {
+  position: absolute;
+  bottom: 2rem;
+  left: 0.75rem;
+  z-index: 2;
+  max-width: calc(100% - 4.5rem);
+  padding: 0.65rem 0.8rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.96);
+  color: #334155;
+  font-size: 0.75rem;
+  pointer-events: none;
+}
+
+.submission-heatmap-legend__scale {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.5rem;
+}
+
+.submission-heatmap-legend__scale span {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.submission-heatmap-legend__scale i {
+  width: 0.8rem;
+  height: 0.8rem;
+  border: 1px solid rgba(15, 23, 42, 0.2);
+  border-radius: 2px;
+}
