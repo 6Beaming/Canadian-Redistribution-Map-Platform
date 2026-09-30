@@ -1,103 +1,186 @@
 # Canadian Redistribution Map Platform (CRMP)
 
-**Graders:** follow [docs/Grading-Instructions.md](docs/Grading-Instructions.md) to pull and run the published Docker image without cloning this repository.
+[![CI](https://github.com/6Beaming/Canadian-Redistribution-Map-Platform/actions/workflows/ci.yml/badge.svg)](https://github.com/6Beaming/Canadian-Redistribution-Map-Platform/actions/workflows/ci.yml)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
+[![Node.js](https://img.shields.io/badge/Node.js-22-5FA04E?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Express](https://img.shields.io/badge/Express-4-000000?logo=express&logoColor=white)](https://expressjs.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E?logo=supabase&logoColor=white)](https://supabase.com/)
+[![MapLibre](https://img.shields.io/badge/MapLibre-GL_JS-396CB2?logo=maplibre&logoColor=white)](https://maplibre.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Jest](https://img.shields.io/badge/Jest-30-C21325?logo=jest&logoColor=white)](https://jestjs.io/)
 
-**User Guide (GitHub Wiki):** [Platform, Public User, and Commissioner feature docs](https://github.com/UTSC-CSCC01-Software-Engineering-I/course-project-five-guys/wiki)
+## Demo
 
-## Release
-The current software release is [CRMP v1.0.0](https://github.com/UTSC-CSCC01-Software-Engineering-I/course-project-five-guys/releases/tag/v1.0.0)
+[![CRMP demo showing interactive counter-proposal boundary editing](docs/assets/crmp-demo-thumbnail.png)](https://youtu.be/M4CyjWInyD4)
 
-Past Releases:
-[CRMP v0.2.0](https://github.com/UTSC-CSCC01-Software-Engineering-I/course-project-five-guys/releases/tag/v0.2.0)
-[CRMP v0.1.0](https://github.com/UTSC-CSCC01-Software-Engineering-I/course-project-five-guys/releases/tag/v0.1.0).
-
-These releases were verified with `npm test`, `npm run check:server`, and `npm run build`.
-
-## After Course
-
-Since August 6, the project has received broad post-course hardening and optimization across immutable map releases, sparse geometry operations, database contracts and security, submission queries and caching, realtime synchronization, Workspace and Archived Tree workflows, responsive map UI, diagnostics, and integration coverage. The implemented Supabase and indexed local metadata contracts are documented in the [post-course data architecture](docs/After-Course/data-architecture.md). The remaining Counter-Proposal editing scalability gap is the replacement of runtime exact geometry with a canonical operational mesh, documented in the [future Counter-Proposal canonical mesh plan](docs/After-Course/future-update-plan.md).
+[▶ Watch the CRMP demo](https://youtu.be/M4CyjWInyD4)
 
 ## Background
-Every ten years, the Canadian government redraws the lines for federal voting districts (ridings). Currently, if citizens want to provide feedback or object to new boundaries, they must submit emails or physical letters. This project provides a map-centered web application where people can view proposed electoral maps, submit feedback, or even draw better lines directly on the screen.
 
-## Core Architecture
-* **Interactive Map Frontend:** A responsive user interface where users can pan, zoom, click on geographic shapes, and drag district boundaries around.
-* **Validation Backend:** A robust backend system that instantly checks the math to see if a user's new map is valid, ensuring that population numbers and geographic constraints still make sense.
-* **Commissioner Dashboard:** A secure, private administrative portal for government officials to log in and read all public complaints and proposals organized in one centralized place.
+Every ten years, the Canadian government redraws the lines for federal voting districts (ridings). Currently, if citizens want to provide feedback or object to new boundaries, they must submit emails or physical letters.
 
-## User Workflows
-### 1. Public Users (Citizens)
-Regular citizens use the platform to engage with the redistribution process. 
-* **Simple Feedback:** A user goes to the website, zooms in on their neighborhood, and sees a proposed line cutting their community in half. They click that specific line, type a comment like *"This is a bad idea,"* and hit submit.
-* **Advanced Counter-Proposals:** A more advanced user can use the interactive tools to actually redraw the boundary line on the screen, submitting their newly shaped district as a formal suggestion.
+CRMP is a map-centred civic engagement platform for exploring proposed Canadian federal electoral boundaries. Public users can review local boundary and demographic information, submit feedback or objections, and draw counter-proposals. Commissioners receive a province-scoped workspace for reviewing, organizing, comparing, and archiving those submissions.
 
-### 2. Commissioners (Government Officials)
-The backend dashboard is strictly for the independent boundary commissioners tasked with reviewing the maps. 
-* **Structure:** There are 10 separate commissions (one for each of the 10 provinces), with each team consisting of 3 to 5 commissioners. 
-* **Workflow:** These officials log into the private dashboard to read, categorize, and analyze all public complaints and counter-proposals.
+## Highlights
 
-## Tech Stack
+### Public participation
 
-This project is built using the following technologies:
+- Explore electoral districts and dissemination areas on a responsive MapLibre map.
+- Search Canadian places and return to a saved postal area.
+- Review demographic and population information for selected areas.
+- Submit comments, formal objections, and map-based counter-proposals.
+- Track previous submissions and reopen their map context.
 
-* **Front-end:** React, D3.js
-* **Back-end:** Express.js
-* **Database:** Supabase (PostgreSQL database, authentication, and real-time APIs)
-* **Testing:** Jest, Cypress
+### Commissioner workflow
 
-## Local Development
+- Review province-scoped submissions in map, table, and detail views.
+- Filter and analyze submissions, render a heatmap, and export CSV data.
+- Coordinate reviews with assignments, labels, comments, and status changes.
+- Compare submitted geometry with the active map release.
+- Create and review immutable archive versions through the Archived Tree.
+- Receive scoped updates through an authenticated WebSocket gateway.
 
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-2. Download the current root `.env` file from the project Google Drive shared folder and place it in the repository root. The file is Git-ignored and is the only local environment file used by this project. It contains `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `SIGNUP_EMAIL_REDIRECT_URL`, `PASSWORD_RESET_REDIRECT_URL`, `VITE_GOOGLE_MAPS_API_KEY`, and `GOOGLE_MAPS_SERVER_API_KEY`.
-   Do not commit the downloaded file or create a `.env.local` override. Each teammate must use the shared project configuration or obtain a replacement Google key with `localhost` and `127.0.0.1` referrer access enabled in Google Cloud Console. `GOOGLE_MAPS_SERVER_API_KEY` is a separate server-only key restricted to the Geocoding API; never expose it through a `VITE_*` variable.
-3. Start the React frontend and Express backend:
-   ```bash
-   npm run dev
-   ```
+## Architecture
+
+CRMP has three main parts:
+
+- **Interactive map:** The React frontend uses MapLibre to display electoral districts, demographic information, and proposed boundary changes. Public users can select an area, submit feedback, or draw a counter-proposal directly on the map.
+- **Application server:** The Express backend handles sign-in, submissions, commissioner tools, exports, archived maps, and map data. It also sends live workspace updates through WebSockets.
+- **Database and authentication:** Supabase provides user authentication and a PostgreSQL database for profiles, submissions, review activity, and archived versions.
+
+In production, Docker builds the frontend and runs it together with the server on port `3000`. More technical details are available in the [Data Architecture](docs/After-Course/data-architecture.md) and [Map Architecture](docs/Demo-3/map-architecture.md) documents.
+
+## Technology stack
+
+| Area | Technologies |
+| --- | --- |
+| Frontend | React 19, Vite 8, React Router, Tailwind CSS, Radix UI, Recharts |
+| Mapping | MapLibre GL JS, PMTiles, Google Places and Map Tiles APIs |
+| Backend | Node.js, Express, `ws` WebSockets |
+| Data and auth | Supabase, PostgreSQL, Supabase Auth |
+| Geometry | JSTS, GeoJSON, versioned local indexes |
+| Testing and delivery | Jest, Docker, GitHub Actions, GitHub Container Registry |
+
+## Getting started
+
+### Prerequisites
+
+- Node.js 22 is recommended; Node.js 18 or newer is required.
+- npm, included with Node.js.
+- A Supabase project configured with the migrations in `supabase/migrations`.
+- Browser-restricted Google Maps credentials for Places API (New) and Map Tiles API.
+- A separate server-restricted Google Maps key for the Geocoding API.
+
+### 1. Install dependencies
+
+```bash
+npm ci
+```
+
+### 2. Configure the environment
+
+Copy the example file `.env.example` to `.env` in your local repo and replace its placeholders:
+
+
+| Variable | Purpose |
+| --- | --- |
+| `SUPABASE_URL` | Supabase project URL used by the server |
+| `SUPABASE_PUBLISHABLE_KEY` | Publishable Supabase key used by the server |
+| `SUPABASE_SERVICE_ROLE_KEY` | Privileged server-only key for trusted operations |
+| `VITE_SUPABASE_URL` | Supabase project URL compiled into the browser bundle |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Publishable Supabase key compiled into the browser bundle |
+| `VITE_GOOGLE_MAPS_API_KEY` | Browser key for Google Places and Map Tiles |
+| `GOOGLE_MAPS_SERVER_API_KEY` | Server-only key for postal-code geocoding |
+| `CLIENT_ORIGIN` | Allowed browser origin; defaults to `http://localhost:5173` |
+
+
+
+### 3. Prepare the database
+
+Apply the SQL migrations in `supabase/migrations` to the Supabase project used by your `.env`. With the Supabase CLI linked to the intended project, this can be done with:
+
+```bash
+npx supabase db push
+```
+
+Review the target project before pushing migrations. The repository contains the application schema but does not include production credentials or seeded user accounts.
+
+### 4. Run the application
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:5173](http://localhost:5173). Vite serves the frontend and proxies `/api` and WebSocket traffic to Express at [http://localhost:3000](http://localhost:3000). Check server health at [http://localhost:3000/api/health](http://localhost:3000/api/health).
+
+To run each process separately:
+
+```bash
+npm run dev:server
+npm run dev:client
+```
 
 ## Docker
 
-The production container builds the Vite client and serves it together with the
-Express API on port `3000`. It also includes the checked-in local map assets
-used by the map API.
+Docker Compose builds the frontend and runs the compiled SPA, Express API, WebSocket gateway, and checked-in map assets from one container:
 
-1. Download the current project `.env` from the shared Google Drive folder and
-   place it in the repository root. Do not commit it. The file must include the
-   Supabase and Google Maps variables described in `.env.example`.
-2. Build and start the service:
-   ```bash
-   docker compose up --build
-   ```
-3. Open `http://localhost:3000`. Health can be checked at
-   `http://localhost:3000/api/health`.
+```bash
+docker compose up --build
+```
 
-For a deployed origin, set `DOCKER_CLIENT_ORIGIN` and the three
-`DOCKER_*_REDIRECT_URL` values before starting Compose. Public `VITE_*` values
-are compiled into the browser bundle, so rebuild the image whenever any of
-those values change. Server-only values such as `SUPABASE_SERVICE_ROLE_KEY`
-remain runtime environment variables and must never be embedded in a client
-build or committed to Git. Compose automatically allows non-Secure cookies for
-its HTTP `localhost` origin; for a deployed HTTPS origin, explicitly set
-`DOCKER_COOKIE_SECURE=true`.
+Open [http://localhost:3000](http://localhost:3000), or check [http://localhost:3000/api/health](http://localhost:3000/api/health).
 
-## Map Data Notes
+For an HTTPS deployment, set the `DOCKER_*` origin and redirect variables documented in `.env.example`, including `DOCKER_COOKIE_SECURE=true`. Because `VITE_*` values are embedded at build time, rebuild the image whenever they change.
 
-- Canonical DA metadata shards live in `src/data/map/metadata/`.
-- Frontend render artifacts live in `src/data/map/render/`.
-- FED reference assets live in `src/data/map/reference/`.
-- Runtime lookup files live in `src/data/map/manifests/` and `src/data/map/indexes/`.
-- Raw external StatCan CSV inputs stay outside the committed map bundle under `data/external/statcan/`.
-- The current map architecture is documented in [docs/Demo-3/map-architecture.md](docs/Demo-3/map-architecture.md).
+See the [Docker Access Guide](docs/Docker-Instructions.md) for complete setup, GHCR, health-check, deployment, and troubleshooting instructions.
 
-## Team information
-**Team Name:** Five Guys
-| Team member | Student # | Email |
-| :--- | :--- | :--- |
-| Eric Liu | 1011195939 | ericb.liu@mail.utoronto.ca |
-| Erfang Yuan | 1011400360 | erfang.yuan@mail.utoronto.ca |
-| Alex Xu | 1010244264 | alexxx.xu@mail.utoronto.ca |
-| Muhammad Hamza | 1011333709 | maza.hamza@mail.utoronto.ca |
-| Arvindh Sengu | 1010396947 | arvindh.sengu@mail.utoronto.ca |
+## Verification
+
+```bash
+npm test
+npm run check:server
+npm run build
+```
+
+- `npm test` runs the Jest API, data-contract, UI-contract, geometry, archive, and realtime test suites.
+- `npm run check:server` syntax-checks the server entry points and core modules.
+- `npm run build` creates the production frontend bundle in `dist`.
+- `npm run test:coverage` runs the Jest suite with coverage reporting.
+
+The CI workflow runs tests, server checks, and a production build on every push and pull request. Main-branch and version-tag builds can also publish container images through the repository's package workflow.
+
+## Repository layout
+
+```text
+.
+├── src/                    React application, map UI, workers, and map assets
+│   └── data/map/           Metadata, PMTiles, manifests, indexes, and releases
+├── server/                 Express API, WebSocket runtime, and domain services
+├── supabase/migrations/    PostgreSQL schema and policy migrations
+├── scripts/reusable/       Repeatable geographic data and release builders
+├── scripts/one-time/       Dry-run-first migration and cutover utilities
+├── tests/                  Jest integration and contract tests
+├── docs/                   Architecture, workflow, and project documentation
+├── Dockerfile              Production multi-stage container build
+└── docker-compose.yml      Local production-style runtime
+```
+
+## Map data pipeline
+
+The reusable data tooling converts source geography into two related outputs:
+
+1. browser-oriented PMTiles and labels for fast overview rendering; and
+2. immutable exact-geometry releases with DGUID, scope, adjacency, topology, and display indexes for validation and editing.
+
+See [Reusable Scripts](scripts/reusable/README.md) for the build order and [Map Data](src/data/map/README.md) for the runtime directory contract. Raw external Statistics Canada inputs are intentionally excluded from Git; generated runtime assets required by the application are checked in.
+
+## Additional documentation
+
+- [Post-Course Data Architecture](docs/After-Course/data-architecture.md)
+- [Map Architecture](docs/Demo-3/map-architecture.md)
+- [Workspace Frontend](docs/Demo-3/workspace.md)
+- [Workspace Backend](docs/Demo-3/workspace-backend.md)
+- [Authentication Workflow](docs/Demo-1/Auth_Workflow.md)
+- [Future Counter-Proposal Scaling Plan](docs/After-Course/future-update-plan.md)
