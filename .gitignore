@@ -12,7 +12,8 @@ src/data/map/render/da_boundaries_available.geojson
 dist/
 coverage/
 .env
-.env.local
+.env.*
+!.env.example
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
